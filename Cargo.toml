@@ -1,0 +1,9 @@
+[package]
+name = "flexi_logger"
+version = "0.1.1"
+authors = ["emabee <meinolf.block@sap.com>"]
+
+[dependencies]
+log = "*"
+regex = "*"
+time = "*"
