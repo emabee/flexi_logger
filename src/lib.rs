@@ -202,11 +202,11 @@ struct LogDirective {
 /// This should be called early in the execution of a Rust program. Note that the
 /// global logger may only be initialized once, subsequent initialization attempts
 /// will return an error.
-pub fn init(config: LogConfig, loglevelspec: Option<& str>) -> Result<(),FlexiLoggerError> {
+pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiLoggerError> {
     log::set_logger( |max_level| {
         let (mut directives, filter) =
             match loglevelspec {
-                Some(spec) => parse_logging_spec(&spec),
+                Some(ref llspec) => {let spec: &str = llspec; parse_logging_spec(&spec)},
                 None => {
                     match env::var("RUST_LOG") {
                         Ok(spec) => parse_logging_spec(&spec),
