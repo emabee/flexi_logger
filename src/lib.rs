@@ -21,12 +21,14 @@
 //! ```
 //! use flexi_logger::{detailed_format, LogConfig};
 //!
-//!     flexi_logger::init( LogConfig::new() )
+//!     flexi_logger::init( LogConfig::new(), None )
 //!             .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
 //! ```
 //!
 //!
-//! Here we configure flexi_logger to write log entries with fine-grained time and location info into a trace file.
+//! Here we configure flexi_logger to write log entries with fine-grained
+//! time and location info into a trace file, and we provide the loglevel-specification
+//! programmatically as a ```Some<String>```, which fits well to what docopt provides.
 //!
 //! ```
 //! use flexi_logger::{detailed_format, LogConfig};
@@ -35,12 +37,13 @@
 //!                             log_to_file: true,
 //!                             format: flexi_logger::detailed_format,
 //!                             .. LogConfig::new()  // use defaults for all other options
-//!                         }
+//!                         },
+//!                         args.flag_loglevelspec
 //!     ).unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
 //! ```
 //!
-//! Flexi logger comes with two predefined format variants, ```default_format()``` and ```detailed_format()```,
-//! but you can easily create and use your own one, with the signature ```fn(&LogRecord) -> String```.
+//! Flexi_logger comes with two predefined format variants, ```default_format()``` and ```detailed_format()```,
+//! but you can easily create and use your own format function with the signature ```fn(&LogRecord) -> String```.
 //!
 
 
