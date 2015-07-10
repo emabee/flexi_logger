@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["emabee <meinolf.block@sap.com>"]
 description = "A flexible logger that can write to stderr or to log files"
 keywords = ["file", "logger"]
