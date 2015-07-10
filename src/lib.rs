@@ -14,9 +14,19 @@
 //!  Only the initialization is a bit more chatty due to the configurability.
 //!
 //!
-//! ## Example: initialization
+//! ## Example: Initialization
 //!
-//! Here we use the flexi logger to write log entries with rich annotations into a trace file.
+//! If you initialize flexi_logger with default settings, then it behaves like the well-known env_logger:
+//!
+//! ```
+//! use flexi_logger::{detailed_format, LogConfig};
+//!
+//!     flexi_logger::init( LogConfig::new() )
+//!             .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
+//! ```
+//!
+//!
+//! Here we configure flexi_logger to write log entries with fine-grained time and location info into a trace file.
 //!
 //! ```
 //! use flexi_logger::{detailed_format, LogConfig};
@@ -29,6 +39,10 @@
 //!     ).unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
 //! ```
 //!
+//! Flexi logger comes with two predefined format variants, ```default_format()``` and ```detailed_format()```,
+//! but you can easily create and use your own one, with the signature ```fn(&LogRecord) -> String```.
+//!
+
 
 extern crate log;
 extern crate regex;
