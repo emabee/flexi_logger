@@ -28,7 +28,8 @@
 //!
 //! Here we configure flexi_logger to write log entries with fine-grained
 //! time and location info into a trace file, and we provide the loglevel-specification
-//! programmatically as a ```Some<String>```, which fits well to what docopt provides.
+//! programmatically as a ```Some<String>```, which fits well to what docopt provides,
+//! if you have e.g. a command-line option ```--loglevelspec```:
 //!
 //! ```
 //! use flexi_logger::{detailed_format, LogConfig};
