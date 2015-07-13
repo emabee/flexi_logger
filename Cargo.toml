@@ -6,7 +6,6 @@ description = "A flexible logger that can write to stderr or to log files"
 keywords = ["file", "logger"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/emabee/flexi_logger"
-documentation = "https://raw.githubusercontent.com/emabee/flexi_logger/master/src/reldoc/flexi_logger/index.html"
 
 [dependencies]
 log = "0.3"
