@@ -1,52 +1,42 @@
-//! An extended version of the [env_logger](http://rust-lang.github.io/log/env_logger/), which
+#![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+       html_favicon_url = "http://www.rust-lang.org/favicon.ico",
+       html_root_url = "http://doc.rust-lang.org/")]
+
+//! An extended copy of [env_logger](http://rust-lang.github.io/log/env_logger/), which
 //! can write the log to standard error <i>or to a fresh file</i>
 //! and allows custom logline formats.
 //!
-//! It plugs into the logging facade given by the [log crate](http://rust-lang.github.io/log/log/).
-//! See there to learn how to write traces from your code using simple macros.
+//! # Usage
 //!
-//! Specifying the log levels that you really want to see in a specific program run
-//! happens in the same great way as with the
-//! [env_logger](http://rust-lang.github.io/log/env_logger/)
-//! (from where this functionality was ruthlessly copied),
-//! i.e., using the environment variable RUST_LOG.
+//! This crate is on [crates.io](https://crates.io/crates/flexi_logger) and
+//! can be used by adding `flexi_logger` to the dependencies in your
+//! project's `Cargo.toml`.
 //!
-//!  Only the initialization is a bit more chatty due to the configurability.
-//!
-//!
-//! ## Example: Initialization
-//!
-//! If you initialize flexi_logger with default settings, then it behaves like the well-known env_logger:
-//!
-//! ```
-//! use flexi_logger::{detailed_format, LogConfig};
-//!
-//!     flexi_logger::init( LogConfig::new(), None )
-//!             .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
+//! ```toml
+//! [dependencies]
+//! flexi_logger = "0.3"
 //! ```
 //!
+//! and this to your crate root:
 //!
-//! Here we configure flexi_logger to write log entries with fine-grained
-//! time and location info into a trace file, and we provide the loglevel-specification
-//! programmatically as a ```Some<String>```, which fits well to what docopt provides,
-//! if you have e.g. a command-line option ```--loglevelspec```:
-//!
-//! ```
-//! use flexi_logger::{detailed_format, LogConfig};
-//!
-//!     flexi_logger::init( LogConfig {
-//!                             log_to_file: true,
-//!                             format: flexi_logger::detailed_format,
-//!                             .. LogConfig::new()  // use defaults for all other options
-//!                         },
-//!                         args.flag_loglevelspec
-//!     ).unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
+//! ```rust
+//! extern crate flexi_logger;
 //! ```
 //!
-//! Flexi_logger comes with two predefined format variants, ```default_format()``` and ```detailed_format()```,
-//! but you can easily create and use your own format function with the signature ```fn(&LogRecord) -> String```.
+//! flexi_logger plugs into the logging facade given by the
+//! [log crate](http://rust-lang.github.io/log/log/).
+//! i.e., you use the ```log``` macros to write log lines from your code.
 //!
-
+//! In its initialization (see function [init](fn.init.html)), you can
+//!
+//! *  decide whether you want to write your logs to stderr (like with env_logger), or to a file,
+//! *  programmatically provide the log-level-specification, i.e., the decision which log
+//!    lines really should be written out, if you don't want to use the environment variable RUST_LOG
+//! *  specify the line format for the log lines <br>
+//!    (flexi_logger comes with two predefined variants for the log line format,
+//!    ```default_format()``` and ```detailed_format()```,
+//!    but you can easily create and use your own format function with the
+//!    signature ```fn(&LogRecord) -> String```)
 
 extern crate log;
 extern crate regex;
@@ -141,20 +131,28 @@ impl fmt::Display for  FlexiLoggerError {
     }
 }
 
-/// Allows influencing the behavior of the FlexiLogger.
+/// Allows influencing the behavior of flexi_logger.
 pub struct LogConfig {
     /// If `true`, the log is written to a file. Default is `false`, the log is then
     /// written to stderr.
     /// If `true`, a new file in the current directory is created and written to.
-    /// The name of the file is chosen as '\<program_name\>\_\<date\>\_\<time\>.trc', e.g. `myprog_2015-07-08_10-44-11.trc`
+    /// The name of the file is chosen as '\<program_name\>\_\<date\>\_\<time\>.trc',
+    ///  e.g. `myprog_2015-07-08_10-44-11.trc`
     pub log_to_file: bool,
-    /// If `true` (which is default), and if `log_to_file` is `true`, the name of the tracefile is documented in a message to stdout.
+
+    /// If `true` (which is default), and if `log_to_file` is `true`,
+    /// the name of the logfile is documented in a message to stdout.
     pub print_message: bool,
-    /// If `true` (which is default), and if `log_to_file` is `true`, all error messages are written also to stdout.
+
+    /// If `true` (which is default), and if `log_to_file` is `true`,
+    /// all logged error messages are duplicated to stdout.
     pub duplicate_error: bool,
-    /// If `true` (which is default), and if `log_to_file` is `true`, also info messages are written also to stdout.
+
+    /// If `true` (which is default), and if `log_to_file` is `true`,
+    /// all logged warning and info messages are also duplicated to stdout.
     pub duplicate_info: bool,
-    /// Allows providing a custom logline format; default is flexi_logger::default_format.
+
+    /// Allows providing a custom logline format; default is ```flexi_logger::default_format```.
     pub format: fn(&LogRecord) -> String,
 }
 impl LogConfig {
@@ -201,11 +199,64 @@ struct LogDirective {
     level: LogLevelFilter,
 }
 
-/// Initializes the global logger with a flexi logger.
+/// Initializes the flexi_logger to your needs, and the global logger with flexi_logger.
 ///
-/// This should be called early in the execution of a Rust program. Note that the
+/// Note: this should be called early in the execution of a Rust program. The
 /// global logger may only be initialized once, subsequent initialization attempts
 /// will return an error.
+///
+/// ## Configuration
+///
+/// See [LogConfig](struct.LogConfig.html) for most of the initialization options.
+///
+/// ## Log Level Specification
+///
+/// Specifying the log levels that you really want to see in a specific program run
+/// can be done in the syntax defined by
+/// [env_logger -> enabling logging](http://rust-lang.github.io/log/env_logger/#enabling-logging)
+/// (from where this functionality was ruthlessly copied).
+/// You can hand over the desired log-level-specification as an
+/// initialization parameter to flexi_logger, or, if you don't do so,
+/// with the environment variable RUST_LOG (as with env_logger).
+/// Since using environment variables is on Windows not as comfortable as on linux,
+/// you might consider using e.g. a docopt option for specifying the
+/// log-Level-specification on the command line of your program.
+///
+///
+/// ## Examples
+///
+/// ### Use defaults only
+///
+/// If you initialize flexi_logger with default settings, then it behaves like env_logger:
+///
+/// ```
+/// use flexi_logger::{init,LogConfig};
+///
+/// init(LogConfig::new(), None).unwrap();
+/// ```
+///
+/// ### Write to files, use a detailed log-line format
+///
+/// Here we configure flexi_logger to write log entries with fine-grained
+/// time and location info into a log file, and we provide the loglevel-specification
+/// programmatically as a ```Some<String>```, which fits well to what docopt provides,
+/// if you have e.g. a command-line option ```--loglevelspec```:
+///
+/// ```
+/// use flexi_logger::{detailed_format,init,LogConfig};
+///
+/// init( LogConfig { log_to_file: true,
+///                   format: detailed_format,
+///                    .. LogConfig::new() },
+///       args.flag_loglevelspec )
+/// .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
+/// ```
+///
+/// # Failures
+///
+/// Init returns a FlexiLoggerError, if it is supposed to write to an output file
+/// but the file cannot be opened, e.g. because of operating system issues.
+///
 pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiLoggerError> {
     log::set_logger( |max_level| {
         let (mut directives, filter) =
@@ -237,7 +288,7 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiL
         let s_timestamp = time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap();
         let s_path = String::with_capacity(50).add(&filename).add(&s_timestamp).add(".trc");
         if config.print_message {
-            println!("Trace is written to {}", &s_path);
+            println!("Log is written to {}", &s_path);
         }
         Box::new(FlexiLogger::new(directives,filter,&s_path,config))
     }).map_err(|_|{FlexiLoggerError::new("Logger initialization failed")})
