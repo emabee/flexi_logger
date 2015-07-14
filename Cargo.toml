@@ -1,11 +1,12 @@
 [package]
 name = "flexi_logger"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["emabee <meinolf.block@sap.com>"]
 description = "A flexible logger that can write to stderr or to log files"
 keywords = ["file", "logger"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/emabee/flexi_logger"
+documentation = "http://emabee.atwebpages.com/rust/flexi_logger/index.html"
 
 [dependencies]
 log = "0.3"
