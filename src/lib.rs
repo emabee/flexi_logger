@@ -14,7 +14,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "0.3"
+//! flexi_logger = "0.1"
 //! ```
 //!
 //! and this to your crate root:
