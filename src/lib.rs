@@ -3,7 +3,7 @@
        html_root_url = "http://doc.rust-lang.org/")]
 
 //! An extended copy of [env_logger](http://rust-lang.github.io/log/env_logger/), which
-//! can write the log to standard error <i>or to a fresh file</i>
+//! can write the log to standard error or to a fresh file in a configurable folder
 //! and allows custom logline formats.
 //!
 //! # Usage
@@ -14,7 +14,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "0.1"
+//! flexi_logger = "0.2"
 //! ```
 //!
 //! and this to your crate root:
@@ -29,9 +29,12 @@
 //!
 //! In its initialization (see function [init](fn.init.html)), you can
 //!
-//! *  decide whether you want to write your logs to stderr (like with env_logger), or to a file,
-//! *  programmatically provide the log-level-specification, i.e., the decision which log
-//!    lines really should be written out, if you don't want to use the environment variable RUST_LOG
+//! *  decide whether you want to write your logs to stderr (like with env_logger),
+//!    or to a file,
+//! *  configure the folder in which the log files are created,
+//! *  provide the log-level-specification, i.e., the decision which log
+//!    lines really should be written out, programmatically (if you don't want to
+//!    use the environment variable RUST_LOG)
 //! *  specify the line format for the log lines <br>
 //!    (flexi_logger comes with two predefined variants for the log line format,
 //!    ```default_format()``` and ```detailed_format()```,
@@ -49,27 +52,45 @@ use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io;
-use std::io::{LineWriter, Write};
-use std::ops::Add;
+use std::io::{stderr, LineWriter, Write};
+use std::ops::{Add,DerefMut};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
+macro_rules! print_err {
+    ($($arg:tt)*) => (
+        {
+            use std::io::prelude::*;
+            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
+                panic!("Failed to write to stderr.\
+                    \nOriginal error output: {}\
+                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
+            }
+        }
+    )
+}
 
 
 struct FlexiLogger{
     directives: Vec<LogDirective>,
     filter: Option<Regex>,
-    line_writer: Arc<Mutex<LineWriter<File>>>,
+    line_writer: Arc<Mutex<Option<LineWriter<File>>>>,
     config: LogConfig
 }
 impl FlexiLogger {
-    fn new( directives: Vec<LogDirective>, filter: Option<Regex>,
-            logfile_path:&str, config: LogConfig) -> FlexiLogger  {
-        // we die hard if the log file cannot be opened
-        let line_writer = Arc::new(Mutex::new( LineWriter::new(File::create(logfile_path.clone()).unwrap()) ));
-        FlexiLogger {directives: directives,filter: filter, line_writer: line_writer, config: config }
+    fn new( directives: Vec<LogDirective>,
+            filter: Option<Regex>,
+            config: LogConfig) -> FlexiLogger  {
+
+        let o_lw = get_line_writer_if_needed(&config);
+        FlexiLogger {
+                directives: directives,
+                filter: filter,
+                line_writer: Arc::new(Mutex::new(o_lw)),
+                config: config }
     }
 
-    fn ml_enabled(&self, level: LogLevel, target: &str) -> bool {
+    fn fl_enabled(&self, level: LogLevel, target: &str) -> bool {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for directive in self.directives.iter().rev() {
             match directive.name {
@@ -82,9 +103,10 @@ impl FlexiLogger {
         false
     }
 }
+
 impl Log for FlexiLogger {
     fn enabled(&self, metadata: &LogMetadata) -> bool {
-        self.ml_enabled(metadata.level(), metadata.target())
+        self.fl_enabled(metadata.level(), metadata.target())
     }
 
     fn log(&self, record: &LogRecord) {
@@ -106,16 +128,76 @@ impl Log for FlexiLogger {
                 println!("{}",&record.args());
             }
             let msgb = msg.as_bytes();
-            let lw = self.line_writer.clone();
-            let mut lw1 = lw.lock().unwrap(); // FIXME correct error handling
-            lw1.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e)} );
+            let a_m_o_lw = self.line_writer.clone();    // Arc<Mutex<Option<LineWriter<File>>>>
+            let mut mg_o_lw = a_m_o_lw.lock().unwrap(); // MutexGuard<Option<LineWriter<File>>>
+            let mut o_lw = mg_o_lw.deref_mut();         // &mut Option<LineWriter<File>>
+            match *o_lw {
+                Some(ref mut lw) => {
+                    &lw.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e);} );
+                },
+                None => {}
+            };
         } else {
             let _ = writeln!(&mut io::stderr(), "{}", msg );
         }
     }
 }
 
-/// Describes all kinds of errors in the initialization of FlexiLogger.
+fn get_line_writer_if_needed(config: &LogConfig) -> Option<LineWriter<File>> {
+    if !config.log_to_file {
+        return None;
+    }
+    // make sure the folder exists
+    let s_directory: String = match config.directory {
+        Some(ref dir) => dir.clone(),
+        None => ".".to_string()
+    };
+    let directory = Path::new(&s_directory);
+    let active = if directory.is_absolute() {
+        match std::fs::metadata(&directory) {
+            Err(_) => {
+                    print_err!("Trace cannot be written: output directory \"{}\" (absolute path) does not exist", &directory.display());
+                    false
+            },
+            Ok(_) => true
+        }
+    } else {
+        match std::fs::metadata(&directory) {
+            Err(_) => {
+                match std::fs::create_dir_all(&directory) {
+                    Ok(_) => true,
+                    Err(_) => {
+                        print_err!("Trace cannot be written: could not create output directory \"{}\" (relative path)", &directory.display());
+                        false
+                    }
+                }
+            },
+            Ok(_) => true
+        }
+    };
+    if !active {
+        return None;
+    }
+
+    // create the log file
+    let arg0 = env::args().next().unwrap();
+    let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
+    let s_timestamp = time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap();
+    let mut filename = String::with_capacity(80).add(&progname).add(&s_timestamp);
+    match config.suffix {
+        Some(ref suffix) => filename = filename.add(".").add(suffix),
+        None => {}
+    };
+    let path = directory.join(filename);
+    if config.print_message {
+        println!("Log is written to {}", path.display());
+    }
+
+    Some(LineWriter::new(File::create(path.clone()).unwrap()))
+}
+
+
+/// Describes all kinds of errors in the initialization of flexi_logger.
 #[derive(Debug)]
 pub struct FlexiLoggerError {
     message: &'static str
@@ -136,8 +218,8 @@ pub struct LogConfig {
     /// If `true`, the log is written to a file. Default is `false`, the log is then
     /// written to stderr.
     /// If `true`, a new file in the current directory is created and written to.
-    /// The name of the file is chosen as '\<program_name\>\_\<date\>\_\<time\>.trc',
-    ///  e.g. `myprog_2015-07-08_10-44-11.trc`
+    /// The name of the file is chosen as '\<program_name\>\_\<date\>\_\<time\>.<suffix>',
+    ///  e.g. `myprog_2015-07-08_10-44-11.log`
     pub log_to_file: bool,
 
     /// If `true` (which is default), and if `log_to_file` is `true`,
@@ -154,8 +236,24 @@ pub struct LogConfig {
 
     /// Allows providing a custom logline format; default is ```flexi_logger::default_format```.
     pub format: fn(&LogRecord) -> String,
+
+    /// Allows specifying a directory in which the log files are created
+    pub directory: Option<String>,
+
+    /// Allows specifying the filesystem suffix of the log files
+    pub suffix: Option<String>,
 }
 impl LogConfig {
+    /// initializes with
+    ///
+    /// *  log_to_file = false,
+    /// *  print_message = true,
+    /// *  duplicate_error = true,
+    /// *  duplicate_info = false,
+    /// *  format = flexi_logger::default_format,
+    /// *  no directory (log files are created where the program was started),
+    /// *  suffix =  "log".
+
     pub fn new() -> LogConfig {
         LogConfig {
             log_to_file: false,
@@ -163,6 +261,8 @@ impl LogConfig {
             duplicate_error: true,
             duplicate_info: false,
             format: default_format,
+            directory: None,
+            suffix: Some("log".to_string()),
         }
     }
 }
@@ -238,14 +338,16 @@ struct LogDirective {
 /// ### Write to files, use a detailed log-line format
 ///
 /// Here we configure flexi_logger to write log entries with fine-grained
-/// time and location info into a log file, and we provide the loglevel-specification
-/// programmatically as a ```Some<String>```, which fits well to what docopt provides,
-/// if you have e.g. a command-line option ```--loglevelspec```:
+/// time and location info into a log file in folder "log_files",
+/// and we provide the loglevel-specification programmatically
+/// as a ```Some<String>```, which might come in this form from what docopt provides,
+/// if you have a command-line option ```--loglevelspec```:
 ///
 /// ```
 /// use flexi_logger::{detailed_format,init,LogConfig};
 ///
 /// init( LogConfig { log_to_file: true,
+///                   directory: "log_files",
 ///                   format: detailed_format,
 ///                    .. LogConfig::new() },
 ///       args.flag_loglevelspec )
@@ -283,14 +385,7 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiL
             max.unwrap_or(LogLevelFilter::Off)
         };
         max_level.set(level);
-        let arg0 = env::args().next().unwrap();
-        let filename = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
-        let s_timestamp = time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap();
-        let s_path = String::with_capacity(50).add(&filename).add(&s_timestamp).add(".trc");
-        if config.print_message {
-            println!("Log is written to {}", &s_path);
-        }
-        Box::new(FlexiLogger::new(directives,filter,&s_path,config))
+        Box::new(FlexiLogger::new(directives,filter,config))
     }).map_err(|_|{FlexiLoggerError::new("Logger initialization failed")})
 }
 
@@ -303,8 +398,7 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
     let mods = parts.next();
     let filter = parts.next();
     if parts.next().is_some() {
-        println!("warning: invalid logging spec '{}', \
-                 ignoring it (too many '/'s)", spec);
+        print_err!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
         return (dirs, None);
     }
     mods.map(|m| { for s in m.split(',') {
@@ -323,15 +417,13 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
                 match part1.parse() {
                     Ok(num) => (num, Some(part0)),
                     _ => {
-                        println!("warning: invalid logging spec '{}', \
-                                 ignoring it", part1);
+                        print_err!("warning: invalid logging spec '{}', ignoring it", part1);
                         continue
                     }
                 }
             },
             _ => {
-                println!("warning: invalid logging spec '{}', \
-                         ignoring it", s);
+                print_err!("warning: invalid logging spec '{}', ignoring it", s);
                 continue
             }
         };
@@ -345,7 +437,7 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
         match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
-                println!("warning: invalid regex filter - {}", e);
+                print_err!("warning: invalid regex filter - {}", e);
                 None
             }
         }
