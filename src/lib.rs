@@ -41,16 +41,20 @@
 //!    but you can easily create and use your own format function with the
 //!    signature ```fn(&LogRecord) -> String```)
 
+extern crate glob;
 extern crate log;
 extern crate regex;
 extern crate time;
 
+use glob::glob;
 use log::{Log, LogLevel, LogLevelFilter, LogMetadata};
 pub use log::LogRecord;
 use regex::Regex;
+use std::cell::RefCell;
+use std::cmp::max;
 use std::env;
 use std::fmt;
-use std::fs::File;
+use std::fs::{create_dir_all,File};
 use std::io;
 use std::io::{stderr, LineWriter, Write};
 use std::ops::{Add,DerefMut};
@@ -70,23 +74,166 @@ macro_rules! print_err {
     )
 }
 
+// Encapsulation for LineWriter-related stuff
+struct OptLineWriter {
+    olw: Option<LineWriter<File>>,
+    o_filename_base: Option<String>,
+    use_rolling: bool,
+    written_bytes: usize,
+    roll_idx: usize,
+}
+impl OptLineWriter {
+    fn new (config: &LogConfig) -> OptLineWriter {
+        if !config.log_to_file {
+            // we don't need a line-writer, so we return a meaningless "empty" instance
+            return OptLineWriter{olw: None, o_filename_base: None, use_rolling: false, written_bytes: 0, roll_idx: 0};
+        }
+
+        // make sure the folder exists or can be created
+        let s_directory: String = match config.directory {
+            Some(ref dir) => dir.clone(),
+            None => ".".to_string()
+        };
+        let directory = Path::new(&s_directory);
+
+        create_dir_all(&directory).unwrap_or(
+            print_err!("Log cannot be written: output directory \"{}\" does not exist and could not be created",
+                       &directory.display()));
+
+        let o_filename_base = match std::fs::metadata(&directory) {
+            Ok(metadata) => {
+                if metadata.is_dir() {
+                    Some(get_filename_base(&s_directory.clone(), & config.o_discriminant))
+                } else {
+                    None
+                }
+            },
+            Err(_) => None
+        };
+
+        let (use_rolling, roll_idx) = match o_filename_base {
+            None => (false, 0),
+            Some(ref s_filename_base) => {
+                match config.rollover_size {
+                    None => (false, 0),
+                    Some(_) => (true, get_next_roll_idx(&s_filename_base, & config.suffix))
+                }
+            }
+        };
+
+        let mut olw = OptLineWriter{
+            olw: None,
+            o_filename_base: o_filename_base,
+            use_rolling: use_rolling,
+            written_bytes: 0,
+            roll_idx: roll_idx,
+        };
+        olw.mount_linewriter(&config.suffix, config.print_message);
+        olw
+    }
+
+    fn mount_linewriter(&mut self, suffix: &Option<String>, print_message: bool) {
+        match self.olw {
+            None => {
+                match self.o_filename_base {
+                    Some(ref s_filename_base) => {
+                        let filename = get_filename(s_filename_base, self.use_rolling, self.roll_idx, suffix);
+                        let path = Path::new(&filename);
+                        if print_message {
+                            println!("Log is written to {}", path.display());
+                        }
+                        self.olw = Some(LineWriter::new(File::create(path.clone()).unwrap()));
+                    },
+                    None => {/* Folder is broken, logging not possible */}
+                }
+            },
+            Some(_) => {/* we're all set to log */}
+        }
+    }
+}
+
+fn get_filename_base(s_directory: & String, o_discriminant: & Option<String>) -> String {
+    let arg0 = env::args().next().unwrap();
+    let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
+    let mut filename = String::with_capacity(180).add(&s_directory).add("/").add(&progname);
+    match * o_discriminant {
+        Some(ref s_d) => {
+            filename = filename.add(&format!("_{}", s_d));
+        },
+        None => {}
+    }
+    filename
+}
+
+fn get_filename(s_filename_base: &String,
+                do_rolling: bool,
+                roll_idx: usize,
+                o_suffix: &Option<String>) -> String {
+    let mut filename = String::with_capacity(180).add(&s_filename_base);
+    if do_rolling {
+        filename = filename.add(&format!("_{}", roll_idx));
+    } else {
+        filename = filename.add(&time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap());
+    }
+    match o_suffix {
+        & Some(ref suffix) => filename = filename.add(".").add(suffix),
+        & None => {}
+    }
+    filename
+}
+
+fn get_filename_pattern(s_filename_base: & String, o_suffix: & Option<String>) -> String {
+    let mut filename = String::with_capacity(180).add(&s_filename_base);
+    filename = filename.add("_*");
+    match o_suffix {
+        & Some(ref suffix) => filename = filename.add(".").add(suffix),
+        & None => {}
+    }
+    filename
+}
+
+fn get_next_roll_idx(s_filename_base: & String, o_suffix: & Option<String>) -> usize {
+    let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
+    let paths = glob(&fn_pattern);
+    let mut roll_idx = 0;
+    match paths {
+        Err(e) => {
+            panic!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
+        },
+        Ok(it) => {
+            for globresult in it {
+                match globresult {
+                    Err(e) => println!("Ups - error occured: {}", e),
+                    Ok(pathbuf) => {
+                        println!("Found: {}", pathbuf.clone().into_os_string().to_string_lossy()); // FIXME delete this line
+                        let filename = pathbuf.file_stem().unwrap().to_string_lossy();
+                        let mut it = filename.rsplit("_r");
+                        let idx: usize = it.next().unwrap().parse().unwrap_or(0);
+                        println!("idx = {}", idx); // FIXME delete this line
+                        roll_idx = max(roll_idx, idx);
+                    }
+                }
+            }
+        }
+    }
+    roll_idx+1
+}
+
 
 struct FlexiLogger{
     directives: Vec<LogDirective>,
-    filter: Option<Regex>,
-    line_writer: Arc<Mutex<Option<LineWriter<File>>>>,
+    o_filter: Option<Regex>,
+    amo_line_writer: Arc<Mutex<RefCell<OptLineWriter>>>,
     config: LogConfig
 }
 impl FlexiLogger {
     fn new( directives: Vec<LogDirective>,
             filter: Option<Regex>,
             config: LogConfig) -> FlexiLogger  {
-
-        let o_lw = get_line_writer_if_needed(&config);
         FlexiLogger {
                 directives: directives,
-                filter: filter,
-                line_writer: Arc::new(Mutex::new(o_lw)),
+                o_filter: filter,
+                amo_line_writer: Arc::new(Mutex::new(RefCell::new(OptLineWriter::new(&config)))),
                 config: config }
     }
 
@@ -114,7 +261,7 @@ impl Log for FlexiLogger {
             return;
         }
 
-        if let Some(filter) = self.filter.as_ref() {
+        if let Some(filter) = self.o_filter.as_ref() {
             if filter.is_match(&*record.args().to_string()) {
                 return;
             }
@@ -128,14 +275,27 @@ impl Log for FlexiLogger {
                 println!("{}",&record.args());
             }
             let msgb = msg.as_bytes();
-            let a_m_o_lw = self.line_writer.clone();    // Arc<Mutex<Option<LineWriter<File>>>>
-            let mut mg_o_lw = a_m_o_lw.lock().unwrap(); // MutexGuard<Option<LineWriter<File>>>
-            let mut o_lw = mg_o_lw.deref_mut();         // &mut Option<LineWriter<File>>
-            match *o_lw {
+
+            let amo_lw = self.amo_line_writer.clone();  // Arc<Mutex<RefCell<OptLineWriter>>>
+            let mut mg_rc_olw = amo_lw.lock().unwrap(); // MutexGuard<RefCell<OptLineWriter>>
+            let rc_olw = mg_rc_olw.deref_mut();         // &mut RefCell<OptLineWriter>
+            let mut rm_olw = rc_olw.borrow_mut();       // RefMut<OptLineWriter>
+            let olw: &mut OptLineWriter = rm_olw.deref_mut();
+
+            if olw.use_rolling && (olw.written_bytes > self.config.rollover_size.unwrap()) {
+                olw.olw = None;  // Hope that closes the previous lw
+                olw.written_bytes = 0;
+                olw.roll_idx += 1;
+                olw.mount_linewriter(&self.config.suffix,  self.config.print_message);
+            }
+            match olw.olw {
                 Some(ref mut lw) => {
                     &lw.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e);} );
+                    if olw.use_rolling {
+                        olw.written_bytes += msgb.len();
+                    }
                 },
-                None => {}
+                None => {/* Folder is broken, logging not possible */}
             };
         } else {
             let _ = writeln!(&mut io::stderr(), "{}", msg );
@@ -143,61 +303,8 @@ impl Log for FlexiLogger {
     }
 }
 
-fn get_line_writer_if_needed(config: &LogConfig) -> Option<LineWriter<File>> {
-    if !config.log_to_file {
-        return None;
-    }
-    // make sure the folder exists
-    let s_directory: String = match config.directory {
-        Some(ref dir) => dir.clone(),
-        None => ".".to_string()
-    };
-    let directory = Path::new(&s_directory);
-    let active = if directory.is_absolute() {
-        match std::fs::metadata(&directory) {
-            Err(_) => {
-                    print_err!("Trace cannot be written: output directory \"{}\" (absolute path) does not exist", &directory.display());
-                    false
-            },
-            Ok(_) => true
-        }
-    } else {
-        match std::fs::metadata(&directory) {
-            Err(_) => {
-                match std::fs::create_dir_all(&directory) {
-                    Ok(_) => true,
-                    Err(_) => {
-                        print_err!("Trace cannot be written: could not create output directory \"{}\" (relative path)", &directory.display());
-                        false
-                    }
-                }
-            },
-            Ok(_) => true
-        }
-    };
-    if !active {
-        return None;
-    }
 
-    // create the log file
-    let arg0 = env::args().next().unwrap();
-    let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
-    let s_timestamp = time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap();
-    let mut filename = String::with_capacity(80).add(&progname).add(&s_timestamp);
-    match config.suffix {
-        Some(ref suffix) => filename = filename.add(".").add(suffix),
-        None => {}
-    };
-    let path = directory.join(filename);
-    if config.print_message {
-        println!("Log is written to {}", path.display());
-    }
-
-    Some(LineWriter::new(File::create(path.clone()).unwrap()))
-}
-
-
-/// Describes all kinds of errors in the initialization of flexi_logger.
+/// Describes errors in the initialization of flexi_logger.
 #[derive(Debug)]
 pub struct FlexiLoggerError {
     message: &'static str
@@ -242,6 +349,13 @@ pub struct LogConfig {
 
     /// Allows specifying the filesystem suffix of the log files
     pub suffix: Option<String>,
+
+    /// Allows specifying a rollover of log files if a certain size is exceeded; the rollover will happen when
+    /// the specified file size is reached or exceeded.
+    pub rollover_size: Option<usize>,
+
+    /// Allows specifying an optional part of the log file name that is inserted after the program name
+    pub o_discriminant: Option<String>,
 }
 impl LogConfig {
     /// initializes with
@@ -252,6 +366,8 @@ impl LogConfig {
     /// *  duplicate_info = false,
     /// *  format = flexi_logger::default_format,
     /// *  no directory (log files are created where the program was started),
+    /// *  no rollover: log file grows indefinitely
+    /// *  no discriminant: log file name consists only of progname, date or roll_idx,  and suffix.
     /// *  suffix =  "log".
 
     pub fn new() -> LogConfig {
@@ -262,6 +378,8 @@ impl LogConfig {
             duplicate_info: false,
             format: default_format,
             directory: None,
+            rollover_size: None,
+            o_discriminant: None,
             suffix: Some("log".to_string()),
         }
     }
