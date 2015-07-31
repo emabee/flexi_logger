@@ -61,32 +61,21 @@ use std::ops::{Add,DerefMut};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-macro_rules! print_err {
-    ($($arg:tt)*) => (
-        {
-            use std::io::prelude::*;
-            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
-                panic!("Failed to write to stderr.\
-                    \nOriginal error output: {}\
-                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
-            }
-        }
-    )
-}
-
-// Encapsulation for LineWriter-related stuff
-struct OptLineWriter {
+// Encapsulation for LineWriter
+struct LwHandle {
     olw: Option<LineWriter<File>>,
     o_filename_base: Option<String>,
     use_rolling: bool,
     written_bytes: usize,
     roll_idx: usize,
 }
-impl OptLineWriter {
-    fn new (config: &LogConfig) -> OptLineWriter {
+impl LwHandle {
+    fn new (config: &LogConfig) -> Result<LwHandle,FlexiLoggerError> {
         if !config.log_to_file {
-            // we don't need a line-writer, so we return a meaningless "empty" instance
-            return OptLineWriter{olw: None, o_filename_base: None, use_rolling: false, written_bytes: 0, roll_idx: 0};
+            // we don't need a line-writer, so we return an empty handle
+            return Ok(LwHandle{
+                olw: None, o_filename_base: None, use_rolling: false, written_bytes: 0, roll_idx: 0
+            });
         }
 
         // make sure the folder exists or can be created
@@ -96,19 +85,27 @@ impl OptLineWriter {
         };
         let directory = Path::new(&s_directory);
 
-        create_dir_all(&directory).unwrap_or(
-            print_err!("Log cannot be written: output directory \"{}\" does not exist and could not be created",
-                       &directory.display()));
+        if let Err(e) = create_dir_all(&directory) {
+            return Err(FlexiLoggerError::new(
+                format!("Log cannot be written: output directory \"{}\" does not \
+                exist and could not be created due to {}", &directory.display(),e)));
+        };
 
         let o_filename_base = match std::fs::metadata(&directory) {
             Ok(metadata) => {
                 if metadata.is_dir() {
                     Some(get_filename_base(&s_directory.clone(), & config.o_discriminant))
                 } else {
-                    None
+                    return Err(FlexiLoggerError::new(
+                        format!("Log cannot be written: output directory \"{}\" is not \
+                        a directory", &directory.display())));
                 }
             },
-            Err(_) => None
+            Err(e) => {
+                return Err(FlexiLoggerError::new(
+                    format!("Log cannot be written: error accessing output directory \"{}\": {}",
+                    &directory.display(), e)));
+            }
         };
 
         let (use_rolling, roll_idx) = match o_filename_base {
@@ -121,46 +118,37 @@ impl OptLineWriter {
             }
         };
 
-        let mut olw = OptLineWriter{
+        let mut lwh = LwHandle{
             olw: None,
             o_filename_base: o_filename_base,
             use_rolling: use_rolling,
             written_bytes: 0,
             roll_idx: roll_idx,
         };
-        olw.mount_linewriter(&config.suffix, config.print_message);
-        olw
+        lwh.mount_linewriter(&config.suffix, config.print_message);
+        Ok(lwh)
     }
 
     fn mount_linewriter(&mut self, suffix: &Option<String>, print_message: bool) {
-        match self.olw {
-            None => {
-                match self.o_filename_base {
-                    Some(ref s_filename_base) => {
-                        let filename = get_filename(s_filename_base, self.use_rolling, self.roll_idx, suffix);
-                        let path = Path::new(&filename);
-                        if print_message {
-                            println!("Log is written to {}", path.display());
-                        }
-                        self.olw = Some(LineWriter::new(File::create(path.clone()).unwrap()));
-                    },
-                    None => {/* Folder is broken, logging not possible */}
+        if let None = self.olw {
+            if let Some(ref s_filename_base) = self.o_filename_base {
+                let filename = get_filename(s_filename_base, self.use_rolling, self.roll_idx, suffix);
+                let path = Path::new(&filename);
+                if print_message {
+                    println!("Log is written to {}", path.display());
                 }
-            },
-            Some(_) => {/* we're all set to log */}
+                self.olw = Some(LineWriter::new(File::create(path.clone()).unwrap()));
+            }
         }
     }
 }
 
-fn get_filename_base(s_directory: & String, o_discriminant: & Option<String>) -> String {
+fn get_filename_base(s_directory: &String, o_discriminant: &Option<String>) -> String {
     let arg0 = env::args().next().unwrap();
     let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
     let mut filename = String::with_capacity(180).add(&s_directory).add("/").add(&progname);
-    match * o_discriminant {
-        Some(ref s_d) => {
-            filename = filename.add(&format!("_{}", s_d));
-        },
-        None => {}
+    if let Some(ref s_d) = *o_discriminant {
+        filename = filename.add(&format!("_{}", s_d));
     }
     filename
 }
@@ -175,19 +163,17 @@ fn get_filename(s_filename_base: &String,
     } else {
         filename = filename.add(&time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap());
     }
-    match o_suffix {
-        & Some(ref suffix) => filename = filename.add(".").add(suffix),
-        & None => {}
+    if let &Some(ref suffix) = o_suffix {
+        filename = filename.add(".").add(suffix);
     }
     filename
 }
 
-fn get_filename_pattern(s_filename_base: & String, o_suffix: & Option<String>) -> String {
+fn get_filename_pattern(s_filename_base: &String, o_suffix: &Option<String>) -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
     filename = filename.add("_*");
-    match o_suffix {
-        & Some(ref suffix) => filename = filename.add(".").add(suffix),
-        & None => {}
+    if let &Some(ref suffix) = o_suffix {
+        filename = filename.add(".").add(suffix);
     }
     filename
 }
@@ -198,18 +184,16 @@ fn get_next_roll_idx(s_filename_base: & String, o_suffix: & Option<String>) -> u
     let mut roll_idx = 0;
     match paths {
         Err(e) => {
-            panic!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
+            panic!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e); // FIXME
         },
         Ok(it) => {
             for globresult in it {
                 match globresult {
                     Err(e) => println!("Ups - error occured: {}", e),
                     Ok(pathbuf) => {
-                        println!("Found: {}", pathbuf.clone().into_os_string().to_string_lossy()); // FIXME delete this line
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
                         let idx: usize = it.next().unwrap().parse().unwrap_or(0);
-                        println!("idx = {}", idx); // FIXME delete this line
                         roll_idx = max(roll_idx, idx);
                     }
                 }
@@ -223,18 +207,40 @@ fn get_next_roll_idx(s_filename_base: & String, o_suffix: & Option<String>) -> u
 struct FlexiLogger{
     directives: Vec<LogDirective>,
     o_filter: Option<Regex>,
-    amo_line_writer: Arc<Mutex<RefCell<OptLineWriter>>>,
+    amo_line_writer: Arc<Mutex<RefCell<LwHandle>>>,
     config: LogConfig
 }
 impl FlexiLogger {
-    fn new( directives: Vec<LogDirective>,
-            filter: Option<Regex>,
-            config: LogConfig) -> FlexiLogger  {
-        FlexiLogger {
-                directives: directives,
-                o_filter: filter,
-                amo_line_writer: Arc::new(Mutex::new(RefCell::new(OptLineWriter::new(&config)))),
-                config: config }
+    fn new(loglevelspec: Option<String>, config: LogConfig)
+            -> Result<FlexiLogger, FlexiLoggerError>  {
+
+        let (mut directives, filter) = match loglevelspec {
+            Some(ref llspec) => {let spec: &str = llspec; parse_logging_spec(&spec)},
+            None => {
+                match env::var("RUST_LOG") {
+                    Ok(spec) => parse_logging_spec(&spec),
+                    Err(..) => (vec![LogDirective { name: None, level: LogLevelFilter::Error }], None),
+                }
+            }
+        };
+
+        // Sort the provided directives by length of their name, this allows a
+        // little more efficient lookup at runtime.
+        directives.sort_by(|a, b| {
+            let alen = a.name.as_ref().map(|a| a.len()).unwrap_or(0);
+            let blen = b.name.as_ref().map(|b| b.len()).unwrap_or(0);
+            alen.cmp(&blen)
+        });
+
+        let lwh = LwHandle::new(&config);
+        match lwh {
+            Ok(lwh) =>  Ok(FlexiLogger {
+                            directives: directives,
+                            o_filter: filter,
+                            amo_line_writer: Arc::new(Mutex::new(RefCell::new(lwh))),
+                            config: config }),
+            Err(e) => Err(e)
+        }
     }
 
     fn fl_enabled(&self, level: LogLevel, target: &str) -> bool {
@@ -268,34 +274,31 @@ impl Log for FlexiLogger {
         }
 
         let mut msg = (self.config.format)(record);
-        msg.push('\n');
         if self.config.log_to_file {
             if self.config.duplicate_error && record.level() == LogLevel::Error
             || self.config.duplicate_info  && record.level() == LogLevel::Info {
                 println!("{}",&record.args());
             }
+            msg.push('\n');
             let msgb = msg.as_bytes();
 
-            let amo_lw = self.amo_line_writer.clone();  // Arc<Mutex<RefCell<OptLineWriter>>>
-            let mut mg_rc_olw = amo_lw.lock().unwrap(); // MutexGuard<RefCell<OptLineWriter>>
-            let rc_olw = mg_rc_olw.deref_mut();         // &mut RefCell<OptLineWriter>
-            let mut rm_olw = rc_olw.borrow_mut();       // RefMut<OptLineWriter>
-            let olw: &mut OptLineWriter = rm_olw.deref_mut();
+            let amo_lw = self.amo_line_writer.clone();  // Arc<Mutex<RefCell<LwHandle>>>
+            let mut mg_rc_lwh = amo_lw.lock().unwrap(); // MutexGuard<RefCell<LwHandle>>
+            let rc_lwh = mg_rc_lwh.deref_mut();         // &mut RefCell<LwHandle>
+            let mut rm_lwh = rc_lwh.borrow_mut();       // RefMut<LwHandle>
+            let lwh: &mut LwHandle = rm_lwh.deref_mut();
 
-            if olw.use_rolling && (olw.written_bytes > self.config.rollover_size.unwrap()) {
-                olw.olw = None;  // Hope that closes the previous lw
-                olw.written_bytes = 0;
-                olw.roll_idx += 1;
-                olw.mount_linewriter(&self.config.suffix,  self.config.print_message);
+            if lwh.use_rolling && (lwh.written_bytes > self.config.rollover_size.unwrap()) {
+                lwh.olw = None;  // Hope that closes the previous lw
+                lwh.written_bytes = 0;
+                lwh.roll_idx += 1;
+                lwh.mount_linewriter(&self.config.suffix,  self.config.print_message);
             }
-            match olw.olw {
-                Some(ref mut lw) => {
-                    &lw.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e);} );
-                    if olw.use_rolling {
-                        olw.written_bytes += msgb.len();
-                    }
-                },
-                None => {/* Folder is broken, logging not possible */}
+            if let Some(ref mut lw) = lwh.olw {
+                &lw.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e);} );//FIXME
+                if lwh.use_rolling {
+                    lwh.written_bytes += msgb.len();
+                }
             };
         } else {
             let _ = writeln!(&mut io::stderr(), "{}", msg );
@@ -307,10 +310,10 @@ impl Log for FlexiLogger {
 /// Describes errors in the initialization of flexi_logger.
 #[derive(Debug)]
 pub struct FlexiLoggerError {
-    message: &'static str
+    message: String
 }
 impl FlexiLoggerError {
-    pub fn new(s: &'static str) -> FlexiLoggerError {
+    pub fn new(s: String) -> FlexiLoggerError {
         FlexiLoggerError {message: s}
     }
 }
@@ -391,6 +394,7 @@ pub fn default_format(record: &LogRecord) -> String {
     format!( "{} [{}] {}", record.level(), record.location().module_path(), record.args() )
 }
 
+
 /// A logline-formatter that produces lines like <br>
 /// ```[2015-07-08 12:12:32:639785] INFO [my_prog::some_submodel] src/some_submodel.rs:26: Task successfully read from conf.json```
 #[allow(unused)]
@@ -465,10 +469,10 @@ struct LogDirective {
 /// use flexi_logger::{detailed_format,init,LogConfig};
 ///
 /// init( LogConfig { log_to_file: true,
-///                   directory: "log_files",
+///                   directory: Some("log_files".to_string()),
 ///                   format: detailed_format,
-///                    .. LogConfig::new() },
-///       args.flag_loglevelspec )
+///                   .. LogConfig::new() },
+///       Some("myprog=debug,mylib=warn".to_string()) )
 /// .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
 /// ```
 ///
@@ -478,33 +482,28 @@ struct LogDirective {
 /// but the file cannot be opened, e.g. because of operating system issues.
 ///
 pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiLoggerError> {
-    log::set_logger( |max_level| {
-        let (mut directives, filter) =
-            match loglevelspec {
-                Some(ref llspec) => {let spec: &str = llspec; parse_logging_spec(&spec)},
-                None => {
-                    match env::var("RUST_LOG") {
-                        Ok(spec) => parse_logging_spec(&spec),
-                        Err(..) => (vec![LogDirective { name: None, level: LogLevelFilter::Error }], None),
-                    }
-                }
-            };
+    let result = FlexiLogger::new(loglevelspec,config);
+    match result {
+        Ok(fl) => {
+            let max = fl.directives.iter().map(|d| d.level).max().unwrap_or(LogLevelFilter::Off);
+            log::set_logger( |max_level| {max_level.set(max);Box::new(fl)} )
+                 .map_err(|e|{FlexiLoggerError::new(format!("Logger initialization failed due to {}", e))})
+        },
+        Err(e) => Err(e),
+    }
+}
 
-        // Sort the provided directives by length of their name, this allows a
-        // little more efficient lookup at runtime.
-        directives.sort_by(|a, b| {
-            let alen = a.name.as_ref().map(|a| a.len()).unwrap_or(0);
-            let blen = b.name.as_ref().map(|b| b.len()).unwrap_or(0);
-            alen.cmp(&blen)
-        });
-
-        let level = {
-            let max = directives.iter().map(|d| d.level).max();
-            max.unwrap_or(LogLevelFilter::Off)
-        };
-        max_level.set(level);
-        Box::new(FlexiLogger::new(directives,filter,config))
-    }).map_err(|_|{FlexiLoggerError::new("Logger initialization failed")})
+macro_rules! print_err {
+    ($($arg:tt)*) => (
+        {
+            use std::io::prelude::*;
+            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
+                panic!("Failed to write to stderr.\
+                    \nOriginal error output: {}\
+                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
+            }
+        }
+    )
 }
 
 /// Parse a logging specification string (e.g: "crate1,crate2::mod3,crate3::x=error/foo")
@@ -562,4 +561,158 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
     });
 
     return (dirs, filter);
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use log::{LogLevel,LogLevelFilter};
+    use super::{FlexiLogger, LogConfig,parse_logging_spec};
+
+    fn make_logger(loglevelspec: &'static str) -> FlexiLogger {
+        FlexiLogger::new(Some(loglevelspec.to_string()), LogConfig::new()).unwrap()
+    }
+
+    #[test]
+    fn match_full_path() {
+        let logger = make_logger("crate2=info,crate1::mod1=warn");
+        assert!(logger.fl_enabled(LogLevel::Warn, "crate1::mod1"));
+        assert!(!logger.fl_enabled(LogLevel::Info, "crate1::mod1"));
+        assert!(logger.fl_enabled(LogLevel::Info, "crate2"));
+        assert!(!logger.fl_enabled(LogLevel::Debug, "crate2"));
+    }
+
+    #[test]
+    fn no_match() {
+        let logger = make_logger("crate2=info,crate1::mod1=warn");
+        assert!(!logger.fl_enabled(LogLevel::Warn, "crate3"));
+    }
+
+    #[test]
+    fn match_beginning() {
+        let logger = make_logger("crate2=info,crate1::mod1=warn");
+        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod1"));
+    }
+
+    #[test]
+    fn match_beginning_longest_match() {
+        let logger = make_logger("crate2=info,crate2::mod=debug,crate1::mod1=warn");
+        assert!(logger.fl_enabled(LogLevel::Debug, "crate2::mod1"));
+        assert!(!logger.fl_enabled(LogLevel::Debug, "crate2"));
+    }
+
+    #[test]
+    fn match_default() {
+        let logger = make_logger("info,crate1::mod1=warn");
+        assert!(logger.fl_enabled(LogLevel::Warn, "crate1::mod1"));
+        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod2"));
+    }
+
+    #[test]
+    fn zero_level() {
+        let logger = make_logger("info,crate1::mod1=off");
+        assert!(!logger.fl_enabled(LogLevel::Error, "crate1::mod1"));
+        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod2"));
+    }
+
+    #[test]
+    fn parse_logging_spec_valid() {
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=error,crate1::mod2,crate2=debug");
+        assert_eq!(dirs.len(), 3);
+        assert_eq!(dirs[0].name, Some("crate1::mod1".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Error);
+
+        assert_eq!(dirs[1].name, Some("crate1::mod2".to_string()));
+        assert_eq!(dirs[1].level, LogLevelFilter::max());
+
+        assert_eq!(dirs[2].name, Some("crate2".to_string()));
+        assert_eq!(dirs[2].level, LogLevelFilter::Debug);
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_invalid_crate() {
+        // test parse_logging_spec with multiple = in specification
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=warn=info,crate2=debug");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate2".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Debug);
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_invalid_log_level() {
+        // test parse_logging_spec with 'noNumber' as log level
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=noNumber,crate2=debug");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate2".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Debug);
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_string_log_level() {
+        // test parse_logging_spec with 'warn' as log level
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=wrong,crate2=warn");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate2".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Warn);
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_empty_log_level() {
+        // test parse_logging_spec with '' as log level
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=wrong,crate2=");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate2".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::max());
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_global() {
+        // test parse_logging_spec with no crate
+        let (dirs, filter) = parse_logging_spec("warn,crate2=debug");
+        assert_eq!(dirs.len(), 2);
+        assert_eq!(dirs[0].name, None);
+        assert_eq!(dirs[0].level, LogLevelFilter::Warn);
+        assert_eq!(dirs[1].name, Some("crate2".to_string()));
+        assert_eq!(dirs[1].level, LogLevelFilter::Debug);
+        assert!(filter.is_none());
+    }
+
+    #[test]
+    fn parse_logging_spec_valid_filter() {
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=error,crate1::mod2,crate2=debug/abc");
+        assert_eq!(dirs.len(), 3);
+        assert_eq!(dirs[0].name, Some("crate1::mod1".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Error);
+
+        assert_eq!(dirs[1].name, Some("crate1::mod2".to_string()));
+        assert_eq!(dirs[1].level, LogLevelFilter::max());
+
+        assert_eq!(dirs[2].name, Some("crate2".to_string()));
+        assert_eq!(dirs[2].level, LogLevelFilter::Debug);
+        assert!(filter.is_some() && filter.unwrap().to_string() == "abc");
+    }
+
+    #[test]
+    fn parse_logging_spec_invalid_crate_filter() {
+        let (dirs, filter) = parse_logging_spec("crate1::mod1=error=warn,crate2=debug/a.c");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate2".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::Debug);
+        assert!(filter.is_some() && filter.unwrap().to_string() == "a.c");
+    }
+
+    #[test]
+    fn parse_logging_spec_empty_with_filter() {
+        let (dirs, filter) = parse_logging_spec("crate1/a*c");
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].name, Some("crate1".to_string()));
+        assert_eq!(dirs[0].level, LogLevelFilter::max());
+        assert!(filter.is_some() && filter.unwrap().to_string() == "a*c");
+    }
 }
