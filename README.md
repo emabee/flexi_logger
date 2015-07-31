@@ -12,10 +12,13 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 flexi_logger = "0.3"
+log = "*"
 ```
 
 and this to your crate root:
 
 ```rust
+#[macro_use]
+extern crate log;
 extern crate flexi_logger;
 ```

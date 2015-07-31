@@ -2,9 +2,9 @@
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/")]
 
-//! An extended copy of [env_logger](http://rust-lang.github.io/log/env_logger/), which
-//! can write the log to standard error or to a fresh file in a configurable folder
+//! A logger that can write the log to standard error or to a fresh file in a configurable folder
 //! and allows custom logline formats.
+//! It had started as an extended copy of [env_logger](http://rust-lang.github.io/log/env_logger/).
 //!
 //! # Usage
 //!
@@ -14,20 +14,23 @@
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "0.2"
+//! flexi_logger = "0.3"
+//! log = "*"
 //! ```
 //!
 //! and this to your crate root:
 //!
-//! ```rust
+//! ```text
+//! #[macro_use]
+//! extern crate log;
 //! extern crate flexi_logger;
 //! ```
 //!
-//! flexi_logger plugs into the logging facade given by the
+//! The latter is needed because flexi_logger plugs into the logging facade given by the
 //! [log crate](http://rust-lang.github.io/log/log/).
 //! i.e., you use the ```log``` macros to write log lines from your code.
 //!
-//! In its initialization (see function [init](fn.init.html)), you can
+//! In flexi_logger's initialization, you can e.g.
 //!
 //! *  decide whether you want to write your logs to stderr (like with env_logger),
 //!    or to a file,
@@ -35,11 +38,10 @@
 //! *  provide the log-level-specification, i.e., the decision which log
 //!    lines really should be written out, programmatically (if you don't want to
 //!    use the environment variable RUST_LOG)
-//! *  specify the line format for the log lines <br>
-//!    (flexi_logger comes with two predefined variants for the log line format,
-//!    ```default_format()``` and ```detailed_format()```,
-//!    but you can easily create and use your own format function with the
-//!    signature ```fn(&LogRecord) -> String```)
+//! *  specify the line format for the log lines
+//!
+//! See function [init](fn.init.html) and structure [LogConfig](struct.LogConfig.html) for
+//! a full description of all configuration options.
 
 extern crate glob;
 extern crate log;
@@ -61,20 +63,35 @@ use std::ops::{Add,DerefMut};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+macro_rules! print_err {
+    ($($arg:tt)*) => (
+        {
+            use std::io::prelude::*;
+            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
+                panic!("Failed to write to stderr.\
+                    \nOriginal error output: {}\
+                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
+            }
+        }
+    )
+}
+
+
+
 // Encapsulation for LineWriter
 struct LwHandle {
     olw: Option<LineWriter<File>>,
     o_filename_base: Option<String>,
-    use_rolling: bool,
+    use_rotating: bool,
     written_bytes: usize,
-    roll_idx: usize,
+    rotate_idx: usize,
 }
 impl LwHandle {
     fn new (config: &LogConfig) -> Result<LwHandle,FlexiLoggerError> {
         if !config.log_to_file {
             // we don't need a line-writer, so we return an empty handle
             return Ok(LwHandle{
-                olw: None, o_filename_base: None, use_rolling: false, written_bytes: 0, roll_idx: 0
+                olw: None, o_filename_base: None, use_rotating: false, written_bytes: 0, rotate_idx: 0
             });
         }
 
@@ -94,7 +111,7 @@ impl LwHandle {
         let o_filename_base = match std::fs::metadata(&directory) {
             Ok(metadata) => {
                 if metadata.is_dir() {
-                    Some(get_filename_base(&s_directory.clone(), & config.o_discriminant))
+                    Some(get_filename_base(&s_directory.clone(), & config.discriminant))
                 } else {
                     return Err(FlexiLoggerError::new(
                         format!("Log cannot be written: output directory \"{}\" is not \
@@ -108,12 +125,12 @@ impl LwHandle {
             }
         };
 
-        let (use_rolling, roll_idx) = match o_filename_base {
+        let (use_rotating, rotate_idx) = match o_filename_base {
             None => (false, 0),
             Some(ref s_filename_base) => {
-                match config.rollover_size {
+                match config.rotate_over_size {
                     None => (false, 0),
-                    Some(_) => (true, get_next_roll_idx(&s_filename_base, & config.suffix))
+                    Some(_) => (true, get_next_rotate_idx(&s_filename_base, & config.suffix))
                 }
             }
         };
@@ -121,9 +138,9 @@ impl LwHandle {
         let mut lwh = LwHandle{
             olw: None,
             o_filename_base: o_filename_base,
-            use_rolling: use_rolling,
+            use_rotating: use_rotating,
             written_bytes: 0,
-            roll_idx: roll_idx,
+            rotate_idx: rotate_idx,
         };
         lwh.mount_linewriter(&config.suffix, config.print_message);
         Ok(lwh)
@@ -132,7 +149,7 @@ impl LwHandle {
     fn mount_linewriter(&mut self, suffix: &Option<String>, print_message: bool) {
         if let None = self.olw {
             if let Some(ref s_filename_base) = self.o_filename_base {
-                let filename = get_filename(s_filename_base, self.use_rolling, self.roll_idx, suffix);
+                let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix);
                 let path = Path::new(&filename);
                 if print_message {
                     println!("Log is written to {}", path.display());
@@ -143,23 +160,23 @@ impl LwHandle {
     }
 }
 
-fn get_filename_base(s_directory: &String, o_discriminant: &Option<String>) -> String {
+fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> String {
     let arg0 = env::args().next().unwrap();
     let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
     let mut filename = String::with_capacity(180).add(&s_directory).add("/").add(&progname);
-    if let Some(ref s_d) = *o_discriminant {
+    if let Some(ref s_d) = *discriminant {
         filename = filename.add(&format!("_{}", s_d));
     }
     filename
 }
 
 fn get_filename(s_filename_base: &String,
-                do_rolling: bool,
-                roll_idx: usize,
+                do_rotating: bool,
+                rotate_idx: usize,
                 o_suffix: &Option<String>) -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
-    if do_rolling {
-        filename = filename.add(&format!("_{}", roll_idx));
+    if do_rotating {
+        filename = filename.add(&format!("_r{:0>5}", rotate_idx));
     } else {
         filename = filename.add(&time::strftime("_%Y-%m-%d_%H-%M-%S",&time::now()).unwrap());
     }
@@ -171,17 +188,18 @@ fn get_filename(s_filename_base: &String,
 
 fn get_filename_pattern(s_filename_base: &String, o_suffix: &Option<String>) -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
-    filename = filename.add("_*");
+    filename = filename.add("_r*");
     if let &Some(ref suffix) = o_suffix {
         filename = filename.add(".").add(suffix);
     }
     filename
 }
 
-fn get_next_roll_idx(s_filename_base: & String, o_suffix: & Option<String>) -> usize {
+// FIXME error handling
+fn get_next_rotate_idx(s_filename_base: & String, o_suffix: & Option<String>) -> usize {
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     let paths = glob(&fn_pattern);
-    let mut roll_idx = 0;
+    let mut rotate_idx = 0;
     match paths {
         Err(e) => {
             panic!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e); // FIXME
@@ -194,13 +212,13 @@ fn get_next_roll_idx(s_filename_base: & String, o_suffix: & Option<String>) -> u
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
                         let idx: usize = it.next().unwrap().parse().unwrap_or(0);
-                        roll_idx = max(roll_idx, idx);
+                        rotate_idx = max(rotate_idx, idx);
                     }
                 }
             }
         }
     }
-    roll_idx+1
+    rotate_idx+1
 }
 
 
@@ -288,15 +306,15 @@ impl Log for FlexiLogger {
             let mut rm_lwh = rc_lwh.borrow_mut();       // RefMut<LwHandle>
             let lwh: &mut LwHandle = rm_lwh.deref_mut();
 
-            if lwh.use_rolling && (lwh.written_bytes > self.config.rollover_size.unwrap()) {
+            if lwh.use_rotating && (lwh.written_bytes > self.config.rotate_over_size.unwrap()) {
                 lwh.olw = None;  // Hope that closes the previous lw
                 lwh.written_bytes = 0;
-                lwh.roll_idx += 1;
+                lwh.rotate_idx += 1;
                 lwh.mount_linewriter(&self.config.suffix,  self.config.print_message);
             }
             if let Some(ref mut lw) = lwh.olw {
                 &lw.write(msgb).unwrap_or_else( |e|{panic!("File logger: write failed with {}",e);} );//FIXME
-                if lwh.use_rolling {
+                if lwh.use_rotating {
                     lwh.written_bytes += msgb.len();
                 }
             };
@@ -325,40 +343,42 @@ impl fmt::Display for  FlexiLoggerError {
 
 /// Allows influencing the behavior of flexi_logger.
 pub struct LogConfig {
-    /// If `true`, the log is written to a file. Default is `false`, the log is then
-    /// written to stderr.
-    /// If `true`, a new file in the current directory is created and written to.
-    /// The name of the file is chosen as '\<program_name\>\_\<date\>\_\<time\>.<suffix>',
-    ///  e.g. `myprog_2015-07-08_10-44-11.log`
-    pub log_to_file: bool,
+    /// Allows providing a custom logline format; by default ```flexi_logger::default_format``` is used.
+    /// You can either choose between two predefined variants, ```default_format``` and ```detailed_format```,
+    /// or you create and use your own format function with the signature ```fn(&LogRecord) -> String```.
 
-    /// If `true` (which is default), and if `log_to_file` is `true`,
-    /// the name of the logfile is documented in a message to stdout.
-    pub print_message: bool,
-
-    /// If `true` (which is default), and if `log_to_file` is `true`,
-    /// all logged error messages are duplicated to stdout.
-    pub duplicate_error: bool,
-
-    /// If `true` (which is default), and if `log_to_file` is `true`,
-    /// all logged warning and info messages are also duplicated to stdout.
-    pub duplicate_info: bool,
-
-    /// Allows providing a custom logline format; default is ```flexi_logger::default_format```.
     pub format: fn(&LogRecord) -> String,
 
-    /// Allows specifying a directory in which the log files are created
+    /// * If `false` (default), the log is written to stderr.
+    /// * If `true`, a new file is created and the log is written to it.
+    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
+    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
+    ///
+    /// <p>Note that all following members of LogConfig are only relevant if this one is set to `true`.
+    pub log_to_file: bool,
+
+    /// If `true` (default), the name of the logfile is documented in a message to stdout.
+    pub print_message: bool,
+
+    /// If `true` (default), all logged error messages are duplicated to stdout.
+    pub duplicate_error: bool,
+
+    /// If `true` (default), all logged warning and info messages are also duplicated to stdout.
+    pub duplicate_info: bool,
+
+    /// Allows specifying a directory in which the log files are created. Default is ```None```.
     pub directory: Option<String>,
 
-    /// Allows specifying the filesystem suffix of the log files
+    /// Allows specifying the filesystem suffix of the log files (without the dot).  Default is ```log```.
     pub suffix: Option<String>,
 
-    /// Allows specifying a rollover of log files if a certain size is exceeded; the rollover will happen when
-    /// the specified file size is reached or exceeded.
-    pub rollover_size: Option<usize>,
+    /// Allows specifying a maximum size for log files in bytes; when
+    /// the specified file size is reached or exceeded, the file will be closed and a new one will be opened.
+    /// The filename pattern changes - instead of the timestamp the serial number is included into the filename.
+    pub rotate_over_size: Option<usize>,
 
-    /// Allows specifying an optional part of the log file name that is inserted after the program name
-    pub o_discriminant: Option<String>,
+    /// Allows specifying an additional part of the log file name that is inserted after the program name.
+    pub discriminant: Option<String>,
 }
 impl LogConfig {
     /// initializes with
@@ -369,8 +389,8 @@ impl LogConfig {
     /// *  duplicate_info = false,
     /// *  format = flexi_logger::default_format,
     /// *  no directory (log files are created where the program was started),
-    /// *  no rollover: log file grows indefinitely
-    /// *  no discriminant: log file name consists only of progname, date or roll_idx,  and suffix.
+    /// *  no rotate_over: log file grows indefinitely
+    /// *  no discriminant: log file name consists only of progname, date or rotate_idx,  and suffix.
     /// *  suffix =  "log".
 
     pub fn new() -> LogConfig {
@@ -381,8 +401,8 @@ impl LogConfig {
             duplicate_info: false,
             format: default_format,
             directory: None,
-            rollover_size: None,
-            o_discriminant: None,
+            rotate_over_size: None,
+            discriminant: None,
             suffix: Some("log".to_string()),
         }
     }
@@ -462,8 +482,8 @@ struct LogDirective {
 /// Here we configure flexi_logger to write log entries with fine-grained
 /// time and location info into a log file in folder "log_files",
 /// and we provide the loglevel-specification programmatically
-/// as a ```Some<String>```, which might come in this form from what docopt provides,
-/// if you have a command-line option ```--loglevelspec```:
+/// as a ```Some<String>```, which might come in this form from what e.g. [docopt](https://crates.io/crates/docopt)
+/// could provide for a respective command-line option:
 ///
 /// ```
 /// use flexi_logger::{detailed_format,init,LogConfig};
@@ -491,19 +511,6 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiL
         },
         Err(e) => Err(e),
     }
-}
-
-macro_rules! print_err {
-    ($($arg:tt)*) => (
-        {
-            use std::io::prelude::*;
-            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
-                panic!("Failed to write to stderr.\
-                    \nOriginal error output: {}\
-                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
-            }
-        }
-    )
 }
 
 /// Parse a logging specification string (e.g: "crate1,crate2::mod3,crate3::x=error/foo")
