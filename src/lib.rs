@@ -222,14 +222,14 @@ fn get_next_rotate_idx(s_filename_base: & String, o_suffix: & Option<String>) ->
 }
 
 
-struct FlexiLogger{
+pub struct FlexiLogger{
     directives: Vec<LogDirective>,
     o_filter: Option<Regex>,
     amo_line_writer: Arc<Mutex<RefCell<LwHandle>>>,
     config: LogConfig
 }
 impl FlexiLogger {
-    fn new(loglevelspec: Option<String>, config: LogConfig)
+    pub fn new(loglevelspec: Option<String>, config: LogConfig)
             -> Result<FlexiLogger, FlexiLoggerError>  {
 
         let (mut directives, filter) = match loglevelspec {
@@ -261,7 +261,7 @@ impl FlexiLogger {
         }
     }
 
-    fn fl_enabled(&self, level: LogLevel, target: &str) -> bool {
+    pub fn fl_enabled(&self, level: LogLevel, target: &str) -> bool {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for directive in self.directives.iter().rev() {
             match directive.name {
