@@ -3,16 +3,18 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{detailed_format,init,LogConfig};
+use flexi_logger::{opt_format,init,LogConfig};
 
 #[test]
-fn files_dir() {
+fn files_dir_dscr_rot() {
     assert_eq!(
         (),
         init( LogConfig {
-                 format: detailed_format,
+                 format: opt_format,
                  log_to_file: true,
                  directory: Some("log_files".to_string()),
+                 discriminant: Some("foo".to_string()),
+                 rotate_over_size: Some(2000),
                  .. LogConfig::new()
                }, Some("info".to_string()) ).unwrap()
     );
