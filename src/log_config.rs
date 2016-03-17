@@ -8,7 +8,6 @@ pub struct LogConfig {
     /// You can either choose between three predefined variants,
     /// ```default_format```, ```opt_format``` and ```detailed_format```,
     /// or you create and use your own format function with the signature ```fn(&LogRecord) -> String```.
-
     pub format: fn(&LogRecord) -> String,
 
     /// * If `false` (default), the log is written to stderr.
@@ -33,6 +32,9 @@ pub struct LogConfig {
 
     /// Allows specifying the filesystem suffix of the log files (without the dot).  Default is ```log```.
     pub suffix: Option<String>,
+
+    /// Allows specifying whether or not the filename should include a timestamp. Default is '''true'''.
+    pub timestamp: Option<bool>,
 
     /// Allows specifying a maximum size for log files in bytes; when
     /// the specified file size is reached or exceeded, the file will be closed and a new one will be opened.
@@ -62,9 +64,10 @@ impl LogConfig {
             duplicate_info: false,
             format: default_format,
             directory: None,
+            suffix: Some("log".to_string()),
+            timestamp: Some(true),
             rotate_over_size: None,
             discriminant: None,
-            suffix: Some("log".to_string()),
         }
     }
 }
