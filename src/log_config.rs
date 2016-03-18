@@ -32,6 +32,9 @@ pub struct LogConfig {
     /// Allows specifying the filesystem suffix of the log files (without the dot).  Default is ```log```.
     pub suffix: Option<String>,
 
+    /// Allows specifying whether or not the filename should include a timestamp. Default is '''true'''.
+    pub timestamp: Option<bool>,
+
     /// Allows specifying a maximum size for log files in bytes; when
     /// the specified file size is reached or exceeded, the file will be closed and a new one will be opened.
     /// The filename pattern changes - instead of the timestamp the serial number is included into the filename.
@@ -60,9 +63,10 @@ impl LogConfig {
             duplicate_info: false,
             format: opt_format,
             directory: None,
+            suffix: Some("log".to_string()),
+            timestamp: Some(true),
             rotate_over_size: None,
             discriminant: None,
-            suffix: Some("log".to_string()),
         }
     }
 }

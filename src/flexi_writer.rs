@@ -83,7 +83,7 @@ impl FlexiWriter {
             written_bytes: 0,
             rotate_idx: rotate_idx,
         };
-        flexi_writer.mount_linewriter(&config.suffix, config.print_message);
+        flexi_writer.mount_linewriter(&config.suffix, &config.timestamp, config.print_message);
         Ok(flexi_writer)
     }
 
@@ -94,7 +94,7 @@ impl FlexiWriter {
             self.o_flw = None;  // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
-            self.mount_linewriter(&config.suffix, config.print_message);
+            self.mount_linewriter(&config.suffix, &config.timestamp, config.print_message);
         }
         // write out the stuff
         if let Some(ref mut lw) = self.o_flw {
@@ -109,10 +109,10 @@ impl FlexiWriter {
         };
     }
 
-    fn mount_linewriter(&mut self, suffix: &Option<String>, print_message: bool) {
+    fn mount_linewriter(&mut self, suffix: &Option<String>, timestamp: &Option<bool>, print_message: bool) {
         if let None = self.o_flw {
             if let Some(ref s_filename_base) = self.o_filename_base {
-                let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix);
+                let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix, timestamp);
                 let path = Path::new(&filename);
                 if print_message {
                     println!("Log is written to {}", path.display());
@@ -134,12 +134,15 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
     filename
 }
 
-fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>) -> String {
+fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>,
+                timestamp: &Option<bool>)
+                -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
-    filename = if do_rotating {
-        filename.add(&format!("_r{:0>5}", rotate_idx))
-    } else {
-        filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
+    if timestamp.is_some() && timestamp.unwrap() {
+        filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
+    };
+    if do_rotating {
+        filename = filename.add(&format!("_r{:0>5}", rotate_idx))
     };
     if let &Some(ref suffix) = o_suffix {
         filename = filename.add(".").add(suffix);
