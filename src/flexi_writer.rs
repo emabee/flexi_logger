@@ -1,11 +1,11 @@
-use {LogConfig,FlexiLoggerError};
+use {LogConfig, FlexiLoggerError};
 
 use chrono::Local;
 use glob::glob;
 use std::cmp::max;
 use std::env;
-use std::fs::{self,File};
-use std::io::{LineWriter,Write};
+use std::fs::{self, File};
+use std::io::{LineWriter, Write};
 use std::ops::Add;
 use std::path::Path;
 
@@ -20,41 +20,49 @@ pub struct FlexiWriter {
     rotate_idx: usize,
 }
 impl FlexiWriter {
-    pub fn new (config: &LogConfig) -> Result<FlexiWriter,FlexiLoggerError> {
+    pub fn new(config: &LogConfig) -> Result<FlexiWriter, FlexiLoggerError> {
         if !config.log_to_file {
             // we don't need a line-writer, so we return an empty handle
-            return Ok(FlexiWriter{
-                o_flw: None, o_filename_base: None, use_rotating: false, written_bytes: 0, rotate_idx: 0
+            return Ok(FlexiWriter {
+                o_flw: None,
+                o_filename_base: None,
+                use_rotating: false,
+                written_bytes: 0,
+                rotate_idx: 0,
             });
         }
 
         // make sure the folder exists or can be created
         let s_directory: String = match config.directory {
             Some(ref dir) => dir.clone(),
-            None => ".".to_string()
+            None => ".".to_string(),
         };
         let directory = Path::new(&s_directory);
 
         if let Err(e) = fs::create_dir_all(&directory) {
-            return Err(FlexiLoggerError::new(
-                format!("Log cannot be written: output directory \"{}\" does not \
-                exist and could not be created due to {}", &directory.display(),e)));
+            return Err(FlexiLoggerError::new(format!("Log cannot be written: output directory \
+                                                      \"{}\" does not exist and could not be \
+                                                      created due to {}",
+                                                     &directory.display(),
+                                                     e)));
         };
 
         let o_filename_base = match fs::metadata(&directory) {
             Ok(metadata) => {
                 if metadata.is_dir() {
-                    Some(get_filename_base(&s_directory.clone(), & config.discriminant))
+                    Some(get_filename_base(&s_directory.clone(), &config.discriminant))
                 } else {
-                    return Err(FlexiLoggerError::new(
-                        format!("Log cannot be written: output directory \"{}\" is not \
-                        a directory", &directory.display())));
+                    return Err(FlexiLoggerError::new(format!("Log cannot be written: output \
+                                                              directory \"{}\" is not a \
+                                                              directory",
+                                                             &directory.display())));
                 }
-            },
+            }
             Err(e) => {
-                return Err(FlexiLoggerError::new(
-                    format!("Log cannot be written: error accessing output directory \"{}\": {}",
-                    &directory.display(), e)));
+                return Err(FlexiLoggerError::new(format!("Log cannot be written: error \
+                                                          accessing output directory \"{}\": {}",
+                                                         &directory.display(),
+                                                         e)));
             }
         };
 
@@ -63,12 +71,12 @@ impl FlexiWriter {
             Some(ref s_filename_base) => {
                 match config.rotate_over_size {
                     None => (false, 0),
-                    Some(_) => (true, get_next_rotate_idx(&s_filename_base, & config.suffix))
+                    Some(_) => (true, get_next_rotate_idx(&s_filename_base, &config.suffix)),
                 }
             }
         };
 
-        let mut flexi_writer = FlexiWriter{
+        let mut flexi_writer = FlexiWriter {
             o_flw: None,
             o_filename_base: o_filename_base,
             use_rotating: use_rotating,
@@ -91,7 +99,10 @@ impl FlexiWriter {
         // write out the stuff
         if let Some(ref mut lw) = self.o_flw {
             lw.write(msgb)
-              .unwrap_or_else( |e|{print_err!("Flexi logger: write access to file failed with {}",e);0} );
+              .unwrap_or_else(|e| {
+                  print_err!("Flexi logger: write access to file failed with {}", e);
+                  0
+              });
             if self.use_rotating {
                 self.written_bytes += msgb.len();
             }
@@ -123,10 +134,7 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
     filename
 }
 
-fn get_filename(s_filename_base: &String,
-                do_rotating: bool,
-                rotate_idx: usize,
-                o_suffix: &Option<String>) -> String {
+fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>) -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
     filename = if do_rotating {
         filename.add(&format!("_r{:0>5}", rotate_idx))
@@ -148,13 +156,13 @@ fn get_filename_pattern(s_filename_base: &String, o_suffix: &Option<String>) -> 
     filename
 }
 
-fn get_next_rotate_idx(s_filename_base: & String, o_suffix: & Option<String>) -> usize {
+fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> usize {
     let mut rotate_idx = 0;
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
-    match glob( &fn_pattern ) {
+    match glob(&fn_pattern) {
         Err(e) => {
             print_err!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
-        },
+        }
         Ok(globresults) => {
             for globresult in globresults {
                 match globresult {
@@ -164,7 +172,10 @@ fn get_next_rotate_idx(s_filename_base: & String, o_suffix: & Option<String>) ->
                         let mut it = filename.rsplit("_r");
                         let idx: usize = it.next().unwrap().parse().unwrap_or(0);
                         rotate_idx = max(rotate_idx, idx);
-        }}}}
+                    }
+                }
+            }
+        }
     }
-    rotate_idx+1
+    rotate_idx + 1
 }

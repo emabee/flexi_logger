@@ -1,6 +1,5 @@
 use log::LogRecord;
-use formats::default_format;
-
+use formats::opt_format;
 
 /// Allows influencing the behavior of flexi_logger.
 pub struct LogConfig {
@@ -8,7 +7,6 @@ pub struct LogConfig {
     /// You can either choose between three predefined variants,
     /// ```default_format```, ```opt_format``` and ```detailed_format```,
     /// or you create and use your own format function with the signature ```fn(&LogRecord) -> String```.
-
     pub format: fn(&LogRecord) -> String,
 
     /// * If `false` (default), the log is written to stderr.
@@ -60,7 +58,7 @@ impl LogConfig {
             print_message: true,
             duplicate_error: true,
             duplicate_info: false,
-            format: default_format,
+            format: opt_format,
             directory: None,
             rotate_over_size: None,
             discriminant: None,

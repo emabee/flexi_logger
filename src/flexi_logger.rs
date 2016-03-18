@@ -1,11 +1,11 @@
 use flexi_writer::FlexiWriter;
 
-use {FlexiLoggerError,LogConfig};
-use log::{self,Log,LogLevel,LogLevelFilter,LogMetadata,LogRecord};
+use {FlexiLoggerError, LogConfig};
+use log::{self, Log, LogLevel, LogLevelFilter, LogMetadata, LogRecord};
 use regex::Regex;
 use std::cell::RefCell;
 use std::env;
-use std::io::{self,Write};
+use std::io::{self, Write};
 
 use std::ops::DerefMut;
 use std::sync::Mutex;
@@ -13,32 +13,41 @@ use std::sync::Mutex;
 
 /// Does the logging.
 /// Is only made public to support usecases where more than one FlexiLogger instance are required in a single process.
-pub struct FlexiLogger{
+pub struct FlexiLogger {
     directives: Vec<LogDirective>,
     o_filter: Option<Regex>,
     // The FlexiWriter has mutable state; since Log.log() requires an unmutable self,
     // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be thread-safe
     mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
-    config: LogConfig
+    config: LogConfig,
 }
 impl FlexiLogger {
     /// Creates a new FlexiLogger instance based on your configuration and a loglevel specification.
     pub fn new(loglevelspec: Option<String>, config: LogConfig) -> Result<FlexiLogger, FlexiLoggerError> {
-        match FlexiLogger::new_int(loglevelspec,config) {
-            Ok((_,fl)) => Ok(fl),
-            Err(e) => Err(e)
+        match FlexiLogger::new_int(loglevelspec, config) {
+            Ok((_, fl)) => Ok(fl),
+            Err(e) => Err(e),
         }
     }
 
     fn new_int(loglevelspec: Option<String>, config: LogConfig)
-    -> Result<(LogLevelFilter,FlexiLogger), FlexiLoggerError> {
+               -> Result<(LogLevelFilter, FlexiLogger), FlexiLoggerError> {
 
         let (mut directives, filter) = match loglevelspec {
-            Some(ref llspec) => {let spec: &str = llspec; parse_logging_spec(&spec)},
+            Some(ref llspec) => {
+                let spec: &str = llspec;
+                parse_logging_spec(&spec)
+            }
             None => {
                 match env::var("RUST_LOG") {
                     Ok(spec) => parse_logging_spec(&spec),
-                    Err(..) => (vec![LogDirective { name: None, level: LogLevelFilter::Error }], None),
+                    Err(..) => {
+                        (vec![LogDirective {
+                                  name: None,
+                                  level: LogLevelFilter::Error,
+                              }],
+                         None)
+                    }
                 }
             }
         };
@@ -54,12 +63,15 @@ impl FlexiLogger {
         let max = directives.iter().map(|d| d.level).max().unwrap_or(LogLevelFilter::Off);
         let flexi_writer = FlexiWriter::new(&config);
         match flexi_writer {
-            Ok(flexi_writer) =>  Ok( (max, FlexiLogger {
-                                            directives: directives,
-                                            o_filter: filter,
-                                            mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
-                                            config: config
-            })),
+            Ok(flexi_writer) => {
+                Ok((max,
+                    FlexiLogger {
+                    directives: directives,
+                    o_filter: filter,
+                    mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
+                    config: config,
+                }))
+            }
             Err(e) => Err(e),
         }
     }
@@ -69,10 +81,8 @@ impl FlexiLogger {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for directive in self.directives.iter().rev() {
             match directive.name {
-                Some(ref name) if !target.starts_with(&**name) => {},
-                Some(..) | None => {
-                    return level <= directive.level
-                }
+                Some(ref name) if !target.starts_with(&**name) => {}
+                Some(..) | None => return level <= directive.level,
             }
         }
         false
@@ -97,9 +107,9 @@ impl Log for FlexiLogger {
 
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
-            if self.config.duplicate_error && record.level() == LogLevel::Error
-            || self.config.duplicate_info  && record.level() == LogLevel::Info {
-                println!("{}",&record.args());
+            if self.config.duplicate_error && record.level() == LogLevel::Error ||
+               self.config.duplicate_info && record.level() == LogLevel::Info {
+                println!("{}", &record.args());
             }
             msg.push('\n');
             let msgb = msg.as_bytes();
@@ -111,7 +121,7 @@ impl Log for FlexiLogger {
 
             flexi_writer.write(msgb, &self.config);
         } else {
-            let _ = writeln!(&mut io::stderr(), "{}", msg );
+            let _ = writeln!(&mut io::stderr(), "{}", msg);
         }
     }
 }
@@ -133,37 +143,41 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
         print_err!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
         return (dirs, None);
     }
-    mods.map(|m| { for s in m.split(',') {
-        if s.len() == 0 { continue }
-        let mut parts = s.split('=');
-        let (log_level, name) = match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
-            (Some(part0), None, None) => {
-                // if the single argument is a log-level string or number, treat that as a global fallback
-                match part0.parse() {
-                    Ok(num) => (num, None),
-                    Err(_) => (LogLevelFilter::max(), Some(part0)),
-                }
+    mods.map(|m| {
+        for s in m.split(',') {
+            if s.len() == 0 {
+                continue;
             }
-            (Some(part0), Some(""), None) => (LogLevelFilter::max(), Some(part0)),
-            (Some(part0), Some(part1), None) => {
-                match part1.parse() {
-                    Ok(num) => (num, Some(part0)),
-                    _ => {
-                        print_err!("warning: invalid logging spec '{}', ignoring it", part1);
-                        continue
+            let mut parts = s.split('=');
+            let (log_level, name) = match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
+                (Some(part0), None, None) => {
+                    // if the single argument is a log-level string or number, treat that as a global fallback
+                    match part0.parse() {
+                        Ok(num) => (num, None),
+                        Err(_) => (LogLevelFilter::max(), Some(part0)),
                     }
                 }
-            },
-            _ => {
-                print_err!("warning: invalid logging spec '{}', ignoring it", s);
-                continue
-            }
-        };
-        dirs.push(LogDirective {
-            name: name.map(|s| s.to_string()),
-            level: log_level,
-        });
-    }});
+                (Some(part0), Some(""), None) => (LogLevelFilter::max(), Some(part0)),
+                (Some(part0), Some(part1), None) => {
+                    match part1.parse() {
+                        Ok(num) => (num, Some(part0)),
+                        _ => {
+                            print_err!("warning: invalid logging spec '{}', ignoring it", part1);
+                            continue;
+                        }
+                    }
+                }
+                _ => {
+                    print_err!("warning: invalid logging spec '{}', ignoring it", s);
+                    continue;
+                }
+            };
+            dirs.push(LogDirective {
+                name: name.map(|s| s.to_string()),
+                level: log_level,
+            });
+        }
+    });
 
     let filter = filter.map_or(None, |filter| {
         match Regex::new(filter) {
@@ -239,12 +253,15 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
 /// Init returns a FlexiLoggerError, if it is supposed to write to an output file
 /// but the file cannot be opened, e.g. because of operating system issues.
 ///
-pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiLoggerError> {
-    match FlexiLogger::new_int(loglevelspec,config) {
-        Ok((max,fl)) => {
-            log::set_logger( |max_level| {max_level.set(max);Box::new(fl)} )
-                 .map_err(|e|{FlexiLoggerError::new(format!("Logger initialization failed due to {}", e))})
-        },
+pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {
+    match FlexiLogger::new_int(loglevelspec, config) {
+        Ok((max, fl)) => {
+            log::set_logger(|max_level| {
+                max_level.set(max);
+                Box::new(fl)
+            })
+                .map_err(|e| FlexiLoggerError::new(format!("Logger initialization failed due to {}", e)))
+        }
         Err(e) => Err(e),
     }
 }
@@ -253,9 +270,9 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(),FlexiL
 
 #[cfg(test)]
 mod tests {
-    use log::{LogLevel,LogLevelFilter};
+    use log::{LogLevel, LogLevelFilter};
     use LogConfig;
-    use super::{FlexiLogger,parse_logging_spec};
+    use super::{FlexiLogger, parse_logging_spec};
 
     fn make_logger(loglevelspec: &'static str) -> FlexiLogger {
         FlexiLogger::new(Some(loglevelspec.to_string()), LogConfig::new()).unwrap()

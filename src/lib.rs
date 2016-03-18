@@ -69,8 +69,8 @@ mod flexi_writer;
 mod formats;
 mod log_config;
 
-pub use log::{LogLevel,LogLevelFilter,LogRecord};
+pub use log::{LogLevel, LogLevelFilter, LogRecord};
 pub use formats::*;
 pub use log_config::LogConfig;
 pub use flexi_error::FlexiLoggerError;
-pub use flexi_logger::{FlexiLogger,init};
+pub use flexi_logger::{FlexiLogger, init};
