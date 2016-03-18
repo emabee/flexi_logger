@@ -1,5 +1,5 @@
 use log::LogRecord;
-use formats::opt_format;
+use formats;
 
 /// Allows influencing the behavior of flexi_logger.
 pub struct LogConfig {
@@ -33,7 +33,7 @@ pub struct LogConfig {
     pub suffix: Option<String>,
 
     /// Allows specifying whether or not the filename should include a timestamp. Default is '''true'''.
-    pub timestamp: Option<bool>,
+    pub timestamp: bool,
 
     /// Allows specifying a maximum size for log files in bytes; when
     /// the specified file size is reached or exceeded, the file will be closed and a new one will be opened.
@@ -61,10 +61,10 @@ impl LogConfig {
             print_message: true,
             duplicate_error: true,
             duplicate_info: false,
-            format: opt_format,
+            format: formats::default_format,
             directory: None,
             suffix: Some("log".to_string()),
-            timestamp: Some(true),
+            timestamp: true,
             rotate_over_size: None,
             discriminant: None,
         }

@@ -83,7 +83,7 @@ impl FlexiWriter {
             written_bytes: 0,
             rotate_idx: rotate_idx,
         };
-        flexi_writer.mount_linewriter(&config.suffix, &config.timestamp, config.print_message);
+        flexi_writer.mount_linewriter(&config.suffix, config.timestamp, config.print_message);
         Ok(flexi_writer)
     }
 
@@ -94,7 +94,7 @@ impl FlexiWriter {
             self.o_flw = None;  // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
-            self.mount_linewriter(&config.suffix, &config.timestamp, config.print_message);
+            self.mount_linewriter(&config.suffix, config.timestamp, config.print_message);
         }
         // write out the stuff
         if let Some(ref mut lw) = self.o_flw {
@@ -109,7 +109,7 @@ impl FlexiWriter {
         };
     }
 
-    fn mount_linewriter(&mut self, suffix: &Option<String>, timestamp: &Option<bool>, print_message: bool) {
+    fn mount_linewriter(&mut self, suffix: &Option<String>, timestamp: bool, print_message: bool) {
         if let None = self.o_flw {
             if let Some(ref s_filename_base) = self.o_filename_base {
                 let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix, timestamp);
@@ -135,10 +135,10 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
 }
 
 fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>,
-                timestamp: &Option<bool>)
+                timestamp: bool)
                 -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
-    if timestamp.is_some() && timestamp.unwrap() {
+    if timestamp {
         filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
     };
     if do_rotating {
