@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-flexi_logger = "0.4"
+flexi_logger = "0.5"
 log = "*"
 ```
 

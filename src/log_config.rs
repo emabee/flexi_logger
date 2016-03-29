@@ -32,7 +32,7 @@ pub struct LogConfig {
     /// Allows specifying the filesystem suffix of the log files (without the dot).  Default is ```log```.
     pub suffix: Option<String>,
 
-    /// Allows specifying whether or not the filename should include a timestamp. Default is '''true'''.
+    /// Allows specifying whether or not the filename should include a timestamp. Default is ```true```.
     pub timestamp: bool,
 
     /// Allows specifying a maximum size for log files in bytes; when
@@ -41,25 +41,31 @@ pub struct LogConfig {
     pub rotate_over_size: Option<usize>,
 
     /// Allows specifying an additional part of the log file name that is inserted after the program name.
+    /// Default is ```None```.
     pub discriminant: Option<String>,
 
     /// Allows specifying an option to create a symlink to the most recent log file created
-    /// using the given name. Default is '''None'''.
-    /// * Rust currently only has an API for unix systems, Windows will be added when available. *
+    /// using the given name. Default is ```None```.
+    ///
+    /// Note that this option is only effective on linux systems.
     pub create_symlink: Option<String>,
 }
 impl LogConfig {
-    /// initializes with
+    /// The default initialization initializes the logger with
     ///
-    /// *  log_to_file = false,
-    /// *  print_message = true,
-    /// *  duplicate_error = true,
-    /// *  duplicate_info = false,
-    /// *  format = flexi_logger::default_format,
-    /// *  no directory (log files are created where the program was started),
-    /// *  no rotate_over: log file grows indefinitely
-    /// *  no discriminant: log file name consists only of progname, date or rotate_idx,  and suffix.
-    /// *  suffix =  "log".
+    /// *  log_to_file = false
+    /// *  print_message = true
+    /// *  duplicate_error = true
+    /// *  duplicate_info = false
+    /// *  format = flexi_logger::default_format
+    /// *  no directory: log files (if they were used) are created where the program was started
+    /// *  no rotate_over: log file (if it were used) grows indefinitely
+    /// *  the name of the log file (if it were used) consists of progname, timestamp, and suffix ```log```
+    /// *  no symlink being created.
+    ///
+    /// We recommend using this constructor as described in the examples of function [init](fn.init.html)
+    /// to avoid compilation issues with your code, if future versions of flexi_logger
+    /// come with extensions to LogConfig.
     pub fn new() -> LogConfig {
         LogConfig {
             log_to_file: false,

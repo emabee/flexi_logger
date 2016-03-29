@@ -8,7 +8,6 @@ use std::fs::{self, File};
 use std::io::{LineWriter, Write};
 use std::ops::Add;
 use std::path::Path;
-use std::os::unix::fs as unix_fs;
 
 type FileLineWriter = LineWriter<File>;
 
@@ -136,23 +135,12 @@ impl FlexiWriter {
                 self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
 
                 if let &Some(ref link) = create_symlink {
-                    if fs::metadata(link).is_ok() {
-                        // old symlink must be removed before creating a new one
-                        let _ = fs::remove_file(link);
-                    }
-
-                    if let Err(e) = unix_fs::symlink(&path, link) {
-                        print_err!("Can not create symlink \"{}\" for path \"{}\": {}",
-                                   link,
-                                   &path.display(),
-                                   e);
-                    };
-                };
+                    self::platform::create_symlink_if_possible(link);
+                }
             }
         }
     }
 }
-
 
 fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> String {
     let arg0 = env::args().next().unwrap();
@@ -219,4 +207,33 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
         }
     }
     rotate_idx + 1
+}
+
+
+mod platform {
+    pub fn create_symlink_if_possible(link: &String) {
+        linux_create_symlink(link);
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_create_symlink(link: &String) {
+        use std::os::unix::fs as unix_fs;
+        if fs::metadata(link).is_ok() {
+            // old symlink must be removed before creating a new one
+            let _ = fs::remove_file(link);
+        }
+
+        if let Err(e) = unix_fs::symlink(&path, link) {
+            print_err!("Can not create symlink \"{}\" for path \"{}\": {}",
+                       link,
+                       &path.display(),
+                       e);
+        }
+    }
+
+    // And this function only gets compiled if the target OS is *not* linux
+    #[cfg(not(target_os = "linux"))]
+    #[allow(unused_variables)]
+    fn linux_create_symlink(link: &String) {
+    }
 }
