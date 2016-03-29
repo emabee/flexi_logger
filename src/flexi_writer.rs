@@ -8,6 +8,7 @@ use std::fs::{self, File};
 use std::io::{LineWriter, Write};
 use std::ops::Add;
 use std::path::Path;
+use std::os::unix::fs as unix_fs;
 
 type FileLineWriter = LineWriter<File>;
 
@@ -83,7 +84,10 @@ impl FlexiWriter {
             written_bytes: 0,
             rotate_idx: rotate_idx,
         };
-        flexi_writer.mount_linewriter(&config.suffix, config.timestamp, config.print_message);
+        flexi_writer.mount_linewriter(&config.suffix,
+                                      &config.create_symlink,
+                                      config.timestamp,
+                                      config.print_message);
         Ok(flexi_writer)
     }
 
@@ -94,8 +98,12 @@ impl FlexiWriter {
             self.o_flw = None;  // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
-            self.mount_linewriter(&config.suffix, config.timestamp, config.print_message);
+            self.mount_linewriter(&config.suffix,
+                                  &config.create_symlink,
+                                  config.timestamp,
+                                  config.print_message);
         }
+
         // write out the stuff
         if let Some(ref mut lw) = self.o_flw {
             lw.write(msgb)
@@ -109,15 +117,37 @@ impl FlexiWriter {
         };
     }
 
-    fn mount_linewriter(&mut self, suffix: &Option<String>, timestamp: bool, print_message: bool) {
+    fn mount_linewriter(&mut self,
+                        suffix: &Option<String>,
+                        create_symlink: &Option<String>,
+                        timestamp: bool,
+                        print_message: bool) {
         if let None = self.o_flw {
             if let Some(ref s_filename_base) = self.o_filename_base {
-                let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix, timestamp);
+                let filename = get_filename(s_filename_base,
+                                            self.use_rotating,
+                                            self.rotate_idx,
+                                            suffix,
+                                            timestamp);
                 let path = Path::new(&filename);
                 if print_message {
-                    println!("Log is written to {}", path.display());
+                    println!("Log is written to {}", &path.display());
                 }
-                self.o_flw = Some(LineWriter::new(File::create(path.clone()).unwrap()));
+                self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
+
+                if let &Some(ref link) = create_symlink {
+                    if fs::metadata(link).is_ok() {
+                        // old symlink must be removed before creating a new one
+                        let _ = fs::remove_file(link);
+                    }
+
+                    if let Err(e) = unix_fs::symlink(&path, link) {
+                        print_err!("Can not create symlink \"{}\" for path \"{}\": {}",
+                                   link,
+                                   &path.display(),
+                                   e);
+                    };
+                };
             }
         }
     }
@@ -134,7 +164,10 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
     filename
 }
 
-fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>,
+fn get_filename(s_filename_base: &String,
+                do_rotating: bool,
+                rotate_idx: usize,
+                o_suffix: &Option<String>,
                 timestamp: bool)
                 -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
@@ -164,12 +197,17 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     match glob(&fn_pattern) {
         Err(e) => {
-            print_err!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
+            print_err!("Is this ({}) really a directory? Listing failed with {}",
+                       fn_pattern,
+                       e);
         }
         Ok(globresults) => {
             for globresult in globresults {
                 match globresult {
-                    Err(e) => print_err!("Error occured when reading directory for log files: {:?}", e),
+                    Err(e) => {
+                        print_err!("Error occured when reading directory for log files: {:?}",
+                                   e)
+                    }
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");

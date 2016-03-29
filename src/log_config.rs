@@ -42,6 +42,11 @@ pub struct LogConfig {
 
     /// Allows specifying an additional part of the log file name that is inserted after the program name.
     pub discriminant: Option<String>,
+
+    /// Allows specifying an option to create a symlink to the most recent log file created
+    /// using the given name. Default is '''None'''.
+    /// * Rust currently only has an API for unix systems, Windows will be added when available. *
+    pub create_symlink: Option<String>,
 }
 impl LogConfig {
     /// initializes with
@@ -67,6 +72,7 @@ impl LogConfig {
             timestamp: true,
             rotate_over_size: None,
             discriminant: None,
+            create_symlink: None,
         }
     }
 }
