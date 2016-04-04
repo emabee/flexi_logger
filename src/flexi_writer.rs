@@ -122,7 +122,7 @@ impl FlexiWriter {
                 self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
 
                 if let &Some(ref link) = create_symlink {
-                    self::platform::create_symlink_if_possible(link);
+                    self::platform::create_symlink_if_possible(link, path);
                 }
             }
         }
@@ -190,13 +190,17 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
 
 
 mod platform {
-    pub fn create_symlink_if_possible(link: &String) {
-        linux_create_symlink(link);
+    use std::fs;
+    use std::path::Path;
+
+    pub fn create_symlink_if_possible(link: &String, path: &Path) {
+        linux_create_symlink(link, path);
     }
 
     #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &String) {
+    fn linux_create_symlink(link: &String, path: &Path) {
         use std::os::unix::fs as unix_fs;
+
         if fs::metadata(link).is_ok() {
             // old symlink must be removed before creating a new one
             let _ = fs::remove_file(link);
