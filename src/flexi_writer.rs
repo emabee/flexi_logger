@@ -190,7 +190,6 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
 
 
 mod platform {
-    use std::fs;
     use std::path::Path;
 
     pub fn create_symlink_if_possible(link: &String, path: &Path) {
@@ -199,6 +198,7 @@ mod platform {
 
     #[cfg(target_os = "linux")]
     fn linux_create_symlink(link: &String, path: &Path) {
+        use std::fs;
         use std::os::unix::fs as unix_fs;
 
         if fs::metadata(link).is_ok() {
@@ -211,8 +211,6 @@ mod platform {
         }
     }
 
-    // And this function only gets compiled if the target OS is *not* linux
     #[cfg(not(target_os = "linux"))]
-    #[allow(unused_variables)]
-    fn linux_create_symlink(link: &String) {}
+    fn linux_create_symlink(_: &String, _: &Path) {}
 }
