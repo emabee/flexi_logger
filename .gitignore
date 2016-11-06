@@ -1,5 +1,7 @@
 target
 Cargo.lock
 *.log
+link_to_log
 log_files
 todo
+*~

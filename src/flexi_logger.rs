@@ -108,7 +108,9 @@ impl Log for FlexiLogger {
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
             if self.config.duplicate_error && record.level() == LogLevel::Error ||
-               self.config.duplicate_info && record.level() == LogLevel::Info {
+               self.config.duplicate_info &&
+               (record.level() == LogLevel::Error || record.level() == LogLevel::Warn ||
+                record.level() == LogLevel::Info) {
                 println!("{}", &record.args());
             }
             msg.push('\n');

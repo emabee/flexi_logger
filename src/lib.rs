@@ -67,10 +67,16 @@ mod flexi_error;
 mod flexi_logger;
 mod flexi_writer;
 mod formats;
-mod log_config;
+mod log_options;
 
 pub use log::{LogLevel, LogLevelFilter, LogRecord};
 pub use formats::*;
-pub use log_config::LogConfig;
+pub use log_options::LogOptions;
+pub use log_options::LogOptions as LogConfig;
 pub use flexi_error::FlexiLoggerError;
 pub use flexi_logger::{FlexiLogger, init};
+
+/// Factory for a LogOptions object.
+pub fn logger_options() -> LogOptions {
+    log_options::LogOptions::new()
+}

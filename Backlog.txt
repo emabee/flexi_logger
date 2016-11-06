@@ -1,0 +1,24 @@
+support init with fluent code like OpenOptions
+
+instead of:
+    or_panic!(flexi_logger::init(flexi_logger::LogConfig {
+                                     format: with_thread,
+                                     ..flexi_logger::LogConfig::new()
+                                 },
+                                 None));
+
+support this:
+    or_panic!(flexi_logger::logger_options()
+                            .format(with_thread)
+                            .log_to_file(true)
+                            .format(opt_format)
+                            .directory(Some("z_logs".to_string()))
+                            .log_spec("info")
+                            .init());
+
+
+set LogConfig to deprecated #[deprecated(since="0.5.1", note="please use `logger_options()` instead")]
+make LogOptions a new_type_struct around LogConfig, hiding the members
+
+
+Update Doku!!
