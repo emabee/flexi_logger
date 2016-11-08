@@ -22,3 +22,13 @@ and this to your crate root:
 extern crate log;
 extern crate flexi_logger;
 ```
+
+Early in the start-up of your program, call something like
+
+```text
+    flexi_logger::LogOptions::new()
+        .log_to_file(true)
+        // ... your configuration options go here ...
+        .init(Some("info".to_string()))
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+```
