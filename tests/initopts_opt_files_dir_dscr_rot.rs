@@ -1,13 +1,14 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
+
+use flexi_logger::LogOptions;
 
 #[test]
 fn files_dir_dscr_rot() {
     let link_name = String::from("link_to_log");
     assert_eq!((),
-               flexi_logger::logger_options()
+               LogOptions::new()
                    .format(flexi_logger::opt_format)
                    .log_to_file(true)
                    .directory(Some("log_files".to_string()))

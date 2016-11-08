@@ -1,13 +1,13 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
+
+use flexi_logger::LogOptions;
 
 #[test]
 fn files_dir_rot() {
     assert_eq!((),
-               flexi_logger::logger_options()
-                   .format(flexi_logger::default_format)
+               LogOptions::new()
                    .log_to_file(true)
                    .directory(Some("log_files".to_string()))
                    .rotate_over_size(Some(2000))

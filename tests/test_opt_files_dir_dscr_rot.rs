@@ -3,23 +3,23 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{opt_format,init,LogConfig};
+use flexi_logger::{opt_format, init, LogConfig};
 
 #[test]
 fn files_dir_dscr_rot() {
     let link_name = String::from("link_to_log");
-    assert_eq!(
-        (),
-        init( LogConfig {
-                 format: opt_format,
-                 log_to_file: true,
-                 directory: Some("log_files".to_string()),
-                 discriminant: Some("foo".to_string()),
-                 rotate_over_size: Some(2000),
-                 create_symlink: Some(link_name.clone()),
-                 .. LogConfig::new()
-               }, Some("info".to_string()) ).unwrap()
-    );
+    assert_eq!((),
+               init(LogConfig {
+                        format: opt_format,
+                        log_to_file: true,
+                        directory: Some("log_files".to_string()),
+                        discriminant: Some("foo".to_string()),
+                        rotate_over_size: Some(2000),
+                        create_symlink: Some(link_name.clone()),
+                        ..LogConfig::new()
+                    },
+                    Some("info".to_string()))
+                   .unwrap());
 
     error!("This is an error message");
     warn!("This is a warning");

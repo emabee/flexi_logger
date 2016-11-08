@@ -4,6 +4,8 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
+use flexi_logger::LogOptions;
+
 use chrono::Local;
 use glob::glob;
 
@@ -25,7 +27,7 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    flexi_logger::logger_options()
+    LogOptions::new()
         .log_to_file(true)
         .format(test_format)
         .duplicate_info(true)
@@ -49,12 +51,12 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
         worker_handles.push(thread::Builder::new()
-            .name(thread_number.to_string())
-            .spawn(move || {
-                do_work(thread_number);
-                0 as u8
-            })
-            .unwrap());
+                                .name(thread_number.to_string())
+                                .spawn(move || {
+                                    do_work(thread_number);
+                                    0 as u8
+                                })
+                                .unwrap());
     }
     trace!("All {} worker threads started.", worker_handles.len());
     worker_handles
@@ -81,8 +83,9 @@ fn define_directory() -> String {
 }
 
 fn test_format(record: &flexi_logger::LogRecord) -> String {
-    format!("XXXXX [{}] {} [{}:{}] {}",
+    format!("XXXXX [{}] T[{:?}] {} [{}:{}] {}",
             Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+            thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.location().file(),
             record.location().line(),

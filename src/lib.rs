@@ -15,7 +15,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "0.5"
+//! flexi_logger = "^0.5.1"
 //! log = "*"
 //! ```
 //!
@@ -31,18 +31,23 @@
 //! [log crate](http://rust-lang.github.io/log/log/),
 //! and you use the ```log``` macros to write log lines from your code.
 //!
-//! In flexi_logger's initialization, you can e.g.
+//! Early in the start-up of your program, call something like
 //!
-//! *  decide whether you want to write your logs to stderr (like with env_logger),
-//!    or to a file,
+//! ```text
+//!    LogOptions::new()
+//!        .log_to_file(true)
+//!        // ... your configuration options go here ...
+//!        .init(Some("info".to_string()))
+//!        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+//! ```
+//!
+//! The configuration options allow e.g. to
+//!
+//! *  decide whether you want to write your logs to stderr (like with env_logger), or to a file,
 //! *  configure the folder in which the log files are created,
-//! *  provide the log-level-specification, i.e., the decision which log
-//!    lines really should be written out, programmatically (if you don't want to
-//!    use the environment variable RUST_LOG)
 //! *  specify the line format for the log lines
 //!
-//! See function [init](fn.init.html) and structure [LogConfig](struct.LogConfig.html) for
-//! a full description of all configuration options.
+//! See [LogOptions](struct.LogOptions.html) for a full description of all configuration options.
 
 extern crate chrono;
 extern crate glob;
@@ -72,11 +77,9 @@ mod log_options;
 pub use log::{LogLevel, LogLevelFilter, LogRecord};
 pub use formats::*;
 pub use log_options::LogOptions;
-pub use log_options::LogOptions as LogConfig;
 pub use flexi_error::FlexiLoggerError;
-pub use flexi_logger::{FlexiLogger, init};
 
-/// Factory for a LogOptions object.
-pub fn logger_options() -> LogOptions {
-    log_options::LogOptions::new()
-}
+
+pub use log_options::LogConfig;
+pub use flexi_logger::FlexiLogger;
+pub use flexi_logger::init;

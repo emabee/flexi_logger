@@ -1,12 +1,12 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
 
+use flexi_logger::LogOptions;
 
 #[test]
 fn you_must_see_exactly_three_messages_above_1_err_1_warn_1_info() {
-    flexi_logger::logger_options()
+    LogOptions::new()
         .init(Some("info".to_string()))
         .unwrap();
 

@@ -1,12 +1,13 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
+
+use flexi_logger::LogOptions;
 
 #[test]
 fn files_dscr() {
     assert_eq!((),
-               flexi_logger::logger_options()
+               LogOptions::new()
                    .log_to_file(true)
                    .discriminant(Some("foo".to_string()))
                    .init(Some("info".to_string()))

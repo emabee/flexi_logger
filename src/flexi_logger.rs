@@ -1,18 +1,21 @@
+//! Structures and methods that allow supporting multiple FlexiLogger instances in a single process.
 use flexi_writer::FlexiWriter;
+use log_options::LogConfig;
+use FlexiLoggerError;
+use log;
 
-use {FlexiLoggerError, LogConfig};
-use log::{self, Log, LogLevel, LogLevelFilter, LogMetadata, LogRecord};
 use regex::Regex;
+
 use std::cell::RefCell;
 use std::env;
 use std::io::{self, Write};
-
 use std::ops::DerefMut;
 use std::sync::Mutex;
 
 
-/// Does the logging.
-/// Is only made public to support usecases where more than one FlexiLogger instance are required in a single process.
+/// Does the logging in the background, is normally not used directly.
+///
+/// This struct is only required if you want to allow supporting multiple FlexiLogger instances in a single process.
 pub struct FlexiLogger {
     directives: Vec<LogDirective>,
     o_filter: Option<Regex>,
@@ -24,14 +27,11 @@ pub struct FlexiLogger {
 impl FlexiLogger {
     /// Creates a new FlexiLogger instance based on your configuration and a loglevel specification.
     pub fn new(loglevelspec: Option<String>, config: LogConfig) -> Result<FlexiLogger, FlexiLoggerError> {
-        match FlexiLogger::new_int(loglevelspec, config) {
-            Ok((_, fl)) => Ok(fl),
-            Err(e) => Err(e),
-        }
+        FlexiLogger::new_int(loglevelspec, config).map(|(_, fl)| fl)
     }
 
     fn new_int(loglevelspec: Option<String>, config: LogConfig)
-               -> Result<(LogLevelFilter, FlexiLogger), FlexiLoggerError> {
+               -> Result<(log::LogLevelFilter, FlexiLogger), FlexiLoggerError> {
 
         let (mut directives, filter) = match loglevelspec {
             Some(ref llspec) => {
@@ -44,7 +44,7 @@ impl FlexiLogger {
                     Err(..) => {
                         (vec![LogDirective {
                                   name: None,
-                                  level: LogLevelFilter::Error,
+                                  level: log::LogLevelFilter::Error,
                               }],
                          None)
                     }
@@ -60,24 +60,21 @@ impl FlexiLogger {
             alen.cmp(&blen)
         });
 
-        let max = directives.iter().map(|d| d.level).max().unwrap_or(LogLevelFilter::Off);
-        let flexi_writer = FlexiWriter::new(&config);
-        match flexi_writer {
-            Ok(flexi_writer) => {
-                Ok((max,
-                    FlexiLogger {
-                    directives: directives,
-                    o_filter: filter,
-                    mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
-                    config: config,
-                }))
-            }
-            Err(e) => Err(e),
-        }
+        let max = directives.iter().map(|d| d.level).max().unwrap_or(log::LogLevelFilter::Off);
+
+        FlexiWriter::new(&config).map(|flexi_writer| {
+            (max,
+             FlexiLogger {
+                directives: directives,
+                o_filter: filter,
+                mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
+                config: config,
+            })
+        })
     }
 
     /// Checks if a log line for the specified target and level is to be written really
-    pub fn fl_enabled(&self, level: LogLevel, target: &str) -> bool {
+    pub fn fl_enabled(&self, level: log::LogLevel, target: &str) -> bool {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for directive in self.directives.iter().rev() {
             match directive.name {
@@ -89,13 +86,13 @@ impl FlexiLogger {
     }
 }
 
-impl Log for FlexiLogger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+impl log::Log for FlexiLogger {
+    fn enabled(&self, metadata: &log::LogMetadata) -> bool {
         self.fl_enabled(metadata.level(), metadata.target())
     }
 
-    fn log(&self, record: &LogRecord) {
-        if !Log::enabled(self, record.metadata()) {
+    fn log(&self, record: &log::LogRecord) {
+        if !log::Log::enabled(self, record.metadata()) {
             return;
         }
 
@@ -107,10 +104,10 @@ impl Log for FlexiLogger {
 
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
-            if self.config.duplicate_error && record.level() == LogLevel::Error ||
+            if self.config.duplicate_error && record.level() == log::LogLevel::Error ||
                self.config.duplicate_info &&
-               (record.level() == LogLevel::Error || record.level() == LogLevel::Warn ||
-                record.level() == LogLevel::Info) {
+               (record.level() == log::LogLevel::Error || record.level() == log::LogLevel::Warn ||
+                record.level() == log::LogLevel::Info) {
                 println!("{}", &record.args());
             }
             msg.push('\n');
@@ -130,7 +127,7 @@ impl Log for FlexiLogger {
 
 struct LogDirective {
     name: Option<String>,
-    level: LogLevelFilter,
+    level: log::LogLevelFilter,
 }
 
 /// Parse a logging specification string (e.g: "crate1,crate2::mod3,crate3::x=error/foo")
@@ -156,10 +153,10 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
                     // if the single argument is a log-level string or number, treat that as a global fallback
                     match part0.parse() {
                         Ok(num) => (num, None),
-                        Err(_) => (LogLevelFilter::max(), Some(part0)),
+                        Err(_) => (log::LogLevelFilter::max(), Some(part0)),
                     }
                 }
-                (Some(part0), Some(""), None) => (LogLevelFilter::max(), Some(part0)),
+                (Some(part0), Some(""), None) => (log::LogLevelFilter::max(), Some(part0)),
                 (Some(part0), Some(part1), None) => {
                     match part1.parse() {
                         Ok(num) => (num, Some(part0)),
@@ -197,72 +194,22 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
 
 /// Initializes the flexi_logger to your needs, and the global logger with flexi_logger.
 ///
-/// Note: this should be called early in the execution of a Rust program. The
-/// global logger may only be initialized once, subsequent initialization attempts
-/// will return an error.
-///
+/// Directly calling this method is normally not necessary.
 /// ## Configuration
-///
 /// See [LogConfig](struct.LogConfig.html) for most of the initialization options.
 ///
-/// ## Log Level Specification
-///
-/// Specifying the log levels that you really want to see in a specific program run
-/// can be done in the syntax defined by
-/// [env_logger -> enabling logging](http://rust-lang.github.io/log/env_logger/#enabling-logging)
-/// (from where this functionality was ruthlessly copied).
-/// You can hand over the desired log-level-specification as an
-/// initialization parameter to flexi_logger, or, if you don't do so,
-/// with the environment variable RUST_LOG (as with env_logger).
-/// Since using environment variables is on Windows not as comfortable as on linux,
-/// you might consider using e.g. a docopt option for specifying the
-/// log-Level-specification on the command line of your program.
-///
-///
-/// ## Examples
-///
-/// ### Use defaults only
-///
-/// If you initialize flexi_logger with default settings, then it behaves like env_logger:
-///
-/// ```
-/// use flexi_logger::{init,LogConfig};
-///
-/// init(LogConfig::new(), None).unwrap();
-/// ```
-///
-/// ### Write to files, use a detailed log-line format that contains the module and line number
-///
-/// Here we configure flexi_logger to write log entries with
-/// time and location info into a log file in folder "log_files",
-/// and we provide the loglevel-specification programmatically
-/// as a ```Some<String>```, which might come in this form from what e.g. [docopt](https://crates.io/crates/docopt)
-/// could provide for a respective command-line option:
-///
-/// ```
-/// use flexi_logger::{init,opt_format,LogConfig};
-///
-/// init( LogConfig { log_to_file: true,
-///                   directory: Some("log_files".to_string()),
-///                   format: opt_format,
-///                   .. LogConfig::new() },
-///       Some("myprog=debug,mylib=warn".to_string()) )
-/// .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
-/// ```
-///
-/// # Failures
-///
-/// Init returns a FlexiLoggerError, if it is supposed to write to an output file
-/// but the file cannot be opened, e.g. because of operating system issues.
-///
 pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {
+    initialize(config, loglevelspec)
+}
+
+/// Initializes flexi_logger.
+pub fn initialize(config: LogConfig, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {
     match FlexiLogger::new_int(loglevelspec, config) {
         Ok((max, fl)) => {
-            log::set_logger(|max_level| {
+            Ok(try!(log::set_logger(|max_level| {
                 max_level.set(max);
                 Box::new(fl)
-            })
-                .map_err(|e| FlexiLoggerError::new(format!("Logger initialization failed due to {}", e)))
+            })))
         }
         Err(e) => Err(e),
     }
@@ -272,7 +219,7 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(), Flexi
 
 #[cfg(test)]
 mod tests {
-    use log::{LogLevel, LogLevelFilter};
+    use {LogLevel, LogLevelFilter};
     use LogConfig;
     use super::{FlexiLogger, parse_logging_spec};
 

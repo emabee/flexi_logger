@@ -2,12 +2,12 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::logger_options;
+use flexi_logger::LogOptions;
 
 #[test]
 fn files_dir() {
     assert_eq!((),
-               logger_options()
+               LogOptions::new()
                    .format(flexi_logger::default_format)
                    .log_to_file(true)
                    .directory(Some("log_files".to_string()))

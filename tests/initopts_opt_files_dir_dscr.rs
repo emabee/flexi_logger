@@ -2,11 +2,13 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
+use flexi_logger::{LogOptions, opt_format};
+
 #[test]
 fn files_dir_dscr() {
     assert_eq!((),
-               flexi_logger::logger_options()
-                   .format(flexi_logger::opt_format)
+               LogOptions::new()
+                   .format(opt_format)
                    .log_to_file(true)
                    .directory(Some("log_files".to_string()))
                    .discriminant(Some("foo".to_string()))

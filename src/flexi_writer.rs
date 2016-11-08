@@ -1,4 +1,5 @@
-use {LogConfig, FlexiLoggerError};
+use log_options::LogConfig;
+use FlexiLoggerError;
 
 use chrono::Local;
 use glob::glob;
@@ -39,31 +40,12 @@ impl FlexiWriter {
         };
         let directory = Path::new(&s_directory);
 
-        if let Err(e) = fs::create_dir_all(&directory) {
-            return Err(FlexiLoggerError::new(format!("Log cannot be written: output directory \
-                                                      \"{}\" does not exist and could not be \
-                                                      created due to {}",
-                                                     &directory.display(),
-                                                     e)));
-        };
+        try!(fs::create_dir_all(&directory));
 
-        let o_filename_base = match fs::metadata(&directory) {
-            Ok(metadata) => {
-                if metadata.is_dir() {
-                    Some(get_filename_base(&s_directory.clone(), &config.discriminant))
-                } else {
-                    return Err(FlexiLoggerError::new(format!("Log cannot be written: output \
-                                                              directory \"{}\" is not a \
-                                                              directory",
-                                                             &directory.display())));
-                }
-            }
-            Err(e) => {
-                return Err(FlexiLoggerError::new(format!("Log cannot be written: error \
-                                                          accessing output directory \"{}\": {}",
-                                                         &directory.display(),
-                                                         e)));
-            }
+        let o_filename_base = if try!(fs::metadata(&directory)).is_dir() {
+            Some(get_filename_base(&s_directory.clone(), &config.discriminant))
+        } else {
+            return Err(FlexiLoggerError::BadDirectory);
         };
 
         let (use_rotating, rotate_idx) = match o_filename_base {
