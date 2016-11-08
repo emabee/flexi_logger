@@ -34,7 +34,7 @@
 //! Early in the start-up of your program, call something like
 //!
 //! ```text
-//!    LogOptions::new()
+//!    flexi_logger::LogOptions::new()
 //!        .log_to_file(true)
 //!        // ... your configuration options go here ...
 //!        .init(Some("info".to_string()))
