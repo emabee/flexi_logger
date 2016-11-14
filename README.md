@@ -2,8 +2,7 @@
 A flexible logger that can write to stderr or to log files
 
 ## Documentation
-See http://emabee.atwebpages.com/rust/flexi_logger/index.html
-
+See https://docs.rs/flexi_logger/
 
 ## Usage
 
