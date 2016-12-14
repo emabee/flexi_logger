@@ -15,18 +15,21 @@ use std::sync::Mutex;
 
 /// Does the logging in the background, is normally not used directly.
 ///
-/// This struct is only required if you want to allow supporting multiple FlexiLogger instances in a single process.
+/// This struct is only required if you want to allow supporting multiple FlexiLogger
+/// instances in a single process.
 pub struct FlexiLogger {
     directives: Vec<LogDirective>,
     o_filter: Option<Regex>,
     // The FlexiWriter has mutable state; since Log.log() requires an unmutable self,
-    // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be thread-safe
+    // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
+    // thread-safe
     mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
     config: LogConfig,
 }
 impl FlexiLogger {
     /// Creates a new FlexiLogger instance based on your configuration and a loglevel specification.
-    pub fn new(loglevelspec: Option<String>, config: LogConfig) -> Result<FlexiLogger, FlexiLoggerError> {
+    pub fn new(loglevelspec: Option<String>, config: LogConfig)
+               -> Result<FlexiLogger, FlexiLoggerError> {
         FlexiLogger::new_int(loglevelspec, config).map(|(_, fl)| fl)
     }
 
@@ -65,11 +68,11 @@ impl FlexiLogger {
         FlexiWriter::new(&config).map(|flexi_writer| {
             (max,
              FlexiLogger {
-                directives: directives,
-                o_filter: filter,
-                mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
-                config: config,
-            })
+                 directives: directives,
+                 o_filter: filter,
+                 mr_flexi_writer: Mutex::new(RefCell::new(flexi_writer)),
+                 config: config,
+             })
         })
     }
 
@@ -113,9 +116,12 @@ impl log::Log for FlexiLogger {
             msg.push('\n');
             let msgb = msg.as_bytes();
 
-            let mut mutexguard_refcell_fw = self.mr_flexi_writer.lock().unwrap();  // MutexGuard<RefCell<FlexiWriter>>
-            let ref_refcell_fw = mutexguard_refcell_fw.deref_mut();                 // &mut RefCell<FlexiWriter>
-            let mut refmut_fw = ref_refcell_fw.borrow_mut();                        // RefMut<FlexiWriter>
+            // MutexGuard<RefCell<FlexiWriter>>:
+            let mut mutexguard_refcell_fw = self.mr_flexi_writer.lock().unwrap();
+            // &mut RefCell<FlexiWriter>:
+            let ref_refcell_fw = mutexguard_refcell_fw.deref_mut();
+            // RefMut<FlexiWriter>:
+            let mut refmut_fw = ref_refcell_fw.borrow_mut();
             let flexi_writer: &mut FlexiWriter = refmut_fw.deref_mut();
 
             flexi_writer.write(msgb, &self.config);
@@ -148,9 +154,12 @@ fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Regex>) {
                 continue;
             }
             let mut parts = s.split('=');
-            let (log_level, name) = match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
+            let (log_level, name) = match (parts.next(),
+                                           parts.next().map(|s| s.trim()),
+                                           parts.next()) {
                 (Some(part0), None, None) => {
-                    // if the single argument is a log-level string or number, treat that as a global fallback
+                    // if the single argument is a log-level string or number,
+                    // treat that as a global fallback
                     match part0.parse() {
                         Ok(num) => (num, None),
                         Err(_) => (log::LogLevelFilter::max(), Some(part0)),
@@ -206,15 +215,14 @@ pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(), Flexi
 pub fn initialize(config: LogConfig, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {
     match FlexiLogger::new_int(loglevelspec, config) {
         Ok((max, fl)) => {
-            Ok(try!(log::set_logger(|max_level| {
+            Ok(log::set_logger(|max_level| {
                 max_level.set(max);
                 Box::new(fl)
-            })))
+            })?)
         }
         Err(e) => Err(e),
     }
 }
-
 
 
 #[cfg(test)]

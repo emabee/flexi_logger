@@ -1,7 +1,7 @@
 verbose = false                             # Use verbose output
 skip_children = false                       # Don't reformat out of line modules
 
-max_width = 120                             # (100) Maximum width of each line
+max_width = 100                             # (100) Maximum width of each line
 ideal_width = 100                           # (80) Ideal width of each line
 tab_spaces = 4                              # Number of spaces per tab
 fn_call_width = 100                         # (60) Maximum width of the args of a function call before falling back to vertical formatting

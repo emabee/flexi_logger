@@ -40,9 +40,9 @@ impl FlexiWriter {
         };
         let directory = Path::new(&s_directory);
 
-        try!(fs::create_dir_all(&directory));
+        fs::create_dir_all(&directory)?;
 
-        let o_filename_base = if try!(fs::metadata(&directory)).is_dir() {
+        let o_filename_base = if fs::metadata(&directory)?.is_dir() {
             Some(get_filename_base(&s_directory.clone(), &config.discriminant))
         } else {
             return Err(FlexiLoggerError::BadDirectory);
@@ -65,7 +65,10 @@ impl FlexiWriter {
             written_bytes: 0,
             rotate_idx: rotate_idx,
         };
-        flexi_writer.mount_linewriter(&config.suffix, &config.create_symlink, config.timestamp, config.print_message);
+        flexi_writer.mount_linewriter(&config.suffix,
+                                      &config.create_symlink,
+                                      config.timestamp,
+                                      config.print_message);
         Ok(flexi_writer)
     }
 
@@ -76,7 +79,10 @@ impl FlexiWriter {
             self.o_flw = None;  // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
-            self.mount_linewriter(&config.suffix, &config.create_symlink, config.timestamp, config.print_message);
+            self.mount_linewriter(&config.suffix,
+                                  &config.create_symlink,
+                                  config.timestamp,
+                                  config.print_message);
         }
 
         // write out the stuff
@@ -92,11 +98,15 @@ impl FlexiWriter {
         };
     }
 
-    fn mount_linewriter(&mut self, suffix: &Option<String>, create_symlink: &Option<String>, timestamp: bool,
-                        print_message: bool) {
+    fn mount_linewriter(&mut self, suffix: &Option<String>, create_symlink: &Option<String>,
+                        timestamp: bool, print_message: bool) {
         if let None = self.o_flw {
             if let Some(ref s_filename_base) = self.o_filename_base {
-                let filename = get_filename(s_filename_base, self.use_rotating, self.rotate_idx, suffix, timestamp);
+                let filename = get_filename(s_filename_base,
+                                            self.use_rotating,
+                                            self.rotate_idx,
+                                            suffix,
+                                            timestamp);
                 let path = Path::new(&filename);
                 if print_message {
                     println!("Log is written to {}", &path.display());
@@ -121,8 +131,8 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
     filename
 }
 
-fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize, o_suffix: &Option<String>,
-                timestamp: bool)
+fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize,
+                o_suffix: &Option<String>, timestamp: bool)
                 -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
     if timestamp {
@@ -156,7 +166,9 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
         Ok(globresults) => {
             for globresult in globresults {
                 match globresult {
-                    Err(e) => print_err!("Error occured when reading directory for log files: {:?}", e),
+                    Err(e) => {
+                        print_err!("Error occured when reading directory for log files: {:?}", e)
+                    }
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
@@ -189,7 +201,10 @@ mod platform {
         }
 
         if let Err(e) = unix_fs::symlink(&path, link) {
-            print_err!("Can not create symlink \"{}\" for path \"{}\": {}", link, &path.display(), e);
+            print_err!("Can not create symlink \"{}\" for path \"{}\": {}",
+                       link,
+                       &path.display(),
+                       e);
         }
     }
 
