@@ -132,8 +132,17 @@ impl Logger {
 
     /// Makes the logger include a timestamp into the names of the log files
     /// (log_to_file must be chosen, too).
+    /// Deprecated because this is the default anyway.
+    #[deprecated]
     pub fn timestamp(mut self) -> Logger {
         self.config.timestamp = true;
+        self
+    }
+
+    /// Makes the logger not include a timestamp into the names of the log files
+    /// (log_to_file must be chosen, too).
+    pub fn suppress_timestamp(mut self) -> Logger {
+        self.config.timestamp = false;
         self
     }
 

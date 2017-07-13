@@ -56,7 +56,7 @@ impl LogSpecification {
         let mods = parts.next();
         let filter = parts.next();
         if parts.next().is_some() {
-            print_err!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
+            println!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
             return LogSpecification::default(LogLevelFilter::Off).finalize();
         }
         mods.map(|m| {
@@ -66,34 +66,54 @@ impl LogSpecification {
                     continue;
                 }
                 let mut parts = s.split('=');
-                let (log_level, name) = match (parts.next(),
-                                               parts.next().map(|s| s.trim()),
-                                               parts.next()) {
-                    (Some(part0), None, None) => {
-                        // if the single argument is a log-level string or number,
-                        // treat that as a global fallback
-                        match part0.trim().parse() {
-                            Ok(num) => (num, None),
-                            Err(_) => (LogLevelFilter::max(), Some(part0)),
-                        }
-                    }
-                    (Some(part0), Some(""), None) => (LogLevelFilter::max(), Some(part0)),
-                    (Some(part0), Some(part1), None) => {
-                        match part1.trim().parse() {
-                            Ok(num) => (num, Some(part0.trim())),
-                            _ => {
-                                print_err!("warning: invalid part in logging spec '{}', ignoring \
-                                            it",
-                                           part1);
+                let (log_level, name) =
+                    match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
+                        (Some(part0), None, None) => {
+                            if !no_dash(part0) {
+                                println!("warning: invalid part in logging spec '{}', contains a \
+                                          dash, ignoring it",
+                                         part0);
                                 continue;
                             }
+                            // if the single argument is a log-level string or number,
+                            // treat that as a global fallback
+                            match part0.trim().parse() {
+                                Ok(num) => (num, None),
+                                Err(_) => (LogLevelFilter::max(), Some(part0)),
+                            }
                         }
-                    }
-                    _ => {
-                        print_err!("warning: invalid part in logging spec '{}', ignoring it", s);
-                        continue;
-                    }
-                };
+                        (Some(part0), Some(""), None) => {
+                            if !no_dash(part0) {
+                                println!("warning: invalid part in logging spec '{}', contains a \
+                                          dash, ignoring it",
+                                         part0);
+                                continue;
+                            }
+
+                            (LogLevelFilter::max(), Some(part0))
+                        }
+                        (Some(part0), Some(part1), None) => {
+                            if !no_dash(part0) {
+                                println!("warning: invalid part in logging spec '{}', contains a \
+                                          dash, ignoring it",
+                                         part0);
+                                continue;
+                            }
+                            match part1.trim().parse() {
+                                Ok(num) => (num, Some(part0.trim())),
+                                _ => {
+                                    println!("warning: invalid part in logging spec '{}', \
+                                              ignoring it",
+                                             part1);
+                                    continue;
+                                }
+                            }
+                        }
+                        _ => {
+                            println!("warning: invalid part in logging spec '{}', ignoring it", s);
+                            continue;
+                        }
+                    };
                 dirs.push(ModuleFilter {
                     module_name: name.map(|s| s.to_string()),
                     level_filter: log_level,
@@ -104,7 +124,7 @@ impl LogSpecification {
         let textfilter = filter.map_or(None, |filter| match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
-                print_err!("warning: invalid regex filter - {}", e);
+                println!("warning: invalid regex filter - {}", e);
                 None
             }
         });
@@ -143,6 +163,10 @@ impl LogSpecification {
     pub fn text_filter(&self) -> &Option<Regex> {
         &self.textfilter
     }
+}
+
+fn no_dash(s: &str) -> bool {
+    s.find('-') == None
 }
 
 /// Builder for LogSpecification.
@@ -288,6 +312,16 @@ mod tests {
     #[test]
     fn parse_logging_spec_invalid_crate_filter() {
         let spec = LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c");
+        assert_eq!(spec.module_filters().len(), 1);
+        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
+        assert!(spec.text_filter().is_some() &&
+                spec.text_filter().as_ref().unwrap().to_string() == "a.c");
+    }
+
+    #[test]
+    fn parse_logging_spec_invalid_crate_with_dash() {
+        let spec = LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
         assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
