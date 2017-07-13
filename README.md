@@ -10,8 +10,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-flexi_logger = "^0.5.1"
-log = "*"
+flexi_logger = "0.6"
+log = "0.3"
 ```
 
 and this to your crate root:
@@ -25,9 +25,10 @@ extern crate flexi_logger;
 Early in the start-up of your program, call something like
 
 ```text
-    flexi_logger::LogOptions::new()
-        .log_to_file(true)
-        // ... your configuration options go here ...
-        .init(Some("info".to_string()))
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+  use flexi_logger::Logger;
+
+  Logger::with_str("modx::mody=info")
+      // ... your configuration options go here ...
+      .start()
+      .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 ```

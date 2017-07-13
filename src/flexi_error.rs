@@ -7,11 +7,11 @@ use std::error::Error;
 /// Describes errors in the initialization of flexi_logger.
 #[derive(Debug)]
 pub enum FlexiLoggerError {
-    /// "Log cannot be written, most likely due to permission errors on OS level"
+    /// Log file cannot be written because the specified path is not a directory.
     BadDirectory,
-    /// "Log cannot be written because the configured output directory is not accessible"
+    /// Log cannot be written because the configured output directory is not accessible.
     Io(io::Error),
-    /// "Logger initialization failed"
+    /// Logger initialization failed.
     Log(log::SetLoggerError),
 }
 

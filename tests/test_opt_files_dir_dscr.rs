@@ -1,21 +1,18 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{opt_format, init, LogConfig};
+use flexi_logger::{opt_format, Logger};
 
 #[test]
 fn files_dir_dscr() {
     assert_eq!((),
-               init(LogConfig {
-                        format: opt_format,
-                        log_to_file: true,
-                        directory: Some("log_files".to_string()),
-                        discriminant: Some("foo".to_string()),
-                        ..LogConfig::new()
-                    },
-                    Some("info".to_string()))
+               Logger::with_str("info")
+                   .format(opt_format)
+                   .log_to_file()
+                   .directory("log_files")
+                   .discriminant("foo")
+                   .start()
                    .unwrap());
 
     error!("This is an error message");

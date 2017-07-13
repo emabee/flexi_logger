@@ -5,17 +5,16 @@
 
 //! A logger that can write the log to standard error or to a fresh file in a configurable folder
 //! and allows custom logline formats.
-//! It had started as an extended copy of [env_logger](http://rust-lang.github.io/log/env_logger/).
+//!
+//! It had started as an extended copy of [env_logger](http://crates.io/crates/env_logger/).
 //!
 //! # Usage
 //!
-//! This crate is on [crates.io](https://crates.io/crates/flexi_logger) and
-//! can be used by adding `flexi_logger` to the dependencies in your
-//! project's `Cargo.toml`.
+//! Add `flexi_logger` to the dependencies in your project's `Cargo.toml`.
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "^0.5.1"
+//! flexi_logger = "0.6"
 //! log = "*"
 //! ```
 //!
@@ -27,27 +26,29 @@
 //! extern crate log;
 //! ```
 //!
-//! The latter is needed because flexi_logger plugs into the standard Rust logging facade given by the
-//! [log crate](http://rust-lang.github.io/log/log/),
+//! The latter is needed because flexi_logger plugs into the standard Rust logging facade given
+//! by the [log crate](https://crates.io/crates/log),
 //! and you use the ```log``` macros to write log lines from your code.
 //!
 //! Early in the start-up of your program, call something like
 //!
 //! ```text
-//!    flexi_logger::LogOptions::new()
-//!        .log_to_file(true)
+//!    use flexi_logger::Logger;
+//!
+//!    Logger::with_str("modx::mody = info")
 //!        // ... your configuration options go here ...
-//!        .init(Some("info".to_string()))
+//!        .start()
 //!        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 //! ```
 //!
 //! The configuration options allow e.g. to
 //!
-//! *  decide whether you want to write your logs to stderr (like with env_logger), or to a file,
-//! *  configure the folder in which the log files are created,
+//! *  decide whether you want to write your logs to stderr or to a file,
+//! *  configure the filenames and the folder in which the log files are created,
 //! *  specify the line format for the log lines
 //!
-//! See [LogOptions](struct.LogOptions.html) for a full description of all configuration options.
+//! See [Logger](struct.Logger.html) for a full description of all configuration options.
+//!
 
 extern crate chrono;
 extern crate glob;
@@ -67,19 +68,24 @@ macro_rules! print_err {
     )
 }
 
-
+mod deprecated;
 mod flexi_error;
 mod flexi_logger;
 mod flexi_writer;
 mod formats;
-mod log_options;
+mod logger;
+mod log_config;
+mod log_specification;
 
 pub use log::{LogLevel, LogLevelFilter, LogRecord};
+
+#[allow(deprecated)]
+pub use deprecated::{init, LogOptions};
+
 pub use formats::*;
-pub use log_options::LogOptions;
-pub use flexi_error::FlexiLoggerError;
+pub use log_specification::{LogSpecification, LogSpecBuilder};
 
-
-pub use log_options::LogConfig;
+pub use log_config::LogConfig;
+pub use logger::Logger;
 pub use flexi_logger::FlexiLogger;
-pub use flexi_logger::init;
+pub use flexi_error::FlexiLoggerError;

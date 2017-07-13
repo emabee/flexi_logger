@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.5.3"
+version = "0.6.0"
 authors = ["emabee <meinolf.block@sap.com>"]
 description = "A flexible logger that can write to stderr or to log files"
 keywords = ["file", "logger"]
@@ -9,7 +9,7 @@ repository = "https://github.com/emabee/flexi_logger"
 documentation = "https://docs.rs/flexi_logger/"
 
 [dependencies]
-chrono = "0.2.*"
-glob = "0.2.*"
-log = "0.3.*"
-regex = "0.1.*"
+chrono = "0.4"
+glob = "0.2"
+log = "0.3"
+regex = "0.2"

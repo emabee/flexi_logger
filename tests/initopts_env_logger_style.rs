@@ -17,9 +17,8 @@ fn you_must_see_exactly_three_messages_above_1_err_1_warn_1_info() {
     trace!("This is a trace message - you must not see it!");
 }
 
-use flexi_logger::{FlexiLogger, LogConfig, LogLevel};
+use flexi_logger::{FlexiLogger, LogConfig};
 #[allow(dead_code)]
 fn ensure_visibility() {
-    let fl = FlexiLogger::new(None, LogConfig::new()).unwrap();
-    fl.fl_enabled(LogLevel::Error, "foo");
+    let _ = FlexiLogger::new(None, LogConfig::new()).unwrap();
 }

@@ -1,20 +1,17 @@
 extern crate flexi_logger;
-
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{detailed_format, init, LogConfig};
+use flexi_logger::{detailed_format, Logger};
 
 #[test]
 fn files_rot() {
     assert_eq!((),
-               init(LogConfig {
-                        format: detailed_format,
-                        log_to_file: true,
-                        rotate_over_size: Some(2000),
-                        ..LogConfig::new()
-                    },
-                    Some("info".to_string()))
+               Logger::with_str("info")
+                   .format(detailed_format)
+                   .log_to_file()
+                   .rotate_over_size(2000)
+                   .start()
                    .unwrap());
 
     error!("This is an error message");

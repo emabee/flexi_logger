@@ -1,4 +1,4 @@
-use log_options::LogConfig;
+use log_config::LogConfig;
 use FlexiLoggerError;
 
 use chrono::Local;
@@ -18,7 +18,7 @@ pub struct FlexiWriter {
     o_filename_base: Option<String>,
     use_rotating: bool,
     written_bytes: usize,
-    rotate_idx: usize,
+    rotate_idx: u32,
 }
 impl FlexiWriter {
     pub fn new(config: &LogConfig) -> Result<FlexiWriter, FlexiLoggerError> {
@@ -76,7 +76,7 @@ impl FlexiWriter {
     pub fn write(&mut self, msgb: &[u8], config: &LogConfig) {
         // switch to next file if necessary
         if self.use_rotating && (self.written_bytes > config.rotate_over_size.unwrap()) {
-            self.o_flw = None;  // close the previous file
+            self.o_flw = None; // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
             self.mount_linewriter(&config.suffix,
@@ -131,7 +131,7 @@ fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> Str
     filename
 }
 
-fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: usize,
+fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: u32,
                 o_suffix: &Option<String>, timestamp: bool)
                 -> String {
     let mut filename = String::with_capacity(180).add(&s_filename_base);
@@ -156,7 +156,7 @@ fn get_filename_pattern(s_filename_base: &String, o_suffix: &Option<String>) -> 
     filename
 }
 
-fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> usize {
+fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u32 {
     let mut rotate_idx = 0;
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     match glob(&fn_pattern) {
@@ -172,7 +172,7 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
-                        let idx: usize = it.next().unwrap().parse().unwrap_or(0);
+                        let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
                         rotate_idx = max(rotate_idx, idx);
                     }
                 }
