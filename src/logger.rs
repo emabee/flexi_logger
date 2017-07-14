@@ -60,7 +60,7 @@ impl Logger {
     pub fn with(logspec: LogSpecification) -> Logger {
         Logger {
             spec: logspec,
-            config: LogConfig::new(),
+            config: LogConfig::default_config_for_logger(),
         }
     }
 
@@ -69,7 +69,7 @@ impl Logger {
         let logspec = LogSpecification::parse(s.as_ref());
         Logger {
             spec: logspec,
-            config: LogConfig::new(),
+            config: LogConfig::default_config_for_logger(),
         }
     }
 
@@ -77,7 +77,7 @@ impl Logger {
     pub fn with_env() -> Logger {
         Logger {
             spec: LogSpecification::env(),
-            config: LogConfig::new(),
+            config: LogConfig::default_config_for_logger(),
         }
     }
 
@@ -177,5 +177,62 @@ impl Logger {
     /// Consumes the Logger object and initializes the flexi_logger.
     pub fn start(self) -> Result<(), FlexiLoggerError> {
         FlexiLogger::start(self.config, self.spec)
+    }
+
+    // used in tests only
+    #[allow(dead_code)]
+    fn get_config(&self) -> &LogConfig {
+        &self.config
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    extern crate log;
+    use Logger;
+
+    #[test]
+    fn verify_defaults() {
+        let logger = Logger::with_str("");
+        let config = logger.get_config();
+
+        assert!(config.log_to_file == false);
+        assert!(config.print_message == false);
+        assert!(config.duplicate_error == false);
+        assert!(config.duplicate_info == false);
+        assert!(config.directory == None);
+        assert!(config.suffix == Some("log".to_string()));
+        assert!(config.timestamp == true);
+        assert!(config.rotate_over_size == None);
+        assert!(config.discriminant == None);
+        assert!(config.create_symlink == None);
+    }
+
+    #[test]
+    fn verify_non_defaults() {
+        let logger = Logger::with_str("")
+            .log_to_file()
+            .print_message()
+            .duplicate_error()
+            .duplicate_info()
+            .directory("logdir")
+            .suffix("trc")
+            .suppress_timestamp()
+            .rotate_over_size(10_000_000)
+            .discriminant("TEST")
+            .create_symlink("current_log_file");
+        let config = logger.get_config();
+
+        assert!(config.log_to_file == true);
+        assert!(config.print_message == true);
+        assert!(config.duplicate_error == true);
+        assert!(config.duplicate_info == true);
+        assert!(config.directory == Some("logdir".to_string()));
+        assert!(config.suffix == Some("trc".to_string()));
+        assert!(config.timestamp == false);
+        assert!(config.rotate_over_size == Some(10_000_000));
+        assert!(config.discriminant == Some("TEST".to_string()));
+        assert!(config.create_symlink == Some("current_log_file".to_string()));
     }
 }

@@ -66,54 +66,54 @@ impl LogSpecification {
                     continue;
                 }
                 let mut parts = s.split('=');
-                let (log_level, name) =
-                    match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
-                        (Some(part0), None, None) => {
-                            if !no_dash(part0) {
-                                println!("warning: invalid part in logging spec '{}', contains a \
-                                          dash, ignoring it",
-                                         part0);
-                                continue;
-                            }
-                            // if the single argument is a log-level string or number,
-                            // treat that as a global fallback
-                            match part0.trim().parse() {
-                                Ok(num) => (num, None),
-                                Err(_) => (LogLevelFilter::max(), Some(part0)),
-                            }
-                        }
-                        (Some(part0), Some(""), None) => {
-                            if !no_dash(part0) {
-                                println!("warning: invalid part in logging spec '{}', contains a \
-                                          dash, ignoring it",
-                                         part0);
-                                continue;
-                            }
-
-                            (LogLevelFilter::max(), Some(part0))
-                        }
-                        (Some(part0), Some(part1), None) => {
-                            if !no_dash(part0) {
-                                println!("warning: invalid part in logging spec '{}', contains a \
-                                          dash, ignoring it",
-                                         part0);
-                                continue;
-                            }
-                            match part1.trim().parse() {
-                                Ok(num) => (num, Some(part0.trim())),
-                                _ => {
-                                    println!("warning: invalid part in logging spec '{}', \
-                                              ignoring it",
-                                             part1);
-                                    continue;
-                                }
-                            }
-                        }
-                        _ => {
-                            println!("warning: invalid part in logging spec '{}', ignoring it", s);
+                let (log_level, name) = match (parts.next(),
+                                               parts.next().map(|s| s.trim()),
+                                               parts.next()) {
+                    (Some(part0), None, None) => {
+                        if contains_dash(part0) {
+                            println!("warning: invalid part in logging spec '{}', contains a \
+                                      dash, ignoring it",
+                                     part0);
                             continue;
                         }
-                    };
+                        // if the single argument is a log-level string or number,
+                        // treat that as a global fallback
+                        match part0.trim().parse() {
+                            Ok(num) => (num, None),
+                            Err(_) => (LogLevelFilter::max(), Some(part0)),
+                        }
+                    }
+                    (Some(part0), Some(""), None) => {
+                        if contains_dash(part0) {
+                            println!("warning: invalid part in logging spec '{}', contains a \
+                                      dash, ignoring it",
+                                     part0);
+                            continue;
+                        }
+
+                        (LogLevelFilter::max(), Some(part0))
+                    }
+                    (Some(part0), Some(part1), None) => {
+                        if contains_dash(part0) {
+                            println!("warning: invalid part in logging spec '{}', contains a \
+                                      dash, ignoring it",
+                                     part0);
+                            continue;
+                        }
+                        match part1.trim().parse() {
+                            Ok(num) => (num, Some(part0.trim())),
+                            _ => {
+                                println!("warning: invalid part in logging spec '{}', ignoring it",
+                                         part1);
+                                continue;
+                            }
+                        }
+                    }
+                    _ => {
+                        println!("warning: invalid part in logging spec '{}', ignoring it", s);
+                        continue;
+                    }
+                };
                 dirs.push(ModuleFilter {
                     module_name: name.map(|s| s.to_string()),
                     level_filter: log_level,
@@ -165,8 +165,8 @@ impl LogSpecification {
     }
 }
 
-fn no_dash(s: &str) -> bool {
-    s.find('-') == None
+fn contains_dash(s: &str) -> bool {
+    s.find('-') != None
 }
 
 /// Builder for LogSpecification.
