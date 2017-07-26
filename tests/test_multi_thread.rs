@@ -20,8 +20,6 @@ const ROTATE_OVER_SIZE: usize = 4_000_000;
 // cargo test multi_threaded -- --nocapture
 #[test]
 fn multi_threaded() {
-    println!("create a huge number of log lines with a significant number of threads, verify the \
-              log");
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
 
@@ -35,6 +33,8 @@ fn multi_threaded() {
         .rotate_over_size(ROTATE_OVER_SIZE)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    info!("create a huge number of log lines with a significant number of threads, verify the \
+        log");
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     wait_for_workers_to_close(worker_handles);
@@ -117,9 +117,9 @@ fn verify_logs(directory: String) {
             buffer.clear();
         }
     }
-    assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 1);
-    println!("Wrote {} log lines from {} threads into {} files",
-             NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 1,
-             NO_OF_THREADS,
-             no_of_log_files);
+    assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2);
+    info!("Wrote {} log lines from {} threads into {} files",
+          NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 1,
+          NO_OF_THREADS,
+          no_of_log_files);
 }

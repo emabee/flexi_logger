@@ -55,6 +55,7 @@ pub struct Logger {
     config: LogConfig,
 }
 
+/// Simple methods for influencing the behavior of the Logger.
 impl Logger {
     /// Create a Logger that you provide with an explicit LogSpecification.
     pub fn with(logspec: LogSpecification) -> Logger {
@@ -130,15 +131,6 @@ impl Logger {
         self
     }
 
-    /// Makes the logger include a timestamp into the names of the log files
-    /// (log_to_file must be chosen, too).
-    /// Deprecated because this is the default anyway.
-    #[deprecated]
-    pub fn timestamp(mut self) -> Logger {
-        self.config.timestamp = true;
-        self
-    }
-
     /// Makes the logger not include a timestamp into the names of the log files
     /// (log_to_file must be chosen, too).
     pub fn suppress_timestamp(mut self) -> Logger {
@@ -180,9 +172,93 @@ impl Logger {
     }
 
     // used in tests only
+    #[doc(hidden)]
     #[allow(dead_code)]
     fn get_config(&self) -> &LogConfig {
         &self.config
+    }
+}
+
+/// Alternative set of methods to control the behavior of the Logger.
+/// use these methods when you want to control the settings dynamically, e.g. with doc_opts.
+impl Logger {
+    /// With true, makes the logger write all logs to a file, otherwise to stderr.
+    pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
+        self.config.log_to_file = log_to_file;
+        self
+    }
+
+    /// With true, makes the logger print an info message to stdout when a new file is used for log-output.
+    pub fn o_print_message(mut self, print_message: bool) -> Logger {
+        self.config.print_message = print_message;
+        self
+    }
+
+    /// With true, makes the logger write all logged error messages additionally to stdout.
+    pub fn o_duplicate_error(mut self, duplicate_error: bool) -> Logger {
+        self.config.duplicate_error = duplicate_error;
+        self
+    }
+
+    /// With true, makes the logger write all logged error, warning, and info messages additionally to stdout.
+    pub fn o_duplicate_info(mut self, duplicate_info: bool) -> Logger {
+        self.config.duplicate_info = duplicate_info;
+        self
+    }
+
+    /// Specifies a folder for the log files.
+    ///
+    /// This parameter only has an effect if log_to_file is set to true.
+    /// If the specified folder does not exist, the initialization will fail.
+    /// With None, the log files are created in the folder where the program was started.
+    pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> Logger {
+        self.config.directory = directory.map(|d| d.into());
+        self
+    }
+
+    /// Specifies a suffix for the log files.
+    ///
+    /// This parameter only has an effect if log_to_file is set to true.
+    /// By default, the suffix 'log' is used. With None, no suffix is used.
+    pub fn o_suffix<S: Into<String>>(mut self, suffix: Option<S>) -> Logger {
+        self.config.suffix = suffix.map(|s| s.into());
+        self
+    }
+
+    /// With true, makes the logger include a timestamp into the names of the log files.
+    /// (log_to_file must be chosen, too).
+    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
+        self.config.timestamp = timestamp;
+        self
+    }
+
+    /// This option only has an effect if log_to_file is used, too.
+    ///
+    /// By default, and with None, the log file will grow indefinitely.
+    /// If a size is set, when the log file reaches or exceeds the specified size,
+    /// the file will be closed and a new file will be opened.
+    /// Also the filename pattern changes - instead of the timestamp a serial number
+    /// is included into the filename.
+    pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
+        self.config.rotate_over_size = rotate_over_size;
+        self
+    }
+
+    /// This option only has an effect if log_to_file is used, too.
+    ///
+    /// The specified String is added to the log file name.
+    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Logger {
+        self.config.discriminant = discriminant.map(|d| d.into());
+        self
+    }
+
+    /// This option only has an effect if log_to_file is used, too.
+    ///
+    /// If a String is specified, it will be used on linux systems to create in the current folder
+    /// a symbolic link with this name to the current log file.
+    pub fn o_create_symlink<S: Into<String>>(mut self, symlink: Option<S>) -> Logger {
+        self.config.create_symlink = symlink.map(|s| s.into());
+        self
     }
 }
 
