@@ -3,10 +3,12 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
+#[allow(deprecated)]
 use flexi_logger::{default_format, init, LogConfig};
 
+#[allow(deprecated)]
 #[test]
-fn files_dir_rot() {
+fn initialize_with_init() {
     assert_eq!((),
                init(LogConfig {
                         format: default_format,

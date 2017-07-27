@@ -6,13 +6,12 @@ use flexi_logger::{detailed_format, Logger};
 
 #[test]
 fn files_rot() {
-    assert_eq!((),
-               Logger::with_str("info")
-                   .format(detailed_format)
-                   .log_to_file()
-                   .rotate_over_size(2000)
-                   .start()
-                   .unwrap());
+    Logger::with_str("info")
+        .format(detailed_format)
+        .log_to_file()
+        .rotate_over_size(2000)
+        .start()
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
     warn!("This is a warning");

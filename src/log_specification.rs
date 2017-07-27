@@ -47,6 +47,12 @@ pub struct ModuleFilter {
 }
 
 impl LogSpecification {
+    #[doc(hidden)]
+    pub fn reconfigure(&mut self, other_spec: LogSpecification) {
+        self.module_filters = other_spec.module_filters;
+        self.textfilter = other_spec.textfilter;
+    }
+
     /// Returns a log specification from a String
     /// (e.g: "crate1, crate2::mod_a, crate3::mod_x = error /foo").
     pub fn parse(spec: &str) -> LogSpecification {
@@ -338,4 +344,13 @@ mod tests {
         assert!(spec.text_filter().is_some() &&
                 spec.text_filter().as_ref().unwrap().to_string() == "a*c");
     }
+
+    // FIXME make builder modifiable
+    // #[test]
+    // fn reuse_logspec_builder() {
+    //     let builder = LogSpecification::default("info,karl-heinz::mod1=debug");
+    //     let spec1 = builder.clone().finalize();
+    //
+    //     let spec2 = builder.clone().finalize();
+    // }
 }

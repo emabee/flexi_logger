@@ -2,13 +2,20 @@
 use flexi_writer::FlexiWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
+use log_specification::ModuleFilter;
 use FlexiLoggerError;
 use log;
 
+use regex::Regex;
 use std::cell::RefCell;
 use std::io::{self, Write};
 use std::ops::DerefMut;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
+
+enum LogSpec {
+    STATIC(LogSpecification),
+    DYNAMIC(Arc<RwLock<LogSpecification>>),
+}
 
 
 /// Does the logging in the background, is normally not used directly.
@@ -16,7 +23,7 @@ use std::sync::Mutex;
 /// This struct is only used explicitly when you want to allow supporting multiple FlexiLogger
 /// instances in a single process.
 pub struct FlexiLogger {
-    log_specification: LogSpecification,
+    log_specification: LogSpec,
     config: LogConfig,
     // The FlexiWriter has mutable state; since Log.log() requires an unmutable self,
     // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
@@ -24,6 +31,21 @@ pub struct FlexiLogger {
     mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
 }
 
+/// Allows reconfiguring the logger while it is in use.
+pub struct ReconfigurationHandle {
+    spec: Arc<RwLock<LogSpecification>>,
+}
+impl ReconfigurationHandle {
+    fn new(spec: Arc<RwLock<LogSpecification>>) -> ReconfigurationHandle {
+        ReconfigurationHandle { spec: spec }
+    }
+
+    /// allows specifying a new LogLevelSpecification for the current logger.
+    pub fn reconfigure(&mut self, new_spec: LogSpecification) {
+        let mut guard = self.spec.write().unwrap();
+        guard.reconfigure(new_spec);
+    }
+}
 
 impl FlexiLogger {
     /// Configures and starts the flexi_logger.
@@ -35,32 +57,67 @@ impl FlexiLogger {
                       .unwrap_or(log::LogLevelFilter::Off);
 
         let flexi_logger = FlexiLogger::new_internal(spec, config)?;
-
-        Ok(log::set_logger(|max_level| {
+        log::set_logger(|max_level| {
             max_level.set(max);
             Box::new(flexi_logger)
-        })?)
+        })?;
+        Ok(())
+    }
+
+    /// Configures and starts the flexi_logger, and returns a handle to reconfigure the logger.
+    pub fn start_reconfigurable(config: LogConfig, spec: LogSpecification)
+                                -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        let (flexi_logger, handle) = FlexiLogger::new_internal_reconfigurable(spec, config)?;
+        log::set_logger(|max_level| {
+            max_level.set(log::LogLevelFilter::Trace); // no optimization possible, because the spec is dynamic, but max is not
+            Box::new(flexi_logger)
+        })?;
+        Ok(handle)
     }
 
     fn new_internal(spec: LogSpecification, config: LogConfig)
                     -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
-            log_specification: spec,
+            log_specification: LogSpec::STATIC(spec),
             mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
             config: config,
         })
     }
 
+    fn new_internal_reconfigurable
+        (spec: LogSpecification, config: LogConfig)
+         -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
+        let spec = Arc::new(RwLock::new(spec));
+        let flexi_logger = FlexiLogger {
+            log_specification: LogSpec::DYNAMIC(spec.clone()),
+            mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
+            config: config,
+        };
+        let handle = ReconfigurationHandle::new(spec.clone());
+        Ok((flexi_logger, handle))
+    }
+
     // Implementation of Log::enabled() with easier testable signature
     fn fl_enabled(&self, level: log::LogLevel, target: &str) -> bool {
-        // Search for the longest match, the vector is assumed to be pre-sorted.
-        for module_filter in self.log_specification.module_filters().iter().rev() {
-            match module_filter.module_name {
-                Some(ref module_name) if !target.starts_with(&**module_name) => {}
-                Some(..) | None => return level <= module_filter.level_filter,
+        fn check_filter(module_filters: &Vec<ModuleFilter>, level: log::LogLevel, target: &str)
+                        -> bool {
+            // Search for the longest match, the vector is assumed to be pre-sorted.
+            for module_filter in module_filters.iter().rev() {
+                match module_filter.module_name {
+                    Some(ref module_name) if !target.starts_with(&**module_name) => {}
+                    Some(..) | None => return level <= module_filter.level_filter,
+                }
+            }
+            false
+        }
+
+        match self.log_specification {
+            LogSpec::STATIC(ref ls) => check_filter(ls.module_filters(), level, target),
+            LogSpec::DYNAMIC(ref locked_ls) => {
+                let guard = locked_ls.read();
+                check_filter(guard.as_ref().unwrap().module_filters(), level, target)
             }
         }
-        false
     }
 
     /// Creates a new FlexiLogger instance based on your configuration and a loglevel specification.
@@ -81,15 +138,25 @@ impl log::Log for FlexiLogger {
     }
 
     fn log(&self, record: &log::LogRecord) {
-        if !log::Log::enabled(self, record.metadata()) {
+        if !self.enabled(record.metadata()) {
             return;
         }
 
-        if let Some(filter) = self.log_specification.text_filter().as_ref() {
-            if filter.is_match(&*record.args().to_string()) {
-                return;
+        fn check_text_filter(text_filter: &Option<Regex>, record: &log::LogRecord) -> bool {
+            if let Some(filter) = text_filter.as_ref() {
+                filter.is_match(&*record.args().to_string())
+            } else {
+                true
             }
         }
+        match self.log_specification {
+            LogSpec::STATIC(ref ls) => check_text_filter(ls.text_filter(), &record),
+            LogSpec::DYNAMIC(ref locked_ls) => {
+                let guard = locked_ls.read();
+                check_text_filter(guard.as_ref().unwrap().text_filter(), &record)
+            }
+        };
+
 
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {

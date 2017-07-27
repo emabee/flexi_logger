@@ -84,5 +84,5 @@ pub use log_specification::{LogSpecification, LogSpecBuilder};
 
 pub use log_config::LogConfig;
 pub use logger::Logger;
-pub use flexi_logger::FlexiLogger;
+pub use flexi_logger::{FlexiLogger, ReconfigurationHandle};
 pub use flexi_error::FlexiLoggerError;

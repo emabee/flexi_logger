@@ -5,13 +5,14 @@ extern crate flexi_logger;
 extern crate log;
 
 use chrono::Local;
-use flexi_logger::{Logger, LogRecord};
+use flexi_logger::{Logger, LogRecord, LogSpecification, ReconfigurationHandle};
 use glob::glob;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Add;
 use std::thread::{self, JoinHandle};
+use std::time;
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
@@ -25,18 +26,28 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    Logger::with_str("debug")
+    let mut reconf_handle: ReconfigurationHandle = Logger::with_str("info")
         .log_to_file()
         .format(test_format)
-        .duplicate_info()
+        .duplicate_error()
         .directory(directory.clone())
         .rotate_over_size(ROTATE_OVER_SIZE)
-        .start()
+        .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    info!("create a huge number of log lines with a significant number of threads, verify the \
+    error!("create a huge number of log lines with a significant number of threads, verify the \
         log");
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
+    let new_spec = LogSpecification::parse("debug");
+    thread::Builder::new()
+        .spawn(move || {
+            thread::sleep(time::Duration::from_millis(1000));
+            reconf_handle.reconfigure(new_spec);
+            0 as u8
+        })
+        .unwrap();
+
+
     wait_for_workers_to_close(worker_handles);
 
     let delta = Local::now().signed_duration_since(start).num_milliseconds();
@@ -64,10 +75,11 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 
 fn do_work(thread_number: usize) {
     trace!("({})     Thread started working", thread_number);
-
+    debug!("ERROR_IF_PRINTED");
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
-        debug!("({})  writing out line number {}", thread_number, idx);
+        info!("({})  writing out line number {}", thread_number, idx);
     }
+    debug!("MUST_BE_PRINTED");
 }
 
 fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
@@ -79,7 +91,7 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
 }
 
 fn define_directory() -> String {
-    "./log_files/mt_logs/".to_string().add(&Local::now().format("%Y-%m-%d_%H-%M-%S").to_string())
+    format!("./log_files/mt_logs/{}", Local::now().format("%Y-%m-%d_%H-%M-%S"))
 }
 
 fn test_format(record: &LogRecord) -> String {
@@ -117,9 +129,9 @@ fn verify_logs(directory: String) {
             buffer.clear();
         }
     }
-    assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2);
-    info!("Wrote {} log lines from {} threads into {} files",
-          NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 1,
-          NO_OF_THREADS,
-          no_of_log_files);
+    assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2 + NO_OF_THREADS);
+    error!("Wrote {} log lines from {} threads into {} files",
+           line_count,
+           NO_OF_THREADS,
+           no_of_log_files);
 }

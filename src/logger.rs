@@ -3,6 +3,7 @@ use LogConfig;
 use LogSpecification;
 use flexi_error::FlexiLoggerError;
 use FlexiLogger;
+use ReconfigurationHandle;
 
 /// Function type for Format functions.
 pub type FormatFunction = fn(&LogRecord) -> String;
@@ -169,6 +170,55 @@ impl Logger {
     /// Consumes the Logger object and initializes the flexi_logger.
     pub fn start(self) -> Result<(), FlexiLoggerError> {
         FlexiLogger::start(self.config, self.spec)
+    }
+
+    /// Consumes the Logger object and initializes the flexi_logger in a way that
+    /// subsequently the log specification can be exchanged dynamically.
+    /// The resulting logger is still fast, but measurable slower for those log-calls (trace!() etc)
+    /// that are on a deeper level than the deepest level in the LogSpecification.
+    /// This is because the Log crate has an optimization for returning very fast from deep-level
+    /// log calls, but the deepest level needs be given at initialization and cannot be updated
+    /// later.
+    ///
+    /// Here is the output from a benchmark test, runnning on a windows laptop:
+    ///
+    ///  ```text
+    ///   1   PS C:\dev\rust\projects\flexi_logger> cargo bench --test bench_standard -- --nocapture
+    ///   2       Finished release [optimized] target(s) in 0.0 secs
+    ///   3        Running target\release\deps\bench_standard-158f621674f85c86.exe
+    ///   4
+    ///   5   running 4 tests
+    ///   6   test b10_no_logger_active  ... bench:         136 ns/iter (+/- 30)
+    ///   7   test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
+    ///   8   test b30_relevant_logs     ... bench:   1,676,793 ns/iter (+/- 342,747)
+    ///   9   test b40_suppressed_logs   ... bench:         134 ns/iter (+/- 5)
+    ///  10
+    ///  11   test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
+    ///  12
+    ///  13   PS C:\dev\rust\projects\flexi_logger> cargo bench --test bench_reconfigurable -- --nocapture
+    ///  14       Finished release [optimized] target(s) in 0.0 secs
+    ///  15        Running target\release\deps\bench_reconfigurable-bc6bb7d69906fc2f.exe
+    ///  16
+    ///  17   running 4 tests
+    ///  18   test b10_no_logger_active  ... bench:         134 ns/iter (+/- 19)
+    ///  19   test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
+    ///  20   test b30_relevant_logs     ... bench:   1,665,871 ns/iter (+/- 306,734)
+    ///  21   test b40_suppressed_logs   ... bench:       5,208 ns/iter (+/- 564)
+    ///  22
+    ///  23   test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
+    ///  ```
+    ///
+    /// It shows that logging is fastest when no logger is active (lines 6 and 18).
+    /// And it is just as fast when the above-mentioned optimization kicks in (line 9).
+    ///
+    /// Logging is expensive when logs are really written (line 8 and 20), independent of the
+    /// reconfigurability feature of the flexi_logger.
+    ///
+    /// The measurable, but still in most cases not important price for reconfigurability
+    /// can be seen by comparing lines 9 and 21.
+    ///
+    pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        FlexiLogger::start_reconfigurable(self.config, self.spec)
     }
 
     // used in tests only

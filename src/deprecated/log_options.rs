@@ -141,8 +141,9 @@ impl LogOptions {
     pub fn init(self, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {
         //::flexi_logger::initialize(self.0, loglevelspec)
         match loglevelspec {
-            Some(loglevelspec) => Logger::with_str(loglevelspec).start(),
-            None => Logger::with_env().start(),
-        }
+            Some(loglevelspec) => Logger::with_str(loglevelspec).start()?,
+            None => Logger::with_env().start()?,
+        };
+        Ok(())
     }
 }
