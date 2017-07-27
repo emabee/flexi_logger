@@ -174,6 +174,7 @@ impl Logger {
 
     /// Consumes the Logger object and initializes the flexi_logger in a way that
     /// subsequently the log specification can be exchanged dynamically.
+    ///
     /// The resulting logger is still fast, but measurable slower for those log-calls (trace!() etc)
     /// that are on a deeper level than the deepest level in the LogSpecification.
     /// This is because the Log crate has an optimization for returning very fast from deep-level

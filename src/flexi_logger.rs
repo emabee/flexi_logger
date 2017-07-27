@@ -31,7 +31,42 @@ pub struct FlexiLogger {
     mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
 }
 
-/// Allows reconfiguring the logger while it is in use.
+/// Allows reconfiguring the logger while it is in use (see Logger::start_reconfigurable()).
+///
+/// # Example
+///
+/// The following example shows how to use the reconfigurability feature.
+///
+/// ```rust
+/// extern crate log;
+/// extern crate flexi_logger;
+/// use flexi_logger::{Logger, LogSpecBuilder};
+/// use log::LogLevelFilter;
+///
+/// fn main() {
+///     // Build the initial log specification
+///     let mut builder = LogSpecBuilder::new();  // default is LogLevelFilter::Off
+///     builder.default(LogLevelFilter::Info);
+///     builder.module("karl", LogLevelFilter::Debug);
+///
+///     // Initialize Logger, keep builder alive
+///     let mut logger_reconf_handle = Logger::with(builder.build())
+///         // your logger configuration goes here, as usual
+///         .start_reconfigurable()
+///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+///
+///     // ...
+///
+///     // Modify builder and update the logger
+///     builder.default(LogLevelFilter::Error);
+///     builder.remove("karl");
+///     builder.module("emma", LogLevelFilter::Trace);
+///
+///     logger_reconf_handle.set_new_spec(builder.build());
+///
+///     // ...
+/// }
+/// ```
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
 }
@@ -41,7 +76,7 @@ impl ReconfigurationHandle {
     }
 
     /// allows specifying a new LogLevelSpecification for the current logger.
-    pub fn reconfigure(&mut self, new_spec: LogSpecification) {
+    pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
         let mut guard = self.spec.write().unwrap();
         guard.reconfigure(new_spec);
     }

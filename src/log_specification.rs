@@ -1,6 +1,8 @@
 use LogLevelFilter;
 use regex::Regex;
 use std::env;
+use std::collections::HashMap;
+
 
 /// Immutable struct that defines which loglines are to be written,
 /// based on the module, the log level, and the text.
@@ -41,6 +43,7 @@ pub struct LogSpecification {
 }
 
 /// Defines which loglevel filter to use for a given module (or as default, if no module is given)
+#[derive(Clone)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
     pub level_filter: LogLevelFilter,
@@ -152,12 +155,10 @@ impl LogSpecification {
 
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(llf: LogLevelFilter) -> LogSpecBuilder {
-        LogSpecBuilder {
-            module_filters: vec![ModuleFilter {
-                                     module_name: None,
-                                     level_filter: llf,
-                                 }],
-        }
+        LogSpecBuilder::from_module_filters(&vec![ModuleFilter {
+                                                      module_name: None,
+                                                      level_filter: llf,
+                                                  }])
     }
 
     /// Provides a reference to the module filters.
@@ -176,24 +177,51 @@ fn contains_dash(s: &str) -> bool {
 }
 
 /// Builder for LogSpecification.
+#[derive(Clone)]
 pub struct LogSpecBuilder {
-    module_filters: Vec<ModuleFilter>,
+    module_filters: HashMap<Option<String>, LogLevelFilter>,
 }
 
 impl LogSpecBuilder {
-    /// Adds a log level filter for a module.
-    pub fn module(&mut self, module_name: &str, lf: LogLevelFilter) -> &mut LogSpecBuilder {
-        self.module_filters.push(ModuleFilter {
-            module_name: Some(module_name.to_string()),
-            level_filter: lf,
-        });
+    /// Creates a LogSpecBuilder with all logging turned off.
+    pub fn new() -> LogSpecBuilder {
+        let mut modfilmap = HashMap::new();
+        modfilmap.insert(None, LogLevelFilter::Off);
+        LogSpecBuilder { module_filters: modfilmap }
+    }
+
+    /// Creates a LogSpecBuilder from given module filters.
+    pub fn from_module_filters(module_filters: &Vec<ModuleFilter>) -> LogSpecBuilder {
+        let mut modfilmap = HashMap::new();
+        for mf in module_filters {
+            modfilmap.insert(mf.module_name.clone(), mf.level_filter.clone());
+        }
+        LogSpecBuilder { module_filters: modfilmap }
+    }
+
+    /// Adds a default log level filter, or updates the default log level filter.
+    pub fn default(&mut self, lf: LogLevelFilter) -> &mut LogSpecBuilder {
+        self.module_filters.insert(None, lf);
+        self
+    }
+
+    /// Adds a log level filter, or updates the log level filter, for a module.
+    pub fn module<M: AsRef<str>>(&mut self, module_name: M, lf: LogLevelFilter)
+                                 -> &mut LogSpecBuilder {
+        self.module_filters.insert(Some(module_name.as_ref().to_owned()), lf);
+        self
+    }
+
+    /// Adds a log level filter, or updates the log level filter, for a module.
+    pub fn remove<M: AsRef<str>>(&mut self, module_name: M) -> &mut LogSpecBuilder {
+        self.module_filters.remove(&Some(module_name.as_ref().to_owned()));
         self
     }
 
     /// Creates a log specification without text filter.
     pub fn finalize(self) -> LogSpecification {
         LogSpecification {
-            module_filters: self.module_filters.level_sort(),
+            module_filters: self.module_filters.into_vec_module_filter(),
             textfilter: None,
         }
     }
@@ -201,9 +229,42 @@ impl LogSpecBuilder {
     /// Creates a log specification with text filter.
     pub fn finalize_with_textfilter(self, tf: Regex) -> LogSpecification {
         LogSpecification {
-            module_filters: self.module_filters.level_sort(),
+            module_filters: self.module_filters.into_vec_module_filter(),
             textfilter: Some(tf),
         }
+    }
+
+    /// Creates a log specification without being consumed.
+    pub fn build(&self) -> LogSpecification {
+        LogSpecification {
+            module_filters: self.module_filters.clone().into_vec_module_filter(),
+            textfilter: None,
+        }
+    }
+
+    /// Creates a log specification without being consumed, optionally with a text filter.
+    pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
+        LogSpecification {
+            module_filters: self.module_filters.clone().into_vec_module_filter(),
+            textfilter: tf,
+        }
+    }
+}
+
+trait IntoVecModuleFilter {
+    fn into_vec_module_filter(self) -> Vec<ModuleFilter>;
+}
+impl IntoVecModuleFilter for HashMap<Option<String>, LogLevelFilter> {
+    fn into_vec_module_filter(self) -> Vec<ModuleFilter> {
+        let mf: Vec<ModuleFilter> = self.into_iter()
+                                        .map(|(k, v)| {
+                                            ModuleFilter {
+                                                module_name: k,
+                                                level_filter: v,
+                                            }
+                                        })
+                                        .collect();
+        mf.level_sort()
     }
 }
 
@@ -214,12 +275,7 @@ impl LevelSort for Vec<ModuleFilter> {
     /// Sort the module filters by length of their name,
     /// this allows a little more efficient lookup at runtime.
     fn level_sort(mut self) -> Vec<ModuleFilter> {
-        self.sort_by(|a, b| {
-            // let alen = a.module_name.as_ref().map(|a| a.len()).unwrap_or(0);
-            // let blen = b.module_name.as_ref().map(|b| b.len()).unwrap_or(0);
-            // alen.cmp(&blen)
-            a.module_name.cmp(&b.module_name)
-        });
+        self.sort_by(|a, b| a.module_name.cmp(&b.module_name));
         self
     }
 }
@@ -228,7 +284,7 @@ impl LevelSort for Vec<ModuleFilter> {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    use LogSpecification;
+    use {LogSpecification, LogSpecBuilder};
     use log::LogLevelFilter;
 
     #[test]
@@ -345,12 +401,37 @@ mod tests {
                 spec.text_filter().as_ref().unwrap().to_string() == "a*c");
     }
 
-    // FIXME make builder modifiable
-    // #[test]
-    // fn reuse_logspec_builder() {
-    //     let builder = LogSpecification::default("info,karl-heinz::mod1=debug");
-    //     let spec1 = builder.clone().finalize();
-    //
-    //     let spec2 = builder.clone().finalize();
-    // }
+    #[test]
+    fn reuse_logspec_builder() {
+        let mut builder = LogSpecBuilder::new();
+        builder.default(LogLevelFilter::Info);
+        builder.module("karl", LogLevelFilter::Debug);
+        builder.module("toni", LogLevelFilter::Warn);
+
+        let spec1 = builder.build();
+        assert_eq!(spec1.module_filters().len(), 3);
+        assert_eq!(spec1.module_filters()[0].module_name, None);
+        assert_eq!(spec1.module_filters()[0].level_filter, LogLevelFilter::Info);
+
+        assert_eq!(spec1.module_filters()[1].module_name, Some("karl".to_string()));
+        assert_eq!(spec1.module_filters()[1].level_filter, LogLevelFilter::Debug);
+
+        assert_eq!(spec1.module_filters()[2].module_name, Some("toni".to_string()));
+        assert_eq!(spec1.module_filters()[2].level_filter, LogLevelFilter::Warn);
+
+        builder.default(LogLevelFilter::Error);
+        builder.remove("karl");
+        builder.module("emma", LogLevelFilter::Trace);
+        let spec2 = builder.build();
+
+        assert_eq!(spec2.module_filters().len(), 3);
+        assert_eq!(spec2.module_filters()[0].module_name, None);
+        assert_eq!(spec2.module_filters()[0].level_filter, LogLevelFilter::Error);
+
+        assert_eq!(spec2.module_filters()[1].module_name, Some("emma".to_string()));
+        assert_eq!(spec2.module_filters()[1].level_filter, LogLevelFilter::Trace);
+
+        assert_eq!(spec2.module_filters()[2].module_name, Some("toni".to_string()));
+        assert_eq!(spec2.module_filters()[2].level_filter, LogLevelFilter::Warn);
+    }
 }
