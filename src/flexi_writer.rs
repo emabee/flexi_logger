@@ -89,7 +89,7 @@ impl FlexiWriter {
         if let Some(ref mut lw) = self.o_flw {
             lw.write(msgb)
               .unwrap_or_else(|e| {
-                  print_err!("Flexi logger: write access to file failed with {}", e);
+                  eprintln!("Flexi logger: write access to file failed with {}", e);
                   0
               });
             if self.use_rotating {
@@ -161,13 +161,13 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     match glob(&fn_pattern) {
         Err(e) => {
-            print_err!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
+            eprintln!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
         }
         Ok(globresults) => {
             for globresult in globresults {
                 match globresult {
                     Err(e) => {
-                        print_err!("Error occured when reading directory for log files: {:?}", e)
+                        eprintln!("Error occured when reading directory for log files: {:?}", e)
                     }
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();

@@ -11,7 +11,7 @@ pub type FormatFunction = fn(&LogRecord) -> String;
 
 /// The standard entry-point for using flexi_logger.
 ///
-/// Create a Logger with your desired loglevel-specification
+/// Create a Logger with your desired (initial) loglevel-specification
 ///
 /// * by specifying a String programmatically,
 ///   using [Logger::with_str()](struct.Logger.html#method.with_str),
@@ -20,7 +20,8 @@ pub type FormatFunction = fn(&LogRecord) -> String;
 /// * or by providing an explicitly built LogSpecification,
 ///   using [Logger::with()](struct.Logger.html#method.with),
 ///
-/// use its configuration methods, and finally call start().
+/// use its configuration methods, and finally call [start()](struct.Logger.html#method.start)
+/// (or [start_reconfigurable()](struct.Logger.html#method.start_reconfigurable)).
 ///
 /// ## Examples
 ///
@@ -67,6 +68,7 @@ impl Logger {
     }
 
     /// Create a Logger that reads the LogSpecification from a String or &str.
+    /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
     pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
         let logspec = LogSpecification::parse(s.as_ref());
         Logger {

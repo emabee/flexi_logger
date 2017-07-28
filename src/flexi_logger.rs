@@ -217,7 +217,7 @@ impl log::Log for FlexiLogger {
 
             flexi_writer.write(msgb, &self.config);
         } else {
-            let _ = writeln!(&mut io::stderr(), "{}", msg);
+            eprintln!("{}", msg);
         }
     }
 }

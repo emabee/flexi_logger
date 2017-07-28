@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 
-//! A logger that can write the log to standard error or to a fresh file in a configurable folder
-//! and allows custom logline formats.
+//! A logger that can write the log to standard error or to a fresh file in a configurable folder,
+//! and allows custom logline formats, and whose log specification can be changed at runtime.
 //!
 //! It had started as an extended copy of [env_logger](http://crates.io/crates/env_logger/).
 //!
@@ -51,19 +51,6 @@ extern crate chrono;
 extern crate glob;
 extern crate log;
 extern crate regex;
-
-macro_rules! print_err {
-    ($($arg:tt)*) => (
-        {
-            use std::io::prelude::*;
-            if let Err(e) = write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*)) {
-                panic!("Failed to write to stderr.\
-                    \nOriginal error output: {}\
-                    \nSecondary error writing to stderr: {}", format!($($arg)*), e);
-            }
-        }
-    )
-}
 
 mod deprecated;
 mod flexi_error;

@@ -7,7 +7,9 @@ use std::collections::HashMap;
 /// Immutable struct that defines which loglines are to be written,
 /// based on the module, the log level, and the text.
 ///
-/// The loglevel specification via string (relevant for methods parse() and env())
+/// The loglevel specification via string (relevant for methods
+/// [parse()](struct.LogSpecification.html#method.parse) and
+/// [env()](struct.LogSpecification.html#method.env))
 /// works essentially like with env_logger,
 /// but we are a bit more tolerant with spaces. Its functionality can be
 /// described with some Backus-Naur-form:
@@ -18,6 +20,13 @@ use std::collections::HashMap;
 /// <text_filter> ::= <regex>
 /// ```
 ///
+/// * Examples:
+///
+///  * ```"info"```: all logs with info, warn, or error level are written
+///  * ```"crate1"```: all logs of this crate are written, but nothing else
+///  * ```"warn, crate2::mod_a=debug, mod_x::mod_y=trace"```: all crates log warnings and erors, mod_a additional debug messages, and
+///    mod_x::mod_y is fully traced
+///
 /// * If you just specify the module, without log_level, all levels will be traced for this module.
 /// * If you just specify a log level, this will be applied as default to all modules without
 ///   explicit log level assigment.
@@ -25,7 +34,7 @@ use std::collections::HashMap;
 ///   it is necessary to specify their loglevel explicit).
 /// * The module names are compared as Strings, with the side effect that a specified module filter
 ///   affects all modules whose name starts with this String.<br>
-///   Example: "foo" affects e.g.
+///   Example: ```"foo"``` affects e.g.
 ///
 ///   * foo
 ///   * foo::bar
@@ -34,16 +43,16 @@ use std::collections::HashMap;
 ///
 /// The optional text filter is applied for all modules.
 ///
-/// Note that external module names are to be specified like in "extern crate ...".
-/// For crates with a dash in their name this means: the dash is to be replaced with
-/// the underscore (e.g. karl_heinz, not karl-heinz).
+/// Note that external module names are to be specified like in ```"extern crate ..."```, i.e.,
+/// for crates with a dash in their name this means: the dash is to be replaced with
+/// the underscore (e.g. ```karl_heinz```, not ```karl-heinz```).
 #[derive(Clone,Debug)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
     textfilter: Option<Regex>,
 }
 
-/// Defines which loglevel filter to use for a given module (or as default, if no module is given)
+/// Defines which loglevel filter to use for a given module (or as default, if no module is given).
 #[derive(Clone,Debug)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
@@ -57,8 +66,7 @@ impl LogSpecification {
         self.textfilter = other_spec.textfilter;
     }
 
-    /// Returns a log specification from a String
-    /// (e.g: "crate1, crate2::mod_a, crate3::mod_x = error /foo").
+    /// Returns a log specification from a String.
     pub fn parse(spec: &str) -> LogSpecification {
         let mut dirs = Vec::<ModuleFilter>::new();
 
