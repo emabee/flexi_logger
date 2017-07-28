@@ -37,13 +37,14 @@ use std::collections::HashMap;
 /// Note that external module names are to be specified like in "extern crate ...".
 /// For crates with a dash in their name this means: the dash is to be replaced with
 /// the underscore (e.g. karl_heinz, not karl-heinz).
+#[derive(Clone,Debug)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
     textfilter: Option<Regex>,
 }
 
 /// Defines which loglevel filter to use for a given module (or as default, if no module is given)
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
     pub level_filter: LogLevelFilter,

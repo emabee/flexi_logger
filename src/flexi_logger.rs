@@ -134,8 +134,8 @@ impl FlexiLogger {
 
     // Implementation of Log::enabled() with easier testable signature
     fn fl_enabled(&self, level: log::LogLevel, target: &str) -> bool {
-        fn check_filter(module_filters: &Vec<ModuleFilter>, level: log::LogLevel, target: &str)
-                        -> bool {
+        // little closure that we need below
+        let check_filter = |module_filters: &Vec<ModuleFilter>| {
             // Search for the longest match, the vector is assumed to be pre-sorted.
             for module_filter in module_filters.iter().rev() {
                 match module_filter.module_name {
@@ -144,13 +144,13 @@ impl FlexiLogger {
                 }
             }
             false
-        }
+        };
 
         match self.log_specification {
-            LogSpec::STATIC(ref ls) => check_filter(ls.module_filters(), level, target),
+            LogSpec::STATIC(ref ls) => check_filter(ls.module_filters()),
             LogSpec::DYNAMIC(ref locked_ls) => {
                 let guard = locked_ls.read();
-                check_filter(guard.as_ref().unwrap().module_filters(), level, target)
+                check_filter(guard.as_ref().unwrap().module_filters())
             }
         }
     }
@@ -177,20 +177,23 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        fn check_text_filter(text_filter: &Option<Regex>, record: &log::LogRecord) -> bool {
-            if let Some(filter) = text_filter.as_ref() {
-                filter.is_match(&*record.args().to_string())
-            } else {
-                true
-            }
-        }
-        match self.log_specification {
-            LogSpec::STATIC(ref ls) => check_text_filter(ls.text_filter(), &record),
+        // closure that we need below
+        let check_text_filter = |text_filter: &Option<Regex>| if let Some(filter) =
+            text_filter.as_ref() {
+            filter.is_match(&*record.args().to_string())
+        } else {
+            true
+        };
+
+        if !match self.log_specification {
+            LogSpec::STATIC(ref ls) => check_text_filter(ls.text_filter()),
             LogSpec::DYNAMIC(ref locked_ls) => {
                 let guard = locked_ls.read();
-                check_text_filter(guard.as_ref().unwrap().text_filter(), &record)
+                check_text_filter(guard.as_ref().unwrap().text_filter())
             }
-        };
+        } {
+            return;
+        }
 
 
         let mut msg = (self.config.format)(record);
