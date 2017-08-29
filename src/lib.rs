@@ -1,6 +1,7 @@
 #![warn(missing_docs)]
 
-//! A logger that can write the log to standard error or to a fresh file in a configurable folder,
+//! A logger that can write the log to standard error or to a fresh file or to a sequence of files
+//! in a configurable folder,
 //! and allows custom logline formats, and whose log specification can be changed at runtime.
 //!
 //! It had started as an extended copy of [env_logger](http://crates.io/crates/env_logger/).

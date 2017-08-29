@@ -8,7 +8,6 @@ use log;
 
 use regex::Regex;
 use std::cell::RefCell;
-use std::io::{self, Write};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -31,7 +30,8 @@ pub struct FlexiLogger {
     mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
 }
 
-/// Allows reconfiguring the logger while it is in use (see Logger::start_reconfigurable()).
+/// Allows reconfiguring the logger while it is in use
+/// (see [Logger::start_reconfigurable()](struct.Logger.html#method.start_reconfigurable) ).
 ///
 /// # Example
 ///
@@ -75,7 +75,7 @@ impl ReconfigurationHandle {
         ReconfigurationHandle { spec: spec }
     }
 
-    /// allows specifying a new LogLevelSpecification for the current logger.
+    /// Allows specifying a new LogLevelSpecification for the current logger.
     pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
         let mut guard = self.spec.write().unwrap();
         guard.reconfigure(new_spec);

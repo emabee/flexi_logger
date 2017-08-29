@@ -201,10 +201,10 @@ mod platform {
         }
 
         if let Err(e) = unix_fs::symlink(&path, link) {
-            print_err!("Can not create symlink \"{}\" for path \"{}\": {}",
-                       link,
-                       &path.display(),
-                       e);
+            eprintln!("Can not create symlink \"{}\" for path \"{}\": {}",
+                      link,
+                      &path.display(),
+                      e);
         }
     }
 
