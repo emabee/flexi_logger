@@ -12,13 +12,12 @@ use std::io::{BufRead, BufReader};
 #[test]
 fn test_textfilter() {
     let logspec = LogSpecification::parse("info/Hello");
-    Logger::with(logspec)
-        .format(default_format)
-        .print_message()
-        .log_to_file()
-        .suppress_timestamp()
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    Logger::with(logspec).format(default_format)
+                         .print_message()
+                         .log_to_file()
+                         .suppress_timestamp()
+                         .start()
+                         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -43,9 +42,11 @@ fn test_textfilter() {
     let mut buffer = String::new();
     let mut count = 0;
     while reader.read_line(&mut buffer).unwrap() > 0 {
-        if let None = buffer.find("Hello") {
-            assert!(false,
-                    format!("line in log file without Hello {:?}: \"{}\"", filename, buffer));
+        if buffer.find("Hello").is_none() {
+            assert!(
+                false,
+                format!("line in log file without Hello {:?}: \"{}\"", filename, buffer)
+            );
         } else {
             count += 1;
         }

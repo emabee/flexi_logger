@@ -1,4 +1,4 @@
-//! Structures and methods that allow supporting multiple FlexiLogger instances in a single process.
+//! Structures and methods that allow supporting multiple `FlexiLogger` instances in a single process.
 use flexi_writer::FlexiWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
@@ -19,7 +19,7 @@ enum LogSpec {
 
 /// Does the logging in the background, is normally not used directly.
 ///
-/// This struct is only used explicitly when you want to allow supporting multiple FlexiLogger
+/// This struct is only used explicitly when you want to allow supporting multiple `FlexiLogger`
 /// instances in a single process.
 pub struct FlexiLogger {
     log_specification: LogSpec,
@@ -31,7 +31,7 @@ pub struct FlexiLogger {
 }
 
 /// Allows reconfiguring the logger while it is in use
-/// (see [Logger::start_reconfigurable()](struct.Logger.html#method.start_reconfigurable) ).
+/// (see [`Logger::start_reconfigurable()`](struct.Logger.html#method.start_reconfigurable) ).
 ///
 /// # Example
 ///
@@ -124,11 +124,11 @@ impl FlexiLogger {
          -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
         let flexi_logger = FlexiLogger {
-            log_specification: LogSpec::DYNAMIC(spec.clone()),
+            log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
             mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
             config: config,
         };
-        let handle = ReconfigurationHandle::new(spec.clone());
+        let handle = ReconfigurationHandle::new(Arc::clone(&spec));
         Ok((flexi_logger, handle))
     }
 

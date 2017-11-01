@@ -1,7 +1,7 @@
 use formats;
 use LogRecord;
 
-/// Internal struct for influencing the behavior of flexi_logger.
+/// Internal struct for influencing the behavior of `flexi_logger`.
 ///
 /// You only need to use this structure explicitly if you want to instantiate multiple loggers
 /// in a process.
@@ -55,6 +55,13 @@ pub struct LogConfig {
     /// Note that this option is only effective on linux systems.
     pub create_symlink: Option<String>,
 }
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        LogConfig::default_config_for_logger()
+    }
+}
+
 impl LogConfig {
     /// Default configuration used by Logger.
     ///

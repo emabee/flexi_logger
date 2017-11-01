@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// The loglevel specification via string (relevant for methods
 /// [parse()](struct.LogSpecification.html#method.parse) and
 /// [env()](struct.LogSpecification.html#method.env))
-/// works essentially like with env_logger,
+/// works essentially like with `env_logger`,
 /// but we are a bit more tolerant with spaces. Its functionality can be
 /// described with some Backus-Naur-form:
 ///
@@ -22,12 +22,12 @@ use std::collections::HashMap;
 ///
 /// * Examples:
 ///
-///  * ```"info"```: all logs with info, warn, or error level are written
-///  * ```"crate1"```: all logs of this crate are written, but nothing else
-///  * ```"warn, crate2::mod_a=debug, mod_x::mod_y=trace"```: all crates log warnings and erors, mod_a additional debug messages, and
-///    mod_x::mod_y is fully traced
+///  * `"info"`: all logs with info, warn, or error level are written
+///  * `"crate1"`: all logs of this crate are written, but nothing else
+///  * `"warn, crate2::mod_a=debug, mod_x::mod_y=trace"`: all crates log warnings and erors, `mod_a` additional debug messages, and
+///    `mod_x::mod_y` is fully traced
 ///
-/// * If you just specify the module, without log_level, all levels will be traced for this module.
+/// * If you just specify the module, without `log_level`, all levels will be traced for this module.
 /// * If you just specify a log level, this will be applied as default to all modules without
 ///   explicit log level assigment.
 ///   (You see that for modules named error, warn, info, debug or trace,
@@ -36,10 +36,10 @@ use std::collections::HashMap;
 ///   affects all modules whose name starts with this String.<br>
 ///   Example: ```"foo"``` affects e.g.
 ///
-///   * foo
-///   * foo::bar
-///   * foobaz (!)
-///   * foobaz::bar (!)
+///   * `foo`
+///   * `foo::bar`
+///   * `foobaz` (!)
+///   * `foobaz::bar` (!)
 ///
 /// The optional text filter is applied for all modules.
 ///
@@ -80,7 +80,7 @@ impl LogSpecification {
         mods.map(|m| {
             for s in m.split(',') {
                 let s = s.trim();
-                if s.len() == 0 {
+                if s.is_empty() {
                     continue;
                 }
                 let mut parts = s.split('=');
@@ -139,7 +139,7 @@ impl LogSpecification {
             }
         });
 
-        let textfilter = filter.map_or(None, |filter| match Regex::new(filter) {
+        let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
                 println!("warning: invalid regex filter - {}", e);
@@ -164,7 +164,7 @@ impl LogSpecification {
 
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(llf: LogLevelFilter) -> LogSpecBuilder {
-        LogSpecBuilder::from_module_filters(&vec![ModuleFilter {
+        LogSpecBuilder::from_module_filters(&[ModuleFilter {
                                                       module_name: None,
                                                       level_filter: llf,
                                                   }])
@@ -185,8 +185,8 @@ fn contains_dash(s: &str) -> bool {
     s.find('-') != None
 }
 
-/// Builder for LogSpecification.
-#[derive(Clone)]
+/// Builder for `LogSpecification`.
+#[derive(Clone, Default)]
 pub struct LogSpecBuilder {
     module_filters: HashMap<Option<String>, LogLevelFilter>,
 }
@@ -200,10 +200,10 @@ impl LogSpecBuilder {
     }
 
     /// Creates a LogSpecBuilder from given module filters.
-    pub fn from_module_filters(module_filters: &Vec<ModuleFilter>) -> LogSpecBuilder {
+    pub fn from_module_filters(module_filters: &[ModuleFilter]) -> LogSpecBuilder {
         let mut modfilmap = HashMap::new();
         for mf in module_filters {
-            modfilmap.insert(mf.module_name.clone(), mf.level_filter.clone());
+            modfilmap.insert(mf.module_name.clone(), mf.level_filter);
         }
         LogSpecBuilder { module_filters: modfilmap }
     }

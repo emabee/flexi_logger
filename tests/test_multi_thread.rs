@@ -1,11 +1,11 @@
 extern crate chrono;
-extern crate glob;
 extern crate flexi_logger;
+extern crate glob;
 #[macro_use]
 extern crate log;
 
 use chrono::Local;
-use flexi_logger::{Logger, LogRecord, LogSpecification};
+use flexi_logger::{LogRecord, LogSpecification, Logger};
 use glob::glob;
 
 use std::fs::File;
@@ -34,40 +34,41 @@ fn multi_threaded() {
         .rotate_over_size(ROTATE_OVER_SIZE)
         .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    error!("create a huge number of log lines with a significant number of threads, verify the \
-        log");
+    error!(
+        "create a huge number of log lines with a significant number of threads, verify the log"
+    );
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("debug");
-    thread::Builder::new()
-        .spawn(move || {
-            thread::sleep(time::Duration::from_millis(1000));
-            reconf_handle.set_new_spec(new_spec);
-            0 as u8
-        })
-        .unwrap();
+    thread::Builder::new().spawn(move || {
+        thread::sleep(time::Duration::from_millis(1000));
+        reconf_handle.set_new_spec(new_spec);
+        0 as u8
+    })
+                          .unwrap();
 
 
     wait_for_workers_to_close(worker_handles);
 
     let delta = Local::now().signed_duration_since(start).num_milliseconds();
     info!("Task executed with {} threads in {}ms.", NO_OF_THREADS, delta);
-    verify_logs(directory);
+    verify_logs(&directory);
 }
 
-/// Starts given number of worker threads and lets each execute "do_work"
+/// Starts given number of worker threads and lets each execute `do_work`
 fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
     trace!("Starting {} worker threads", no_of_workers);
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
-        worker_handles.push(thread::Builder::new()
-            .name(thread_number.to_string())
-            .spawn(move || {
+        worker_handles.push(
+            thread::Builder::new().name(thread_number.to_string())
+                                  .spawn(move || {
                 do_work(thread_number);
                 0 as u8
             })
-            .unwrap());
+                                  .unwrap(),
+        );
     }
     trace!("All {} worker threads started.", worker_handles.len());
     worker_handles
@@ -95,16 +96,18 @@ fn define_directory() -> String {
 }
 
 fn test_format(record: &LogRecord) -> String {
-    format!("XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-            thread::current().name().unwrap_or("<unnamed>"),
-            record.level(),
-            record.location().file(),
-            record.location().line(),
-            &record.args())
+    format!(
+        "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        thread::current().name().unwrap_or("<unnamed>"),
+        record.level(),
+        record.location().file(),
+        record.location().line(),
+        &record.args()
+    )
 }
 
-fn verify_logs(directory: String) {
+fn verify_logs(directory: &str) {
     // read all files
     let pattern = String::from(directory).add("/*");
     let globresults = match glob(&pattern) {
@@ -130,8 +133,10 @@ fn verify_logs(directory: String) {
         }
     }
     assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2 + NO_OF_THREADS);
-    error!("Wrote {} log lines from {} threads into {} files",
-           line_count,
-           NO_OF_THREADS,
-           no_of_log_files);
+    error!(
+        "Wrote {} log lines from {} threads into {} files",
+        line_count,
+        NO_OF_THREADS,
+        no_of_log_files
+    );
 }

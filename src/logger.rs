@@ -9,27 +9,27 @@ use ReconfigurationHandle;
 pub type FormatFunction = fn(&LogRecord) -> String;
 
 
-/// The standard entry-point for using flexi_logger.
+/// The standard entry-point for using `flexi_logger`.
 ///
 /// Create a Logger with your desired (initial) loglevel-specification
 ///
 /// * by specifying a String programmatically,
-///   using [Logger::with_str()](struct.Logger.html#method.with_str),
+///   using [`Logger::with_str()`](struct.Logger.html#method.with_str),
 /// * or by expecting a String in the environment,
-///   using [Logger::with_env()](struct.Logger.html#method.with_env),
-/// * or by providing an explicitly built LogSpecification,
-///   using [Logger::with()](struct.Logger.html#method.with),
+///   using [`Logger::with_env()`](struct.Logger.html#method.with_env),
+/// * or by providing an explicitly built `LogSpecification`,
+///   using [`Logger::with()`](struct.Logger.html#method.with),
 ///
 /// use its configuration methods, and finally call [start()](struct.Logger.html#method.start)
-/// (or [start_reconfigurable()](struct.Logger.html#method.start_reconfigurable)).
+/// (or [`start_reconfigurable()`](struct.Logger.html#method.start_reconfigurable)).
 ///
 /// ## Examples
 ///
 /// ### Use defaults only
 ///
-/// If you initialize flexi_logger like this, it behaves like env_logger:
+/// If you initialize `flexi_logger` like this, it behaves like `env_logger`:
 ///
-/// ```
+/// ```rust
 /// use flexi_logger::Logger;
 ///
 /// Logger::with_env().start().unwrap();
@@ -37,8 +37,8 @@ pub type FormatFunction = fn(&LogRecord) -> String;
 ///
 /// ### Write to files, use a detailed log-line format that contains the module and line number
 ///
-/// Here we configure flexi_logger to write log entries with
-/// time and location info into a log file in folder "log_files",
+/// Here we configure `flexi_logger` to write log entries with
+/// time and location info into a log file in folder "`log_files`",
 /// and we provide the loglevel-specification programmatically, as String:
 ///
 /// ```
@@ -233,7 +233,7 @@ impl Logger {
 }
 
 /// Alternative set of methods to control the behavior of the Logger.
-/// use these methods when you want to control the settings dynamically, e.g. with doc_opts.
+/// use these methods when you want to control the settings dynamically, e.g. with `doc_opts`.
 impl Logger {
     /// With true, makes the logger write all logs to a file, otherwise to stderr.
     pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {

@@ -8,8 +8,17 @@ pub type FormatFunction = fn(&LogRecord) -> String;
 
 
 /// Deprecated. Use Logger instead.
+#[allow(unknown_lints)]
+#[allow(new_without_default)]
 #[deprecated]
 pub struct LogOptions(LogConfig);
+
+#[allow(deprecated)]
+    impl Default for LogOptions {
+        fn default() -> Self {
+            LogOptions(LogConfig::new())
+        }
+    }
 
 #[allow(deprecated)]
 impl LogOptions {

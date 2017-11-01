@@ -50,12 +50,10 @@ impl FlexiWriter {
 
         let (use_rotating, rotate_idx) = match o_filename_base {
             None => (false, 0),
-            Some(ref s_filename_base) => {
-                match config.rotate_over_size {
-                    None => (false, 0),
-                    Some(_) => (true, get_next_rotate_idx(&s_filename_base, &config.suffix)),
-                }
-            }
+            Some(ref s_filename_base) => match config.rotate_over_size {
+                None => (false, 0),
+                Some(_) => (true, get_next_rotate_idx(s_filename_base, &config.suffix)),
+            },
         };
 
         let mut flexi_writer = FlexiWriter {
@@ -65,10 +63,12 @@ impl FlexiWriter {
             written_bytes: 0,
             rotate_idx: rotate_idx,
         };
-        flexi_writer.mount_linewriter(&config.suffix,
-                                      &config.create_symlink,
-                                      config.timestamp,
-                                      config.print_message);
+        flexi_writer.mount_linewriter(
+            &config.suffix,
+            &config.create_symlink,
+            config.timestamp,
+            config.print_message,
+        );
         Ok(flexi_writer)
     }
 
@@ -79,19 +79,19 @@ impl FlexiWriter {
             self.o_flw = None; // close the previous file
             self.written_bytes = 0;
             self.rotate_idx += 1;
-            self.mount_linewriter(&config.suffix,
-                                  &config.create_symlink,
-                                  config.timestamp,
-                                  config.print_message);
+            self.mount_linewriter(
+                &config.suffix,
+                &config.create_symlink,
+                config.timestamp,
+                config.print_message,
+            );
         }
 
-        // write out the stuff
+        // write out the message
         if let Some(ref mut lw) = self.o_flw {
-            lw.write(msgb)
-              .unwrap_or_else(|e| {
-                  eprintln!("Flexi logger: write access to file failed with {}", e);
-                  0
-              });
+            lw.write_all(msgb).unwrap_or_else(|e| {
+                eprintln!("Flexi logger: write access to file failed with {}", e);
+            });
             if self.use_rotating {
                 self.written_bytes += msgb.len();
             }
@@ -100,20 +100,22 @@ impl FlexiWriter {
 
     fn mount_linewriter(&mut self, suffix: &Option<String>, create_symlink: &Option<String>,
                         timestamp: bool, print_message: bool) {
-        if let None = self.o_flw {
+        if self.o_flw.is_none() {
             if let Some(ref s_filename_base) = self.o_filename_base {
-                let filename = get_filename(s_filename_base,
-                                            self.use_rotating,
-                                            self.rotate_idx,
-                                            suffix,
-                                            timestamp);
+                let filename = get_filename(
+                    s_filename_base,
+                    self.use_rotating,
+                    self.rotate_idx,
+                    suffix,
+                    timestamp,
+                );
                 let path = Path::new(&filename);
                 if print_message {
                     println!("Log is written to {}", &path.display());
                 }
                 self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
 
-                if let &Some(ref link) = create_symlink {
+                if let Some(ref link) = *create_symlink {
                     self::platform::create_symlink_if_possible(link, path);
                 }
             }
@@ -121,63 +123,61 @@ impl FlexiWriter {
     }
 }
 
-fn get_filename_base(s_directory: &String, discriminant: &Option<String>) -> String {
+fn get_filename_base(s_directory: &str, discriminant: &Option<String>) -> String {
     let arg0 = env::args().next().unwrap();
     let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
-    let mut filename = String::with_capacity(180).add(&s_directory).add("/").add(&progname);
+    let mut filename = String::with_capacity(180).add(s_directory)
+                                                 .add("/")
+                                                 .add(&progname);
     if let Some(ref s_d) = *discriminant {
         filename = filename.add(&format!("_{}", s_d));
     }
     filename
 }
 
-fn get_filename(s_filename_base: &String, do_rotating: bool, rotate_idx: u32,
+fn get_filename(s_filename_base: &str, do_rotating: bool, rotate_idx: u32,
                 o_suffix: &Option<String>, timestamp: bool)
                 -> String {
-    let mut filename = String::with_capacity(180).add(&s_filename_base);
+    let mut filename = String::with_capacity(180).add(s_filename_base);
     if timestamp {
         filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
     };
     if do_rotating {
         filename = filename.add(&format!("_r{:0>5}", rotate_idx))
     };
-    if let &Some(ref suffix) = o_suffix {
+    if let Some(ref suffix) = *o_suffix {
         filename = filename.add(".").add(suffix);
     }
     filename
 }
 
-fn get_filename_pattern(s_filename_base: &String, o_suffix: &Option<String>) -> String {
-    let mut filename = String::with_capacity(180).add(&s_filename_base);
+fn get_filename_pattern(s_filename_base: &str, o_suffix: &Option<String>) -> String {
+    let mut filename = String::with_capacity(180).add(s_filename_base);
     filename = filename.add("_r*");
-    if let &Some(ref suffix) = o_suffix {
+    if let Some(ref suffix) = *o_suffix {
         filename = filename.add(".").add(suffix);
     }
     filename
 }
 
-fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u32 {
+fn get_next_rotate_idx(s_filename_base: &str, o_suffix: &Option<String>) -> u32 {
     let mut rotate_idx = 0;
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     match glob(&fn_pattern) {
         Err(e) => {
             eprintln!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
         }
-        Ok(globresults) => {
-            for globresult in globresults {
-                match globresult {
-                    Err(e) => {
-                        eprintln!("Error occured when reading directory for log files: {:?}", e)
-                    }
-                    Ok(pathbuf) => {
-                        let filename = pathbuf.file_stem().unwrap().to_string_lossy();
-                        let mut it = filename.rsplit("_r");
-                        let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
-                        rotate_idx = max(rotate_idx, idx);
-                    }
+        Ok(globresults) => for globresult in globresults {
+            match globresult {
+                Err(e) => eprintln!("Error occured when reading directory for log files: {:?}", e),
+                Ok(pathbuf) => {
+                    let filename = pathbuf.file_stem().unwrap().to_string_lossy();
+                    let mut it = filename.rsplit("_r");
+                    let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
+                    rotate_idx = max(rotate_idx, idx);
                 }
             }
-        }
+        },
     }
     rotate_idx + 1
 }
@@ -186,12 +186,12 @@ fn get_next_rotate_idx(s_filename_base: &String, o_suffix: &Option<String>) -> u
 mod platform {
     use std::path::Path;
 
-    pub fn create_symlink_if_possible(link: &String, path: &Path) {
+    pub fn create_symlink_if_possible(link: &str, path: &Path) {
         linux_create_symlink(link, path);
     }
 
     #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &String, path: &Path) {
+    fn linux_create_symlink(link: &str, path: &Path) {
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
@@ -201,13 +201,15 @@ mod platform {
         }
 
         if let Err(e) = unix_fs::symlink(&path, link) {
-            eprintln!("Can not create symlink \"{}\" for path \"{}\": {}",
-                      link,
-                      &path.display(),
-                      e);
+            eprintln!(
+                "Can not create symlink \"{}\" for path \"{}\": {}",
+                link,
+                &path.display(),
+                e
+            );
         }
     }
 
     #[cfg(not(target_os = "linux"))]
-    fn linux_create_symlink(_: &String, _: &Path) {}
+    fn linux_create_symlink(_: &str, _: &Path) {}
 }

@@ -4,7 +4,7 @@
 //! in a configurable folder,
 //! and allows custom logline formats, and whose log specification can be changed at runtime.
 //!
-//! It had started as an extended copy of [env_logger](http://crates.io/crates/env_logger/).
+//! It had started as an extended copy of [`env_logger`](http://crates.io/crates/env_logger/).
 //!
 //! # Usage
 //!
@@ -24,7 +24,7 @@
 //! extern crate log;
 //! ```
 //!
-//! The latter is needed because flexi_logger plugs into the standard Rust logging facade given
+//! The latter is needed because `flexi_logger` plugs into the standard Rust logging facade given
 //! by the [log crate](https://crates.io/crates/log),
 //! and you use the ```log``` macros to write log lines from your code.
 //!
@@ -68,7 +68,7 @@ pub use log::{LogLevel, LogLevelFilter, LogRecord};
 pub use deprecated::{init, LogOptions};
 
 pub use formats::*;
-pub use log_specification::{LogSpecification, LogSpecBuilder};
+pub use log_specification::{LogSpecBuilder, LogSpecification};
 
 pub use log_config::LogConfig;
 pub use logger::Logger;

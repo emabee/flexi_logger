@@ -4,7 +4,7 @@ use std::io;
 use std::error::Error;
 
 
-/// Describes errors in the initialization of flexi_logger.
+/// Describes errors in the initialization of `flexi_logger`.
 #[derive(Debug)]
 pub enum FlexiLoggerError {
     /// Log file cannot be written because the specified path is not a directory.
