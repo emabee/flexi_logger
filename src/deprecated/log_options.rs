@@ -1,9 +1,9 @@
-use log::LogRecord;
+use log::Record;
 use FlexiLoggerError;
 use Logger;
 use LogConfig;
 
-pub type FormatFunction = fn(&LogRecord) -> String;
+pub type FormatFunction = fn(&Record) -> String;
 
 
 

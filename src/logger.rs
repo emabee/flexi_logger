@@ -1,4 +1,4 @@
-use log::LogRecord;
+use log::Record;
 use LogConfig;
 use LogSpecification;
 use flexi_error::FlexiLoggerError;
@@ -6,7 +6,7 @@ use FlexiLogger;
 use ReconfigurationHandle;
 
 /// Function type for Format functions.
-pub type FormatFunction = fn(&LogRecord) -> String;
+pub type FormatFunction = fn(&Record) -> String;
 
 
 /// The standard entry-point for using `flexi_logger`.

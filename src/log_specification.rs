@@ -1,4 +1,4 @@
-use LogLevelFilter;
+use LevelFilter;
 use regex::Regex;
 use std::env;
 use std::collections::HashMap;
@@ -56,7 +56,7 @@ pub struct LogSpecification {
 #[derive(Clone,Debug)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
-    pub level_filter: LogLevelFilter,
+    pub level_filter: LevelFilter,
 }
 
 impl LogSpecification {
@@ -75,7 +75,7 @@ impl LogSpecification {
         let filter = parts.next();
         if parts.next().is_some() {
             println!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
-            return LogSpecification::default(LogLevelFilter::Off).finalize();
+            return LogSpecification::default(LevelFilter::Off).finalize();
         }
         mods.map(|m| {
             for s in m.split(',') {
@@ -98,7 +98,7 @@ impl LogSpecification {
                         // treat that as a global fallback
                         match part0.trim().parse() {
                             Ok(num) => (num, None),
-                            Err(_) => (LogLevelFilter::max(), Some(part0)),
+                            Err(_) => (LevelFilter::max(), Some(part0)),
                         }
                     }
                     (Some(part0), Some(""), None) => {
@@ -109,7 +109,7 @@ impl LogSpecification {
                             continue;
                         }
 
-                        (LogLevelFilter::max(), Some(part0))
+                        (LevelFilter::max(), Some(part0))
                     }
                     (Some(part0), Some(part1), None) => {
                         if contains_dash(part0) {
@@ -158,12 +158,12 @@ impl LogSpecification {
     pub fn env() -> LogSpecification {
         match env::var("RUST_LOG") {
             Ok(spec) => LogSpecification::parse(&spec),
-            Err(..) => LogSpecification::default(LogLevelFilter::Off).finalize(),
+            Err(..) => LogSpecification::default(LevelFilter::Off).finalize(),
         }
     }
 
     /// Creates a LogSpecBuilder, setting the default log level.
-    pub fn default(llf: LogLevelFilter) -> LogSpecBuilder {
+    pub fn default(llf: LevelFilter) -> LogSpecBuilder {
         LogSpecBuilder::from_module_filters(&[ModuleFilter {
                                                       module_name: None,
                                                       level_filter: llf,
@@ -188,14 +188,14 @@ fn contains_dash(s: &str) -> bool {
 /// Builder for `LogSpecification`.
 #[derive(Clone, Default)]
 pub struct LogSpecBuilder {
-    module_filters: HashMap<Option<String>, LogLevelFilter>,
+    module_filters: HashMap<Option<String>, LevelFilter>,
 }
 
 impl LogSpecBuilder {
     /// Creates a LogSpecBuilder with all logging turned off.
     pub fn new() -> LogSpecBuilder {
         let mut modfilmap = HashMap::new();
-        modfilmap.insert(None, LogLevelFilter::Off);
+        modfilmap.insert(None, LevelFilter::Off);
         LogSpecBuilder { module_filters: modfilmap }
     }
 
@@ -209,13 +209,13 @@ impl LogSpecBuilder {
     }
 
     /// Adds a default log level filter, or updates the default log level filter.
-    pub fn default(&mut self, lf: LogLevelFilter) -> &mut LogSpecBuilder {
+    pub fn default(&mut self, lf: LevelFilter) -> &mut LogSpecBuilder {
         self.module_filters.insert(None, lf);
         self
     }
 
     /// Adds a log level filter, or updates the log level filter, for a module.
-    pub fn module<M: AsRef<str>>(&mut self, module_name: M, lf: LogLevelFilter)
+    pub fn module<M: AsRef<str>>(&mut self, module_name: M, lf: LevelFilter)
                                  -> &mut LogSpecBuilder {
         self.module_filters.insert(Some(module_name.as_ref().to_owned()), lf);
         self
@@ -263,7 +263,7 @@ impl LogSpecBuilder {
 trait IntoVecModuleFilter {
     fn into_vec_module_filter(self) -> Vec<ModuleFilter>;
 }
-impl IntoVecModuleFilter for HashMap<Option<String>, LogLevelFilter> {
+impl IntoVecModuleFilter for HashMap<Option<String>, LevelFilter> {
     fn into_vec_module_filter(self) -> Vec<ModuleFilter> {
         let mf: Vec<ModuleFilter> = self.into_iter()
                                         .map(|(k, v)| {
@@ -294,20 +294,20 @@ impl LevelSort for Vec<ModuleFilter> {
 mod tests {
     extern crate log;
     use {LogSpecification, LogSpecBuilder};
-    use log::LogLevelFilter;
+    use log::LevelFilter;
 
     #[test]
     fn parse_logging_spec_valid() {
         let spec = LogSpecification::parse("crate1::mod1=error,crate1::mod2,crate2=debug");
         assert_eq!(spec.module_filters().len(), 3);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate1::mod1".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Error);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Error);
 
         assert_eq!(spec.module_filters()[1].module_name, Some("crate1::mod2".to_string()));
-        assert_eq!(spec.module_filters()[1].level_filter, LogLevelFilter::max());
+        assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::max());
 
         assert_eq!(spec.module_filters()[2].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[2].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
 
         assert!(spec.text_filter().is_none());
     }
@@ -318,7 +318,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1::mod1=warn=info,crate2=debug");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
 
@@ -328,7 +328,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1::mod1=noNumber,crate2=debug");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
 
@@ -338,7 +338,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=warn");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Warn);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Warn);
         assert!(spec.text_filter().is_none());
     }
 
@@ -348,7 +348,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::max());
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
         assert!(spec.text_filter().is_none());
     }
 
@@ -358,9 +358,9 @@ mod tests {
         let spec = LogSpecification::parse("warn,crate2=debug");
         assert_eq!(spec.module_filters().len(), 2);
         assert_eq!(spec.module_filters()[0].module_name, None);
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Warn);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Warn);
         assert_eq!(spec.module_filters()[1].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[1].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
 
@@ -369,13 +369,13 @@ mod tests {
         let spec = LogSpecification::parse(" crate1::mod1 = error , crate1::mod2,crate2=debug/abc");
         assert_eq!(spec.module_filters().len(), 3);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate1::mod1".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Error);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Error);
 
         assert_eq!(spec.module_filters()[1].module_name, Some("crate1::mod2".to_string()));
-        assert_eq!(spec.module_filters()[1].level_filter, LogLevelFilter::max());
+        assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::max());
 
         assert_eq!(spec.module_filters()[2].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[2].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_some() &&
                 spec.text_filter().as_ref().unwrap().to_string() == "abc");
     }
@@ -385,7 +385,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_some() &&
                 spec.text_filter().as_ref().unwrap().to_string() == "a.c");
     }
@@ -395,7 +395,7 @@ mod tests {
         let spec = LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_some() &&
                 spec.text_filter().as_ref().unwrap().to_string() == "a.c");
     }
@@ -405,7 +405,7 @@ mod tests {
         let spec = LogSpecification::parse("crate1/a*c");
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate1".to_string()));
-        assert_eq!(spec.module_filters()[0].level_filter, LogLevelFilter::max());
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
         assert!(spec.text_filter().is_some() &&
                 spec.text_filter().as_ref().unwrap().to_string() == "a*c");
     }
@@ -413,34 +413,34 @@ mod tests {
     #[test]
     fn reuse_logspec_builder() {
         let mut builder = LogSpecBuilder::new();
-        builder.default(LogLevelFilter::Info);
-        builder.module("karl", LogLevelFilter::Debug);
-        builder.module("toni", LogLevelFilter::Warn);
+        builder.default(LevelFilter::Info);
+        builder.module("karl", LevelFilter::Debug);
+        builder.module("toni", LevelFilter::Warn);
 
         let spec1 = builder.build();
         assert_eq!(spec1.module_filters().len(), 3);
         assert_eq!(spec1.module_filters()[0].module_name, None);
-        assert_eq!(spec1.module_filters()[0].level_filter, LogLevelFilter::Info);
+        assert_eq!(spec1.module_filters()[0].level_filter, LevelFilter::Info);
 
         assert_eq!(spec1.module_filters()[1].module_name, Some("karl".to_string()));
-        assert_eq!(spec1.module_filters()[1].level_filter, LogLevelFilter::Debug);
+        assert_eq!(spec1.module_filters()[1].level_filter, LevelFilter::Debug);
 
         assert_eq!(spec1.module_filters()[2].module_name, Some("toni".to_string()));
-        assert_eq!(spec1.module_filters()[2].level_filter, LogLevelFilter::Warn);
+        assert_eq!(spec1.module_filters()[2].level_filter, LevelFilter::Warn);
 
-        builder.default(LogLevelFilter::Error);
+        builder.default(LevelFilter::Error);
         builder.remove("karl");
-        builder.module("emma", LogLevelFilter::Trace);
+        builder.module("emma", LevelFilter::Trace);
         let spec2 = builder.build();
 
         assert_eq!(spec2.module_filters().len(), 3);
         assert_eq!(spec2.module_filters()[0].module_name, None);
-        assert_eq!(spec2.module_filters()[0].level_filter, LogLevelFilter::Error);
+        assert_eq!(spec2.module_filters()[0].level_filter, LevelFilter::Error);
 
         assert_eq!(spec2.module_filters()[1].module_name, Some("emma".to_string()));
-        assert_eq!(spec2.module_filters()[1].level_filter, LogLevelFilter::Trace);
+        assert_eq!(spec2.module_filters()[1].level_filter, LevelFilter::Trace);
 
         assert_eq!(spec2.module_filters()[2].module_name, Some("toni".to_string()));
-        assert_eq!(spec2.module_filters()[2].level_filter, LogLevelFilter::Warn);
+        assert_eq!(spec2.module_filters()[2].level_filter, LevelFilter::Warn);
     }
 }

@@ -11,5 +11,5 @@ documentation = "https://docs.rs/flexi_logger/"
 [dependencies]
 chrono = "0.4"
 glob = "0.2"
-log = "0.3"
+log = { version = "0.4", features = ["std"] }
 regex = "0.2"

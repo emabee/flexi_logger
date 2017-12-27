@@ -62,7 +62,7 @@ mod logger;
 mod log_config;
 mod log_specification;
 
-pub use log::{LogLevel, LogLevelFilter, LogRecord};
+pub use log::{Level, LevelFilter, Record};
 
 #[allow(deprecated)]
 pub use deprecated::{init, LogOptions};
