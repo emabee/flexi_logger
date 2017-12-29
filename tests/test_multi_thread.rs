@@ -5,7 +5,7 @@ extern crate glob;
 extern crate log;
 
 use chrono::Local;
-use flexi_logger::{LogRecord, LogSpecification, Logger};
+use flexi_logger::{Record, LogSpecification, Logger};
 use glob::glob;
 
 use std::fs::File;
@@ -95,14 +95,14 @@ fn define_directory() -> String {
     format!("./log_files/mt_logs/{}", Local::now().format("%Y-%m-%d_%H-%M-%S"))
 }
 
-fn test_format(record: &LogRecord) -> String {
+fn test_format(record: &Record) -> String {
     format!(
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
         Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
-        record.location().file(),
-        record.location().line(),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
         &record.args()
     )
 }

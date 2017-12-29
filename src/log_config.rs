@@ -1,5 +1,5 @@
 use formats;
-use LogRecord;
+use Record;
 
 /// Internal struct for influencing the behavior of `flexi_logger`.
 ///
@@ -9,8 +9,8 @@ pub struct LogConfig {
     /// Defines the logline format.
     /// You can either choose between some predefined variants,
     /// ```default_format```, ```opt_format```, ```detailed_format```, ```with_thread```,
-    /// or you create and use your own format function with the signature ```fn(&LogRecord) -> String```.
-    pub format: fn(&LogRecord) -> String,
+    /// or you create and use your own format function with the signature ```fn(&Record) -> String```.
+    pub format: fn(&Record) -> String,
 
     /// * If `false`, the log is written to stderr.
     /// * If `true`, a new file is created and the log is written to it.

@@ -41,13 +41,13 @@ pub struct FlexiLogger {
 /// extern crate log;
 /// extern crate flexi_logger;
 /// use flexi_logger::{Logger, LogSpecBuilder};
-/// use log::LogLevelFilter;
+/// use log::LevelFilter;
 ///
 /// fn main() {
 ///     // Build the initial log specification
-///     let mut builder = LogSpecBuilder::new();  // default is LogLevelFilter::Off
-///     builder.default(LogLevelFilter::Info);
-///     builder.module("karl", LogLevelFilter::Debug);
+///     let mut builder = LogSpecBuilder::new();  // default is LevelFilter::Off
+///     builder.default(LevelFilter::Info);
+///     builder.module("karl", LevelFilter::Debug);
 ///
 ///     // Initialize Logger, keep builder alive
 ///     let mut logger_reconf_handle = Logger::with(builder.build())
@@ -58,9 +58,9 @@ pub struct FlexiLogger {
 ///     // ...
 ///
 ///     // Modify builder and update the logger
-///     builder.default(LogLevelFilter::Error);
+///     builder.default(LevelFilter::Error);
 ///     builder.remove("karl");
-///     builder.module("emma", LogLevelFilter::Trace);
+///     builder.module("emma", LevelFilter::Trace);
 ///
 ///     logger_reconf_handle.set_new_spec(builder.build());
 ///
@@ -75,7 +75,7 @@ impl ReconfigurationHandle {
         ReconfigurationHandle { spec: spec }
     }
 
-    /// Allows specifying a new LogLevelSpecification for the current logger.
+    /// Allows specifying a new LogSpecification for the current logger.
     pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
         let mut guard = self.spec.write().unwrap();
         guard.reconfigure(new_spec);
@@ -89,13 +89,11 @@ impl FlexiLogger {
                       .iter()
                       .map(|d| d.level_filter)
                       .max()
-                      .unwrap_or(log::LogLevelFilter::Off);
+                      .unwrap_or(log::LevelFilter::Off);
 
         let flexi_logger = FlexiLogger::new_internal(spec, config)?;
-        log::set_logger(|max_level| {
-            max_level.set(max);
-            Box::new(flexi_logger)
-        })?;
+        log::set_boxed_logger(Box::new(flexi_logger))?;
+        log::set_max_level(max);
         Ok(())
     }
 
@@ -103,10 +101,8 @@ impl FlexiLogger {
     pub fn start_reconfigurable(config: LogConfig, spec: LogSpecification)
                                 -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let (flexi_logger, handle) = FlexiLogger::new_internal_reconfigurable(spec, config)?;
-        log::set_logger(|max_level| {
-            max_level.set(log::LogLevelFilter::Trace); // no optimization possible, because the spec is dynamic, but max is not
-            Box::new(flexi_logger)
-        })?;
+        log::set_boxed_logger(Box::new(flexi_logger))?;
+        log::set_max_level(log::LevelFilter::Trace); // no optimization possible, because the spec is dynamic, but max is not
         Ok(handle)
     }
 
@@ -133,7 +129,7 @@ impl FlexiLogger {
     }
 
     // Implementation of Log::enabled() with easier testable signature
-    fn fl_enabled(&self, level: log::LogLevel, target: &str) -> bool {
+    fn fl_enabled(&self, level: log::Level, target: &str) -> bool {
         // little closure that we need below
         let check_filter = |module_filters: &Vec<ModuleFilter>| {
             // Search for the longest match, the vector is assumed to be pre-sorted.
@@ -168,11 +164,11 @@ impl FlexiLogger {
 }
 
 impl log::Log for FlexiLogger {
-    fn enabled(&self, metadata: &log::LogMetadata) -> bool {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
         self.fl_enabled(metadata.level(), metadata.target())
     }
 
-    fn log(&self, record: &log::LogRecord) {
+    fn log(&self, record: &log::Record) {
         if !self.enabled(record.metadata()) {
             return;
         }
@@ -198,10 +194,10 @@ impl log::Log for FlexiLogger {
 
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
-            if self.config.duplicate_error && record.level() == log::LogLevel::Error ||
+            if self.config.duplicate_error && record.level() == log::Level::Error ||
                self.config.duplicate_info &&
-               (record.level() == log::LogLevel::Error || record.level() == log::LogLevel::Warn ||
-                record.level() == log::LogLevel::Info) {
+               (record.level() == log::Level::Error || record.level() == log::Level::Warn ||
+                record.level() == log::Level::Info) {
                 println!("{}", &record.args());
             }
             msg.push('\n');
@@ -220,11 +216,13 @@ impl log::Log for FlexiLogger {
             eprintln!("{}", msg);
         }
     }
+
+    fn flush(&self) {}
 }
 
 #[cfg(test)]
 mod tests {
-    use LogLevel;
+    use Level;
     use LogConfig;
     use super::FlexiLogger;
 
@@ -235,49 +233,49 @@ mod tests {
     #[test]
     fn match_full_path() {
         let logger = make_logger("crate2=info,crate1::mod1=warn");
-        assert!(logger.fl_enabled(LogLevel::Warn, "crate1::mod1"));
-        assert!(!logger.fl_enabled(LogLevel::Info, "crate1::mod1"));
-        assert!(logger.fl_enabled(LogLevel::Info, "crate2"));
-        assert!(!logger.fl_enabled(LogLevel::Debug, "crate2"));
+        assert!(logger.fl_enabled(Level::Warn, "crate1::mod1"));
+        assert!(!logger.fl_enabled(Level::Info, "crate1::mod1"));
+        assert!(logger.fl_enabled(Level::Info, "crate2"));
+        assert!(!logger.fl_enabled(Level::Debug, "crate2"));
     }
 
     #[test]
     fn no_match() {
         let logger = make_logger("crate2=info,crate1::mod1=warn");
-        assert!(!logger.fl_enabled(LogLevel::Warn, "crate3"));
+        assert!(!logger.fl_enabled(Level::Warn, "crate3"));
     }
 
     #[test]
     fn match_beginning() {
         let logger = make_logger("crate2=info,crate1::mod1=warn");
-        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod1"));
+        assert!(logger.fl_enabled(Level::Info, "crate2::mod1"));
     }
 
     #[test]
     fn match_beginning_longest_match() {
         let logger = make_logger("abcd = info, abcd::mod1 = error, klmn::mod = debug, klmn = info");
-        assert!(logger.fl_enabled(LogLevel::Error, "abcd::mod1::foo"));
-        assert!(!logger.fl_enabled(LogLevel::Warn, "abcd::mod1::foo"));
-        assert!(logger.fl_enabled(LogLevel::Warn, "abcd::mod2::foo"));
-        assert!(!logger.fl_enabled(LogLevel::Debug, "abcd::mod2::foo"));
+        assert!(logger.fl_enabled(Level::Error, "abcd::mod1::foo"));
+        assert!(!logger.fl_enabled(Level::Warn, "abcd::mod1::foo"));
+        assert!(logger.fl_enabled(Level::Warn, "abcd::mod2::foo"));
+        assert!(!logger.fl_enabled(Level::Debug, "abcd::mod2::foo"));
 
-        assert!(!logger.fl_enabled(LogLevel::Debug, "klmn"));
-        assert!(!logger.fl_enabled(LogLevel::Debug, "klmn::foo::bar"));
-        assert!(logger.fl_enabled(LogLevel::Info, "klmn::foo::bar"));
+        assert!(!logger.fl_enabled(Level::Debug, "klmn"));
+        assert!(!logger.fl_enabled(Level::Debug, "klmn::foo::bar"));
+        assert!(logger.fl_enabled(Level::Info, "klmn::foo::bar"));
     }
 
     #[test]
     fn match_default() {
         let logger = make_logger("info,abcd::mod1=warn");
-        assert!(logger.fl_enabled(LogLevel::Warn, "abcd::mod1"));
-        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod2"));
+        assert!(logger.fl_enabled(Level::Warn, "abcd::mod1"));
+        assert!(logger.fl_enabled(Level::Info, "crate2::mod2"));
     }
 
     #[test]
     fn zero_level() {
         let logger = make_logger("info,crate1::mod1=off");
-        assert!(!logger.fl_enabled(LogLevel::Error, "crate1::mod1"));
-        assert!(logger.fl_enabled(LogLevel::Info, "crate2::mod2"));
+        assert!(!logger.fl_enabled(Level::Error, "crate1::mod1"));
+        assert!(logger.fl_enabled(Level::Info, "crate2::mod2"));
     }
 
 }
