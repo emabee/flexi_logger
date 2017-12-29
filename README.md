@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 flexi_logger = "0.6"
-log = "0.3"
+log = "0.4"
 ```
 
 and this to your crate root:
