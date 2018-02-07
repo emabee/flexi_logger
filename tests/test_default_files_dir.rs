@@ -1,5 +1,5 @@
-#![feature(test)]
-extern crate test;
+// #![feature(test)]
+// extern crate test;
 
 extern crate flexi_logger;
 #[macro_use]

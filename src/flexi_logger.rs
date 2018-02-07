@@ -80,6 +80,12 @@ impl ReconfigurationHandle {
         let mut guard = self.spec.write().unwrap();
         guard.reconfigure(new_spec);
     }
+
+    /// Allows specifying a new LogSpecification for the current logger.
+    pub fn parse_new_spec(&mut self, spec: &str) {
+        let mut guard = self.spec.write().unwrap();
+        guard.reconfigure(LogSpecification::parse(spec));
+    }
 }
 
 impl FlexiLogger {

@@ -14,10 +14,11 @@ pub struct LogConfig {
 
     /// * If `false`, the log is written to stderr.
     /// * If `true`, a new file is created and the log is written to it.
+    /// 
     /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
     ///  e.g. `myprog_2015-07-08_10-44-11.log`.
     ///
-    /// <p>Note that all following members are only relevant if this one is set to `true`.
+    /// Note that all following members are only relevant if this one is set to `true`.
     pub log_to_file: bool,
 
     /// If `true`, the name of the logfile is documented in a message to stdout.

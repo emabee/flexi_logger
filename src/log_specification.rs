@@ -3,7 +3,7 @@ use regex::Regex;
 use std::env;
 use std::collections::HashMap;
 
-
+///
 /// Immutable struct that defines which loglines are to be written,
 /// based on the module, the log level, and the text.
 ///
@@ -22,12 +22,13 @@ use std::collections::HashMap;
 ///
 /// * Examples:
 ///
-///  * `"info"`: all logs with info, warn, or error level are written
-///  * `"crate1"`: all logs of this crate are written, but nothing else
-///  * `"warn, crate2::mod_a=debug, mod_x::mod_y=trace"`: all crates log warnings and erors, `mod_a` additional debug messages, and
-///    `mod_x::mod_y` is fully traced
+///   * `"info"`: all logs with info, warn, or error level are written
+///   * `"crate1"`: all logs of this crate are written, but nothing else
+///   * `"warn, crate2::mod_a=debug, mod_x::mod_y=trace"`: all crates log warnings and erors,
+///     `mod_a` additional debug messages, and `mod_x::mod_y` is fully traced
 ///
-/// * If you just specify the module, without `log_level`, all levels will be traced for this module.
+/// * If you just specify the module, without `log_level`, all levels will be traced for this
+///   module.
 /// * If you just specify a log level, this will be applied as default to all modules without
 ///   explicit log level assigment.
 ///   (You see that for modules named error, warn, info, debug or trace,
@@ -46,14 +47,14 @@ use std::collections::HashMap;
 /// Note that external module names are to be specified like in ```"extern crate ..."```, i.e.,
 /// for crates with a dash in their name this means: the dash is to be replaced with
 /// the underscore (e.g. ```karl_heinz```, not ```karl-heinz```).
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
     textfilter: Option<Regex>,
 }
 
 /// Defines which loglevel filter to use for a given module (or as default, if no module is given).
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
     pub level_filter: LevelFilter,
@@ -84,54 +85,61 @@ impl LogSpecification {
                     continue;
                 }
                 let mut parts = s.split('=');
-                let (log_level, name) = match (parts.next(),
-                                               parts.next().map(|s| s.trim()),
-                                               parts.next()) {
-                    (Some(part0), None, None) => {
-                        if contains_dash(part0) {
-                            println!("warning: invalid part in logging spec '{}', contains a \
-                                      dash, ignoring it",
-                                     part0);
-                            continue;
-                        }
-                        // if the single argument is a log-level string or number,
-                        // treat that as a global fallback
-                        match part0.trim().parse() {
-                            Ok(num) => (num, None),
-                            Err(_) => (LevelFilter::max(), Some(part0)),
-                        }
-                    }
-                    (Some(part0), Some(""), None) => {
-                        if contains_dash(part0) {
-                            println!("warning: invalid part in logging spec '{}', contains a \
-                                      dash, ignoring it",
-                                     part0);
-                            continue;
-                        }
-
-                        (LevelFilter::max(), Some(part0))
-                    }
-                    (Some(part0), Some(part1), None) => {
-                        if contains_dash(part0) {
-                            println!("warning: invalid part in logging spec '{}', contains a \
-                                      dash, ignoring it",
-                                     part0);
-                            continue;
-                        }
-                        match part1.trim().parse() {
-                            Ok(num) => (num, Some(part0.trim())),
-                            _ => {
-                                println!("warning: invalid part in logging spec '{}', ignoring it",
-                                         part1);
+                let (log_level, name) =
+                    match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
+                        (Some(part0), None, None) => {
+                            if contains_dash(part0) {
+                                println!(
+                                    "warning: invalid part in logging spec '{}', contains a dash, \
+                                     ignoring it",
+                                    part0
+                                );
                                 continue;
                             }
+                            // if the single argument is a log-level string or number,
+                            // treat that as a global fallback
+                            match part0.trim().parse() {
+                                Ok(num) => (num, None),
+                                Err(_) => (LevelFilter::max(), Some(part0)),
+                            }
                         }
-                    }
-                    _ => {
-                        println!("warning: invalid part in logging spec '{}', ignoring it", s);
-                        continue;
-                    }
-                };
+                        (Some(part0), Some(""), None) => {
+                            if contains_dash(part0) {
+                                println!(
+                                    "warning: invalid part in logging spec '{}', contains a dash, \
+                                     ignoring it",
+                                    part0
+                                );
+                                continue;
+                            }
+
+                            (LevelFilter::max(), Some(part0))
+                        }
+                        (Some(part0), Some(part1), None) => {
+                            if contains_dash(part0) {
+                                println!(
+                                    "warning: invalid part in logging spec '{}', contains a dash, \
+                                     ignoring it",
+                                    part0
+                                );
+                                continue;
+                            }
+                            match part1.trim().parse() {
+                                Ok(num) => (num, Some(part0.trim())),
+                                _ => {
+                                    println!(
+                                        "warning: invalid part in logging spec '{}', ignoring it",
+                                        part1
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
+                        _ => {
+                            println!("warning: invalid part in logging spec '{}', ignoring it", s);
+                            continue;
+                        }
+                    };
                 dirs.push(ModuleFilter {
                     module_name: name.map(|s| s.to_string()),
                     level_filter: log_level,
@@ -164,10 +172,12 @@ impl LogSpecification {
 
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(llf: LevelFilter) -> LogSpecBuilder {
-        LogSpecBuilder::from_module_filters(&[ModuleFilter {
-                                                      module_name: None,
-                                                      level_filter: llf,
-                                                  }])
+        LogSpecBuilder::from_module_filters(&[
+            ModuleFilter {
+                module_name: None,
+                level_filter: llf,
+            },
+        ])
     }
 
     /// Provides a reference to the module filters.
@@ -196,7 +206,9 @@ impl LogSpecBuilder {
     pub fn new() -> LogSpecBuilder {
         let mut modfilmap = HashMap::new();
         modfilmap.insert(None, LevelFilter::Off);
-        LogSpecBuilder { module_filters: modfilmap }
+        LogSpecBuilder {
+            module_filters: modfilmap,
+        }
     }
 
     /// Creates a LogSpecBuilder from given module filters.
@@ -205,7 +217,9 @@ impl LogSpecBuilder {
         for mf in module_filters {
             modfilmap.insert(mf.module_name.clone(), mf.level_filter);
         }
-        LogSpecBuilder { module_filters: modfilmap }
+        LogSpecBuilder {
+            module_filters: modfilmap,
+        }
     }
 
     /// Adds a default log level filter, or updates the default log level filter.
@@ -215,15 +229,18 @@ impl LogSpecBuilder {
     }
 
     /// Adds a log level filter, or updates the log level filter, for a module.
-    pub fn module<M: AsRef<str>>(&mut self, module_name: M, lf: LevelFilter)
-                                 -> &mut LogSpecBuilder {
-        self.module_filters.insert(Some(module_name.as_ref().to_owned()), lf);
+    pub fn module<M: AsRef<str>>(
+        &mut self, module_name: M, lf: LevelFilter
+    ) -> &mut LogSpecBuilder {
+        self.module_filters
+            .insert(Some(module_name.as_ref().to_owned()), lf);
         self
     }
 
     /// Adds a log level filter, or updates the log level filter, for a module.
     pub fn remove<M: AsRef<str>>(&mut self, module_name: M) -> &mut LogSpecBuilder {
-        self.module_filters.remove(&Some(module_name.as_ref().to_owned()));
+        self.module_filters
+            .remove(&Some(module_name.as_ref().to_owned()));
         self
     }
 
@@ -266,13 +283,13 @@ trait IntoVecModuleFilter {
 impl IntoVecModuleFilter for HashMap<Option<String>, LevelFilter> {
     fn into_vec_module_filter(self) -> Vec<ModuleFilter> {
         let mf: Vec<ModuleFilter> = self.into_iter()
-                                        .map(|(k, v)| {
-                                            ModuleFilter {
-                                                module_name: k,
-                                                level_filter: v,
-                                            }
-                                        })
-                                        .collect();
+            .map(|(k, v)| {
+                ModuleFilter {
+                    module_name: k,
+                    level_filter: v,
+                }
+            })
+            .collect();
         mf.level_sort()
     }
 }
@@ -293,7 +310,7 @@ impl LevelSort for Vec<ModuleFilter> {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    use {LogSpecification, LogSpecBuilder};
+    use {LogSpecBuilder, LogSpecification};
     use log::LevelFilter;
 
     #[test]
@@ -376,8 +393,10 @@ mod tests {
 
         assert_eq!(spec.module_filters()[2].module_name, Some("crate2".to_string()));
         assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
-        assert!(spec.text_filter().is_some() &&
-                spec.text_filter().as_ref().unwrap().to_string() == "abc");
+        assert!(
+            spec.text_filter().is_some()
+                && spec.text_filter().as_ref().unwrap().to_string() == "abc"
+        );
     }
 
     #[test]
@@ -386,8 +405,10 @@ mod tests {
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(spec.text_filter().is_some() &&
-                spec.text_filter().as_ref().unwrap().to_string() == "a.c");
+        assert!(
+            spec.text_filter().is_some()
+                && spec.text_filter().as_ref().unwrap().to_string() == "a.c"
+        );
     }
 
     #[test]
@@ -396,8 +417,10 @@ mod tests {
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(spec.text_filter().is_some() &&
-                spec.text_filter().as_ref().unwrap().to_string() == "a.c");
+        assert!(
+            spec.text_filter().is_some()
+                && spec.text_filter().as_ref().unwrap().to_string() == "a.c"
+        );
     }
 
     #[test]
@@ -406,8 +429,10 @@ mod tests {
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(spec.module_filters()[0].module_name, Some("crate1".to_string()));
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
-        assert!(spec.text_filter().is_some() &&
-                spec.text_filter().as_ref().unwrap().to_string() == "a*c");
+        assert!(
+            spec.text_filter().is_some()
+                && spec.text_filter().as_ref().unwrap().to_string() == "a*c"
+        );
     }
 
     #[test]
