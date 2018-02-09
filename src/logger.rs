@@ -85,6 +85,23 @@ impl Logger {
         }
     }
 
+    // /// Create a Logger that reads the LogSpecification from the environment variable RUST_LOG.
+    // pub fn with_env_or(logspec: LogSpecification) -> Logger {
+    //     Logger {
+    //         spec: logspec,
+    //         config: LogConfig::default_config_for_logger(),
+    //     }
+    // }
+
+    /// Create a Logger that reads the LogSpecification from the environment variable RUST_LOG, 
+    /// or derives it from the given String, if RUST_LOG is not set.
+    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
+        Logger {
+            spec: LogSpecification::env_or_parse(s),
+            config: LogConfig::default_config_for_logger(),
+        }
+    }
+
     /// Makes the logger write all logs to a file, rather than to stderr.
     pub fn log_to_file(mut self) -> Logger {
         self.config.log_to_file = true;

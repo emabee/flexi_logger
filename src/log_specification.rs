@@ -170,6 +170,15 @@ impl LogSpecification {
         }
     }
 
+    /// Returns a log specification based on the value of the environment variable RUST_LOG,
+    /// or on the given String.
+    pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> LogSpecification {
+        match env::var("RUST_LOG") {
+            Ok(spec) => LogSpecification::parse(&spec),
+            Err(..) => LogSpecification::parse(given_spec.as_ref()),
+        }
+    }
+
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(llf: LevelFilter) -> LogSpecBuilder {
         LogSpecBuilder::from_module_filters(&[
