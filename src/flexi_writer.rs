@@ -43,7 +43,10 @@ impl FlexiWriter {
         fs::create_dir_all(&directory)?;
 
         let o_filename_base = if fs::metadata(&directory)?.is_dir() {
-            Some(get_filename_base(&s_directory.clone(), &config.discriminant))
+            Some(get_filename_base(
+                &s_directory.clone(),
+                &config.discriminant,
+            ))
         } else {
             return Err(FlexiLoggerError::BadDirectory);
         };
@@ -98,8 +101,13 @@ impl FlexiWriter {
         };
     }
 
-    fn mount_linewriter(&mut self, suffix: &Option<String>, create_symlink: &Option<String>,
-                        timestamp: bool, print_message: bool) {
+    fn mount_linewriter(
+        &mut self,
+        suffix: &Option<String>,
+        create_symlink: &Option<String>,
+        timestamp: bool,
+        print_message: bool,
+    ) {
         if self.o_flw.is_none() {
             if let Some(ref s_filename_base) = self.o_filename_base {
                 let filename = get_filename(
@@ -126,18 +134,23 @@ impl FlexiWriter {
 fn get_filename_base(s_directory: &str, discriminant: &Option<String>) -> String {
     let arg0 = env::args().next().unwrap();
     let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
-    let mut filename = String::with_capacity(180).add(s_directory)
-                                                 .add("/")
-                                                 .add(&progname);
+    let mut filename = String::with_capacity(180)
+        .add(s_directory)
+        .add("/")
+        .add(&progname);
     if let Some(ref s_d) = *discriminant {
         filename = filename.add(&format!("_{}", s_d));
     }
     filename
 }
 
-fn get_filename(s_filename_base: &str, do_rotating: bool, rotate_idx: u32,
-                o_suffix: &Option<String>, timestamp: bool)
-                -> String {
+fn get_filename(
+    s_filename_base: &str,
+    do_rotating: bool,
+    rotate_idx: u32,
+    o_suffix: &Option<String>,
+    timestamp: bool,
+) -> String {
     let mut filename = String::with_capacity(180).add(s_filename_base);
     if timestamp {
         filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
@@ -165,11 +178,17 @@ fn get_next_rotate_idx(s_filename_base: &str, o_suffix: &Option<String>) -> u32 
     let fn_pattern = get_filename_pattern(s_filename_base, o_suffix);
     match glob(&fn_pattern) {
         Err(e) => {
-            eprintln!("Is this ({}) really a directory? Listing failed with {}", fn_pattern, e);
+            eprintln!(
+                "Is this ({}) really a directory? Listing failed with {}",
+                fn_pattern, e
+            );
         }
         Ok(globresults) => for globresult in globresults {
             match globresult {
-                Err(e) => eprintln!("Error occured when reading directory for log files: {:?}", e),
+                Err(e) => eprintln!(
+                    "Error occured when reading directory for log files: {:?}",
+                    e
+                ),
                 Ok(pathbuf) => {
                     let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                     let mut it = filename.rsplit("_r");
@@ -181,7 +200,6 @@ fn get_next_rotate_idx(s_filename_base: &str, o_suffix: &Option<String>) -> u32 
     }
     rotate_idx + 1
 }
-
 
 mod platform {
     use std::path::Path;

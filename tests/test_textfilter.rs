@@ -12,12 +12,13 @@ use std::io::{BufRead, BufReader};
 #[test]
 fn test_textfilter() {
     let logspec = LogSpecification::parse("info/Hello");
-    Logger::with(logspec).format(default_format)
-                         .print_message()
-                         .log_to_file()
-                         .suppress_timestamp()
-                         .start()
-                         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    Logger::with(logspec)
+        .format(default_format)
+        .print_message()
+        .log_to_file()
+        .suppress_timestamp()
+        .start()
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -30,7 +31,6 @@ fn test_textfilter() {
     info!("Hello, this is an info message! Hello");
     debug!("Hello, this is a debug message - you must not see it!");
     trace!("Hello, this is a trace message - you must not see it!");
-
 
     let arg0 = env::args().next().unwrap();
     let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
@@ -45,7 +45,10 @@ fn test_textfilter() {
         if buffer.find("Hello").is_none() {
             assert!(
                 false,
-                format!("line in log file without Hello {:?}: \"{}\"", filename, buffer)
+                format!(
+                    "line in log file without Hello {:?}: \"{}\"",
+                    filename, buffer
+                )
             );
         } else {
             count += 1;

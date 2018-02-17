@@ -8,7 +8,6 @@ use ReconfigurationHandle;
 /// Function type for Format functions.
 pub type FormatFunction = fn(&Record) -> String;
 
-
 /// The standard entry-point for using `flexi_logger`.
 ///
 /// Create a Logger with your desired (initial) loglevel-specification
@@ -59,7 +58,7 @@ pub struct Logger {
 
 /// Simple methods for influencing the behavior of the Logger.
 impl Logger {
-    /// Create a Logger that you provide with an explicit LogSpecification.
+    /// Creates a Logger that you provide with an explicit LogSpecification.
     pub fn with(logspec: LogSpecification) -> Logger {
         Logger {
             spec: logspec,
@@ -67,7 +66,7 @@ impl Logger {
         }
     }
 
-    /// Create a Logger that reads the LogSpecification from a String or &str.
+    /// Creates a Logger that reads the LogSpecification from a String or &str.
     /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
     pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
         let logspec = LogSpecification::parse(s.as_ref());
@@ -77,7 +76,7 @@ impl Logger {
         }
     }
 
-    /// Create a Logger that reads the LogSpecification from the environment variable RUST_LOG.
+    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG.
     pub fn with_env() -> Logger {
         Logger {
             spec: LogSpecification::env(),
@@ -85,15 +84,7 @@ impl Logger {
         }
     }
 
-    // /// Create a Logger that reads the LogSpecification from the environment variable RUST_LOG.
-    // pub fn with_env_or(logspec: LogSpecification) -> Logger {
-    //     Logger {
-    //         spec: logspec,
-    //         config: LogConfig::default_config_for_logger(),
-    //     }
-    // }
-
-    /// Create a Logger that reads the LogSpecification from the environment variable RUST_LOG, 
+    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG,
     /// or derives it from the given String, if RUST_LOG is not set.
     pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
         Logger {
@@ -135,7 +126,7 @@ impl Logger {
 
     /// Specifies a folder for the log files.
     ///
-    /// This parameter only has an effect if log_to_file is set to true.
+    /// This parameter only has an effect if `log_to_file` is set to true.
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
     pub fn directory<S: Into<String>>(mut self, directory: S) -> Logger {
@@ -145,42 +136,44 @@ impl Logger {
 
     /// Specifies a suffix for the log files.
     ///
-    /// This parameter only has an effect if log_to_file is set to true.
+    /// This parameter only has an effect if `log_to_file` is set to true.
     pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Logger {
         self.config.suffix = Some(suffix.into());
         self
     }
 
     /// Makes the logger not include a timestamp into the names of the log files
-    /// (log_to_file must be chosen, too).
+    ///
+    /// This option only has an effect if `log_to_file` is used, too.
     pub fn suppress_timestamp(mut self) -> Logger {
         self.config.timestamp = false;
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
-    ///
     /// By default, the log file will grow indefinitely.
     /// With this option, when the log file reaches or exceeds the specified file size,
     /// the file will be closed and a new file will be opened.
-    /// Also he filename pattern changes - instead of the timestamp a serial number is included into the filename.
+    /// Also the filename pattern changes - instead of the timestamp,
+    /// a serial number is included into the filename.
+    ///
+    /// This option only has an effect if `log_to_file` is used, too.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
         self.config.rotate_over_size = Some(rotate_over_size);
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
-    ///
     /// The specified String is added to the log file name.
+    ///
+    /// This option only has an effect if `log_to_file` is used, too.
     pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Logger {
         self.config.discriminant = Some(discriminant.into());
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
-    ///
     /// The specified String will be used on linux systems to create in the current folder
     /// a symbolic link to the current log file.
+    ///
+    /// This option only has an effect if `log_to_file` is used, too.
     pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> Logger {
         self.config.create_symlink = Some(symlink.into());
         self
@@ -203,7 +196,7 @@ impl Logger {
     /// Here is the output from a benchmark test, runnning on a windows laptop:
     ///
     ///  ```text
-    ///   1   PS C:\dev\rust\projects\flexi_logger> cargo bench --test bench_standard -- --nocapture
+    ///   1   PS C:\projects\flexi_logger> cargo bench --test bench_standard -- --nocapture
     ///   2       Finished release [optimized] target(s) in 0.0 secs
     ///   3        Running target\release\deps\bench_standard-158f621674f85c86.exe
     ///   4
@@ -215,7 +208,7 @@ impl Logger {
     ///  10
     ///  11   test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
     ///  12
-    ///  13   PS C:\dev\rust\projects\flexi_logger> cargo bench --test bench_reconfigurable -- --nocapture
+    ///  13   PS C:\projects\flexi_logger> cargo bench --test bench_reconfigurable -- --nocapture
     ///  14       Finished release [optimized] target(s) in 0.0 secs
     ///  15        Running target\release\deps\bench_reconfigurable-bc6bb7d69906fc2f.exe
     ///  16
@@ -234,7 +227,7 @@ impl Logger {
     /// Logging is expensive when logs are really written (line 8 and 20), independent of the
     /// reconfigurability feature of the flexi_logger.
     ///
-    /// The measurable, but still in most cases not important price for reconfigurability
+    /// The measurable, but still in most cases not important, price for reconfigurability
     /// can be seen by comparing lines 9 and 21.
     ///
     pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
@@ -250,7 +243,7 @@ impl Logger {
 }
 
 /// Alternative set of methods to control the behavior of the Logger.
-/// use these methods when you want to control the settings dynamically, e.g. with `doc_opts`.
+/// Use these methods when you want to control the settings dynamically, e.g. with `doc_opts`.
 impl Logger {
     /// With true, makes the logger write all logs to a file, otherwise to stderr.
     pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
@@ -258,7 +251,8 @@ impl Logger {
         self
     }
 
-    /// With true, makes the logger print an info message to stdout when a new file is used for log-output.
+    /// With true, makes the logger print an info message to stdout, each time
+    /// when a new file is used for log-output.
     pub fn o_print_message(mut self, print_message: bool) -> Logger {
         self.config.print_message = print_message;
         self
@@ -270,7 +264,8 @@ impl Logger {
         self
     }
 
-    /// With true, makes the logger write all logged error, warning, and info messages additionally to stdout.
+    /// With true, makes the logger write all logged error, warning,
+    /// and info messages additionally to stdout.
     pub fn o_duplicate_info(mut self, duplicate_info: bool) -> Logger {
         self.config.duplicate_info = duplicate_info;
         self
@@ -331,7 +326,6 @@ impl Logger {
         self
     }
 }
-
 
 #[cfg(test)]
 mod tests {

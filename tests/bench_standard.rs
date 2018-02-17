@@ -22,7 +22,6 @@ fn b20_initialize_logger(_: &mut Bencher) {
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 }
 
-
 #[bench]
 fn b30_relevant_logs(b: &mut Bencher) {
     b.iter(use_error);

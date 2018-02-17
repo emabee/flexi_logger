@@ -9,16 +9,19 @@ use flexi_logger::{default_format, init, LogConfig};
 #[allow(deprecated)]
 #[test]
 fn initialize_with_init() {
-    assert_eq!((),
-               init(LogConfig {
-                        format: default_format,
-                        log_to_file: true,
-                        directory: Some("log_files".to_string()),
-                        rotate_over_size: Some(2000),
-                        ..LogConfig::new()
-                    },
-                    Some("info".to_string()))
-                   .unwrap());
+    assert_eq!(
+        (),
+        init(
+            LogConfig {
+                format: default_format,
+                log_to_file: true,
+                directory: Some("log_files".to_string()),
+                rotate_over_size: Some(2000),
+                ..LogConfig::new()
+            },
+            Some("info".to_string())
+        ).unwrap()
+    );
 
     error!("This is an error message");
     warn!("This is a warning");

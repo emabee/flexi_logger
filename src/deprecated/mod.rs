@@ -3,7 +3,7 @@ pub mod log_options;
 #[allow(deprecated)]
 pub use self::log_options::LogOptions;
 
-use {FlexiLoggerError, FlexiLogger, LogConfig, LogSpecification};
+use {FlexiLogger, FlexiLoggerError, LogConfig, LogSpecification};
 
 ///
 #[deprecated]

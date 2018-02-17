@@ -3,7 +3,6 @@ use std::fmt;
 use std::io;
 use std::error::Error;
 
-
 /// Describes errors in the initialization of `flexi_logger`.
 #[derive(Debug)]
 pub enum FlexiLoggerError {
@@ -14,7 +13,6 @@ pub enum FlexiLoggerError {
     /// Logger initialization failed.
     Log(log::SetLoggerError),
 }
-
 
 impl fmt::Display for FlexiLoggerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

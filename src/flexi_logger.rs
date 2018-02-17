@@ -1,4 +1,5 @@
-//! Structures and methods that allow supporting multiple `FlexiLogger` instances in a single process.
+//! Structures and methods that allow supporting multiple `FlexiLogger` instances
+//! in a single process.
 use flexi_writer::FlexiWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
@@ -15,7 +16,6 @@ enum LogSpec {
     STATIC(LogSpecification),
     DYNAMIC(Arc<RwLock<LogSpecification>>),
 }
-
 
 /// Does the logging in the background, is normally not used directly.
 ///
@@ -92,10 +92,10 @@ impl FlexiLogger {
     /// Configures and starts the flexi_logger.
     pub fn start(config: LogConfig, spec: LogSpecification) -> Result<(), FlexiLoggerError> {
         let max = spec.module_filters()
-                      .iter()
-                      .map(|d| d.level_filter)
-                      .max()
-                      .unwrap_or(log::LevelFilter::Off);
+            .iter()
+            .map(|d| d.level_filter)
+            .max()
+            .unwrap_or(log::LevelFilter::Off);
 
         let flexi_logger = FlexiLogger::new_internal(spec, config)?;
         log::set_boxed_logger(Box::new(flexi_logger))?;
@@ -104,16 +104,21 @@ impl FlexiLogger {
     }
 
     /// Configures and starts the flexi_logger, and returns a handle to reconfigure the logger.
-    pub fn start_reconfigurable(config: LogConfig, spec: LogSpecification)
-                                -> Result<ReconfigurationHandle, FlexiLoggerError> {
+    pub fn start_reconfigurable(
+        config: LogConfig,
+        spec: LogSpecification,
+    ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let (flexi_logger, handle) = FlexiLogger::new_internal_reconfigurable(spec, config)?;
         log::set_boxed_logger(Box::new(flexi_logger))?;
-        log::set_max_level(log::LevelFilter::Trace); // no optimization possible, because the spec is dynamic, but max is not
+        // no optimization possible, because the spec is dynamic, but max is not:
+        log::set_max_level(log::LevelFilter::Trace);
         Ok(handle)
     }
 
-    fn new_internal(spec: LogSpecification, config: LogConfig)
-                    -> Result<FlexiLogger, FlexiLoggerError> {
+    fn new_internal(
+        spec: LogSpecification,
+        config: LogConfig,
+    ) -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
             mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
@@ -121,9 +126,10 @@ impl FlexiLogger {
         })
     }
 
-    fn new_internal_reconfigurable
-        (spec: LogSpecification, config: LogConfig)
-         -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
+    fn new_internal_reconfigurable(
+        spec: LogSpecification,
+        config: LogConfig,
+    ) -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
@@ -159,8 +165,10 @@ impl FlexiLogger {
 
     /// Creates a new FlexiLogger instance based on your configuration and a loglevel specification.
     /// Only needed in special setups.
-    pub fn new(loglevelspec: Option<String>, config: LogConfig)
-               -> Result<FlexiLogger, FlexiLoggerError> {
+    pub fn new(
+        loglevelspec: Option<String>,
+        config: LogConfig,
+    ) -> Result<FlexiLogger, FlexiLoggerError> {
         let spec = match loglevelspec {
             Some(loglevelspec) => LogSpecification::parse(&loglevelspec),
             None => LogSpecification::env(),
@@ -180,11 +188,12 @@ impl log::Log for FlexiLogger {
         }
 
         // closure that we need below
-        let check_text_filter = |text_filter: &Option<Regex>| if let Some(filter) =
-            text_filter.as_ref() {
-            filter.is_match(&*record.args().to_string())
-        } else {
-            true
+        let check_text_filter = |text_filter: &Option<Regex>| {
+            if let Some(filter) = text_filter.as_ref() {
+                filter.is_match(&*record.args().to_string())
+            } else {
+                true
+            }
         };
 
         if !match self.log_specification {
@@ -197,27 +206,24 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
-            if self.config.duplicate_error && record.level() == log::Level::Error ||
-               self.config.duplicate_info &&
-               (record.level() == log::Level::Error || record.level() == log::Level::Warn ||
-                record.level() == log::Level::Info) {
+            if self.config.duplicate_error && record.level() == log::Level::Error
+                || self.config.duplicate_info
+                    && (record.level() == log::Level::Error || record.level() == log::Level::Warn
+                        || record.level() == log::Level::Info)
+            {
                 println!("{}", &record.args());
             }
             msg.push('\n');
             let msgb = msg.as_bytes();
 
-            // MutexGuard<RefCell<FlexiWriter>>:
-            let mut mutexguard_refcell_fw = self.mr_flexi_writer.lock().unwrap();
-            // &mut RefCell<FlexiWriter>:
-            let ref_refcell_fw = mutexguard_refcell_fw.deref_mut();
-            // RefMut<FlexiWriter>:
-            let mut refmut_fw = ref_refcell_fw.borrow_mut();
-            let flexi_writer: &mut FlexiWriter = refmut_fw.deref_mut();
-
-            flexi_writer.write(msgb, &self.config);
+            // Unlock the mutex -> MutexGuard<RefCell<FlexiWriter>>
+            let mut mutexguard = self.mr_flexi_writer.lock().unwrap();
+            // Borrow the RefCell-Content -> RefMut<FlexiWriter>
+            let mut refmut = mutexguard.deref_mut().borrow_mut();
+            // Call write() on the FlexiWriter
+            (*refmut).write(msgb, &self.config);
         } else {
             eprintln!("{}", msg);
         }

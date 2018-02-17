@@ -5,9 +5,13 @@ use std::thread;
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
 pub fn default_format(record: &Record) -> String {
-    format!("{} [{}] {}", record.level(), record.module_path().unwrap_or("<unnamed>"), record.args())
+    format!(
+        "{} [{}] {}",
+        record.level(),
+        record.module_path().unwrap_or("<unnamed>"),
+        record.args()
+    )
 }
-
 
 /// A logline-formatter that produces log lines like
 /// <br>
@@ -15,14 +19,15 @@ pub fn default_format(record: &Record) -> String {
 /// <br>
 /// i.e. with timestamp and file location.
 pub fn opt_format(record: &Record) -> String {
-    format!("[{}] {} [{}:{}] {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-            record.level(),
-            record.file().unwrap_or("<unnamed>"),
-            record.line().unwrap_or(0),
-            &record.args())
+    format!(
+        "[{}] {} [{}:{}] {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        record.level(),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
+        &record.args()
+    )
 }
-
 
 /// A logline-formatter that produces log lines like
 /// <br>
@@ -30,15 +35,16 @@ pub fn opt_format(record: &Record) -> String {
 /// <br>
 /// i.e. with timestamp, module path and file location.
 pub fn detailed_format(record: &Record) -> String {
-    format!("[{}] {} [{}] {}:{}: {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-            record.level(),
-            record.module_path().unwrap_or("<unnamed>"),
-            record.file().unwrap_or("<unnamed>"),
-            record.line().unwrap_or(0),
-            &record.args())
+    format!(
+        "[{}] {} [{}] {}:{}: {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        record.level(),
+        record.module_path().unwrap_or("<unnamed>"),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
+        &record.args()
+    )
 }
-
 
 /// A logline-formatter that produces log lines like
 /// <br>
@@ -46,11 +52,13 @@ pub fn detailed_format(record: &Record) -> String {
 /// <br>
 /// i.e. with timestamp, thread name and file location.
 pub fn with_thread(record: &Record) -> String {
-    format!("[{}] T[{:?}] {} [{}:{}] {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-            thread::current().name().unwrap_or("<unnamed>"),
-            record.level(),
-            record.file().unwrap_or("<unnamed>"),
-            record.line().unwrap_or(0),
-            &record.args())
+    format!(
+        "[{}] T[{:?}] {} [{}:{}] {}",
+        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        thread::current().name().unwrap_or("<unnamed>"),
+        record.level(),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
+        &record.args()
+    )
 }

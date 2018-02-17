@@ -75,7 +75,10 @@ impl LogSpecification {
         let mods = parts.next();
         let filter = parts.next();
         if parts.next().is_some() {
-            println!("warning: invalid logging spec '{}', ignoring it (too many '/'s)", spec);
+            println!(
+                "warning: invalid logging spec '{}', ignoring it (too many '/'s)",
+                spec
+            );
             return LogSpecification::default(LevelFilter::Off).finalize();
         }
         mods.map(|m| {
@@ -239,7 +242,9 @@ impl LogSpecBuilder {
 
     /// Adds a log level filter, or updates the log level filter, for a module.
     pub fn module<M: AsRef<str>>(
-        &mut self, module_name: M, lf: LevelFilter
+        &mut self,
+        module_name: M,
+        lf: LevelFilter,
     ) -> &mut LogSpecBuilder {
         self.module_filters
             .insert(Some(module_name.as_ref().to_owned()), lf);
@@ -292,11 +297,9 @@ trait IntoVecModuleFilter {
 impl IntoVecModuleFilter for HashMap<Option<String>, LevelFilter> {
     fn into_vec_module_filter(self) -> Vec<ModuleFilter> {
         let mf: Vec<ModuleFilter> = self.into_iter()
-            .map(|(k, v)| {
-                ModuleFilter {
-                    module_name: k,
-                    level_filter: v,
-                }
+            .map(|(k, v)| ModuleFilter {
+                module_name: k,
+                level_filter: v,
             })
             .collect();
         mf.level_sort()
@@ -315,7 +318,6 @@ impl LevelSort for Vec<ModuleFilter> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate log;
@@ -326,13 +328,22 @@ mod tests {
     fn parse_logging_spec_valid() {
         let spec = LogSpecification::parse("crate1::mod1=error,crate1::mod2,crate2=debug");
         assert_eq!(spec.module_filters().len(), 3);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate1::mod1".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate1::mod1".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Error);
 
-        assert_eq!(spec.module_filters()[1].module_name, Some("crate1::mod2".to_string()));
+        assert_eq!(
+            spec.module_filters()[1].module_name,
+            Some("crate1::mod2".to_string())
+        );
         assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::max());
 
-        assert_eq!(spec.module_filters()[2].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[2].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
 
         assert!(spec.text_filter().is_none());
@@ -343,7 +354,10 @@ mod tests {
         // test parse_logging_spec with multiple = in specification
         let spec = LogSpecification::parse("crate1::mod1=warn=info,crate2=debug");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
@@ -353,7 +367,10 @@ mod tests {
         // test parse_logging_spec with 'noNumber' as log level
         let spec = LogSpecification::parse("crate1::mod1=noNumber,crate2=debug");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
@@ -363,7 +380,10 @@ mod tests {
         // test parse_logging_spec with 'warn' as log level
         let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=warn");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Warn);
         assert!(spec.text_filter().is_none());
     }
@@ -373,7 +393,10 @@ mod tests {
         // test parse_logging_spec with '' as log level
         let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
         assert!(spec.text_filter().is_none());
     }
@@ -385,7 +408,10 @@ mod tests {
         assert_eq!(spec.module_filters().len(), 2);
         assert_eq!(spec.module_filters()[0].module_name, None);
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Warn);
-        assert_eq!(spec.module_filters()[1].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[1].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::Debug);
         assert!(spec.text_filter().is_none());
     }
@@ -394,13 +420,22 @@ mod tests {
     fn parse_logging_spec_valid_filter() {
         let spec = LogSpecification::parse(" crate1::mod1 = error , crate1::mod2,crate2=debug/abc");
         assert_eq!(spec.module_filters().len(), 3);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate1::mod1".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate1::mod1".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Error);
 
-        assert_eq!(spec.module_filters()[1].module_name, Some("crate1::mod2".to_string()));
+        assert_eq!(
+            spec.module_filters()[1].module_name,
+            Some("crate1::mod2".to_string())
+        );
         assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::max());
 
-        assert_eq!(spec.module_filters()[2].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[2].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
         assert!(
             spec.text_filter().is_some()
@@ -412,7 +447,10 @@ mod tests {
     fn parse_logging_spec_invalid_crate_filter() {
         let spec = LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(
             spec.text_filter().is_some()
@@ -424,7 +462,10 @@ mod tests {
     fn parse_logging_spec_invalid_crate_with_dash() {
         let spec = LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate2".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate2".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
         assert!(
             spec.text_filter().is_some()
@@ -436,7 +477,10 @@ mod tests {
     fn parse_logging_spec_empty_with_filter() {
         let spec = LogSpecification::parse("crate1/a*c");
         assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(spec.module_filters()[0].module_name, Some("crate1".to_string()));
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("crate1".to_string())
+        );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
         assert!(
             spec.text_filter().is_some()
@@ -456,10 +500,16 @@ mod tests {
         assert_eq!(spec1.module_filters()[0].module_name, None);
         assert_eq!(spec1.module_filters()[0].level_filter, LevelFilter::Info);
 
-        assert_eq!(spec1.module_filters()[1].module_name, Some("karl".to_string()));
+        assert_eq!(
+            spec1.module_filters()[1].module_name,
+            Some("karl".to_string())
+        );
         assert_eq!(spec1.module_filters()[1].level_filter, LevelFilter::Debug);
 
-        assert_eq!(spec1.module_filters()[2].module_name, Some("toni".to_string()));
+        assert_eq!(
+            spec1.module_filters()[2].module_name,
+            Some("toni".to_string())
+        );
         assert_eq!(spec1.module_filters()[2].level_filter, LevelFilter::Warn);
 
         builder.default(LevelFilter::Error);
@@ -471,10 +521,16 @@ mod tests {
         assert_eq!(spec2.module_filters()[0].module_name, None);
         assert_eq!(spec2.module_filters()[0].level_filter, LevelFilter::Error);
 
-        assert_eq!(spec2.module_filters()[1].module_name, Some("emma".to_string()));
+        assert_eq!(
+            spec2.module_filters()[1].module_name,
+            Some("emma".to_string())
+        );
         assert_eq!(spec2.module_filters()[1].level_filter, LevelFilter::Trace);
 
-        assert_eq!(spec2.module_filters()[2].module_name, Some("toni".to_string()));
+        assert_eq!(
+            spec2.module_filters()[2].module_name,
+            Some("toni".to_string())
+        );
         assert_eq!(spec2.module_filters()[2].level_filter, LevelFilter::Warn);
     }
 }

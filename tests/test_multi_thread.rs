@@ -5,7 +5,7 @@ extern crate glob;
 extern crate log;
 
 use chrono::Local;
-use flexi_logger::{Record, LogSpecification, Logger};
+use flexi_logger::{LogSpecification, Logger, Record};
 use glob::glob;
 
 use std::fs::File;
@@ -40,18 +40,21 @@ fn multi_threaded() {
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("debug");
-    thread::Builder::new().spawn(move || {
-        thread::sleep(time::Duration::from_millis(1000));
-        reconf_handle.set_new_spec(new_spec);
-        0 as u8
-    })
-                          .unwrap();
-
+    thread::Builder::new()
+        .spawn(move || {
+            thread::sleep(time::Duration::from_millis(1000));
+            reconf_handle.set_new_spec(new_spec);
+            0 as u8
+        })
+        .unwrap();
 
     wait_for_workers_to_close(worker_handles);
 
     let delta = Local::now().signed_duration_since(start).num_milliseconds();
-    info!("Task executed with {} threads in {}ms.", NO_OF_THREADS, delta);
+    info!(
+        "Task executed with {} threads in {}ms.",
+        NO_OF_THREADS, delta
+    );
     verify_logs(&directory);
 }
 
@@ -62,12 +65,13 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
         worker_handles.push(
-            thread::Builder::new().name(thread_number.to_string())
-                                  .spawn(move || {
-                do_work(thread_number);
-                0 as u8
-            })
-                                  .unwrap(),
+            thread::Builder::new()
+                .name(thread_number.to_string())
+                .spawn(move || {
+                    do_work(thread_number);
+                    0 as u8
+                })
+                .unwrap(),
         );
     }
     trace!("All {} worker threads started.", worker_handles.len());
@@ -85,14 +89,18 @@ fn do_work(thread_number: usize) {
 
 fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
     for worker_handle in worker_handles {
-        worker_handle.join()
-                     .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
+        worker_handle
+            .join()
+            .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
     }
     trace!("All worker threads joined.");
 }
 
 fn define_directory() -> String {
-    format!("./log_files/mt_logs/{}", Local::now().format("%Y-%m-%d_%H-%M-%S"))
+    format!(
+        "./log_files/mt_logs/{}",
+        Local::now().format("%Y-%m-%d_%H-%M-%S")
+    )
 }
 
 fn test_format(record: &Record) -> String {
@@ -111,7 +119,10 @@ fn verify_logs(directory: &str) {
     // read all files
     let pattern = String::from(directory).add("/*");
     let globresults = match glob(&pattern) {
-        Err(e) => panic!("Is this ({}) really a directory? Listing failed with {}", pattern, e),
+        Err(e) => panic!(
+            "Is this ({}) really a directory? Listing failed with {}",
+            pattern, e
+        ),
         Ok(globresults) => globresults,
     };
     let mut no_of_log_files = 0;
@@ -127,16 +138,20 @@ fn verify_logs(directory: &str) {
             if buffer.starts_with("XXXXX") {
                 line_count += 1;
             } else {
-                assert!(false, format!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer));
+                assert!(
+                    false,
+                    format!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer)
+                );
             }
             buffer.clear();
         }
     }
-    assert_eq!(line_count, NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2 + NO_OF_THREADS);
+    assert_eq!(
+        line_count,
+        NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2 + NO_OF_THREADS
+    );
     error!(
         "Wrote {} log lines from {} threads into {} files",
-        line_count,
-        NO_OF_THREADS,
-        no_of_log_files
+        line_count, NO_OF_THREADS, no_of_log_files
     );
 }
