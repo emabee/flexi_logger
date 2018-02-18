@@ -1,8 +1,0 @@
-For improved testability, 
-* we could expose a hidden method in the reconf handle to 
-* check if the expected traces and the written traces match, and panic otherwise.
-* the method needs to take a specification of the expected traces [(module, level))
-* and be able to parse the written traces
-* this requires a significant change: the reconf handle so far only shares the LogSpecification
-* with the FlexiLogger, but then needs also access to the FileLineWriter,
-* and the FileLineWriter must in the end implement the check

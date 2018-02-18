@@ -27,7 +27,7 @@ pub struct FlexiLogger {
     // The FlexiWriter has mutable state; since Log.log() requires an unmutable self,
     // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
     // thread-safe
-    mr_flexi_writer: Mutex<RefCell<FlexiWriter>>,
+    amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
 }
 
 /// Allows reconfiguring the logger while it is in use
@@ -69,10 +69,17 @@ pub struct FlexiLogger {
 /// ```
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
+    amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
 }
 impl ReconfigurationHandle {
-    fn new(spec: Arc<RwLock<LogSpecification>>) -> ReconfigurationHandle {
-        ReconfigurationHandle { spec: spec }
+    fn new(
+        spec: Arc<RwLock<LogSpecification>>,
+        amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
+    ) -> ReconfigurationHandle {
+        ReconfigurationHandle {
+            spec: spec,
+            amr_flexi_writer: amr_flexi_writer,
+        }
     }
 
     /// Allows specifying a new LogSpecification for the current logger.
@@ -85,6 +92,16 @@ impl ReconfigurationHandle {
     pub fn parse_new_spec(&mut self, spec: &str) {
         let mut guard = self.spec.write().unwrap();
         guard.reconfigure(LogSpecification::parse(spec));
+    }
+
+    #[doc(hidden)]
+    /// Allows checking the logs written so far to the writer
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str)]) -> bool {
+        // Unlock the mutex -> MutexGuard<RefCell<FlexiWriter>>
+        let mut mutexguard = self.amr_flexi_writer.lock().unwrap();
+        // Borrow the RefCell-Content -> RefMut<FlexiWriter>
+        let fw: &mut FlexiWriter = &mut mutexguard.deref_mut().borrow_mut();
+        fw.validate_logs(expected)
     }
 }
 
@@ -121,7 +138,7 @@ impl FlexiLogger {
     ) -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
-            mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
+            amr_flexi_writer: Arc::new(Mutex::new(RefCell::new(FlexiWriter::new(&config)?))),
             config: config,
         })
     }
@@ -131,12 +148,13 @@ impl FlexiLogger {
         config: LogConfig,
     ) -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
+        let fw = Arc::new(Mutex::new(RefCell::new(FlexiWriter::new(&config)?)));
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
-            mr_flexi_writer: Mutex::new(RefCell::new(FlexiWriter::new(&config)?)),
+            amr_flexi_writer: Arc::clone(&fw),
             config: config,
         };
-        let handle = ReconfigurationHandle::new(Arc::clone(&spec));
+        let handle = ReconfigurationHandle::new(Arc::clone(&spec), Arc::clone(&fw));
         Ok((flexi_logger, handle))
     }
 
@@ -219,7 +237,7 @@ impl log::Log for FlexiLogger {
             let msgb = msg.as_bytes();
 
             // Unlock the mutex -> MutexGuard<RefCell<FlexiWriter>>
-            let mut mutexguard = self.mr_flexi_writer.lock().unwrap();
+            let mut mutexguard = self.amr_flexi_writer.lock().unwrap();
             // Borrow the RefCell-Content -> RefMut<FlexiWriter>
             let mut refmut = mutexguard.deref_mut().borrow_mut();
             // Call write() on the FlexiWriter

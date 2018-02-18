@@ -6,7 +6,7 @@ use glob::glob;
 use std::cmp::max;
 use std::env;
 use std::fs::{self, File};
-use std::io::{LineWriter, Write};
+use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::ops::Add;
 use std::path::Path;
 
@@ -19,6 +19,7 @@ pub struct FlexiWriter {
     use_rotating: bool,
     written_bytes: usize,
     rotate_idx: u32,
+    current_path: Option<String>,
 }
 impl FlexiWriter {
     pub fn new(config: &LogConfig) -> Result<FlexiWriter, FlexiLoggerError> {
@@ -30,6 +31,7 @@ impl FlexiWriter {
                 use_rotating: false,
                 written_bytes: 0,
                 rotate_idx: 0,
+                current_path: None,
             });
         }
 
@@ -65,6 +67,7 @@ impl FlexiWriter {
             use_rotating: use_rotating,
             written_bytes: 0,
             rotate_idx: rotate_idx,
+            current_path: None,
         };
         flexi_writer.mount_linewriter(
             &config.suffix,
@@ -117,17 +120,36 @@ impl FlexiWriter {
                     suffix,
                     timestamp,
                 );
-                let path = Path::new(&filename);
-                if print_message {
-                    println!("Log is written to {}", &path.display());
+                {
+                    let path = Path::new(&filename);
+                    if print_message {
+                        println!("Log is written to {}", &path.display());
+                    }
+                    self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
+                    if let Some(ref link) = *create_symlink {
+                        self::platform::create_symlink_if_possible(link, path);
+                    }
                 }
-                self.o_flw = Some(LineWriter::new(File::create(&path).unwrap()));
-
-                if let Some(ref link) = *create_symlink {
-                    self::platform::create_symlink_if_possible(link, path);
-                }
+                self.current_path = Some(filename);
             }
         }
+    }
+
+    #[doc(hidden)]
+    pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str)]) -> bool {
+        assert!(!self.current_path.is_none());
+        let path = Path::new(self.current_path.as_ref().unwrap());
+        let f = File::open(path).unwrap();
+        let mut reader = BufReader::new(f);
+
+        let mut line = String::new();
+        for tuple in expected {
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            assert!(line.contains(&tuple.0));
+            assert!(line.contains(&tuple.1));
+        }
+        false
     }
 }
 

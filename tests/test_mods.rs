@@ -2,13 +2,15 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{detailed_format, Logger};
+use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
 
 #[test]
-fn simple() {
-    Logger::with_env_or_str("info, test_simple::mymod1=info, test_simple::mymod2=error")
-        .format(detailed_format)
-        .start()
+fn test_mods() {
+    let handle: ReconfigurationHandle = Logger::with_env_or_str(
+        "info, test_mods::mymod1=debug, test_mods::mymod2=error",
+    ).format(detailed_format)
+        .log_to_file()
+        .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
@@ -19,7 +21,17 @@ fn simple() {
 
     mymod1::test_traces();
     mymod2::test_traces();
-    println!("Done");
+
+    handle.validate_logs(&[
+        ("ERROR", "error"),
+        ("WARN", "warning"),
+        ("INFO", "info"),
+        ("ERROR", "error"),
+        ("WARN", "warning"),
+        ("INFO", "info"),
+        ("DEBUG", "debug"),
+        ("ERROR", "error"),
+    ]);
 }
 
 mod mymod1 {
@@ -27,15 +39,15 @@ mod mymod1 {
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");
-        debug!("This is a debug message - you must not see it!");
+        debug!("This is a debug message");
         trace!("This is a trace message - you must not see it!");
     }
 }
 mod mymod2 {
     pub fn test_traces() {
         error!("This is an error message");
-        warn!("This is a warning");
-        info!("This is an info message");
+        warn!("This is a warning - you must not see it!");
+        info!("This is an info message - you must not see it!");
         debug!("This is a debug message - you must not see it!");
         trace!("This is a trace message - you must not see it!");
     }

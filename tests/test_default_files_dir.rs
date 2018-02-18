@@ -9,10 +9,10 @@ use flexi_logger::Logger;
 
 #[test]
 fn files_dir() {
-    Logger::with_str("info")
+    let handle = Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
-        .start()
+        .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
@@ -20,4 +20,5 @@ fn files_dir() {
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
+    handle.validate_logs(&[("ERROR", "error"), ("WARN", "warning"), ("INFO", "info")]);
 }
