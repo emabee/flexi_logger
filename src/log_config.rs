@@ -1,3 +1,5 @@
+use log_writer::LogWriter;
+use std::collections::HashMap;
 use formats;
 use Record;
 
@@ -55,6 +57,9 @@ pub struct LogConfig {
     ///
     /// Note that this option is only effective on linux systems.
     pub create_symlink: Option<String>,
+
+    /// Allows specifying additional log output writers.
+    pub writers: Option<HashMap<String, Box<LogWriter>>>,
 }
 
 impl Default for LogConfig {
@@ -108,6 +113,7 @@ impl LogConfig {
             rotate_over_size: None,
             discriminant: None,
             create_symlink: None,
+            writers: None,
         }
     }
 }

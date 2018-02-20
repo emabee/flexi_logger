@@ -61,6 +61,7 @@ mod formats;
 mod logger;
 mod log_config;
 mod log_specification;
+mod log_writer;
 
 pub use log::{Level, LevelFilter, Record};
 

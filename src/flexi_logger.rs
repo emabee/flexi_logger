@@ -224,6 +224,19 @@ impl log::Log for FlexiLogger {
             return;
         }
 
+        let target = record.metadata().target();
+        if target.starts_with('{') {
+            let targets: Vec<&str> = target[1..(target.len() - 1)].split(",").collect();
+            for t in targets {
+                match self.config.writers.as_ref().unwrap().get(t) {
+                    None => eprintln!("bad writer spec: {}", t),
+                    Some(writer) => {
+                        writer.write((self.config.format)(record).as_bytes());
+                    }
+                }
+            }
+        }
+
         let mut msg = (self.config.format)(record);
         if self.config.log_to_file {
             if self.config.duplicate_error && record.level() == log::Level::Error
