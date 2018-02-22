@@ -231,7 +231,7 @@ impl log::Log for FlexiLogger {
                 match self.config.writers.as_ref().unwrap().get(t) {
                     None => eprintln!("bad writer spec: {}", t),
                     Some(writer) => {
-                        writer.write((self.config.format)(record).as_bytes());
+                        writer.write(record);
                     }
                 }
             }

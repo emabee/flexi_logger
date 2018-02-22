@@ -137,7 +137,10 @@ impl FlexiWriter {
 
     #[doc(hidden)]
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str)]) -> bool {
-        assert!(!self.current_path.is_none());
+        assert!(
+            !self.current_path.is_none(),
+            "validate_logs() requires std trace being directed to a file"
+        );
         let path = Path::new(self.current_path.as_ref().unwrap());
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);

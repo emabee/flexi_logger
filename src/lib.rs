@@ -56,12 +56,14 @@ extern crate regex;
 mod deprecated;
 mod flexi_error;
 mod flexi_logger;
+mod default_writer;
 mod flexi_writer;
 mod formats;
 mod logger;
 mod log_config;
 mod log_specification;
 mod log_writer;
+mod file_log_writer;
 
 pub use log::{Level, LevelFilter, Record};
 
@@ -73,5 +75,7 @@ pub use log_specification::{LogSpecBuilder, LogSpecification};
 
 pub use log_config::LogConfig;
 pub use logger::Logger;
+pub use log_writer::LogWriter;
+pub use file_log_writer::{FileLogWriter, FileLogWriterConfig};
 pub use flexi_logger::{FlexiLogger, ReconfigurationHandle};
 pub use flexi_error::FlexiLoggerError;

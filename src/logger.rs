@@ -1,9 +1,11 @@
+use log_writer::LogWriter;
 use log::Record;
 use LogConfig;
 use LogSpecification;
 use flexi_error::FlexiLoggerError;
 use FlexiLogger;
 use ReconfigurationHandle;
+use std::collections::HashMap;
 
 /// Function type for Format functions.
 pub type FormatFunction = fn(&Record) -> String;
@@ -176,6 +178,22 @@ impl Logger {
     /// This option only has an effect if `log_to_file` is used, too.
     pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> Logger {
         self.config.create_symlink = Some(symlink.into());
+        self
+    }
+
+    /// The specified String will be used on linux systems to create in the current folder
+    /// a symbolic link to the current log file.
+    ///
+    /// This option only has an effect if `log_to_file` is used, too.
+    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
+        if self.config.writers.is_none() {
+            self.config.writers = Some(HashMap::<String, Box<LogWriter>>::new());
+        }
+        self.config
+            .writers
+            .as_mut()
+            .unwrap()
+            .insert(name.into(), writer);
         self
     }
 
