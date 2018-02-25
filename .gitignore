@@ -1,5 +1,6 @@
 target
 Cargo.lock
+*.alerts
 *.log
 link_to_log
 log_files

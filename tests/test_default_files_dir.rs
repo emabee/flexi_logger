@@ -8,7 +8,7 @@ extern crate log;
 use flexi_logger::Logger;
 
 #[test]
-fn files_dir() {
+fn test_default_files_dir() {
     let handle = Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
@@ -20,5 +20,9 @@ fn files_dir() {
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
-    handle.validate_logs(&[("ERROR", "error"), ("WARN", "warning"), ("INFO", "info")]);
+    handle.validate_logs(&[
+        ("ERROR", "test_default_files_dir", "error"),
+        ("WARN", "test_default_files_dir", "warning"),
+        ("INFO", "test_default_files_dir", "info"),
+    ]);
 }

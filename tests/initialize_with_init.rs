@@ -3,8 +3,9 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
+use flexi_logger::default_format;
 #[allow(deprecated)]
-use flexi_logger::{default_format, init, LogConfig};
+use flexi_logger::deprecated::{init, LogConfig};
 
 #[allow(deprecated)]
 #[test]

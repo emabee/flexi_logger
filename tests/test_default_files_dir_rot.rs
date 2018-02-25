@@ -5,7 +5,7 @@ extern crate log;
 use flexi_logger::{default_format, Logger};
 
 #[test]
-fn files_dir_rot() {
+fn test_default_files_dir_rot() {
     Logger::with_str("info")
         .format(default_format)
         .log_to_file()

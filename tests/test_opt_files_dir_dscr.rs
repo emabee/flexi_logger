@@ -5,7 +5,7 @@ extern crate log;
 use flexi_logger::{opt_format, Logger};
 
 #[test]
-fn files_dir_dscr() {
+fn test_opt_files_dir_dscr() {
     let handle = Logger::with_str("info")
         .format(opt_format)
         .log_to_file()
@@ -19,5 +19,9 @@ fn files_dir_dscr() {
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
-    handle.validate_logs(&[("ERROR", "error"), ("WARN", "warning"), ("INFO", "info")]);
+    handle.validate_logs(&[
+        ("ERROR", "test_opt_files_dir_dscr", "error"),
+        ("WARN", "test_opt_files_dir_dscr", "warning"),
+        ("INFO", "test_opt_files_dir_dscr", "info"),
+    ]);
 }

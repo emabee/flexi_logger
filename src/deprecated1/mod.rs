@@ -3,8 +3,9 @@ pub mod log_options;
 #[allow(deprecated)]
 pub use self::log_options::LogOptions;
 
-use {FlexiLogger, FlexiLoggerError, LogConfig, LogSpecification};
-
+use {FlexiLoggerError, LogSpecification};
+use log_config::LogConfig;
+use deprecated::FlexiLogger;
 ///
 #[deprecated]
 pub fn init(config: LogConfig, loglevelspec: Option<String>) -> Result<(), FlexiLoggerError> {

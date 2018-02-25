@@ -3,11 +3,11 @@ extern crate flexi_logger;
 extern crate log;
 
 #[allow(deprecated)]
-use flexi_logger::LogOptions;
+use flexi_logger::deprecated::LogOptions;
 
 #[test]
 #[allow(deprecated)]
-fn files_dir_rot() {
+fn initialize_with_logoptions() {
     assert_eq!(
         (),
         LogOptions::new()

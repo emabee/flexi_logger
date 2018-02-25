@@ -34,16 +34,16 @@ fn test_reconfigure_methods() {
     trace!("This is a trace message");
 
     handle.validate_logs(&[
-        ("ERROR", "error"),
-        ("WARN", "warning"),
-        ("INFO", "info"),
+        ("ERROR", "test_reconfigure_methods", "error"),
+        ("WARN", "test_reconfigure_methods", "warning"),
+        ("INFO", "test_reconfigure_methods", "info"),
         //
-        ("ERROR", "error"),
+        ("ERROR", "test_reconfigure_methods", "error"),
         //
-        ("ERROR", "error"),
-        ("WARN", "warning"),
-        ("INFO", "info"),
-        ("DEBUG", "debug"),
-        ("TRACE", "trace"),
+        ("ERROR", "test_reconfigure_methods", "error"),
+        ("WARN", "test_reconfigure_methods", "warning"),
+        ("INFO", "test_reconfigure_methods", "info"),
+        ("DEBUG", "test_reconfigure_methods", "debug"),
+        ("TRACE", "test_reconfigure_methods", "trace"),
     ]);
 }

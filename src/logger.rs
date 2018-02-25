@@ -1,9 +1,9 @@
-use log_writer::LogWriter;
+use writers::LogWriter;
 use log::Record;
-use LogConfig;
+use log_config::LogConfig;
 use LogSpecification;
 use flexi_error::FlexiLoggerError;
-use FlexiLogger;
+use flexi_logger::FlexiLogger;
 use ReconfigurationHandle;
 use std::collections::HashMap;
 
@@ -40,12 +40,13 @@ pub type FormatFunction = fn(&Record) -> String;
 ///
 /// Here we configure `flexi_logger` to write log entries with
 /// time and location info into a log file in folder "`log_files`",
-/// and we provide the loglevel-specification programmatically, as String:
+/// and we provide the loglevel-specification programmatically, as String, but allow it
+/// to be overridden by the environment variable `RUST_LOG`:
 ///
 /// ```
 /// use flexi_logger::{Logger,opt_format};
 ///
-/// Logger::with_str("myprog=debug, mylib=warn")
+/// Logger::with_env_or_str("myprog=debug, mylib=warn")
 ///             .log_to_file()
 ///             .directory("log_files")
 ///             .format(opt_format)
@@ -56,6 +57,7 @@ pub type FormatFunction = fn(&Record) -> String;
 pub struct Logger {
     spec: LogSpecification,
     config: LogConfig,
+    other_writers: HashMap<String, Box<LogWriter>>,
 }
 
 /// Simple methods for influencing the behavior of the Logger.
@@ -65,6 +67,7 @@ impl Logger {
         Logger {
             spec: logspec,
             config: LogConfig::default_config_for_logger(),
+            other_writers: HashMap::<String, Box<LogWriter>>::new(),
         }
     }
 
@@ -75,6 +78,7 @@ impl Logger {
         Logger {
             spec: logspec,
             config: LogConfig::default_config_for_logger(),
+            other_writers: HashMap::<String, Box<LogWriter>>::new(),
         }
     }
 
@@ -83,6 +87,7 @@ impl Logger {
         Logger {
             spec: LogSpecification::env(),
             config: LogConfig::default_config_for_logger(),
+            other_writers: HashMap::<String, Box<LogWriter>>::new(),
         }
     }
 
@@ -92,6 +97,7 @@ impl Logger {
         Logger {
             spec: LogSpecification::env_or_parse(s),
             config: LogConfig::default_config_for_logger(),
+            other_writers: HashMap::<String, Box<LogWriter>>::new(),
         }
     }
 
@@ -181,25 +187,26 @@ impl Logger {
         self
     }
 
-    /// The specified String will be used on linux systems to create in the current folder
-    /// a symbolic link to the current log file.
+    /// Registers a LogWriter implementation under the given target name.
     ///
-    /// This option only has an effect if `log_to_file` is used, too.
+    /// Names should not start with an underscore.
+    /// The name given here is used in calls to the log macros to identify the writer(s)
+    /// to which a log message is sent.
+    ///
+    /// A log call with a target value that has the form `{Name1,Name2,...}`, i.e.,
+    /// a comma-separated list of target names, within braces, is not sent to the default logger,
+    /// but to the loggers specified explicitly in the list.
+    /// In such a list you can again specify the default logger with the name `_Default`.
+    ///
+    /// See also [the module documentation of `writers`](writers/index.html).
     pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
-        if self.config.writers.is_none() {
-            self.config.writers = Some(HashMap::<String, Box<LogWriter>>::new());
-        }
-        self.config
-            .writers
-            .as_mut()
-            .unwrap()
-            .insert(name.into(), writer);
+        self.other_writers.insert(name.into(), writer);
         self
     }
 
     /// Consumes the Logger object and initializes the flexi_logger.
     pub fn start(self) -> Result<(), FlexiLoggerError> {
-        FlexiLogger::start(self.config, self.spec)
+        FlexiLogger::start_multi(self.config, self.spec, self.other_writers)
     }
 
     /// Consumes the Logger object and initializes the flexi_logger in a way that
@@ -214,42 +221,42 @@ impl Logger {
     /// Here is the output from a benchmark test, runnning on a windows laptop:
     ///
     ///  ```text
-    ///   1   PS C:\projects\flexi_logger> cargo bench --test bench_standard -- --nocapture
-    ///   2       Finished release [optimized] target(s) in 0.0 secs
-    ///   3        Running target\release\deps\bench_standard-158f621674f85c86.exe
+    ///   1  PS C:\projects\flexi_logger> cargo bench --bench bench_standard -- --nocapture
+    ///   2      Finished release [optimized] target(s) in 0.4 secs
+    ///   3       Running target\release\deps\bench_standard-20539c2be6d4f2e0.exe
     ///   4
-    ///   5   running 4 tests
-    ///   6   test b10_no_logger_active  ... bench:         136 ns/iter (+/- 30)
-    ///   7   test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
-    ///   8   test b30_relevant_logs     ... bench:   1,676,793 ns/iter (+/- 342,747)
-    ///   9   test b40_suppressed_logs   ... bench:         134 ns/iter (+/- 5)
+    ///   5  running 4 tests
+    ///   6  test b10_no_logger_active  ... bench:         118 ns/iter (+/- 19)
+    ///   7  test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
+    ///   8  test b30_relevant_logs     ... bench:     291,436 ns/iter (+/- 44,658)
+    ///   9  test b40_suppressed_logs   ... bench:         123 ns/iter (+/- 5)
     ///  10
-    ///  11   test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
+    ///  11  test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
     ///  12
-    ///  13   PS C:\projects\flexi_logger> cargo bench --test bench_reconfigurable -- --nocapture
-    ///  14       Finished release [optimized] target(s) in 0.0 secs
-    ///  15        Running target\release\deps\bench_reconfigurable-bc6bb7d69906fc2f.exe
+    ///  13  PS C:\projects\flexi_logger> cargo bench --bench bench_reconfigurable -- --nocapture
+    ///  14      Finished release [optimized] target(s) in 0.4 secs
+    ///  15       Running target\release\deps\bench_reconfigurable-2e292a8d5c887d0d.exe
     ///  16
-    ///  17   running 4 tests
-    ///  18   test b10_no_logger_active  ... bench:         134 ns/iter (+/- 19)
-    ///  19   test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
-    ///  20   test b30_relevant_logs     ... bench:   1,665,871 ns/iter (+/- 306,734)
-    ///  21   test b40_suppressed_logs   ... bench:       5,208 ns/iter (+/- 564)
+    ///  17  running 4 tests
+    ///  18  test b10_no_logger_active  ... bench:         130 ns/iter (+/- 37)
+    ///  19  test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
+    ///  20  test b30_relevant_logs     ... bench:     301,092 ns/iter (+/- 87,452)
+    ///  21  test b40_suppressed_logs   ... bench:       3,482 ns/iter (+/- 339)
     ///  22
-    ///  23   test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
+    ///  23  test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
     ///  ```
     ///
     /// It shows that logging is fastest when no logger is active (lines 6 and 18).
     /// And it is just as fast when the above-mentioned optimization kicks in (line 9).
     ///
-    /// Logging is expensive when logs are really written (line 8 and 20), independent of the
-    /// reconfigurability feature of the flexi_logger.
+    /// Logging has measurable costs when logs are really written (line 8 and 20), independent
+    /// of the reconfigurability feature of the flexi_logger.
     ///
     /// The measurable, but still in most cases not important, price for reconfigurability
     /// can be seen by comparing lines 9 and 21.
     ///
     pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
-        FlexiLogger::start_reconfigurable(self.config, self.spec)
+        FlexiLogger::start_multi_reconfigurable(self.config, self.spec, self.other_writers)
     }
 
     // used in tests only

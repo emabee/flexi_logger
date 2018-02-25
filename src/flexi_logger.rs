@@ -1,6 +1,9 @@
 //! Structures and methods that allow supporting multiple `FlexiLogger` instances
 //! in a single process.
-use flexi_writer::FlexiWriter;
+use writers::LogWriter;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use default_log_writer::DefaultLogWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
 use log_specification::ModuleFilter;
@@ -8,9 +11,7 @@ use FlexiLoggerError;
 use log;
 
 use regex::Regex;
-use std::cell::RefCell;
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 enum LogSpec {
     STATIC(LogSpecification),
@@ -23,11 +24,8 @@ enum LogSpec {
 /// instances in a single process.
 pub struct FlexiLogger {
     log_specification: LogSpec,
-    config: LogConfig,
-    // The FlexiWriter has mutable state; since Log.log() requires an unmutable self,
-    // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
-    // thread-safe
-    amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
+    default_writer: Arc<DefaultLogWriter>,
+    other_writers: HashMap<String, Box<LogWriter>>,
 }
 
 /// Allows reconfiguring the logger while it is in use
@@ -69,55 +67,74 @@ pub struct FlexiLogger {
 /// ```
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
-    amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
+    default_writer: Arc<DefaultLogWriter>,
 }
 impl ReconfigurationHandle {
     fn new(
         spec: Arc<RwLock<LogSpecification>>,
-        amr_flexi_writer: Arc<Mutex<RefCell<FlexiWriter>>>,
+        default_writer: Arc<DefaultLogWriter>,
     ) -> ReconfigurationHandle {
         ReconfigurationHandle {
             spec: spec,
-            amr_flexi_writer: amr_flexi_writer,
+            default_writer: default_writer,
         }
     }
 
     /// Allows specifying a new LogSpecification for the current logger.
     pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
-        let mut guard = self.spec.write().unwrap();
+        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
         guard.reconfigure(new_spec);
     }
 
     /// Allows specifying a new LogSpecification for the current logger.
     pub fn parse_new_spec(&mut self, spec: &str) {
-        let mut guard = self.spec.write().unwrap();
+        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
         guard.reconfigure(LogSpecification::parse(spec));
     }
 
     #[doc(hidden)]
     /// Allows checking the logs written so far to the writer
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str)]) -> bool {
-        // Unlock the mutex -> MutexGuard<RefCell<FlexiWriter>>
-        let mut mutexguard = self.amr_flexi_writer.lock().unwrap();
-        // Borrow the RefCell-Content -> RefMut<FlexiWriter>
-        let fw: &mut FlexiWriter = &mut mutexguard.deref_mut().borrow_mut();
-        fw.validate_logs(expected)
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
+        Borrow::<DefaultLogWriter>::borrow(&self.default_writer).validate_logs(expected)
     }
 }
 
 impl FlexiLogger {
-    /// Configures and starts the flexi_logger.
-    pub fn start(config: LogConfig, spec: LogSpecification) -> Result<(), FlexiLoggerError> {
+    /// Configures and starts the flexi_logger with multiple writers.
+    pub fn start_multi(
+        config: LogConfig,
+        spec: LogSpecification,
+        other_writers: HashMap<String, Box<LogWriter>>,
+    ) -> Result<(), FlexiLoggerError> {
         let max = spec.module_filters()
             .iter()
             .map(|d| d.level_filter)
             .max()
             .unwrap_or(log::LevelFilter::Off);
-
-        let flexi_logger = FlexiLogger::new_internal(spec, config)?;
+        let flexi_logger = FlexiLogger::new_internal(spec, config, other_writers)?;
         log::set_boxed_logger(Box::new(flexi_logger))?;
         log::set_max_level(max);
         Ok(())
+    }
+
+    /// Configures and starts the flexi_logger.
+    pub fn start(config: LogConfig, spec: LogSpecification) -> Result<(), FlexiLoggerError> {
+        FlexiLogger::start_multi(config, spec, HashMap::new())
+    }
+
+    /// Configures and starts the flexi_logger with multiple writers,
+    /// and returns a handle to reconfigure the logger.
+    pub fn start_multi_reconfigurable(
+        config: LogConfig,
+        spec: LogSpecification,
+        other_writers: HashMap<String, Box<LogWriter>>,
+    ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        let (flexi_logger, handle) =
+            FlexiLogger::new_internal_reconfigurable(spec, config, other_writers)?;
+        log::set_boxed_logger(Box::new(flexi_logger))?;
+        // no optimization possible, because the spec is dynamic, but max is not:
+        log::set_max_level(log::LevelFilter::Trace);
+        Ok(handle)
     }
 
     /// Configures and starts the flexi_logger, and returns a handle to reconfigure the logger.
@@ -125,36 +142,36 @@ impl FlexiLogger {
         config: LogConfig,
         spec: LogSpecification,
     ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
-        let (flexi_logger, handle) = FlexiLogger::new_internal_reconfigurable(spec, config)?;
-        log::set_boxed_logger(Box::new(flexi_logger))?;
-        // no optimization possible, because the spec is dynamic, but max is not:
-        log::set_max_level(log::LevelFilter::Trace);
-        Ok(handle)
+        FlexiLogger::start_multi_reconfigurable(config, spec, HashMap::new())
     }
 
     fn new_internal(
         spec: LogSpecification,
         config: LogConfig,
+        other_writers: HashMap<String, Box<LogWriter>>,
     ) -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
-            amr_flexi_writer: Arc::new(Mutex::new(RefCell::new(FlexiWriter::new(&config)?))),
-            config: config,
+            default_writer: Arc::new(DefaultLogWriter::new(config)?),
+            other_writers: other_writers,
         })
     }
 
     fn new_internal_reconfigurable(
         spec: LogSpecification,
         config: LogConfig,
+        other_writers: HashMap<String, Box<LogWriter>>,
     ) -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
-        let fw = Arc::new(Mutex::new(RefCell::new(FlexiWriter::new(&config)?)));
+        let default_writer = Arc::new(DefaultLogWriter::new(config)?);
+
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
-            amr_flexi_writer: Arc::clone(&fw),
-            config: config,
+            default_writer: Arc::clone(&default_writer),
+            other_writers: other_writers,
         };
-        let handle = ReconfigurationHandle::new(Arc::clone(&spec), Arc::clone(&fw));
+
+        let handle = ReconfigurationHandle::new(spec, default_writer);
         Ok((flexi_logger, handle))
     }
 
@@ -176,7 +193,9 @@ impl FlexiLogger {
             LogSpec::STATIC(ref ls) => check_filter(ls.module_filters()),
             LogSpec::DYNAMIC(ref locked_ls) => {
                 let guard = locked_ls.read();
-                check_filter(guard.as_ref().unwrap().module_filters())
+                check_filter(
+                    guard.as_ref().unwrap(/* not sure if we should expose this */).module_filters(),
+                )
             }
         }
     }
@@ -191,7 +210,7 @@ impl FlexiLogger {
             Some(loglevelspec) => LogSpecification::parse(&loglevelspec),
             None => LogSpecification::env(),
         };
-        FlexiLogger::new_internal(spec, config)
+        FlexiLogger::new_internal(spec, config, HashMap::new())
     }
 }
 
@@ -201,6 +220,27 @@ impl log::Log for FlexiLogger {
     }
 
     fn log(&self, record: &log::Record) {
+        let target = record.metadata().target();
+        if target.starts_with('{') {
+            let mut use_default = false;
+            let targets: Vec<&str> = target[1..(target.len() - 1)].split(',').collect();
+            for t in targets {
+                if t == "_Default" {
+                    use_default = true;
+                } else {
+                    match self.other_writers.get(t) {
+                        None => eprintln!("bad writer spec: {}", t),
+                        Some(writer) => {
+                            writer.write(record);
+                        }
+                    }
+                }
+            }
+            if !use_default {
+                return;
+            }
+        }
+
         if !self.enabled(record.metadata()) {
             return;
         }
@@ -218,59 +258,33 @@ impl log::Log for FlexiLogger {
             LogSpec::STATIC(ref ls) => check_text_filter(ls.text_filter()),
             LogSpec::DYNAMIC(ref locked_ls) => {
                 let guard = locked_ls.read();
-                check_text_filter(guard.as_ref().unwrap().text_filter())
+                check_text_filter(
+                    guard.as_ref().unwrap(/* not sure if we should expose this */).text_filter(),
+                )
             }
         } {
             return;
         }
 
-        let target = record.metadata().target();
-        if target.starts_with('{') {
-            let targets: Vec<&str> = target[1..(target.len() - 1)].split(",").collect();
-            for t in targets {
-                match self.config.writers.as_ref().unwrap().get(t) {
-                    None => eprintln!("bad writer spec: {}", t),
-                    Some(writer) => {
-                        writer.write(record);
-                    }
-                }
-            }
-        }
-
-        let mut msg = (self.config.format)(record);
-        if self.config.log_to_file {
-            if self.config.duplicate_error && record.level() == log::Level::Error
-                || self.config.duplicate_info
-                    && (record.level() == log::Level::Error || record.level() == log::Level::Warn
-                        || record.level() == log::Level::Info)
-            {
-                println!("{}", &record.args());
-            }
-            msg.push('\n');
-            let msgb = msg.as_bytes();
-
-            // Unlock the mutex -> MutexGuard<RefCell<FlexiWriter>>
-            let mut mutexguard = self.amr_flexi_writer.lock().unwrap();
-            // Borrow the RefCell-Content -> RefMut<FlexiWriter>
-            let mut refmut = mutexguard.deref_mut().borrow_mut();
-            // Call write() on the FlexiWriter
-            (*refmut).write(msgb, &self.config);
-        } else {
-            eprintln!("{}", msg);
-        }
+        self.default_writer.write(record);
     }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        self.default_writer.flush();
+        for writer in self.other_writers.values() {
+            writer.flush();
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use Level;
-    use LogConfig;
+    use log_config::LogConfig;
     use super::FlexiLogger;
 
     fn make_logger(loglevelspec: &'static str) -> FlexiLogger {
-        FlexiLogger::new(Some(loglevelspec.to_string()), LogConfig::new()).unwrap()
+        FlexiLogger::new(Some(loglevelspec.to_string()), LogConfig::new()).unwrap(/*test only*/)
     }
 
     #[test]

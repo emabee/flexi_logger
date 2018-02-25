@@ -23,14 +23,14 @@ fn test_mods() {
     mymod2::test_traces();
 
     handle.validate_logs(&[
-        ("ERROR", "error"),
-        ("WARN", "warning"),
-        ("INFO", "info"),
-        ("ERROR", "error"),
-        ("WARN", "warning"),
-        ("INFO", "info"),
-        ("DEBUG", "debug"),
-        ("ERROR", "error"),
+        ("ERROR", "test_mods", "error"),
+        ("WARN", "test_mods", "warning"),
+        ("INFO", "test_mods", "info"),
+        ("ERROR", "test_mods", "error"),
+        ("WARN", "test_mods", "warning"),
+        ("INFO", "test_mods", "info"),
+        ("DEBUG", "test_mods", "debug"),
+        ("ERROR", "test_mods", "error"),
     ]);
 }
 

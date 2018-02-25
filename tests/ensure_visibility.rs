@@ -1,5 +1,6 @@
 extern crate flexi_logger;
-use flexi_logger::{FlexiLogger, LogConfig};
+
+use flexi_logger::deprecated::{FlexiLogger, LogConfig};
 
 #[allow(dead_code)]
 #[test]

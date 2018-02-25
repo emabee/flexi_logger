@@ -5,7 +5,7 @@ extern crate log;
 use flexi_logger::{opt_format, Logger};
 
 #[test]
-fn files_dir_dscr_rot() {
+fn test_opt_files_dir_dscr_rot() {
     let link_name = "link_to_log".to_string();
     let handle = Logger::with_str("info")
         .format(opt_format)
@@ -22,7 +22,11 @@ fn files_dir_dscr_rot() {
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
-    handle.validate_logs(&[("ERROR", "error"), ("WARN", "warning"), ("INFO", "info")]);
+    handle.validate_logs(&[
+        ("ERROR", "test_opt_files_dir_dscr_rot", "error"),
+        ("WARN", "test_opt_files_dir_dscr_rot", "warning"),
+        ("INFO", "test_opt_files_dir_dscr_rot", "info"),
+    ]);
     self::platform::check_link(&link_name);
 }
 

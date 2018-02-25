@@ -5,7 +5,7 @@ extern crate log;
 use flexi_logger::{detailed_format, Logger};
 
 #[test]
-fn files_rot() {
+fn test_detailed_files_rot() {
     let handle = Logger::with_str("info")
         .format(detailed_format)
         .log_to_file()
@@ -18,5 +18,9 @@ fn files_rot() {
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
-    handle.validate_logs(&[("ERROR", "error"), ("WARN", "warning"), ("INFO", "info")]);
+    handle.validate_logs(&[
+        ("ERROR", "test_detailed_files_rot", "error"),
+        ("WARN", "test_detailed_files_rot", "warning"),
+        ("INFO", "test_detailed_files_rot", "info"),
+    ]);
 }

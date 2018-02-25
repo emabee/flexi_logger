@@ -1,7 +1,7 @@
 use log::Record;
 use FlexiLoggerError;
 use Logger;
-use LogConfig;
+use log_config::LogConfig;
 
 pub type FormatFunction = fn(&Record) -> String;
 
