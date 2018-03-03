@@ -178,7 +178,7 @@ impl FileLogWriterState {
     }
 }
 
-/// A `LogWriter` that writes to a file or, if rotation is used, a sequence of files.
+/// A configurable `LogWriter` that writes to a file or, if rotation is used, a sequence of files.
 pub struct FileLogWriter {
     config: FileLogWriterConfig,
     // the state needs to be mutable; since `Log.log()` requires an unmutable self,

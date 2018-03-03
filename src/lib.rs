@@ -48,7 +48,9 @@
 //! *  specify the line format for the log lines
 //! *  define additional log writers, e.g for special log types.
 //!
-//! See [Logger](struct.Logger.html) for a full description of all configuration options.
+//! See [Logger](struct.Logger.html) for a full description of all configuration options,
+//! and the [writers](writers/index.html) module for the usage
+//! of additional log writers.
 //!
 
 extern crate chrono;

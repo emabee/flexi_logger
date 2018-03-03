@@ -1,8 +1,8 @@
 [package]
 name = "flexi_logger"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["emabee <meinolf.block@sap.com>"]
-description = "A flexible and reconfigurable logger that can write to stderr or to log files"
+description = "A logger that writes logs to stderr or to a fresh file, or to a sequence of files in a configurable folder. It allows custom logline formats, and it allows changing the log specification at runtime. It further allows defining additional log streams, e.g. for alert or security messages."
 keywords = ["file", "logger"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/emabee/flexi_logger"

@@ -189,16 +189,9 @@ impl Logger {
 
     /// Registers a LogWriter implementation under the given target name.
     ///
-    /// Names should not start with an underscore.
-    /// The name given here is used in calls to the log macros to identify the writer(s)
-    /// to which a log message is sent.
+    /// The target name should not start with an underscore.
     ///
-    /// A log call with a target value that has the form `{Name1,Name2,...}`, i.e.,
-    /// a comma-separated list of target names, within braces, is not sent to the default logger,
-    /// but to the loggers specified explicitly in the list.
-    /// In such a list you can again specify the default logger with the name `_Default`.
-    ///
-    /// See also [the module documentation of `writers`](writers/index.html).
+    /// See [the module documentation of `writers`](writers/index.html).
     pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
         self.other_writers.insert(name.into(), writer);
         self
