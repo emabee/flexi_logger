@@ -58,7 +58,7 @@ extern crate glob;
 extern crate log;
 extern crate regex;
 
-mod default_log_writer;
+mod primary_writer;
 mod deprecated1;
 mod flexi_error;
 mod flexi_logger;
