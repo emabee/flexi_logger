@@ -1,11 +1,11 @@
-use writers::LogWriter;
+use flexi_error::FlexiLoggerError;
+use flexi_logger::FlexiLogger;
 use log::Record;
 use log_config::LogConfig;
 use LogSpecification;
-use flexi_error::FlexiLoggerError;
-use flexi_logger::FlexiLogger;
 use ReconfigurationHandle;
 use std::collections::HashMap;
+use writers::LogWriter;
 
 /// Function type for Format functions.
 pub type FormatFunction = fn(&Record) -> String;

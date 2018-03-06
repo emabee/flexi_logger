@@ -1,14 +1,15 @@
 //! Structures and methods that allow supporting multiple `FlexiLogger` instances
 //! in a single process.
-use writers::LogWriter;
+use log;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use default_log_writer::DefaultLogWriter;
+
+use primary_writer::PrimaryWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
 use log_specification::ModuleFilter;
 use FlexiLoggerError;
-use log;
+use writers::LogWriter;
 
 use regex::Regex;
 use std::sync::{Arc, RwLock};
@@ -24,7 +25,7 @@ enum LogSpec {
 /// instances in a single process.
 pub struct FlexiLogger {
     log_specification: LogSpec,
-    default_writer: Arc<DefaultLogWriter>,
+    primary_writer: Arc<PrimaryWriter>,
     other_writers: HashMap<String, Box<LogWriter>>,
 }
 
@@ -67,16 +68,16 @@ pub struct FlexiLogger {
 /// ```
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
-    default_writer: Arc<DefaultLogWriter>,
+    primary_writer: Arc<PrimaryWriter>,
 }
 impl ReconfigurationHandle {
     fn new(
         spec: Arc<RwLock<LogSpecification>>,
-        default_writer: Arc<DefaultLogWriter>,
+        primary_writer: Arc<PrimaryWriter>,
     ) -> ReconfigurationHandle {
         ReconfigurationHandle {
             spec: spec,
-            default_writer: default_writer,
+            primary_writer: primary_writer,
         }
     }
 
@@ -95,7 +96,7 @@ impl ReconfigurationHandle {
     #[doc(hidden)]
     /// Allows checking the logs written so far to the writer
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        Borrow::<DefaultLogWriter>::borrow(&self.default_writer).validate_logs(expected)
+        Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
     }
 }
 
@@ -152,7 +153,7 @@ impl FlexiLogger {
     ) -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
-            default_writer: Arc::new(DefaultLogWriter::new(config)?),
+            primary_writer: Arc::new(PrimaryWriter::new(config)?),
             other_writers: other_writers,
         })
     }
@@ -163,15 +164,15 @@ impl FlexiLogger {
         other_writers: HashMap<String, Box<LogWriter>>,
     ) -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
-        let default_writer = Arc::new(DefaultLogWriter::new(config)?);
+        let primary_writer = Arc::new(PrimaryWriter::new(config)?);
 
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
-            default_writer: Arc::clone(&default_writer),
+            primary_writer: Arc::clone(&primary_writer),
             other_writers: other_writers,
         };
 
-        let handle = ReconfigurationHandle::new(spec, default_writer);
+        let handle = ReconfigurationHandle::new(spec, primary_writer);
         Ok((flexi_logger, handle))
     }
 
@@ -266,11 +267,11 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        self.default_writer.write(record);
+        self.primary_writer.write(record);
     }
 
     fn flush(&self) {
-        self.default_writer.flush();
+        self.primary_writer.flush();
         for writer in self.other_writers.values() {
             writer.flush();
         }
