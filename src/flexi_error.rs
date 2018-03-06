@@ -1,4 +1,5 @@
 use log;
+use toml;
 use std::fmt;
 use std::io;
 use std::error::Error;
@@ -10,6 +11,8 @@ pub enum FlexiLoggerError {
     BadDirectory,
     /// Log cannot be written because the configured output directory is not accessible.
     Io(io::Error),
+    /// Log cannot be written because the configured output directory is not accessible.
+    Toml(toml::de::Error),
     /// Logger initialization failed.
     Log(log::SetLoggerError),
 }
@@ -19,6 +22,7 @@ impl fmt::Display for FlexiLoggerError {
         match *self {
             FlexiLoggerError::BadDirectory => Ok(()),
             FlexiLoggerError::Io(ref err) => err.fmt(f),
+            FlexiLoggerError::Toml(ref err) => err.fmt(f),
             FlexiLoggerError::Log(ref err) => err.fmt(f),
         }
     }
@@ -29,6 +33,7 @@ impl Error for FlexiLoggerError {
         match *self {
             FlexiLoggerError::BadDirectory => "not a directory", // ""
             FlexiLoggerError::Io(ref err) => err.description(),  // "Log cannot be written"
+            FlexiLoggerError::Toml(ref err) => err.description(), // "Log cannot be written"
             FlexiLoggerError::Log(ref err) => err.description(), // "Logger initialization failed"
         }
     }
@@ -37,6 +42,7 @@ impl Error for FlexiLoggerError {
         match *self {
             FlexiLoggerError::BadDirectory => None,
             FlexiLoggerError::Io(ref err) => Some(err),
+            FlexiLoggerError::Toml(ref err) => Some(err),
             FlexiLoggerError::Log(ref err) => Some(err),
         }
     }
@@ -50,5 +56,10 @@ impl From<log::SetLoggerError> for FlexiLoggerError {
 impl From<io::Error> for FlexiLoggerError {
     fn from(err: io::Error) -> FlexiLoggerError {
         FlexiLoggerError::Io(err)
+    }
+}
+impl From<toml::de::Error> for FlexiLoggerError {
+    fn from(err: toml::de::Error) -> FlexiLoggerError {
+        FlexiLoggerError::Toml(err)
     }
 }

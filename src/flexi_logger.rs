@@ -1,9 +1,10 @@
 //! Structures and methods that allow supporting multiple `FlexiLogger` instances
 //! in a single process.
+use primary_writer::PrimaryWriter;
+use std::path::Path;
 use writers::LogWriter;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use default_log_writer::DefaultLogWriter;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
 use log_specification::ModuleFilter;
@@ -24,7 +25,7 @@ enum LogSpec {
 /// instances in a single process.
 pub struct FlexiLogger {
     log_specification: LogSpec,
-    default_writer: Arc<DefaultLogWriter>,
+    primary_writer: Arc<PrimaryWriter>,
     other_writers: HashMap<String, Box<LogWriter>>,
 }
 
@@ -67,16 +68,16 @@ pub struct FlexiLogger {
 /// ```
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
-    default_writer: Arc<DefaultLogWriter>,
+    primary_writer: Arc<PrimaryWriter>,
 }
 impl ReconfigurationHandle {
     fn new(
         spec: Arc<RwLock<LogSpecification>>,
-        default_writer: Arc<DefaultLogWriter>,
+        primary_writer: Arc<PrimaryWriter>,
     ) -> ReconfigurationHandle {
         ReconfigurationHandle {
             spec: spec,
-            default_writer: default_writer,
+            primary_writer: primary_writer,
         }
     }
 
@@ -95,7 +96,7 @@ impl ReconfigurationHandle {
     #[doc(hidden)]
     /// Allows checking the logs written so far to the writer
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        Borrow::<DefaultLogWriter>::borrow(&self.default_writer).validate_logs(expected)
+        Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
     }
 }
 
@@ -137,6 +138,28 @@ impl FlexiLogger {
         Ok(handle)
     }
 
+    /// Configures and starts the flexi_logger with LogSpec from a file, and with multiple writers.
+    pub fn start_multi_with_specfile<P: AsRef<Path>>(
+        config: LogConfig,
+        spec: LogSpecification,
+        specfile: P,
+        other_writers: HashMap<String, Box<LogWriter>>,
+    ) -> Result<(), FlexiLoggerError> {
+        let (flexi_logger, mut handle) =
+            FlexiLogger::new_internal_reconfigurable(spec, config, other_writers)?;
+        log::set_boxed_logger(Box::new(flexi_logger))?;
+
+        // no optimization possible, because the spec is dynamic, but max is not:
+        log::set_max_level(log::LevelFilter::Trace);
+
+        // setup fs notification to automatically reread the file
+        //  FIXME
+
+        // initialize from file
+        handle.set_new_spec(LogSpecification::from_file(specfile)?);
+        Ok(())
+    }
+
     /// Configures and starts the flexi_logger, and returns a handle to reconfigure the logger.
     pub fn start_reconfigurable(
         config: LogConfig,
@@ -152,7 +175,7 @@ impl FlexiLogger {
     ) -> Result<FlexiLogger, FlexiLoggerError> {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
-            default_writer: Arc::new(DefaultLogWriter::new(config)?),
+            primary_writer: Arc::new(PrimaryWriter::new(config)?),
             other_writers: other_writers,
         })
     }
@@ -163,15 +186,15 @@ impl FlexiLogger {
         other_writers: HashMap<String, Box<LogWriter>>,
     ) -> Result<(FlexiLogger, ReconfigurationHandle), FlexiLoggerError> {
         let spec = Arc::new(RwLock::new(spec));
-        let default_writer = Arc::new(DefaultLogWriter::new(config)?);
+        let primary_writer = Arc::new(PrimaryWriter::new(config)?);
 
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
-            default_writer: Arc::clone(&default_writer),
+            primary_writer: Arc::clone(&primary_writer),
             other_writers: other_writers,
         };
 
-        let handle = ReconfigurationHandle::new(spec, default_writer);
+        let handle = ReconfigurationHandle::new(spec, primary_writer);
         Ok((flexi_logger, handle))
     }
 
@@ -266,11 +289,11 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        self.default_writer.write(record);
+        self.primary_writer.write(record);
     }
 
     fn flush(&self) {
-        self.default_writer.flush();
+        self.primary_writer.flush();
         for writer in self.other_writers.values() {
             writer.flush();
         }

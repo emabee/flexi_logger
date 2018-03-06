@@ -1,7 +1,12 @@
+use flexi_error::FlexiLoggerError;
 use LevelFilter;
 use regex::Regex;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
-use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use toml;
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -54,7 +59,7 @@ pub struct LogSpecification {
 }
 
 /// Defines which loglevel filter to use for a given module (or as default, if no module is given).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleFilter {
     pub module_name: Option<String>,
     pub level_filter: LevelFilter,
@@ -182,6 +187,61 @@ impl LogSpecification {
         }
     }
 
+    /// Reads a log specification from a file.
+    /// FIXME: describe file format
+    pub fn from_file<P: AsRef<Path>>(specfile: P) -> Result<LogSpecification, FlexiLoggerError> {
+        // Open the file in read-only mode.
+        let mut file = File::open(specfile)?;
+
+        // Read the content toml file as an instance of `LogSpecFileFormat`.
+        let mut s = String::new();
+        file.read_to_string(&mut s)?;
+        LogSpecification::from_toml(&s)
+    }
+
+    //
+    fn from_toml(s: &str) -> Result<LogSpecification, FlexiLoggerError> {
+        #[derive(Clone, Debug, Deserialize)]
+        struct LogSpecFileFormat {
+            pub global_level: Option<String>,
+            pub global_pattern: Option<String>,
+            pub modules: BTreeMap<String, String>,
+        }
+
+        let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
+        let mut module_filters = Vec::<ModuleFilter>::new();
+
+        if let Some(s) = logspec_ff.global_level {
+            module_filters.push(ModuleFilter {
+                module_name: None,
+                level_filter: parse_level_filter(s),
+            });
+        }
+
+        for (k, v) in logspec_ff.modules {
+            module_filters.push(ModuleFilter {
+                module_name: Some(k),
+                level_filter: parse_level_filter(v),
+            });
+        }
+
+        let textfilter = match logspec_ff.global_pattern {
+            None => None,
+            Some(s) => match Regex::new(&s) {
+                Ok(re) => Some(re),
+                Err(e) => {
+                    println!("warning: invalid regex filter - {}", e);
+                    None
+                }
+            },
+        };
+
+        Ok(LogSpecification {
+            module_filters: module_filters,
+            textfilter: textfilter,
+        })
+    }
+
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(llf: LevelFilter) -> LogSpecBuilder {
         LogSpecBuilder::from_module_filters(&[
@@ -199,7 +259,18 @@ impl LogSpecification {
 
     /// Provides a reference to the text filter.
     pub fn text_filter(&self) -> &Option<Regex> {
-        &self.textfilter
+        &(self.textfilter)
+    }
+}
+
+fn parse_level_filter<S: AsRef<str>>(s: S) -> LevelFilter {
+    match s.as_ref() {
+        "error" => LevelFilter::Error,
+        "warn" => LevelFilter::Warn,
+        "info" => LevelFilter::Info,
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        _ => LevelFilter::Off,
     }
 }
 
@@ -323,6 +394,58 @@ mod tests {
     extern crate log;
     use {LogSpecBuilder, LogSpecification};
     use log::LevelFilter;
+
+    #[test]
+    fn specfile() {
+        compare_specs(
+            "[modules]\n\
+             ",
+            "",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             \n\
+             [modules]\n\
+             ",
+            "info",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             \n\
+             [modules]\n\
+             'mod1::mod2' = 'debug'\n\
+             'mod3' = 'trace'\n\
+             ",
+            "info, mod1::mod2 = debug, mod3 = trace",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             global_pattern = 'Foo'\n\
+             \n\
+             [modules]\n\
+             'mod1::mod2' = 'debug'\n\
+             'mod3' = 'trace'\n\
+             ",
+            "info, mod1::mod2 = debug, mod3 = trace /Foo",
+        );
+    }
+
+    fn compare_specs(s1: &str, s2: &str) {
+        let ls1 = LogSpecification::from_toml(s1).unwrap();
+        let ls2 = LogSpecification::parse(s2);
+
+        assert_eq!(ls1.module_filters, ls2.module_filters);
+        assert_eq!(ls1.textfilter.is_none(), ls2.textfilter.is_none());
+        if ls1.textfilter.is_some() && ls2.textfilter.is_some() {
+            assert_eq!(
+                ls1.textfilter.unwrap().to_string(),
+                ls2.textfilter.unwrap().to_string()
+            );
+        }
+    }
 
     #[test]
     fn parse_logging_spec_valid() {

@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["emabee <meinolf.block@sap.com>"]
 description = "A logger that writes logs to stderr or to a fresh file, or to a sequence of files in a configurable folder. It allows custom logline formats, and it allows changing the log specification at runtime. It further allows defining additional log streams, e.g. for alert or security messages."
 keywords = ["file", "logger"]
@@ -13,3 +13,6 @@ chrono = "0.4"
 glob = "0.2"
 log = { version = "0.4", features = ["std"] }
 regex = "0.2"
+serde = "1.0"
+serde_derive = "1.0"
+toml = "0.4"

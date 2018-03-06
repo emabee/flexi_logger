@@ -1,11 +1,12 @@
-use writers::LogWriter;
+use flexi_error::FlexiLoggerError;
+use flexi_logger::FlexiLogger;
 use log::Record;
 use log_config::LogConfig;
 use LogSpecification;
-use flexi_error::FlexiLoggerError;
-use flexi_logger::FlexiLogger;
 use ReconfigurationHandle;
 use std::collections::HashMap;
+use std::path::Path;
+use writers::LogWriter;
 
 /// Function type for Format functions.
 pub type FormatFunction = fn(&Record) -> String;
@@ -74,31 +75,18 @@ impl Logger {
     /// Creates a Logger that reads the LogSpecification from a String or &str.
     /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
     pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
-        let logspec = LogSpecification::parse(s.as_ref());
-        Logger {
-            spec: logspec,
-            config: LogConfig::default_config_for_logger(),
-            other_writers: HashMap::<String, Box<LogWriter>>::new(),
-        }
+        Logger::with(LogSpecification::parse(s.as_ref()))
     }
 
     /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG.
     pub fn with_env() -> Logger {
-        Logger {
-            spec: LogSpecification::env(),
-            config: LogConfig::default_config_for_logger(),
-            other_writers: HashMap::<String, Box<LogWriter>>::new(),
-        }
+        Logger::with(LogSpecification::env())
     }
 
     /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG,
     /// or derives it from the given String, if RUST_LOG is not set.
     pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
-        Logger {
-            spec: LogSpecification::env_or_parse(s),
-            config: LogConfig::default_config_for_logger(),
-            other_writers: HashMap::<String, Box<LogWriter>>::new(),
-        }
+        Logger::with(LogSpecification::env_or_parse(s))
     }
 
     /// Makes the logger write all logs to a file, rather than to stderr.
@@ -250,6 +238,15 @@ impl Logger {
     ///
     pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         FlexiLogger::start_multi_reconfigurable(self.config, self.spec, self.other_writers)
+    }
+
+    /// Uses the given spec as default (which is applied if the file does not exist
+    /// or cannot be read) and tries to read the logspec from a file.
+    /// If the file is updated while the program is running, flexi_logger re-reads the file and
+    /// adapts the LogSpecification it uses.
+    ///
+    pub fn start_with_specfile<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
+        FlexiLogger::start_multi_with_specfile(self.config, self.spec, specfile, self.other_writers)
     }
 
     // used in tests only
