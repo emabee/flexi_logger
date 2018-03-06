@@ -9,7 +9,7 @@ use log_config::LogConfig;
 use log_specification::LogSpecification;
 use log_specification::ModuleFilter;
 use FlexiLoggerError;
-use log;
+use writers::LogWriter;
 
 use regex::Regex;
 use std::sync::{Arc, RwLock};
