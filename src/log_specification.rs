@@ -165,7 +165,7 @@ impl LogSpecification {
 
         LogSpecification {
             module_filters: dirs.level_sort(),
-            textfilter: textfilter,
+            textfilter,
         }
     }
 
@@ -237,17 +237,17 @@ impl LogSpecification {
         };
 
         Ok(LogSpecification {
-            module_filters: module_filters,
-            textfilter: textfilter,
+            module_filters,
+            textfilter,
         })
     }
 
     /// Creates a LogSpecBuilder, setting the default log level.
-    pub fn default(llf: LevelFilter) -> LogSpecBuilder {
+    pub fn default(level_filter: LevelFilter) -> LogSpecBuilder {
         LogSpecBuilder::from_module_filters(&[
             ModuleFilter {
                 module_name: None,
-                level_filter: llf,
+                level_filter,
             },
         ])
     }

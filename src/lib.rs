@@ -55,7 +55,9 @@
 
 extern crate chrono;
 extern crate glob;
+#[macro_use]
 extern crate log;
+extern crate notify;
 extern crate regex;
 extern crate serde;
 #[macro_use]
@@ -72,6 +74,7 @@ mod log_config;
 mod log_specification;
 
 pub mod writers;
+
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
 

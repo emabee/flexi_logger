@@ -1,18 +1,24 @@
 //! Structures and methods that allow supporting multiple `FlexiLogger` instances
 //! in a single process.
-use primary_writer::PrimaryWriter;
-use std::path::Path;
-use writers::LogWriter;
-use std::borrow::Borrow;
-use std::collections::HashMap;
+use log;
 use log_config::LogConfig;
 use log_specification::LogSpecification;
 use log_specification::ModuleFilter;
 use FlexiLoggerError;
+use primary_writer::PrimaryWriter;
 use writers::LogWriter;
 
 use regex::Regex;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::sync::mpsc::channel;
+use std::time::Duration;
+use std::thread;
+use std::io::prelude::*;
 
 enum LogSpec {
     STATIC(LogSpecification),
@@ -76,8 +82,8 @@ impl ReconfigurationHandle {
         primary_writer: Arc<PrimaryWriter>,
     ) -> ReconfigurationHandle {
         ReconfigurationHandle {
-            spec: spec,
-            primary_writer: primary_writer,
+            spec,
+            primary_writer,
         }
     }
 
@@ -141,22 +147,102 @@ impl FlexiLogger {
     /// Configures and starts the flexi_logger with LogSpec from a file, and with multiple writers.
     pub fn start_multi_with_specfile<P: AsRef<Path>>(
         config: LogConfig,
-        spec: LogSpecification,
+        default_spec: LogSpecification,
         specfile: P,
         other_writers: HashMap<String, Box<LogWriter>>,
     ) -> Result<(), FlexiLoggerError> {
+        //
+        // Initialize flexi_logger with default spec and get reconfiguration handle
         let (flexi_logger, mut handle) =
-            FlexiLogger::new_internal_reconfigurable(spec, config, other_writers)?;
+            FlexiLogger::new_internal_reconfigurable(default_spec, config, other_writers)?;
         log::set_boxed_logger(Box::new(flexi_logger))?;
-
-        // no optimization possible, because the spec is dynamic, but max is not:
+        // no optimization possible, because the spec is dynamic, but max is not
         log::set_max_level(log::LevelFilter::Trace);
 
-        // setup fs notification to automatically reread the file
-        //  FIXME
+        // now setup fs notification to automatically reread the file, and initialize from the file
+        let specfile = specfile.as_ref().to_owned();
+        thread::Builder::new().spawn(move || {
+            // Create a channel to receive the events.
+            let (tx, rx) = channel();
+            // Create a watcher object, delivering debounced events
+            let mut watcher = match watcher(tx, Duration::from_millis(800)) {
+                Ok(w) => w,
+                Err(e) => {
+                    eprintln!("watcher() failed with {:?}", e);
+                    ::std::process::exit(-1);
+                }
+            };
 
-        // initialize from file
-        handle.set_new_spec(LogSpecification::from_file(specfile)?);
+            // if the specfile does not exist, try to create it with default content
+            // under the specified name
+            if !Path::is_file(&specfile) {
+                match File::create(&specfile) {
+                    Err(e) => {
+                        error!(
+                            "cannot create an initial logspec file under the specified name \
+                             {:?}, caused by: {}",
+                            &specfile, e
+                        );
+                        return;
+                    }
+                    Ok(mut file) => {
+                        file.write_all(
+                            b"
+# Optional: Default log level
+global_level = 'info'
+
+# Optional: Only log messages that contain the specified pattern
+# global_pattern = 'some pattern'
+
+# Specific log levels per module are defined in this section
+[modules]
+#'mod1' = 'warn'
+#'mod2' = 'debug'
+#'mod2::mod3' = 'trace'
+",
+                        ).unwrap();
+                    }
+                };
+            }
+
+            // watch the spec file
+            match watcher.watch(&specfile, RecursiveMode::NonRecursive) {
+                Err(e) => {
+                    error!(
+                        "watcher.watch() failed for the log specification file {:?}, caused by {:?}",
+                        specfile, e
+                    );
+                    ::std::process::exit(-1);
+                }
+                Ok(_) => {
+                    // initial read of the file: if that fails, just print an error and continue
+                    match LogSpecification::from_file(&specfile) {
+                        Ok(spec) => handle.set_new_spec(spec),
+                        Err(e) => error!("Can't read the log specification file, due to {:?}", e),
+                    }
+
+                    loop {
+                        match rx.recv() {
+                            Ok(DebouncedEvent::Write(_)) => {
+                                debug!("Got Write event");
+                                match LogSpecification::from_file(&specfile) {
+                                    Ok(spec) => handle.set_new_spec(spec),
+                                    Err(e) => eprintln!(
+                                        "Continuing with current log specification \
+                                         because the log specification file is not readable, \
+                                         due to {:?}",
+                                        e
+                                    ),
+                                }
+                            }
+                            Ok(_event) => trace!("ignoring event {:?}", _event),
+                            Err(e) => error!("watch error: {:?}", e),
+                        }
+                    }
+                }
+            }
+        })?;
+
         Ok(())
     }
 
@@ -176,7 +262,7 @@ impl FlexiLogger {
         Ok(FlexiLogger {
             log_specification: LogSpec::STATIC(spec),
             primary_writer: Arc::new(PrimaryWriter::new(config)?),
-            other_writers: other_writers,
+            other_writers,
         })
     }
 
@@ -191,7 +277,7 @@ impl FlexiLogger {
         let flexi_logger = FlexiLogger {
             log_specification: LogSpec::DYNAMIC(Arc::clone(&spec)),
             primary_writer: Arc::clone(&primary_writer),
-            other_writers: other_writers,
+            other_writers,
         };
 
         let handle = ReconfigurationHandle::new(spec, primary_writer);

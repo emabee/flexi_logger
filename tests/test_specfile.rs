@@ -1,24 +1,24 @@
-// #![feature(test)]
-// extern crate test;
-
 extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::Logger;
+use flexi_logger::{detailed_format, Logger};
+use std::{thread, time};
 
 #[test]
 fn test_specfile() {
-    Logger::with_str("off")
-        .log_to_file()
-        .directory("log_files")
+    Logger::with_str("info")
+        .format(detailed_format)
         .start_with_specfile("./tests/logspec.toml")
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
-    error!("This is an error message");
-    warn!("This is a warning");
-    warn!("This warning is filtered out");
-    info!("This is an info message");
-    debug!("This is a debug message - you must not see it!");
-    trace!("This is a trace message - you must not see it!");
+    let wait_a_sec = time::Duration::from_millis(1000);
+    loop {
+        thread::sleep(wait_a_sec);
+        error!("This is an error message");
+        warn!("This is a warning");
+        info!("This is an info message");
+        debug!("This is a debug message");
+        trace!("This is a trace message");
+    }
 }

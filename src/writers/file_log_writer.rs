@@ -161,12 +161,12 @@ impl FileLogWriterState {
             Some(_) => get_next_rotate_idx(&config.filename_base, &config.suffix),
         };
 
-        let (lw, cp) = get_linewriter(rotate_idx, config)?;
+        let (lw, current_path) = get_linewriter(rotate_idx, config)?;
         Ok(FileLogWriterState {
-            lw: lw,
-            current_path: cp,
+            lw,
+            current_path,
             written_bytes: 0,
-            rotate_idx: rotate_idx,
+            rotate_idx,
         })
     }
 
