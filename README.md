@@ -1,34 +1,5 @@
 # flexi_logger
-A flexible logger that can write to stderr or to log files
+A logger that writes logs to stderr or to a fresh file, or to a sequence of files in a configurable folder. It allows custom logline formats, and it allows changing the log specification at runtime. It also allows defining additional log streams, e.g. for alert or security messages.
 
 ## Documentation
 See https://docs.rs/flexi_logger/
-
-## Usage
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-flexi_logger = "0.6"
-log = "0.4"
-```
-
-and this to your crate root:
-
-```rust
-#[macro_use]
-extern crate log;
-extern crate flexi_logger;
-```
-
-Early in the start-up of your program, call something like
-
-```text
-  use flexi_logger::Logger;
-
-  Logger::with_str("modx::mody=info")
-      // ... your configuration options go here ...
-      .start()
-      .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-```

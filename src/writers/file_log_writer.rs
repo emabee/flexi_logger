@@ -1,5 +1,5 @@
+use FormatFunction;
 use formats::default_format;
-use logger::FormatFunction;
 use std::sync::Mutex;
 use std::cell::RefCell;
 use writers::log_writer::LogWriter;
@@ -144,6 +144,59 @@ impl FileLogWriterBuilder {
             state: Mutex::new(RefCell::new(FileLogWriterState::new(&self.config)?)),
             config: self.config,
         })
+    }
+}
+
+/// Alternative set of methods to control the behavior of the `FileLogWriterBuilder`.
+/// Use these methods when you want to control the settings flexibly,
+/// e.g. with commandline arguments via `docopts` or `clap`.
+impl FileLogWriterBuilder {
+    /// With true, makes the FileLogWriterBuilder print an info message to stdout, each time
+    /// when a new file is used for log-output.
+    pub fn o_print_message(mut self, print_message: bool) -> FileLogWriterBuilder {
+        self.config.print_message = print_message;
+        self
+    }
+
+    /// Specifies a folder for the log files.
+    ///
+    /// If the specified folder does not exist, the initialization will fail.
+    /// With None, the log files are created in the folder where the program was started.
+    pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> FileLogWriterBuilder {
+        self.directory = directory.map(|d| d.into());
+        self
+    }
+
+    /// With true, makes the FileLogWriterBuilder include a timestamp into the names of the log files.
+    pub fn o_timestamp(mut self, timestamp: bool) -> FileLogWriterBuilder {
+        self.config.use_timestamp = timestamp;
+        self
+    }
+
+    /// By default, and with None, the log file will grow indefinitely.
+    /// If a size is set, when the log file reaches or exceeds the specified size,
+    /// the file will be closed and a new file will be opened.
+    /// Also the filename pattern changes - instead of the timestamp a serial number
+    /// is included into the filename.
+    pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
+        self.config.rotate_over_size = rotate_over_size;
+        self
+    }
+
+    /// The specified String is added to the log file name.
+    pub fn o_discriminant<S: Into<String>>(
+        mut self,
+        discriminant: Option<S>,
+    ) -> FileLogWriterBuilder {
+        self.discriminant = discriminant.map(|d| d.into());
+        self
+    }
+
+    /// If a String is specified, it will be used on linux systems to create in the current folder
+    /// a symbolic link with this name to the current log file.
+    pub fn o_create_symlink<S: Into<String>>(mut self, symlink: Option<S>) -> FileLogWriterBuilder {
+        self.config.create_symlink = symlink.map(|s| s.into());
+        self
     }
 }
 

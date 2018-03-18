@@ -10,15 +10,25 @@
 //!
 //! # Usage
 //!
-//! Add `flexi_logger` to the dependencies in your project's `Cargo.toml`.
+//! Add `flexi_logger` to the dependencies in your project's `Cargo.toml`, with
 //!
 //! ```toml
 //! [dependencies]
-//! flexi_logger = "0.7"
+//! flexi_logger = "0.8"
 //! log = "0.4"
 //! ```
 //!
-//! and this to your crate root:
+//! or, if you want to use the
+//! [`specfile`](struct.Logger.html#method.start_with_specfile)
+//! feature, with
+//!
+//! ```toml
+//! [dependencies]
+//! flexi_logger = { version = "0.8", features = ["specfile"] }
+//! log = "0.4"
+//! ```
+//!
+//! and add this to your crate root:
 //!
 //! ```text
 //! extern crate flexi_logger;
@@ -26,7 +36,7 @@
 //! extern crate log;
 //! ```
 //!
-//! The latter is needed because `flexi_logger` plugs into the standard Rust logging facade given
+//! `log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
 //! by the [log crate](https://crates.io/crates/log),
 //! and you use the ```log``` macros to write log lines from your code.
 //!
@@ -52,25 +62,33 @@
 //! and the [writers](writers/index.html) module for the usage
 //! of additional log writers.
 //!
+//! See [Change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md)
+//! for details of the previous versions.
+//!
 
 extern crate chrono;
 extern crate glob;
-#[macro_use]
+#[cfg_attr(feature = "specfile", macro_use)]
 extern crate log;
-extern crate notify;
 extern crate regex;
+
+#[cfg(feature = "specfile")]
+extern crate notify;
+#[cfg(feature = "specfile")]
 extern crate serde;
+
+#[cfg(feature = "specfile")]
 #[macro_use]
 extern crate serde_derive;
+
+#[cfg(feature = "specfile")]
 extern crate toml;
 
 mod primary_writer;
-mod deprecated1;
 mod flexi_error;
 mod flexi_logger;
 mod formats;
 mod logger;
-mod log_config;
 mod log_specification;
 
 pub mod writers;
@@ -78,18 +96,12 @@ pub mod writers;
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
 
-/// Package for deprecated structs etc. These will be removed or made internal
-/// in one of the next versions (let us know if this would cause difficulties).
-pub mod deprecated {
-    #[allow(deprecated)]
-    pub use deprecated1::{init, LogOptions};
-    pub use log_config::LogConfig;
-    pub use flexi_logger::FlexiLogger;
-}
-
 pub use formats::*;
 pub use log_specification::{LogSpecBuilder, LogSpecification};
 
 pub use logger::Logger;
 pub use flexi_logger::ReconfigurationHandle;
 pub use flexi_error::FlexiLoggerError;
+
+/// Function type for Format functions.
+pub type FormatFunction = fn(&Record) -> String;

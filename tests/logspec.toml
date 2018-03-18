@@ -1,4 +1,12 @@
-global_level = 'trace'
+### Optional: Default log level
+global_level = 'ERRor'
 
-# Specific log levels per module are defined in this section
+### Optional: specify a regular expression to suppress all messages that don't match
+#global_pattern = 'foo'
+
+# Specific log levels per module are optionally defined in this section
 [modules]
+'modddddd9' = 'warn'
+'moddddd8' = 'warn'
+'moddd6' = 'warn'
+'mod4' = 'warn'

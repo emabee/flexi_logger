@@ -1,5 +1,7 @@
 use log;
+#[cfg(feature = "specfile")]
 use notify;
+#[cfg(feature = "specfile")]
 use toml;
 use std::fmt;
 use std::io;
@@ -13,9 +15,13 @@ pub enum FlexiLoggerError {
     /// Log cannot be written because the configured output directory is not accessible.
     Io(io::Error),
     /// Error with fs-notifications for the specfile
+    #[cfg(feature = "specfile")]
     Notify(notify::Error),
-    /// Log cannot be written because the configured output directory is not accessible.
+    /// The configured logspec file cannot be read
+    #[cfg(feature = "specfile")]
     Toml(toml::de::Error),
+    /// Some error occured during parsing
+    Parse(String),
     /// Logger initialization failed.
     Log(log::SetLoggerError),
 }
@@ -25,8 +31,11 @@ impl fmt::Display for FlexiLoggerError {
         match *self {
             FlexiLoggerError::BadDirectory => Ok(()),
             FlexiLoggerError::Io(ref err) => err.fmt(f),
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Notify(ref err) => err.fmt(f),
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Toml(ref err) => err.fmt(f),
+            FlexiLoggerError::Parse(ref s) => f.write_str(s),
             FlexiLoggerError::Log(ref err) => err.fmt(f),
         }
     }
@@ -37,17 +46,22 @@ impl Error for FlexiLoggerError {
         match *self {
             FlexiLoggerError::BadDirectory => "not a directory", // ""
             FlexiLoggerError::Io(ref err) => err.description(),  // "Log cannot be written"
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Notify(ref err) => err.description(), // "Log cannot be written"
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Toml(ref err) => err.description(), // "Log cannot be written"
+            FlexiLoggerError::Parse(_) => "Error during parsing",
             FlexiLoggerError::Log(ref err) => err.description(), // "Logger initialization failed"
         }
     }
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            FlexiLoggerError::BadDirectory => None,
+            FlexiLoggerError::BadDirectory | FlexiLoggerError::Parse(_) => None,
             FlexiLoggerError::Io(ref err) => Some(err),
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Notify(ref err) => Some(err),
+            #[cfg(feature = "specfile")]
             FlexiLoggerError::Toml(ref err) => Some(err),
             FlexiLoggerError::Log(ref err) => Some(err),
         }
@@ -64,11 +78,13 @@ impl From<io::Error> for FlexiLoggerError {
         FlexiLoggerError::Io(err)
     }
 }
+#[cfg(feature = "specfile")]
 impl From<toml::de::Error> for FlexiLoggerError {
     fn from(err: toml::de::Error) -> FlexiLoggerError {
         FlexiLoggerError::Toml(err)
     }
 }
+#[cfg(feature = "specfile")]
 impl From<notify::Error> for FlexiLoggerError {
     fn from(err: notify::Error) -> FlexiLoggerError {
         FlexiLoggerError::Notify(err)
