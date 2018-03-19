@@ -1,6 +1,3 @@
-use writers::FileLogWriterBuilder;
-#[cfg(feature = "specfile")]
-use std::path::Path;
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 #[cfg(feature = "specfile")]
@@ -10,18 +7,16 @@ use std::time::Duration;
 #[cfg(feature = "specfile")]
 use std::thread;
 
-use writers::FileLogWriter;
 use FormatFunction;
-use super::formats;
-use flexi_error::FlexiLoggerError;
 use flexi_logger::{reconfiguration_handle, FlexiLogger, LogSpec};
-use primary_writer::PrimaryWriter;
+use {formats, FlexiLoggerError, LogSpecification};
 use log;
-use LogSpecification;
+use primary_writer::PrimaryWriter;
 use ReconfigurationHandle;
 use std::collections::HashMap;
-use writers::LogWriter;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
+use writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 
 /// The standard entry-point for using `flexi_logger`.
 ///
@@ -338,11 +333,26 @@ impl Logger {
     ///
     /// The implementation of this configuration method uses some additional crates
     /// that you might not want to depend on with your program if you don't use this functionality.
-    /// For that reason the method is only available if you activate the
+    /// For that reason the method requires to activate the
     /// `specfile` feature. See the [usage](index.html#usage) section for details.
     ///
-    #[cfg(feature = "specfile")]
+    /// Panics if called when the "specfile" feature is not used.
+    ///
     pub fn start_with_specfile<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
+        if cfg!(feature = "specfile") {
+            #[cfg(feature = "specfile")]
+            {
+                self.start_with_specfile_impl(specfile)?;
+            }
+        } else {
+            let _p = specfile;
+            panic!("Logger.start_with_specfile() requires the feature \"specfile\"");
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "specfile")]
+    fn start_with_specfile_impl<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
         let specfile = specfile.as_ref().to_owned();
         self.spec.ensure_specfile_is_valid(&specfile)?;
         let mut handle = self.start_reconfigurable()?;

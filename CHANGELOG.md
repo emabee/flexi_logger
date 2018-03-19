@@ -1,5 +1,9 @@
 # Change log for flexi_logger
 
+## [0.8.1] Expose `Logger.start_with_specfile()` always
+...and not only if the feature "specfile" is used - otherwise it does not appear 
+in the auto-generated docu (because it does not use --allfeatures)
+
 ## [0.8.0] Add specfile feature
 * Add a feature that allows to specify the LogSpecification via a file 
   that can be edited while the program is running

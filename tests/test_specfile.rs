@@ -1,15 +1,11 @@
-#[cfg(feature = "specfile")]
 extern crate flexi_logger;
-#[cfg(feature = "specfile")]
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "specfile")]
 use flexi_logger::{detailed_format, Logger};
-#[cfg(feature = "specfile")]
 use std::{fs, thread, time};
 
-#[cfg(feature = "specfile")]
+#[allow(dead_code)]
 #[cfg_attr(feature = "specfile", test)]
 fn test_specfile() {
     let specfile = "./tests/logspec.toml";
