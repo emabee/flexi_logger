@@ -341,7 +341,7 @@ impl LogSpecification {
         w.write_all(b"#global_pattern = 'foo'\n")?;
 
         w.write_all(
-            b"\n# Specific log levels per module are optionally defined in this section\n",
+            b"\n### Specific log levels per module are optionally defined in this section\n",
         )?;
         w.write_all(b"[modules]\n")?;
         if self.module_filters.is_empty() || self.module_filters[0].module_name.is_none() {

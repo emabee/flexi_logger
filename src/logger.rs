@@ -321,6 +321,40 @@ impl Logger {
     /// If the file does not exist, `flexi_logger` creates the file and fills it
     /// with the initial spec (and in the respective file format, of course).
     ///
+    /// ## Feature dependency
+    ///
+    /// The implementation of this configuration method uses some additional crates
+    /// that you might not want to depend on with your program if you don't use this functionality.
+    /// For that reason the method requires to activate the
+    /// `specfile` feature. See `flexi_logger`'s [usage](index.html#usage) section for details.
+    ///
+    /// The method panics if called when the "specfile" feature is not used.
+    ///
+    /// ## Usage
+    ///
+    /// A logger initialization like
+    ///
+    /// ```
+    ///     Logger::with_str("info")/*...*/.start_with_specfile("logspecification.toml");
+    /// ```
+    ///
+    /// will create the file `logspecification.toml` (if it does not yet exist) with this content:
+    ///
+    /// ```toml
+    /// ### Optional: Default log level
+    /// global_level = 'info'
+    /// ### Optional: specify a regular expression to suppress all messages that don't match
+    /// #global_pattern = 'foo'
+    ///
+    /// ### Specific log levels per module are optionally defined in this section
+    /// [modules]
+    /// #'mod1' = 'warn'
+    /// #'mod2' = 'debug'
+    /// #'mod2::mod3' = 'trace'
+    /// ```
+    ///
+    /// You can subsequently modify the file according to your needs, while the program is running.
+    ///
     /// Currently only toml-files are supported, the file suffix thus must be `.toml`.
     ///
     /// The initial spec remains valid if the file cannot be read.
@@ -330,13 +364,6 @@ impl Logger {
     /// If the file cannot be read anymore, e.g. because the format is not correct, the
     /// previous logspec remains active.
     /// If the file is corrected subsequently, the log spec update will work again.
-    ///
-    /// The implementation of this configuration method uses some additional crates
-    /// that you might not want to depend on with your program if you don't use this functionality.
-    /// For that reason the method requires to activate the
-    /// `specfile` feature. See the [usage](index.html#usage) section for details.
-    ///
-    /// Panics if called when the "specfile" feature is not used.
     ///
     pub fn start_with_specfile<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
         if cfg!(feature = "specfile") {

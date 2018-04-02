@@ -10,7 +10,8 @@ use std::{fs, thread, time};
 fn test_specfile() {
     let specfile = "./tests/logspec.toml";
     fs::remove_file(specfile).ok();
-    Logger::with_str("mod4 = warn, modddddd9 = warn, debug, moddddd8 = warn, moddd6 = warn")
+    // Logger::with_str("mod4 = warn, modddddd9 = warn, debug, moddddd8 = warn, moddd6 = warn")
+    Logger::with_str("info")
         .format(detailed_format)
         .start_with_specfile(specfile)
         .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
