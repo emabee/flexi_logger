@@ -10,7 +10,7 @@ use chrono::Local;
 use glob::glob;
 use std::cmp::max;
 use std::env;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::ops::Add;
 use std::path::Path;
@@ -22,6 +22,7 @@ struct FileLogWriterConfig {
     filename_base: String,
     suffix: String,
     use_timestamp: bool,
+    append: bool,
     rotate_over_size: Option<usize>,
     create_symlink: Option<String>,
 }
@@ -34,6 +35,7 @@ impl FileLogWriterConfig {
             filename_base: FileLogWriterConfig::get_filename_base(",", None),
             suffix: "log".to_string(),
             use_timestamp: true,
+            append: false,
             rotate_over_size: None,
             create_symlink: None,
         }
@@ -115,6 +117,13 @@ impl FileLogWriterBuilder {
         self
     }
 
+    /// Makes the logger append to the given file, if it exists; by default, the file would be
+    /// truncated.
+    pub fn append(mut self) -> FileLogWriterBuilder {
+        self.config.append = true;
+        self
+    }
+
     /// The specified String is added to the log file name.
     pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> FileLogWriterBuilder {
         self.discriminant = Some(discriminant.into());
@@ -180,6 +189,13 @@ impl FileLogWriterBuilder {
     /// is included into the filename.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
         self.config.rotate_over_size = rotate_over_size;
+        self
+    }
+
+    /// If append is set to true, makes the logger append to the given file, if it exists.
+    /// By default, or with false, the file would be truncated.
+    pub fn o_append(mut self, append: bool) -> FileLogWriterBuilder {
+        self.config.append = append;
         self
     }
 
@@ -355,7 +371,12 @@ fn get_linewriter(
         if let Some(ref link) = config.create_symlink {
             self::platform::create_symlink_if_possible(link, path);
         }
-        LineWriter::new(File::create(&path)?)
+        LineWriter::new(OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(config.append)
+            .truncate(!config.append)
+            .open(&path)?)
     };
     Ok((lw, filename))
 }

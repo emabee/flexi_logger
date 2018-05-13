@@ -151,7 +151,7 @@ impl Logger {
 
     /// Specifies a folder for the log files.
     ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
+    /// This parameter only has an effect if `log_to_file()` is used, too.
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
     pub fn directory<S: Into<String>>(mut self, directory: S) -> Logger {
@@ -161,7 +161,7 @@ impl Logger {
 
     /// Specifies a suffix for the log files.
     ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
+    /// This parameter only has an effect if `log_to_file()` is used, too.
     pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Logger {
         self.flwb = self.flwb.suffix(suffix);
         self
@@ -169,7 +169,7 @@ impl Logger {
 
     /// Makes the logger not include a timestamp into the names of the log files.
     ///
-    /// This option only has an effect if `log_to_file` is used, too.
+    /// This option only has an effect if `log_to_file()` is used, too.
     pub fn suppress_timestamp(mut self) -> Logger {
         self.flwb = self.flwb.suppress_timestamp();
         self
@@ -181,15 +181,25 @@ impl Logger {
     /// Also the filename pattern changes - instead of the timestamp,
     /// a serial number is included into the filename.
     ///
-    /// This option only has an effect if `log_to_file` is used, too.
+    /// This option only has an effect if `log_to_file()` is used, too.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
         self.flwb = self.flwb.rotate_over_size(rotate_over_size);
         self
     }
 
+    /// Makes the logger append to the specified output file, if it exists already;
+    /// by default, the file would be truncated.
+    ///
+    /// This option only has an effect if `log_to_file()` is used, too.
+    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+    pub fn append(mut self) -> Logger {
+        self.flwb = self.flwb.append();
+        self
+    }
+
     /// The specified String is added to the log file name after the program name.
     ///
-    /// This option only has an effect if `log_to_file` is used, too.
+    /// This option only has an effect if `log_to_file()` is used, too.
     pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Logger {
         self.flwb = self.flwb.discriminant(discriminant);
         self
@@ -198,7 +208,7 @@ impl Logger {
     /// The specified String will be used on linux systems to create in the current folder
     /// a symbolic link to the current log file.
     ///
-    /// This option only has an effect if `log_to_file` is used, too.
+    /// This option only has an effect if `log_to_file()` is used, too.
     pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> Logger {
         self.flwb = self.flwb.create_symlink(symlink);
         self
@@ -334,7 +344,8 @@ impl Logger {
     ///
     /// A logger initialization like
     ///
-    /// ```
+    /// ```ignore
+    /// use flexi_logger::Logger;
     ///     Logger::with_str("info")/*...*/.start_with_specfile("logspecification.toml");
     /// ```
     ///
@@ -353,7 +364,8 @@ impl Logger {
     /// #'mod2::mod3' = 'trace'
     /// ```
     ///
-    /// You can subsequently modify the file according to your needs, while the program is running.
+    /// You can subsequently edit and modify the file according to your needs,
+    /// while the program is running, and it will immediately take your changes into account.
     ///
     /// Currently only toml-files are supported, the file suffix thus must be `.toml`.
     ///
@@ -471,7 +483,7 @@ impl Logger {
 
     /// Specifies a folder for the log files.
     ///
-    /// This parameter only has an effect if log_to_file is set to true.
+    /// This parameter only has an effect if `log_to_file` is set to true.
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
     pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> Logger {
@@ -480,13 +492,14 @@ impl Logger {
     }
 
     /// With true, makes the logger include a timestamp into the names of the log files.
-    /// (log_to_file must be chosen, too).
+    ///
+    /// This parameter only has an effect if `log_to_file` is set to true.
     pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
         self.flwb = self.flwb.o_timestamp(timestamp);
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
+    /// This option only has an effect if `log_to_file` is set to true.
     ///
     /// By default, and with None, the log file will grow indefinitely.
     /// If a size is set, when the log file reaches or exceeds the specified size,
@@ -498,7 +511,19 @@ impl Logger {
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
+    /// This option only has an effect if `log_to_file` is set to true.
+    ///
+    /// If append is set to true, makes the logger append to the specified output file, if it exists.
+    /// By default, or with false, the file would be truncated.
+    ///
+    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+
+    pub fn o_append(mut self, append: bool) -> Logger {
+        self.flwb = self.flwb.o_append(append);
+        self
+    }
+
+    /// This option only has an effect if `log_to_file` is set to true.
     ///
     /// The specified String is added to the log file name.
     pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Logger {
@@ -506,7 +531,7 @@ impl Logger {
         self
     }
 
-    /// This option only has an effect if log_to_file is used, too.
+    /// This option only has an effect if `log_to_file` is set to true.
     ///
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
