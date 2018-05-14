@@ -1,6 +1,8 @@
 # Change log for flexi_logger
 
-## [0.8.2] Docu updates
+## [0.8.3] Make append() also work for rotating log files
+
+## [0.8.2] Add option to append to existing log files, rather than always truncating them
 
 ## [0.8.1] Expose `Logger.start_with_specfile()` always
 ...and not only if the feature "specfile" is used - otherwise it does not appear 

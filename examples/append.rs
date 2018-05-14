@@ -9,6 +9,7 @@ fn main() {
         .format(detailed_format)
         .print_message()
         .log_to_file()
+        .rotate_over_size(1_000)
         .append()
         .suppress_timestamp()
         .start()

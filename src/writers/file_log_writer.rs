@@ -23,7 +23,7 @@ struct FileLogWriterConfig {
     suffix: String,
     use_timestamp: bool,
     append: bool,
-    rotate_over_size: Option<usize>,
+    rotate_over_size: Option<u64>,
     create_symlink: Option<String>,
 }
 impl FileLogWriterConfig {
@@ -113,7 +113,7 @@ impl FileLogWriterBuilder {
     /// Also the filename pattern changes - instead of the timestamp,
     /// a serial number is included into the filename.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
-        self.config.rotate_over_size = Some(rotate_over_size);
+        self.config.rotate_over_size = Some(rotate_over_size as u64);
         self
     }
 
@@ -188,7 +188,7 @@ impl FileLogWriterBuilder {
     /// Also the filename pattern changes - instead of the timestamp a serial number
     /// is included into the filename.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
-        self.config.rotate_over_size = rotate_over_size;
+        self.config.rotate_over_size = rotate_over_size.map(|r| r as u64);
         self
     }
 
@@ -219,7 +219,7 @@ impl FileLogWriterBuilder {
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
     lw: LineWriter<File>,
-    written_bytes: usize,
+    written_bytes: u64,
     rotate_idx: u32,
     current_path: String,
 }
@@ -227,24 +227,100 @@ impl FileLogWriterState {
     fn new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
         let rotate_idx = match config.rotate_over_size {
             None => 0,
-            Some(_) => get_next_rotate_idx(&config.filename_base, &config.suffix),
+            Some(_) => {
+                let rotate_idx = get_highest_rotate_idx(&config.filename_base, &config.suffix);
+                if config.append {
+                    rotate_idx
+                } else {
+                    rotate_idx + 1
+                }
+            }
         };
 
-        let (lw, current_path) = get_linewriter(rotate_idx, config)?;
+        let (lw, written_bytes, current_path) = get_linewriter(rotate_idx, config)?;
         Ok(FileLogWriterState {
             lw,
             current_path,
-            written_bytes: 0,
+            written_bytes,
             rotate_idx,
         })
     }
 
-    fn mount_linewriter(&mut self, config: &FileLogWriterConfig) -> Result<(), FlexiLoggerError> {
-        let (lw, cp) = get_linewriter(self.rotate_idx, config)?;
+    fn mount_next_linewriter(
+        &mut self,
+        config: &FileLogWriterConfig,
+    ) -> Result<(), FlexiLoggerError> {
+        self.rotate_idx += 1;
+        self.written_bytes = 0;
+        let (lw, wb, cp) = get_linewriter(self.rotate_idx, config)?;
         self.lw = lw;
+        self.written_bytes = wb;
         self.current_path = cp;
         Ok(())
     }
+}
+
+fn get_linewriter(
+    rotate_idx: u32,
+    config: &FileLogWriterConfig,
+) -> Result<(LineWriter<File>, u64, String), FlexiLoggerError> {
+    let filename = config.get_filename(rotate_idx);
+    let (lw, wb) = {
+        let path = Path::new(&filename);
+        if config.print_message {
+            println!("Log is written to {}", &path.display());
+        }
+        if let Some(ref link) = config.create_symlink {
+            self::platform::create_symlink_if_possible(link, path);
+        }
+        (
+            LineWriter::new(OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(config.append)
+                .truncate(!config.append)
+                .open(&path)?),
+            if config.append {
+                let metadata = fs::metadata(&filename)?;
+                metadata.len()
+            } else {
+                0
+            },
+        )
+    };
+    Ok((lw, wb, filename))
+}
+
+fn get_highest_rotate_idx(filename_base: &str, suffix: &str) -> u32 {
+    let mut rotate_idx = 0;
+    let fn_pattern = String::with_capacity(180)
+        .add(filename_base)
+        .add("_r*")
+        .add(".")
+        .add(suffix);
+    match glob(&fn_pattern) {
+        Err(e) => {
+            eprintln!(
+                "Is this ({}) really a directory? Listing failed with {}",
+                fn_pattern, e
+            );
+        }
+        Ok(globresults) => for globresult in globresults {
+            match globresult {
+                Err(e) => eprintln!(
+                    "Error occured when reading directory for log files: {:?}",
+                    e
+                ),
+                Ok(pathbuf) => {
+                    let filename = pathbuf.file_stem().unwrap().to_string_lossy();
+                    let mut it = filename.rsplit("_r");
+                    let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
+                    rotate_idx = max(rotate_idx, idx);
+                }
+            }
+        },
+    }
+    rotate_idx
 }
 
 /// A configurable `LogWriter` that writes to a file or, if rotation is used, a sequence of files.
@@ -299,11 +375,11 @@ impl LogWriter for FileLogWriter {
         // switch to next file if necessary
         if let Some(rotate_over_size) = self.config.rotate_over_size {
             if state.written_bytes > rotate_over_size {
-                state.written_bytes = 0;
-                state.rotate_idx += 1;
-                state.mount_linewriter(&self.config).unwrap_or_else(|e| {
-                    eprintln!("FlexiLogger: opening file failed with {}", e);
-                });
+                state
+                    .mount_next_linewriter(&self.config)
+                    .unwrap_or_else(|e| {
+                        eprintln!("FlexiLogger: opening file failed with {}", e);
+                    });
             }
         }
 
@@ -315,7 +391,7 @@ impl LogWriter for FileLogWriter {
             eprintln!("FlexiLogger: write access to file failed with {}", e);
         });
         if self.config.rotate_over_size.is_some() {
-            state.written_bytes += msgb.len();
+            state.written_bytes += msgb.len() as u64;
         }
     }
 
@@ -324,61 +400,6 @@ impl LogWriter for FileLogWriter {
         let mut state = guard.borrow_mut();
         state.lw.flush().ok();
     }
-}
-
-fn get_next_rotate_idx(filename_base: &str, suffix: &str) -> u32 {
-    let mut rotate_idx = 0;
-    let fn_pattern = String::with_capacity(180)
-        .add(filename_base)
-        .add("_r*")
-        .add(".")
-        .add(suffix);
-    match glob(&fn_pattern) {
-        Err(e) => {
-            eprintln!(
-                "Is this ({}) really a directory? Listing failed with {}",
-                fn_pattern, e
-            );
-        }
-        Ok(globresults) => for globresult in globresults {
-            match globresult {
-                Err(e) => eprintln!(
-                    "Error occured when reading directory for log files: {:?}",
-                    e
-                ),
-                Ok(pathbuf) => {
-                    let filename = pathbuf.file_stem().unwrap().to_string_lossy();
-                    let mut it = filename.rsplit("_r");
-                    let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
-                    rotate_idx = max(rotate_idx, idx);
-                }
-            }
-        },
-    }
-    rotate_idx + 1
-}
-
-fn get_linewriter(
-    rotate_idx: u32,
-    config: &FileLogWriterConfig,
-) -> Result<(LineWriter<File>, String), FlexiLoggerError> {
-    let filename = config.get_filename(rotate_idx);
-    let lw = {
-        let path = Path::new(&filename);
-        if config.print_message {
-            println!("Log is written to {}", &path.display());
-        }
-        if let Some(ref link) = config.create_symlink {
-            self::platform::create_symlink_if_possible(link, path);
-        }
-        LineWriter::new(OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(config.append)
-            .truncate(!config.append)
-            .open(&path)?)
-    };
-    Ok((lw, filename))
 }
 
 mod platform {
