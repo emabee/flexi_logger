@@ -1,5 +1,7 @@
 # Change log for flexi_logger
 
+## [0.8.4] Add flexi_logger to category `development-tools::debugging`
+
 ## [0.8.3] Make append() also work for rotating log files
 
 ## [0.8.2] Add option to append to existing log files, rather than always truncating them

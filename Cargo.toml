@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.8.3"
+version = "0.8.4"
 authors = ["emabee <meinolf.block@sap.com>"]
 description = """
 A logger that writes logs to stderr or to a fresh file, \
@@ -9,6 +9,7 @@ It allows custom logline formats, and it allows changing the log specification a
 It also allows defining additional log streams, e.g. for alert or security messages.\
 """
 keywords = ["file", "logger"]
+categories = ["development-tools::debugging"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/emabee/flexi_logger"
 
