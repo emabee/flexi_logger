@@ -1,6 +1,4 @@
-use std::io::Write;
 use flexi_error::FlexiLoggerError;
-use LevelFilter;
 use log;
 use regex::Regex;
 #[cfg(feature = "specfile")]
@@ -8,15 +6,17 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
 #[cfg(feature = "specfile")]
-use std::fs;
-#[cfg(feature = "specfile")]
 use std::ffi::OsStr;
 #[cfg(feature = "specfile")]
+use std::fs;
+#[cfg(feature = "specfile")]
 use std::io::Read;
+use std::io::Write;
 #[cfg(feature = "specfile")]
 use std::path::{Path, PathBuf};
 #[cfg(feature = "specfile")]
 use toml;
+use LevelFilter;
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -108,7 +108,7 @@ impl LogSpecification {
             );
             return LogSpecification::default(LevelFilter::Off).finalize();
         }
-        mods.map(|m| {
+        if let Some(m) = mods {
             for s in m.split(',') {
                 let s = s.trim();
                 if s.is_empty() {
@@ -120,8 +120,8 @@ impl LogSpecification {
                         (Some(part0), None, None) => {
                             if contains_dash(part0) {
                                 println!(
-                                    "warning: invalid part in logging spec '{}', contains a dash, \
-                                     ignoring it",
+                                    "warning: ignoring invalid part in logging spec '{}' \
+                                     (contains a dash)",
                                     part0
                                 );
                                 continue;
@@ -136,8 +136,8 @@ impl LogSpecification {
                         (Some(part0), Some(""), None) => {
                             if contains_dash(part0) {
                                 println!(
-                                    "warning: invalid part in logging spec '{}', contains a dash, \
-                                     ignoring it",
+                                    "warning: ignoring invalid part in logging spec '{}' \
+                                     (contains a dash)",
                                     part0
                                 );
                                 continue;
@@ -148,8 +148,8 @@ impl LogSpecification {
                         (Some(part0), Some(part1), None) => {
                             if contains_dash(part0) {
                                 println!(
-                                    "warning: invalid part in logging spec '{}', contains a dash, \
-                                     ignoring it",
+                                    "warning: ignoring invalid part in logging spec '{}' \
+                                     (contains a dash)",
                                     part0
                                 );
                                 continue;
@@ -175,7 +175,7 @@ impl LogSpecification {
                     level_filter: log_level,
                 });
             }
-        });
+        }
 
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(re),
@@ -365,12 +365,10 @@ impl LogSpecification {
 
     /// Creates a LogSpecBuilder, setting the default log level.
     pub fn default(level_filter: LevelFilter) -> LogSpecBuilder {
-        LogSpecBuilder::from_module_filters(&[
-            ModuleFilter {
-                module_name: None,
-                level_filter,
-            },
-        ])
+        LogSpecBuilder::from_module_filters(&[ModuleFilter {
+            module_name: None,
+            level_filter,
+        }])
     }
 
     /// Provides a reference to the module filters.
@@ -525,8 +523,8 @@ impl LevelSort for Vec<ModuleFilter> {
 #[cfg(test)]
 mod tests {
     extern crate log;
-    use {LogSpecBuilder, LogSpecification};
     use log::{Level, LevelFilter};
+    use {LogSpecBuilder, LogSpecification};
 
     #[test]
     fn specfile() {

@@ -1,23 +1,23 @@
-use FormatFunction;
 use formats::default_format;
-use std::sync::Mutex;
-use std::cell::RefCell;
-use writers::log_writer::LogWriter;
 use log::Record;
+use writers::log_writer::LogWriter;
 use FlexiLoggerError;
+use FormatFunction;
 
 use chrono::Local;
 use glob::glob;
+use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, LineWriter, Write};
-use std::ops::Add;
+use std::io::{self, BufRead, BufReader, LineWriter, Write};
+use std::ops::{Add, DerefMut};
 use std::path::Path;
+use std::sync::Mutex;
 
 // The immutable configuration of a FileLogWriter.
 struct FileLogWriterConfig {
-    format: fn(&Record) -> String,
+    format: FormatFunction,
     print_message: bool,
     filename_base: String,
     suffix: String,
@@ -219,6 +219,7 @@ impl FileLogWriterBuilder {
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
     lw: LineWriter<File>,
+    rotate_over: bool,
     written_bytes: u64,
     rotate_idx: u32,
     current_path: String,
@@ -243,6 +244,7 @@ impl FileLogWriterState {
             current_path,
             written_bytes,
             rotate_idx,
+            rotate_over: config.rotate_over_size.is_some(),
         })
     }
 
@@ -257,6 +259,22 @@ impl FileLogWriterState {
         self.written_bytes = wb;
         self.current_path = cp;
         Ok(())
+    }
+}
+
+impl Write for FileLogWriterState {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.lw.write_all(buf)?;
+        if self.rotate_over {
+            self.written_bytes += buf.len() as u64;
+        };
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.lw.flush()
     }
 }
 
@@ -360,18 +378,33 @@ impl FileLogWriter {
         for tuple in expected {
             line.clear();
             reader.read_line(&mut line).unwrap();
-            assert!(line.contains(&tuple.0));
-            assert!(line.contains(&tuple.1));
-            assert!(line.contains(&tuple.2));
+            assert!(
+                line.contains(&tuple.0),
+                "Did not find tuple.0 = {}",
+                tuple.0
+            );
+            assert!(
+                line.contains(&tuple.1),
+                "Did not find tuple.1 = {}",
+                tuple.1
+            );
+            assert!(
+                line.contains(&tuple.2),
+                "Did not find tuple.2 = {}",
+                tuple.2
+            );
         }
         false
     }
 }
 
 impl LogWriter for FileLogWriter {
-    fn write(&self, record: &Record) {
-        let guard = self.state.lock().unwrap();
-        let mut state = guard.borrow_mut();
+    #[inline]
+    fn write(&self, record: &Record) -> io::Result<()> {
+        let guard = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
+        let mut state = guard.borrow_mut(); // : RefMut<FileLogWriterState>
+        let state = state.deref_mut(); // : &mut FileLogWriterState
+
         // switch to next file if necessary
         if let Some(rotate_over_size) = self.config.rotate_over_size {
             if state.written_bytes > rotate_over_size {
@@ -383,22 +416,15 @@ impl LogWriter for FileLogWriter {
             }
         }
 
-        let mut msg = (self.config.format)(record);
-        msg.push('\n');
-        let msgb = msg.as_bytes();
-        // write out the message
-        state.lw.write_all(msgb).unwrap_or_else(|e| {
-            eprintln!("FlexiLogger: write access to file failed with {}", e);
-        });
-        if self.config.rotate_over_size.is_some() {
-            state.written_bytes += msgb.len() as u64;
-        }
+        (self.config.format)(state, record)?;
+        state.write_all(b"\n")
     }
 
-    fn flush(&self) {
+    #[inline]
+    fn flush(&self) -> io::Result<()> {
         let guard = self.state.lock().unwrap();
         let mut state = guard.borrow_mut();
-        state.lw.flush().ok();
+        state.lw.flush()
     }
 }
 

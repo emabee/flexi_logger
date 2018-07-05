@@ -1,8 +1,11 @@
-use FormatFunction;
 use log;
 use log::Record;
+use std::io;
+use std::io::Write;
+
 use writers::FileLogWriter;
 use writers::LogWriter;
+use FormatFunction;
 
 // Writes either to stderr or to a file.
 #[allow(unknown_lints)]
@@ -24,7 +27,7 @@ impl PrimaryWriter {
     }
 
     // Write out a log line.
-    pub fn write(&self, record: &Record) {
+    pub fn write(&self, record: &Record) -> io::Result<()> {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.write(record),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.write(record),
@@ -32,7 +35,7 @@ impl PrimaryWriter {
     }
 
     // Flush any buffered records.
-    pub fn flush(&self) {
+    pub fn flush(&self) -> io::Result<()> {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.flush(),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.flush(),
@@ -53,10 +56,15 @@ pub struct StdErrWriter {
 }
 
 impl StdErrWriter {
-    fn write(&self, record: &Record) {
-        eprintln!("{}", (self.format)(record));
+    #[inline]
+    fn write(&self, record: &Record) -> io::Result<()> {
+        write_to_stderr(self.format, record)
     }
-    fn flush(&self) {}
+
+    #[inline]
+    fn flush(&self) -> io::Result<()> {
+        io::stderr().flush()
+    }
 }
 
 /// `ExtendedFileWriter` writes logs to stderr or to a `FileLogWriter`, and in the latter case
@@ -71,18 +79,25 @@ impl ExtendedFileWriter {
         self.w.validate_logs(expected)
     }
 
-    fn write(&self, record: &Record) {
+    fn write(&self, record: &Record) -> io::Result<()> {
         if self.duplicate_error && record.level() == log::Level::Error
             || self.duplicate_info
                 && (record.level() == log::Level::Error || record.level() == log::Level::Warn
                     || record.level() == log::Level::Info)
         {
-            println!("{}", (self.w.format())(record));
+            write_to_stderr(self.w.format(), record)?;
         }
-        self.w.write(record);
+        self.w.write(record)
     }
 
-    fn flush(&self) {
-        self.w.flush();
+    fn flush(&self) -> io::Result<()> {
+        self.w.flush()?;
+        io::stderr().flush()
     }
+}
+
+#[inline]
+fn write_to_stderr(f: FormatFunction, record: &Record) -> io::Result<()> {
+    (f)(&mut io::stderr(), record)?;
+    io::stderr().write_all(b"\n")
 }

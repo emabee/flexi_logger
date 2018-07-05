@@ -2,8 +2,10 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{detailed_format, Logger, Record};
 use flexi_logger::writers::{FileLogWriter, LogWriter};
+use flexi_logger::{detailed_format, Logger, Record};
+
+use std::io;
 use std::sync::Arc;
 
 #[macro_use]
@@ -74,10 +76,10 @@ impl SecWriter {
     }
 }
 impl LogWriter for SecWriter {
-    fn write(&self, record: &Record) {
-        self.0.write(record);
+    fn write(&self, record: &Record) -> io::Result<()> {
+        self.0.write(record)
     }
-    fn flush(&self) {
+    fn flush(&self) -> io::Result<()> {
         self.0.flush()
     }
 }

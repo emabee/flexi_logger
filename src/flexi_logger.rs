@@ -1,10 +1,9 @@
-use log;
-use LogSpecification;
 use primary_writer::PrimaryWriter;
 use writers::LogWriter;
+use LogSpecification;
 
+use log;
 use regex::Regex;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -13,85 +12,16 @@ pub enum LogSpec {
     DYNAMIC(Arc<RwLock<LogSpecification>>),
 }
 
-// Does the logging in the background, is normally not used directly.
+// Implements log::Log to plug into the log crate.
 //
-// This struct is only used explicitly when you want to allow supporting multiple `FlexiLogger`
-// instances in a single process.
+// Delegates the real logging to the configured PrimaryWriter and optionally to other writers.
+// The `PrimaryWriter` is either a `StdErrWriter` or an `ExtendedFileWriter`.
+// An ExtendedFileWriter logs to a file, by delegating to a FileWriter,
+// and can additionally duplicate log lines to stderr.
 pub struct FlexiLogger {
     log_specification: LogSpec,
     primary_writer: Arc<PrimaryWriter>,
     other_writers: HashMap<String, Box<LogWriter>>,
-}
-
-/// Allows reconfiguring the logger while it is in use
-/// (see [`Logger::start_reconfigurable()`](struct.Logger.html#method.start_reconfigurable) ).
-///
-/// # Example
-///
-/// The following example shows how to use the reconfigurability feature.
-///
-/// ```rust
-/// extern crate log;
-/// extern crate flexi_logger;
-/// use flexi_logger::{Logger, LogSpecBuilder};
-/// use log::LevelFilter;
-///
-/// fn main() {
-///     // Build the initial log specification
-///     let mut builder = LogSpecBuilder::new();  // default is LevelFilter::Off
-///     builder.default(LevelFilter::Info);
-///     builder.module("karl", LevelFilter::Debug);
-///
-///     // Initialize Logger, keep builder alive
-///     let mut logger_reconf_handle = Logger::with(builder.build())
-///         // your logger configuration goes here, as usual
-///         .start_reconfigurable()
-///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-///
-///     // ...
-///
-///     // Modify builder and update the logger
-///     builder.default(LevelFilter::Error);
-///     builder.remove("karl");
-///     builder.module("emma", LevelFilter::Trace);
-///
-///     logger_reconf_handle.set_new_spec(builder.build());
-///
-///     // ...
-/// }
-/// ```
-pub struct ReconfigurationHandle {
-    spec: Arc<RwLock<LogSpecification>>,
-    primary_writer: Arc<PrimaryWriter>,
-}
-impl ReconfigurationHandle {
-    /// Allows specifying a new LogSpecification for the current logger.
-    pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        guard.reconfigure(new_spec);
-    }
-
-    /// Allows specifying a new LogSpecification for the current logger.
-    pub fn parse_new_spec(&mut self, spec: &str) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        guard.reconfigure(LogSpecification::parse(spec));
-    }
-
-    #[doc(hidden)]
-    /// Allows checking the logs written so far to the writer
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
-    }
-}
-
-pub fn reconfiguration_handle(
-    spec: Arc<RwLock<LogSpecification>>,
-    primary_writer: Arc<PrimaryWriter>,
-) -> ReconfigurationHandle {
-    ReconfigurationHandle {
-        spec,
-        primary_writer,
-    }
 }
 
 impl FlexiLogger {
@@ -137,7 +67,12 @@ impl log::Log for FlexiLogger {
                     match self.other_writers.get(t) {
                         None => eprintln!("bad writer spec: {}", t),
                         Some(writer) => {
-                            writer.write(record);
+                            writer.write(record).unwrap_or_else(|e| {
+                                eprintln!(
+                                    "FlexiLogger: writing log line to custom_writer failed with {}",
+                                    e
+                                );
+                            });
                         }
                     }
                 }
@@ -172,13 +107,22 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        self.primary_writer.write(record);
+        self.primary_writer.write(record).unwrap_or_else(|e| {
+            eprintln!(
+                "FlexiLogger: writing log line to primary_writer failed with {}",
+                e
+            );
+        });
     }
 
     fn flush(&self) {
-        self.primary_writer.flush();
+        self.primary_writer.flush().unwrap_or_else(|e| {
+            eprintln!("FlexiLogger: flushing primary_writer failed with {}", e);
+        });
         for writer in self.other_writers.values() {
-            writer.flush();
+            writer.flush().unwrap_or_else(|e| {
+                eprintln!("FlexiLogger: flushing custom_writer failed with {}", e);
+            });
         }
     }
 }

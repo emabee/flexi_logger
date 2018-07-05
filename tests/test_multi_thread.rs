@@ -9,7 +9,7 @@ use flexi_logger::{LogSpecification, Logger, Record};
 use glob::glob;
 
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{self, BufRead, BufReader};
 use std::ops::Add;
 use std::thread::{self, JoinHandle};
 use std::time;
@@ -103,8 +103,9 @@ fn define_directory() -> String {
     )
 }
 
-fn test_format(record: &Record) -> String {
-    format!(
+pub fn test_format(w: &mut io::Write, record: &Record) -> io::Result<()> {
+    write!(
+        w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
         Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         thread::current().name().unwrap_or("<unnamed>"),
