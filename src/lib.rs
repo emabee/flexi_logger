@@ -52,7 +52,7 @@ pub use flexi_error::FlexiLoggerError;
 pub use formats::*;
 pub use log::{Level, LevelFilter, Record};
 pub use log_specification::{LogSpecBuilder, LogSpecification};
-pub use logger::Logger;
+pub use logger::{Duplicate, Logger};
 pub use reconfiguration_handle::ReconfigurationHandle;
 
 use std::io;

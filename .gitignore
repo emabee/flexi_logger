@@ -1,3 +1,4 @@
+examples/_*
 target
 Cargo.lock
 *.alerts

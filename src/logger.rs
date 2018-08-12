@@ -22,18 +22,30 @@ use {formats, FlexiLoggerError, LogSpecification};
 
 /// The entry-point for using `flexi_logger`.
 ///
+/// A simple example with file logging might look like this:
+///
+/// ```rust
+/// use flexi_logger::{Duplicate,Logger};
+///
+/// Logger::with_str("info, mycrate = debug")
+///         .log_to_file()
+///         .duplicate_to_stderr(Duplicate::Warn)
+///         .start()
+///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+///
+/// ```
+///
+///
 /// `Logger` is a builder class that allows you to
 /// * specify your desired (initial) loglevel-specification
-///
 ///   * either programmatically as a String
-///    (see [`Logger::with_str()`](struct.Logger.html#method.with_str))
+///    ([`Logger::with_str()`](struct.Logger.html#method.with_str))
 ///   * or by providing a String in the environment
-///    (see [`Logger::with_env()`](struct.Logger.html#method.with_env)),
+///    ([`Logger::with_env()`](struct.Logger.html#method.with_env)),
 ///   * or by combining both options
-///    (see [`Logger::with_env_or_str()`](struct.Logger.html#method.with_env_or_str)),
+///    ([`Logger::with_env_or_str()`](struct.Logger.html#method.with_env_or_str)),
 ///   * or by building a `LogSpecification` programmatically
-///    (see [`Logger::with()`](struct.Logger.html#method.with)),
-///
+///    ([`Logger::with()`](struct.Logger.html#method.with)),
 /// * use the desired configuration methods,
 /// * and finally start the logger with
 ///
@@ -44,8 +56,7 @@ use {formats, FlexiLoggerError, LogSpecification};
 pub struct Logger {
     spec: LogSpecification,
     log_to_file: bool,
-    duplicate_error: bool,
-    duplicate_info: bool,
+    duplicate: Duplicate,
     format: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<LogWriter>>,
@@ -60,8 +71,7 @@ impl Logger {
         Logger {
             spec: logspec,
             log_to_file: false,
-            duplicate_error: false,
-            duplicate_info: false,
+            duplicate: Duplicate::None,
             format: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<LogWriter>>::new(),
@@ -93,7 +103,8 @@ impl Logger {
     /// If started this way, the logger cannot be influenced anymore while the program is running.
     /// This is what you want in most of the cases.
     pub fn start(mut self) -> Result<(), FlexiLoggerError> {
-        let max = self.spec
+        let max = self
+            .spec
             .module_filters()
             .iter()
             .map(|d| d.level_filter)
@@ -104,11 +115,7 @@ impl Logger {
             LogSpec::STATIC(self.spec),
             Arc::new(if self.log_to_file {
                 self.flwb = self.flwb.format(self.format);
-                PrimaryWriter::file(
-                    self.duplicate_error,
-                    self.duplicate_info,
-                    self.flwb.instantiate()?,
-                )
+                PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
             } else {
                 PrimaryWriter::stderr(self.format)
             }),
@@ -191,11 +198,7 @@ impl Logger {
 
         let primary_writer = Arc::new(if self.log_to_file {
             self.flwb = self.flwb.format(self.format);
-            PrimaryWriter::file(
-                self.duplicate_error,
-                self.duplicate_info,
-                self.flwb.instantiate()?,
-            )
+            PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
         } else {
             PrimaryWriter::stderr(self.format)
         });
@@ -343,15 +346,23 @@ impl Logger {
         self
     }
 
-    /// Makes the logger write all logged error messages additionally to stdout.
-    pub fn duplicate_error(mut self) -> Logger {
-        self.duplicate_error = true;
+    /// Makes the logger write messages with the specified minimum severity additionally to stderr.
+    pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Logger {
+        self.duplicate = dup;
         self
     }
 
-    /// Makes the logger write all logged error, warning, and info messages additionally to stdout.
+    /// Makes the logger write all logged error messages additionally to stderr.
+    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
+    pub fn duplicate_error(mut self) -> Logger {
+        self.duplicate = Duplicate::Error;
+        self
+    }
+
+    /// Makes the logger write all logged error, warning, and info messages additionally to stderr.
+    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
     pub fn duplicate_info(mut self) -> Logger {
-        self.duplicate_info = true;
+        self.duplicate = Duplicate::Info;
         self
     }
 
@@ -460,16 +471,28 @@ impl Logger {
         self
     }
 
-    /// With true, makes the logger write all logged error messages additionally to stdout.
+    /// With true, makes the logger write all logged error messages additionally to stderr;
+    /// with false, no messages are duplicated.
+    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
     pub fn o_duplicate_error(mut self, duplicate_error: bool) -> Logger {
-        self.duplicate_error = duplicate_error;
+        if duplicate_error {
+            self.duplicate = Duplicate::Error;
+        } else {
+            self.duplicate = Duplicate::None;
+        }
         self
     }
 
     /// With true, makes the logger write all logged error, warning,
-    /// and info messages additionally to stdout.
+    /// and info messages additionally to stderr;
+    /// with false, no messages are duplicated.
+    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
     pub fn o_duplicate_info(mut self, duplicate_info: bool) -> Logger {
-        self.duplicate_info = duplicate_info;
+        if duplicate_info {
+            self.duplicate = Duplicate::Info;
+        } else {
+            self.duplicate = Duplicate::None;
+        }
         self
     }
 
@@ -531,4 +554,22 @@ impl Logger {
         self.flwb = self.flwb.o_create_symlink(symlink);
         self
     }
+}
+
+/// Used to control which messages are to be duplicated to stderr, when log_to_file() is used.
+pub enum Duplicate {
+    /// No messages are duplicated.
+    None,
+    /// Only error messages are duplicated.
+    Error,
+    /// Error and warn messages are duplicated.
+    Warn,
+    /// Error, warn, and info messages are duplicated.
+    Info,
+    /// Error, warn, info, and debug messages are duplicated.
+    Debug,
+    /// All messages are duplicated.
+    Trace,
+    /// All messages are duplicated.
+    All,
 }

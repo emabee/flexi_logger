@@ -5,7 +5,7 @@ extern crate glob;
 extern crate log;
 
 use chrono::Local;
-use flexi_logger::{LogSpecification, Logger, Record};
+use flexi_logger::{Duplicate, LogSpecification, Logger, Record};
 use glob::glob;
 
 use std::fs::File;
@@ -29,7 +29,7 @@ fn multi_threaded() {
     let mut reconf_handle = Logger::with_str("info")
         .log_to_file()
         .format(test_format)
-        .duplicate_error()
+        .duplicate_to_stderr(Duplicate::Error)
         .directory(directory.clone())
         .rotate_over_size(ROTATE_OVER_SIZE)
         .start_reconfigurable()

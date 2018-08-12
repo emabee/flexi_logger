@@ -1,5 +1,6 @@
 use log;
 use log::Record;
+use logger::Duplicate;
 use std::io;
 use std::io::Write;
 
@@ -15,12 +16,8 @@ pub enum PrimaryWriter {
     ExtendedFileWriter(ExtendedFileWriter),
 }
 impl PrimaryWriter {
-    pub fn file(duplicate_error: bool, duplicate_info: bool, w: FileLogWriter) -> PrimaryWriter {
-        PrimaryWriter::ExtendedFileWriter(ExtendedFileWriter {
-            duplicate_error,
-            duplicate_info,
-            w,
-        })
+    pub fn file(duplicate: Duplicate, w: FileLogWriter) -> PrimaryWriter {
+        PrimaryWriter::ExtendedFileWriter(ExtendedFileWriter { duplicate, w })
     }
     pub fn stderr(format: FormatFunction) -> PrimaryWriter {
         PrimaryWriter::StdErrWriter(StdErrWriter { format })
@@ -68,10 +65,9 @@ impl StdErrWriter {
 }
 
 /// `ExtendedFileWriter` writes logs to stderr or to a `FileLogWriter`, and in the latter case
-/// can duplicate some messages to stdout.
+/// can duplicate messages to stderr.
 pub struct ExtendedFileWriter {
-    duplicate_error: bool,
-    duplicate_info: bool,
+    duplicate: Duplicate,
     w: FileLogWriter,
 }
 impl ExtendedFileWriter {
@@ -80,11 +76,14 @@ impl ExtendedFileWriter {
     }
 
     fn write(&self, record: &Record) -> io::Result<()> {
-        if self.duplicate_error && record.level() == log::Level::Error
-            || self.duplicate_info
-                && (record.level() == log::Level::Error || record.level() == log::Level::Warn
-                    || record.level() == log::Level::Info)
-        {
+        if match self.duplicate {
+            Duplicate::Error => record.level() == log::Level::Error,
+            Duplicate::Warn => record.level() <= log::Level::Warn,
+            Duplicate::Info => record.level() <= log::Level::Info,
+            Duplicate::Debug => record.level() <= log::Level::Debug,
+            Duplicate::Trace | Duplicate::All => true,
+            Duplicate::None => false,
+        } {
             write_to_stderr(self.w.format(), record)?;
         }
         self.w.write(record)
