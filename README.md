@@ -3,9 +3,9 @@ A flexible and easy-to-use logger that writes logs to stderr and/or to files.
 
 # Usage
 Add flexi_logger to the dependencies section in your project's `Cargo.toml`, with
-```
+```toml
 [dependencies]
-flexi_logger = "0.9"
+flexi_logger = "^0.9.2"
 log = "0.4"
 ```
 

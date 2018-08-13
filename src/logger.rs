@@ -412,7 +412,10 @@ impl Logger {
     ///
     /// This option only has an effect if `log_to_file()` is used, too.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
-        self.flwb = self.flwb.rotate_over_size(rotate_over_size);
+        self.flwb = self
+            .flwb
+            .rotate_over_size(rotate_over_size)
+            .o_timestamp(false);
         self
     }
 
@@ -506,14 +509,6 @@ impl Logger {
         self
     }
 
-    /// With true, makes the logger include a timestamp into the names of the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
-    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
-        self.flwb = self.flwb.o_timestamp(timestamp);
-        self
-    }
-
     /// This option only has an effect if `log_to_file` is set to true.
     ///
     /// By default, and with None, the log file will grow indefinitely.
@@ -522,7 +517,20 @@ impl Logger {
     /// Also the filename pattern changes - instead of the timestamp a serial number
     /// is included into the filename.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
-        self.flwb = self.flwb.o_rotate_over_size(rotate_over_size);
+        self.flwb = self
+            .flwb
+            .o_rotate_over_size(rotate_over_size)
+            .o_timestamp(rotate_over_size.is_none());
+        self
+    }
+
+    /// With true, makes the logger include a timestamp into the names of the log files.
+    /// `true` is the default, but `rotate_over_size` sets it to `false`.
+    /// With this method you can set it to `true` again.
+    ///
+    /// This parameter only has an effect if `log_to_file` is set to true.
+    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
+        self.flwb = self.flwb.o_timestamp(timestamp);
         self
     }
 

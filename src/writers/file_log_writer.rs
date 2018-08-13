@@ -19,7 +19,7 @@ use std::sync::Mutex;
 struct FileLogWriterConfig {
     format: FormatFunction,
     print_message: bool,
-    filename_base: String,
+    filename_base: Option<String>,
     suffix: String,
     use_timestamp: bool,
     append: bool,
@@ -32,7 +32,7 @@ impl FileLogWriterConfig {
         FileLogWriterConfig {
             format: default_format,
             print_message: false,
-            filename_base: FileLogWriterConfig::get_filename_base(",", None),
+            filename_base: None,
             suffix: "log".to_string(),
             use_timestamp: true,
             append: false,
@@ -41,21 +41,23 @@ impl FileLogWriterConfig {
         }
     }
 
-    fn get_filename_base(dir: &str, o_discriminant: Option<String>) -> String {
-        let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
-        let progname = Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy();
-        let mut filename = String::with_capacity(180).add(dir).add("/").add(&progname);
-        if let Some(discriminant) = o_discriminant {
-            filename = filename.add(&format!("_{}", discriminant));
+    fn set_filename_base(&mut self, dir: &str, o_discriminant: Option<String>) {
+        if self.filename_base.is_none() {
+            let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
+            let progname = Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy();
+            let mut filename = String::with_capacity(180).add(dir).add("/").add(&progname);
+            if let Some(discriminant) = o_discriminant {
+                filename = filename.add(&format!("_{}", discriminant));
+            }
+            if self.use_timestamp {
+                filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
+            };
+            self.filename_base = Some(filename);
         }
-        filename
     }
 
     fn get_filename(&self, rotate_idx: u32) -> String {
-        let mut filename = String::with_capacity(180).add(&self.filename_base);
-        if self.use_timestamp {
-            filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
-        };
+        let mut filename = String::with_capacity(180).add(self.filename_base.as_ref().unwrap());
         if self.rotate_over_size.is_some() {
             filename = filename.add(&format!("_r{:0>5}", rotate_idx))
         };
@@ -114,6 +116,7 @@ impl FileLogWriterBuilder {
     /// a serial number is included into the filename.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
         self.config.rotate_over_size = Some(rotate_over_size as u64);
+        self.config.use_timestamp = false;
         self
     }
 
@@ -147,8 +150,8 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::BadDirectory);
         };
 
-        self.config.filename_base =
-            FileLogWriterConfig::get_filename_base(&s_directory, self.discriminant);
+        self.config
+            .set_filename_base(&s_directory, self.discriminant);
         Ok(FileLogWriter {
             state: Mutex::new(RefCell::new(FileLogWriterState::new(&self.config)?)),
             config: self.config,
@@ -177,8 +180,8 @@ impl FileLogWriterBuilder {
     }
 
     /// With true, makes the FileLogWriterBuilder include a timestamp into the names of the log files.
-    pub fn o_timestamp(mut self, timestamp: bool) -> FileLogWriterBuilder {
-        self.config.use_timestamp = timestamp;
+    pub fn o_timestamp(mut self, use_timestamp: bool) -> FileLogWriterBuilder {
+        self.config.use_timestamp = use_timestamp;
         self
     }
 
@@ -189,6 +192,7 @@ impl FileLogWriterBuilder {
     /// is included into the filename.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
         self.config.rotate_over_size = rotate_over_size.map(|r| r as u64);
+        self.config.use_timestamp = false;
         self
     }
 
@@ -229,7 +233,8 @@ impl FileLogWriterState {
         let rotate_idx = match config.rotate_over_size {
             None => 0,
             Some(_) => {
-                let rotate_idx = get_highest_rotate_idx(&config.filename_base, &config.suffix);
+                let rotate_idx =
+                    get_highest_rotate_idx(config.filename_base.as_ref().unwrap(), &config.suffix);
                 if config.append {
                     rotate_idx
                 } else {
@@ -292,12 +297,14 @@ fn get_linewriter(
             self::platform::create_symlink_if_possible(link, path);
         }
         (
-            LineWriter::new(OpenOptions::new()
-                .write(true)
-                .create(true)
-                .append(config.append)
-                .truncate(!config.append)
-                .open(&path)?),
+            LineWriter::new(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(config.append)
+                    .truncate(!config.append)
+                    .open(&path)?,
+            ),
             if config.append {
                 let metadata = fs::metadata(&filename)?;
                 metadata.len()
@@ -318,10 +325,7 @@ fn get_highest_rotate_idx(filename_base: &str, suffix: &str) -> u32 {
         .add(suffix);
     match glob(&fn_pattern) {
         Err(e) => {
-            eprintln!(
-                "Is this ({}) really a directory? Listing failed with {}",
-                fn_pattern, e
-            );
+            eprintln!("Listing files with ({}) failed with {}", fn_pattern, e);
         }
         Ok(globresults) => for globresult in globresults {
             match globresult {
