@@ -407,7 +407,7 @@ impl Logger {
     /// By default, the log file will grow indefinitely.
     /// With this option, when the log file reaches or exceeds the specified file size,
     /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes - instead of the timestamp,
+    /// Also the filename pattern changes: instead of the timestamp,
     /// a serial number is included into the filename.
     ///
     /// The size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
@@ -517,10 +517,10 @@ impl Logger {
     /// By default, and with None, the log file will grow indefinitely.
     /// If a size is set, when the log file reaches or exceeds the specified size,
     /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes - instead of the timestamp a serial number
+    /// Also the filename pattern changes: instead of the timestamp, a serial number
     /// is included into the filename.
     ///
-    /// The size is given in bytes, e.g. `o_rotate_over_size(1_000)` will rotate
+    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
     /// files once they reach a size of 1 kB.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
         self.flwb = self
