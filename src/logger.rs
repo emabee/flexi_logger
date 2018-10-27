@@ -410,6 +410,9 @@ impl Logger {
     /// Also the filename pattern changes - instead of the timestamp,
     /// a serial number is included into the filename.
     ///
+    /// The size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
+    /// files once they reach a size of 1 kB.
+    ///
     /// This option only has an effect if `log_to_file()` is used, too.
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
         self.flwb = self
@@ -516,6 +519,9 @@ impl Logger {
     /// the file will be closed and a new file will be opened.
     /// Also the filename pattern changes - instead of the timestamp a serial number
     /// is included into the filename.
+    ///
+    /// The size is given in bytes, e.g. `o_rotate_over_size(1_000)` will rotate
+    /// files once they reach a size of 1 kB.
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
         self.flwb = self
             .flwb
