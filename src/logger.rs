@@ -10,15 +10,16 @@ use std::thread;
 use std::time::Duration;
 
 use flexi_logger::{FlexiLogger, LogSpec};
-use log;
 use primary_writer::PrimaryWriter;
 use reconfiguration_handle::reconfiguration_handle;
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use FormatFunction;
 use ReconfigurationHandle;
 use {formats, FlexiLoggerError, LogSpecification};
+
+use log;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// The entry-point for using `flexi_logger`.
 ///
@@ -55,6 +56,7 @@ use {formats, FlexiLoggerError, LogSpecification};
 ///
 pub struct Logger {
     spec: LogSpecification,
+    parse_errs: Option<Vec<String>>,
     log_to_file: bool,
     duplicate: Duplicate,
     format: FormatFunction,
@@ -68,8 +70,30 @@ impl Logger {
     /// Creates a Logger that you provide with an explicit LogSpecification.
     /// By default, logs are written with `default_format` to `stderr`.
     pub fn with(logspec: LogSpecification) -> Logger {
+        Logger::from_spec_and_errs(logspec, None)
+    }
+
+    /// Creates a Logger that reads the LogSpecification from a String or &str.
+    /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
+    pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
+        Logger::from_result(LogSpecification::parse(s.as_ref()))
+    }
+
+    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG.
+    pub fn with_env() -> Logger {
+        Logger::from_result(LogSpecification::env())
+    }
+
+    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG,
+    /// or derives it from the given String, if RUST_LOG is not set.
+    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
+        Logger::from_result(LogSpecification::env_or_parse(s))
+    }
+
+    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<Vec<String>>) -> Logger {
         Logger {
-            spec: logspec,
+            spec,
+            parse_errs,
             log_to_file: false,
             duplicate: Duplicate::None,
             format: formats::default_format,
@@ -78,21 +102,16 @@ impl Logger {
         }
     }
 
-    /// Creates a Logger that reads the LogSpecification from a String or &str.
-    /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
-    pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
-        Logger::with(LogSpecification::parse(s.as_ref()))
-    }
-
-    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG.
-    pub fn with_env() -> Logger {
-        Logger::with(LogSpecification::env())
-    }
-
-    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG,
-    /// or derives it from the given String, if RUST_LOG is not set.
-    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
-        Logger::with(LogSpecification::env_or_parse(s))
+    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Logger {
+        match result {
+            Ok(logspec) => Logger::from_spec_and_errs(logspec, None),
+            Err(e) => match e {
+                FlexiLoggerError::Parse(parse_errs, logspec) => {
+                    Logger::from_spec_and_errs(logspec, Some(parse_errs))
+                }
+                _ => Logger::from_spec_and_errs(LogSpecification::off(), None),
+            },
+        }
     }
 }
 
@@ -330,6 +349,35 @@ impl Logger {
 
 /// Simple methods for influencing the behavior of the Logger.
 impl Logger {
+    /// Allows verifying that no parsing errors have occured in the used factory method,
+    /// and examining the parse error.
+    ///
+    /// The factory methods `Logger::with_str()`, `Logger::with_env()`,
+    /// and `Logger::with_env_or_str()`,
+    /// parse a log specification String, and deduce from it a `LogSpecification` object.
+    /// Parsing errors are reported to stdout, but effectively ignored; in worst case, a
+    /// LogSpecification might be used that turns off logging completely!
+    ///
+    /// This method gives programmatic access to parse errors, if there were any.
+    ///
+    /// In the following example we just panic if the spec was not free of errors:
+    ///
+    /// ```rust
+    /// # use flexi_logger::Logger;
+    /// # let some_log_spec_string = "hello";
+    /// Logger::with_str(some_log_spec_string)
+    /// .check_parser_error()
+    /// .unwrap()
+    /// .log_to_file()
+    /// .start();
+    /// ```
+    pub fn check_parser_error(self) -> Result<Logger, FlexiLoggerError> {
+        match self.parse_errs {
+            Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
+            None => Ok(self),
+        }
+    }
+
     /// Makes the logger write all logs to a file, rather than to stderr.
     ///
     /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',

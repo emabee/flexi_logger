@@ -1,11 +1,12 @@
 use log;
+use log_specification::LogSpecification;
 #[cfg(feature = "specfile")]
 use notify;
-#[cfg(feature = "specfile")]
-use toml;
+use std::error::Error;
 use std::fmt;
 use std::io;
-use std::error::Error;
+#[cfg(feature = "specfile")]
+use toml;
 
 /// Describes errors in the initialization of `flexi_logger`.
 #[derive(Debug)]
@@ -20,8 +21,10 @@ pub enum FlexiLoggerError {
     /// The configured logspec file cannot be read
     #[cfg(feature = "specfile")]
     Toml(toml::de::Error),
+    /// Invalid level filter
+    LevelFilter(String),
     /// Some error occured during parsing
-    Parse(String),
+    Parse(Vec<String>, LogSpecification),
     /// Logger initialization failed.
     Log(log::SetLoggerError),
 }
@@ -30,13 +33,20 @@ impl fmt::Display for FlexiLoggerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             FlexiLoggerError::BadDirectory => Ok(()),
-            FlexiLoggerError::Io(ref err) => err.fmt(f),
+            FlexiLoggerError::Io(ref err) => fmt::Display::fmt(err, f),
+            FlexiLoggerError::LevelFilter(ref s) => f.write_str(s),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Notify(ref err) => err.fmt(f),
+            FlexiLoggerError::Notify(ref err) => fmt::Display::fmt(err, f),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Toml(ref err) => err.fmt(f),
-            FlexiLoggerError::Parse(ref s) => f.write_str(s),
-            FlexiLoggerError::Log(ref err) => err.fmt(f),
+            FlexiLoggerError::Toml(ref err) => fmt::Display::fmt(err, f),
+            FlexiLoggerError::Parse(ref vec, ref logspec) => {
+                for s in vec {
+                    f.write_str(&format!("parse error: \'{}\', ", s))?;
+                }
+                f.write_str(&format!("resulting logspec: {:?}", logspec))?;
+                Ok(())
+            }
+            FlexiLoggerError::Log(ref err) => fmt::Display::fmt(err, f),
         }
     }
 }
@@ -44,20 +54,23 @@ impl fmt::Display for FlexiLoggerError {
 impl Error for FlexiLoggerError {
     fn description(&self) -> &str {
         match *self {
-            FlexiLoggerError::BadDirectory => "not a directory", // ""
-            FlexiLoggerError::Io(ref err) => err.description(),  // "Log cannot be written"
+            FlexiLoggerError::BadDirectory => "not a directory",
+            FlexiLoggerError::Io(ref err) => err.description(),
+            FlexiLoggerError::LevelFilter(_) => "invalid level filter",
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Notify(ref err) => err.description(), // "Log cannot be written"
+            FlexiLoggerError::Notify(ref err) => err.description(),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Toml(ref err) => err.description(), // "Log cannot be written"
-            FlexiLoggerError::Parse(_) => "Error during parsing",
-            FlexiLoggerError::Log(ref err) => err.description(), // "Logger initialization failed"
+            FlexiLoggerError::Toml(ref err) => err.description(),
+            FlexiLoggerError::Parse(_, _) => "Error during parsing",
+            FlexiLoggerError::Log(ref err) => err.description(),
         }
     }
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            FlexiLoggerError::BadDirectory | FlexiLoggerError::Parse(_) => None,
+            FlexiLoggerError::BadDirectory
+            | FlexiLoggerError::LevelFilter(_)
+            | FlexiLoggerError::Parse(_, _) => None,
             FlexiLoggerError::Io(ref err) => Some(err),
             #[cfg(feature = "specfile")]
             FlexiLoggerError::Notify(ref err) => Some(err),

@@ -39,15 +39,15 @@ use LevelFilter;
 ///
 ///   * `"info"`: all logs with info, warn, or error level are written
 ///   * `"crate1"`: all logs of this crate are written, but nothing else
-///   * `"warn, crate2::mod_a=debug, mod_x::mod_y=trace"`: all crates log warnings and erors,
-///     `mod_a` additional debug messages, and `mod_x::mod_y` is fully traced
+///   * `"warn, crate2::mod_a=debug, mod_x::mod_y=trace"`: all crates log warnings and errors,
+///     `mod_a` additionally debug messages, and `mod_x::mod_y` is fully traced
 ///
 /// * If you just specify the module, without `log_level`, all levels will be traced for this
 ///   module.
 /// * If you just specify a log level, this will be applied as default to all modules without
 ///   explicit log level assigment.
 ///   (You see that for modules named error, warn, info, debug or trace,
-///   it is necessary to specify their loglevel explicit).
+///   it is necessary to specify their loglevel explicitly).
 /// * The module names are compared as Strings, with the side effect that a specified module filter
 ///   affects all modules whose name starts with this String.<br>
 ///   Example: ```"foo"``` affects e.g.
@@ -62,7 +62,7 @@ use LevelFilter;
 /// Note that external module names are to be specified like in ```"extern crate ..."```, i.e.,
 /// for crates with a dash in their name this means: the dash is to be replaced with
 /// the underscore (e.g. ```karl_heinz```, not ```karl-heinz```).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
     textfilter: Option<Regex>,
@@ -76,8 +76,7 @@ pub struct ModuleFilter {
 }
 
 impl LogSpecification {
-    #[doc(hidden)]
-    pub fn reconfigure(&mut self, other_spec: LogSpecification) {
+    pub(crate) fn reconfigure(&mut self, other_spec: LogSpecification) {
         self.module_filters = other_spec.module_filters;
         self.textfilter = other_spec.textfilter;
     }
@@ -94,19 +93,25 @@ impl LogSpecification {
         false
     }
 
+    /// Returns a `LogSpecification` where all traces are switched off.
+    pub fn off() -> LogSpecification {
+        Default::default()
+    }
+
     /// Returns a log specification from a String.
-    pub fn parse(spec: &str) -> LogSpecification {
+    pub fn parse(spec: &str) -> Result<LogSpecification, FlexiLoggerError> {
+        let mut parse_errs = Vec::<String>::new();
         let mut dirs = Vec::<ModuleFilter>::new();
 
         let mut parts = spec.split('/');
         let mods = parts.next();
         let filter = parts.next();
         if parts.next().is_some() {
-            println!(
-                "warning: invalid logging spec '{}', ignoring it (too many '/'s)",
-                spec
+            push_err(
+                format!("invalid log spec '{}' (too many '/'s), ignoring it", spec),
+                &mut parse_errs,
             );
-            return LogSpecification::default(LevelFilter::Off).finalize();
+            return parse_err(parse_errs, LogSpecification::off());
         }
         if let Some(m) = mods {
             for s in m.split(',') {
@@ -118,55 +123,41 @@ impl LogSpecification {
                 let (log_level, name) =
                     match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
                         (Some(part0), None, None) => {
-                            if contains_dash(part0) {
-                                println!(
-                                    "warning: ignoring invalid part in logging spec '{}' \
-                                     (contains a dash)",
-                                    part0
-                                );
+                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
                                 continue;
                             }
                             // if the single argument is a log-level string or number,
-                            // treat that as a global fallback
-                            match part0.trim().parse() {
+                            // treat that as a global fallback setting
+                            match parse_level_filter(part0.trim()) {
                                 Ok(num) => (num, None),
                                 Err(_) => (LevelFilter::max(), Some(part0)),
                             }
                         }
+
                         (Some(part0), Some(""), None) => {
-                            if contains_dash(part0) {
-                                println!(
-                                    "warning: ignoring invalid part in logging spec '{}' \
-                                     (contains a dash)",
-                                    part0
-                                );
+                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
                                 continue;
                             }
-
                             (LevelFilter::max(), Some(part0))
                         }
+
                         (Some(part0), Some(part1), None) => {
-                            if contains_dash(part0) {
-                                println!(
-                                    "warning: ignoring invalid part in logging spec '{}' \
-                                     (contains a dash)",
-                                    part0
-                                );
+                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
                                 continue;
                             }
-                            match part1.trim().parse() {
+                            match parse_level_filter(part1.trim()) {
                                 Ok(num) => (num, Some(part0.trim())),
-                                _ => {
-                                    println!(
-                                        "warning: invalid part in logging spec '{}', ignoring it",
-                                        part1
-                                    );
+                                Err(e) => {
+                                    push_err(e.to_string(), &mut parse_errs);
                                     continue;
                                 }
                             }
                         }
                         _ => {
-                            println!("warning: invalid part in logging spec '{}', ignoring it", s);
+                            push_err(
+                                format!("invalid part in log spec '{}', ignoring it", s),
+                                &mut parse_errs,
+                            );
                             continue;
                         }
                     };
@@ -180,29 +171,37 @@ impl LogSpecification {
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
-                println!("warning: invalid regex filter - {}", e);
+                push_err(format!("invalid regex filter - {}", e), &mut parse_errs);
                 None
             }
         });
 
-        LogSpecification {
+        let logspec = LogSpecification {
             module_filters: dirs.level_sort(),
             textfilter,
+        };
+
+        if parse_errs.is_empty() {
+            Ok(logspec)
+        } else {
+            Err(FlexiLoggerError::Parse(parse_errs, logspec))
         }
     }
 
     /// Returns a log specification based on the value of the environment variable RUST_LOG,
     /// or an empty one.
-    pub fn env() -> LogSpecification {
+    pub fn env() -> Result<LogSpecification, FlexiLoggerError> {
         match env::var("RUST_LOG") {
             Ok(spec) => LogSpecification::parse(&spec),
-            Err(..) => LogSpecification::default(LevelFilter::Off).finalize(),
+            Err(..) => Ok(LogSpecification::off()),
         }
     }
 
     /// Returns a log specification based on the value of the environment variable RUST_LOG,
     /// or on the given String.
-    pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> LogSpecification {
+    pub fn env_or_parse<S: AsRef<str>>(
+        given_spec: S,
+    ) -> Result<LogSpecification, FlexiLoggerError> {
         match env::var("RUST_LOG") {
             Ok(spec) => LogSpecification::parse(&spec),
             Err(..) => LogSpecification::parse(given_spec.as_ref()),
@@ -217,10 +216,12 @@ impl LogSpecification {
             .extension()
             .unwrap_or_else(|| OsStr::new(""))
             .to_str()
-            .unwrap_or("") != "toml"
+            .unwrap_or("")
+            != "toml"
         {
             return Err(FlexiLoggerError::Parse(
-                "only files with suffix toml are supported".to_owned(),
+                vec!["only files with suffix toml are supported".to_owned()],
+                LogSpecification::off(),
             ));
         }
 
@@ -283,6 +284,7 @@ impl LogSpecification {
         }
 
         let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
+        let mut parse_errs = Vec::<String>::new();
         let mut module_filters = Vec::<ModuleFilter>::new();
 
         if let Some(s) = logspec_ff.global_level {
@@ -304,16 +306,21 @@ impl LogSpecification {
             Some(s) => match Regex::new(&s) {
                 Ok(re) => Some(re),
                 Err(e) => {
-                    println!("warning: invalid regex filter - {}", e);
+                    push_err(format!("invalid regex filter - {}", e), &mut parse_errs);
                     None
                 }
             },
         };
 
-        Ok(LogSpecification {
+        let logspec = LogSpecification {
             module_filters: module_filters.level_sort(),
             textfilter,
-        })
+        };
+        if parse_errs.is_empty() {
+            Ok(logspec)
+        } else {
+            Err(FlexiLoggerError::Parse(parse_errs, logspec))
+        }
     }
 
     /// Serializes itself in toml format
@@ -382,7 +389,19 @@ impl LogSpecification {
     }
 }
 
-#[cfg(feature = "specfile")]
+fn push_err(s: String, parse_errs: &mut Vec<String>) {
+    println!("flexi_logger warning: {}", s);
+    parse_errs.push(s);
+}
+
+fn parse_err(
+    errors: Vec<String>,
+    logspec: LogSpecification,
+) -> Result<LogSpecification, FlexiLoggerError> {
+    Err(FlexiLoggerError::Parse(errors, logspec))
+}
+
+// #[cfg(feature = "specfile")]
 fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerError> {
     Ok(match s.as_ref().to_lowercase().as_ref() {
         "off" => LevelFilter::Off,
@@ -392,7 +411,7 @@ fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerErr
         "debug" => LevelFilter::Debug,
         "trace" => LevelFilter::Trace,
         _ => {
-            return Err(FlexiLoggerError::Parse(format!(
+            return Err(FlexiLoggerError::LevelFilter(format!(
                 "unknown level filter: {}",
                 s.as_ref()
             )))
@@ -400,8 +419,18 @@ fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerErr
     })
 }
 
-fn contains_dash(s: &str) -> bool {
-    s.find('-') != None
+fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
+    let result = s.find('-').is_some() || s.find(' ').is_some() || s.find('\t').is_some();
+    if result {
+        push_err(
+            format!(
+                "ignoring invalid part in log spec '{}' (contains a dash)",
+                s
+            ),
+            parse_errs,
+        );
+    }
+    result
 }
 
 /// Builder for `LogSpecification`.
@@ -493,12 +522,12 @@ trait IntoVecModuleFilter {
 }
 impl IntoVecModuleFilter for HashMap<Option<String>, LevelFilter> {
     fn into_vec_module_filter(self) -> Vec<ModuleFilter> {
-        let mf: Vec<ModuleFilter> = self.into_iter()
+        let mf: Vec<ModuleFilter> = self
+            .into_iter()
             .map(|(k, v)| ModuleFilter {
                 module_name: k,
                 level_filter: v,
-            })
-            .collect();
+            }).collect();
         mf.level_sort()
     }
 }

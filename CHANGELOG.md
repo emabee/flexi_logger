@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2018-10-30
+
+`LogSpecification::parse()` now returns a `Result<LogSpecification, FlexiLoggerError>`, rather than
+a log spec directly (-> version bump).
+This enables a more reliable usage of FlexiLogger in non-trivial cases.
+
+For the sake of compatibility for the normal usecases, the Logger methods `with_str()` etc.
+remain unchanged. An extra method is added to retrieve parser errors, if desired.
+
 ## [0.9.3] - 2018-10-27
 
 Docu improvement.

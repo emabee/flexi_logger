@@ -1,5 +1,6 @@
 use log_specification::LogSpecification;
 use primary_writer::PrimaryWriter;
+
 use std::borrow::Borrow;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -55,7 +56,8 @@ impl ReconfigurationHandle {
     /// Allows specifying a new LogSpecification for the current logger.
     pub fn parse_new_spec(&mut self, spec: &str) {
         let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        guard.reconfigure(LogSpecification::parse(spec));
+        guard
+            .reconfigure(LogSpecification::parse(spec).unwrap_or_else(|_| LogSpecification::off()));
     }
 
     #[doc(hidden)]

@@ -39,7 +39,10 @@ impl PrimaryWriter {
         }
     }
 
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
+    pub(crate) fn validate_logs(
+        &self,
+        expected: &[(&'static str, &'static str, &'static str)],
+    ) -> bool {
         match *self {
             PrimaryWriter::StdErrWriter(_) => false,
             PrimaryWriter::ExtendedFileWriter(ref w) => w.validate_logs(expected),

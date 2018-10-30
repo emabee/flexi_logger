@@ -35,18 +35,17 @@ fn multi_threaded() {
         .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     error!(
-        "create a huge number of log lines with a significant number of threads, verify the log"
+        "create a huge number of log lines with a considerable number of threads, verify the log"
     );
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
-    let new_spec = LogSpecification::parse("debug");
+    let new_spec = LogSpecification::parse("debug").unwrap();
     thread::Builder::new()
         .spawn(move || {
             thread::sleep(time::Duration::from_millis(1000));
             reconf_handle.set_new_spec(new_spec);
             0 as u8
-        })
-        .unwrap();
+        }).unwrap();
 
     wait_for_workers_to_close(worker_handles);
 
@@ -70,8 +69,7 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
                 .spawn(move || {
                     do_work(thread_number);
                     0 as u8
-                })
-                .unwrap(),
+                }).unwrap(),
         );
     }
     trace!("All {} worker threads started.", worker_handles.len());

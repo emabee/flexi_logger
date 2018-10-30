@@ -2,16 +2,16 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use std::env;
 use flexi_logger::{default_format, LogSpecification, Logger};
 
+use std::env;
 use std::fs::File;
-use std::path::Path;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 #[test]
 fn test_textfilter() {
-    let logspec = LogSpecification::parse("info/Hello");
+    let logspec = LogSpecification::parse("info/Hello").unwrap();
     Logger::with(logspec)
         .format(default_format)
         .print_message()
