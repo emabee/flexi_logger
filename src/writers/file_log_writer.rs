@@ -1,8 +1,8 @@
-use formats::default_format;
+use crate::formats::default_format;
+use crate::writers::log_writer::LogWriter;
+use crate::FlexiLoggerError;
+use crate::FormatFunction;
 use log::Record;
-use writers::log_writer::LogWriter;
-use FlexiLoggerError;
-use FormatFunction;
 
 use chrono::Local;
 use glob::glob;
@@ -172,7 +172,7 @@ impl FileLogWriterBuilder {
         };
 
         Ok(FileLogWriter {
-            state: Mutex::new(RefCell::new(FileLogWriterState::new(&self.config)?)),
+            state: Mutex::new(RefCell::new(FileLogWriterState::try_new(&self.config)?)),
             config: self.config,
         })
     }
@@ -252,7 +252,7 @@ struct FileLogWriterState {
 }
 impl FileLogWriterState {
     // If rotate, the logger writes into a file with infix `_rCURRENT`.
-    fn new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
+    fn try_new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
         let rotate_idx = match config.rotate_over_size {
             None => None,
             Some(_) => Some({

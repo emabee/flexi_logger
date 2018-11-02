@@ -12,30 +12,28 @@
 //! * support changing the log specification on the fly, while the program is running,
 //!
 //! `flexi_logger` uses a similar syntax as [`env_logger`](http://crates.io/crates/env_logger/)
-//! for specifying which logs should really be written.
+//! for specifying which logs should really be written (but is more graceful with the syntax,
+//! and can provide error information).
 //!
 //! See [Logger](struct.Logger.html) for a full description of all configuration options,
 //! and the [writers](writers/index.html) module for the usage of additional log writers.
 //!
 //! See [the homepage](https://crates.io/crates/flexi_logger) for how to get started.
 
-extern crate chrono;
-extern crate glob;
-#[cfg_attr(feature = "specfile", macro_use)]
-extern crate log;
-extern crate regex;
+// #[cfg_attr(feature = "specfile", macro_use)]
+// extern crate log;
 
-#[cfg(feature = "specfile")]
-extern crate notify;
-#[cfg(feature = "specfile")]
-extern crate serde;
+// #[cfg(feature = "specfile")]
+// extern crate notify;
+// #[cfg(feature = "specfile")]
+// extern crate serde;
 
-#[cfg(feature = "specfile")]
-#[macro_use]
-extern crate serde_derive;
+// #[cfg(feature = "specfile")]
+// #[macro_use]
+// extern crate serde_derive;
 
-#[cfg(feature = "specfile")]
-extern crate toml;
+// #[cfg(feature = "specfile")]
+// extern crate toml;
 
 mod flexi_error;
 mod flexi_logger;
@@ -48,12 +46,13 @@ mod reconfiguration_handle;
 pub mod writers;
 
 /// Re-exports from log crate
-pub use flexi_error::FlexiLoggerError;
-pub use formats::*;
 pub use log::{Level, LevelFilter, Record};
-pub use log_specification::{LogSpecBuilder, LogSpecification};
-pub use logger::{Duplicate, Logger};
-pub use reconfiguration_handle::ReconfigurationHandle;
+
+pub use crate::flexi_error::FlexiLoggerError;
+pub use crate::formats::*;
+pub use crate::log_specification::{LogSpecBuilder, LogSpecification};
+pub use crate::logger::{Duplicate, Logger};
+pub use crate::reconfiguration_handle::ReconfigurationHandle;
 
 use std::io;
 

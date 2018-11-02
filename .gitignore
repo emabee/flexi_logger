@@ -3,6 +3,7 @@ target
 Cargo.lock
 *.alerts
 *.log
+*.seclog
 link_to_log
 log_files
 todo

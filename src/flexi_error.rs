@@ -1,5 +1,5 @@
+use crate::log_specification::LogSpecification;
 use log;
-use log_specification::LogSpecification;
 #[cfg(feature = "specfile")]
 use notify;
 use std::error::Error;

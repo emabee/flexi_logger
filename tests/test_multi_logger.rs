@@ -1,4 +1,3 @@
-extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
@@ -18,7 +17,8 @@ mod macros {
     }
 }
 
-fn main() {
+#[test]
+fn test() {
     // more complex just to support validation:
     let (sec_writer, sec_handle) = SecWriter::new();
     let log_handle = Logger::with_str("info")

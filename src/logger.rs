@@ -1,25 +1,24 @@
+use log;
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::collections::HashMap;
 #[cfg(feature = "specfile")]
 use std::path::Path;
 #[cfg(feature = "specfile")]
 use std::sync::mpsc::channel;
+use std::sync::{Arc, RwLock};
 #[cfg(feature = "specfile")]
 use std::thread;
 #[cfg(feature = "specfile")]
 use std::time::Duration;
 
-use flexi_logger::{FlexiLogger, LogSpec};
-use primary_writer::PrimaryWriter;
-use reconfiguration_handle::reconfiguration_handle;
-use writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
-use FormatFunction;
-use ReconfigurationHandle;
-use {formats, FlexiLoggerError, LogSpecification};
-
-use log;
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use crate::flexi_logger::{FlexiLogger, LogSpec};
+use crate::primary_writer::PrimaryWriter;
+use crate::reconfiguration_handle::reconfiguration_handle;
+use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
+use crate::FormatFunction;
+use crate::ReconfigurationHandle;
+use crate::{formats, FlexiLoggerError, LogSpecification};
 
 /// The entry-point for using `flexi_logger`.
 ///

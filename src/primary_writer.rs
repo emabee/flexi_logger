@@ -1,16 +1,14 @@
 use log;
 use log::Record;
-use logger::Duplicate;
-use std::io;
-use std::io::Write;
+use std::io::{self, Write};
 
-use writers::FileLogWriter;
-use writers::LogWriter;
-use FormatFunction;
+use crate::logger::Duplicate;
+use crate::writers::FileLogWriter;
+use crate::writers::LogWriter;
+use crate::FormatFunction;
 
 // Writes either to stderr or to a file.
-#[allow(unknown_lints)]
-#[allow(large_enum_variant)]
+#[allow(clippy::large_enum_variant)]
 pub enum PrimaryWriter {
     StdErrWriter(StdErrWriter),
     ExtendedFileWriter(ExtendedFileWriter),
@@ -77,6 +75,7 @@ pub struct ExtendedFileWriter {
     file_log_writer: FileLogWriter,
 }
 impl ExtendedFileWriter {
+    #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
         self.file_log_writer.validate_logs(expected)
     }

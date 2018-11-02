@@ -1,5 +1,5 @@
-use log_specification::LogSpecification;
-use primary_writer::PrimaryWriter;
+use crate::log_specification::LogSpecification;
+use crate::primary_writer::PrimaryWriter;
 
 use std::borrow::Borrow;
 use std::sync::Arc;
@@ -60,8 +60,8 @@ impl ReconfigurationHandle {
             .reconfigure(LogSpecification::parse(spec).unwrap_or_else(|_| LogSpecification::off()));
     }
 
-    #[doc(hidden)]
     /// Allows checking the logs written so far to the writer
+    #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
         Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
     }

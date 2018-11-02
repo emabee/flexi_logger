@@ -1,6 +1,6 @@
-use primary_writer::PrimaryWriter;
-use writers::LogWriter;
-use LogSpecification;
+use crate::primary_writer::PrimaryWriter;
+use crate::writers::LogWriter;
+use crate::LogSpecification;
 
 use log;
 use regex::Regex;

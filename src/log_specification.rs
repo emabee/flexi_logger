@@ -1,4 +1,6 @@
-use flexi_error::FlexiLoggerError;
+use crate::flexi_error::FlexiLoggerError;
+use crate::LevelFilter;
+
 use log;
 use regex::Regex;
 #[cfg(feature = "specfile")]
@@ -16,7 +18,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "specfile")]
 use toml;
-use LevelFilter;
 
 ///
 /// Immutable struct that defines which loglines are to be written,

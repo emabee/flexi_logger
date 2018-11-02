@@ -2,6 +2,7 @@
 name = "flexi_logger"
 version = "0.10.2"
 authors = ["emabee <meinolf.block@sap.com>"]
+edition = "2018"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/emabee/flexi_logger"
