@@ -16,8 +16,11 @@ pub enum PrimaryWriter {
     ExtendedFileWriter(ExtendedFileWriter),
 }
 impl PrimaryWriter {
-    pub fn file(duplicate: Duplicate, w: FileLogWriter) -> PrimaryWriter {
-        PrimaryWriter::ExtendedFileWriter(ExtendedFileWriter { duplicate, w })
+    pub fn file(duplicate: Duplicate, file_log_writer: FileLogWriter) -> PrimaryWriter {
+        PrimaryWriter::ExtendedFileWriter(ExtendedFileWriter {
+            duplicate,
+            file_log_writer,
+        })
     }
     pub fn stderr(format: FormatFunction) -> PrimaryWriter {
         PrimaryWriter::StdErrWriter(StdErrWriter { format })
@@ -71,11 +74,11 @@ impl StdErrWriter {
 /// can duplicate messages to stderr.
 pub struct ExtendedFileWriter {
     duplicate: Duplicate,
-    w: FileLogWriter,
+    file_log_writer: FileLogWriter,
 }
 impl ExtendedFileWriter {
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        self.w.validate_logs(expected)
+        self.file_log_writer.validate_logs(expected)
     }
 
     fn write(&self, record: &Record) -> io::Result<()> {
@@ -87,13 +90,13 @@ impl ExtendedFileWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_to_stderr(self.w.format(), record)?;
+            write_to_stderr(self.file_log_writer.format(), record)?;
         }
-        self.w.write(record)
+        self.file_log_writer.write(record)
     }
 
     fn flush(&self) -> io::Result<()> {
-        self.w.flush()?;
+        self.file_log_writer.flush()?;
         io::stderr().flush()
     }
 }

@@ -19,7 +19,7 @@ use std::sync::Mutex;
 struct FileLogWriterConfig {
     format: FormatFunction,
     print_message: bool,
-    filename_base: Option<String>,
+    path_base: String,
     suffix: String,
     use_timestamp: bool,
     append: bool,
@@ -32,36 +32,13 @@ impl FileLogWriterConfig {
         FileLogWriterConfig {
             format: default_format,
             print_message: false,
-            filename_base: None,
+            path_base: String::new(),
             suffix: "log".to_string(),
             use_timestamp: true,
             append: false,
             rotate_over_size: None,
             create_symlink: None,
         }
-    }
-
-    fn set_filename_base(&mut self, dir: &str, o_discriminant: Option<String>) {
-        if self.filename_base.is_none() {
-            let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
-            let progname = Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy();
-            let mut filename = String::with_capacity(180).add(dir).add("/").add(&progname);
-            if let Some(discriminant) = o_discriminant {
-                filename = filename.add(&format!("_{}", discriminant));
-            }
-            if self.use_timestamp {
-                filename = filename.add(&Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
-            };
-            self.filename_base = Some(filename);
-        }
-    }
-
-    fn get_filename(&self, rotate_idx: u32) -> String {
-        let mut filename = String::with_capacity(180).add(self.filename_base.as_ref().unwrap());
-        if self.rotate_over_size.is_some() {
-            filename = filename.add(&format!("_r{:0>5}", rotate_idx))
-        };
-        filename.add(".").add(&self.suffix)
     }
 }
 
@@ -153,8 +130,22 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::BadDirectory);
         };
 
-        self.config
-            .set_filename_base(&s_directory, self.discriminant);
+        let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
+        let progname = Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy();
+
+        self.config.path_base.clear();
+        self.config.path_base.reserve(180);
+        self.config.path_base += &s_directory;
+        self.config.path_base += "/";
+        self.config.path_base += &progname;
+
+        if let Some(discriminant) = self.discriminant {
+            self.config.path_base += &format!("_{}", discriminant);
+        }
+        if self.config.use_timestamp {
+            self.config.path_base += &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
+        };
+
         Ok(FileLogWriter {
             state: Mutex::new(RefCell::new(FileLogWriterState::new(&self.config)?)),
             config: self.config,
@@ -228,47 +219,59 @@ impl FileLogWriterBuilder {
 
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
-    lw: LineWriter<File>,
-    rotate_over: bool,
+    line_writer: LineWriter<File>,
     written_bytes: u64,
-    rotate_idx: u32,
-    current_path: String,
+    // None if no rotation is desired, or else Some(idx) where idx is the highest existing rotate_idx
+    rotate_idx: Option<u32>,
+    path: String,
 }
 impl FileLogWriterState {
+    // FIXME
+    // If rotate,
+    //     the logger should always write into a file with infix `_rCURRENT`.
+    //     We have to rotate the `_rCURRENT` file
+    //         if it exists
+    //         and
+    //             if it is already too big
+    //             or if we do not append
+
     fn new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
         let rotate_idx = match config.rotate_over_size {
-            None => 0,
-            Some(_) => {
-                let rotate_idx =
-                    get_highest_rotate_idx(config.filename_base.as_ref().unwrap(), &config.suffix);
+            None => None,
+            Some(_) => Some({
+                let rotate_idx = get_highest_rotate_idx(&config.path_base, &config.suffix);
                 if config.append {
                     rotate_idx
                 } else {
                     rotate_idx + 1
                 }
-            }
+            }),
         };
 
-        let (lw, written_bytes, current_path) = get_linewriter(rotate_idx, config)?;
+        let (line_writer, written_bytes, path) = get_linewriter(rotate_idx, config)?;
         Ok(FileLogWriterState {
-            lw,
-            current_path,
+            line_writer,
+            path,
             written_bytes,
             rotate_idx,
-            rotate_over: config.rotate_over_size.is_some(),
         })
     }
 
+    // FIXME
+    // The logger should always write into a file with infix `_rCURRENT`.
+    // On overflow, and on restart without append(),
+    // an existing `_rCURRENT` file must be renamed to the next numbered file,
+    // before writing into `_rCURRENT` goes on.
     fn mount_next_linewriter(
         &mut self,
         config: &FileLogWriterConfig,
     ) -> Result<(), FlexiLoggerError> {
-        self.rotate_idx += 1;
+        self.rotate_idx.as_mut().map(|idx| *idx += 1);
         self.written_bytes = 0;
-        let (lw, wb, cp) = get_linewriter(self.rotate_idx, config)?;
-        self.lw = lw;
-        self.written_bytes = wb;
-        self.current_path = cp;
+        let (line_writer, written_bytes, path) = get_linewriter(self.rotate_idx, config)?;
+        self.line_writer = line_writer;
+        self.written_bytes = written_bytes;
+        self.path = path;
         Ok(())
     }
 }
@@ -276,8 +279,8 @@ impl FileLogWriterState {
 impl Write for FileLogWriterState {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.lw.write_all(buf)?;
-        if self.rotate_over {
+        self.line_writer.write_all(buf)?;
+        if self.rotate_idx.is_some() {
             self.written_bytes += buf.len() as u64;
         };
         Ok(buf.len())
@@ -285,23 +288,31 @@ impl Write for FileLogWriterState {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.lw.flush()
+        self.line_writer.flush()
     }
 }
 
+// Returns line_writer, written_bytes, path.
 fn get_linewriter(
-    rotate_idx: u32,
+    rotate_idx: Option<u32>,
     config: &FileLogWriterConfig,
 ) -> Result<(LineWriter<File>, u64, String), FlexiLoggerError> {
-    let filename = config.get_filename(rotate_idx);
-    let (lw, wb) = {
-        let path = Path::new(&filename);
+    let mut s_path = String::with_capacity(180) + &config.path_base;
+    if let Some(idx) = rotate_idx {
+        s_path += &format!("_r{:0>5}", idx);
+    };
+    s_path += ".";
+    s_path += &config.suffix;
+
+    let (line_writer, file_size) = {
+        let p_path = Path::new(&s_path);
         if config.print_message {
-            println!("Log is written to {}", &path.display());
+            println!("Log is written to {}", &p_path.display());
         }
         if let Some(ref link) = config.create_symlink {
-            self::platform::create_symlink_if_possible(link, path);
+            self::platform::create_symlink_if_possible(link, p_path);
         }
+
         (
             LineWriter::new(
                 OpenOptions::new()
@@ -309,23 +320,23 @@ fn get_linewriter(
                     .create(true)
                     .append(config.append)
                     .truncate(!config.append)
-                    .open(&path)?,
+                    .open(&p_path)?,
             ),
             if config.append {
-                let metadata = fs::metadata(&filename)?;
+                let metadata = fs::metadata(&s_path)?;
                 metadata.len()
             } else {
                 0
             },
         )
     };
-    Ok((lw, wb, filename))
+    Ok((line_writer, file_size, s_path))
 }
 
-fn get_highest_rotate_idx(filename_base: &str, suffix: &str) -> u32 {
+fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
     let mut rotate_idx = 0;
     let fn_pattern = String::with_capacity(180)
-        .add(filename_base)
+        .add(path_base)
         .add("_r*")
         .add(".")
         .add(suffix);
@@ -333,20 +344,22 @@ fn get_highest_rotate_idx(filename_base: &str, suffix: &str) -> u32 {
         Err(e) => {
             eprintln!("Listing files with ({}) failed with {}", fn_pattern, e);
         }
-        Ok(globresults) => for globresult in globresults {
-            match globresult {
-                Err(e) => eprintln!(
-                    "Error occured when reading directory for log files: {:?}",
-                    e
-                ),
-                Ok(pathbuf) => {
-                    let filename = pathbuf.file_stem().unwrap().to_string_lossy();
-                    let mut it = filename.rsplit("_r");
-                    let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
-                    rotate_idx = max(rotate_idx, idx);
+        Ok(globresults) => {
+            for globresult in globresults {
+                match globresult {
+                    Err(e) => eprintln!(
+                        "Error occured when reading directory for log files: {:?}",
+                        e
+                    ),
+                    Ok(pathbuf) => {
+                        let filename = pathbuf.file_stem().unwrap().to_string_lossy();
+                        let mut it = filename.rsplit("_r");
+                        let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
+                        rotate_idx = max(rotate_idx, idx);
+                    }
                 }
             }
-        },
+        }
     }
     rotate_idx
 }
@@ -380,7 +393,7 @@ impl FileLogWriter {
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
         let guard = self.state.lock().unwrap();
         let state = guard.borrow();
-        let path = Path::new(&state.current_path);
+        let path = Path::new(&state.path);
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);
 
@@ -434,7 +447,7 @@ impl LogWriter for FileLogWriter {
     fn flush(&self) -> io::Result<()> {
         let guard = self.state.lock().unwrap();
         let mut state = guard.borrow_mut();
-        state.lw.flush()
+        state.line_writer.flush()
     }
 }
 
