@@ -1,9 +1,29 @@
-# Change log for flexi_logger
+# Changelog for flexi_logger
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.10.1] - 2018-11-08
+
+When file rotation is used, the name of the file to which the logs are written is now stable.
+
+Details:
+
+* the logs are always written to a file with infix _rCURRENT
+* if this file exceeds the specified rotate-over-size, it is closed and renamed to a file with a sequential number infix, and then the logging continues again to the (fresh) file with infix _rCURRENT
+
+Example:
+
+After some logging with your program my_prog, you will find files like
+
+```text
+my_prog_r00000.log
+my_prog_r00001.log
+my_prog_r00002.log
+my_prog_rCURRENT.log
+```
 
 ## [0.10.0] - 2018-10-30
 

@@ -452,16 +452,10 @@ impl Logger {
         self
     }
 
-    /// By default, the log file will grow indefinitely.
-    /// With this option, when the log file reaches or exceeds the specified file size,
-    /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes: instead of the timestamp,
-    /// a serial number is included into the filename.
+    /// Prevents indefinite growth of log files.
     ///
-    /// The size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
-    /// files once they reach a size of 1 kB.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
+    /// For details, see
+    /// [FileLogWriterBuilder::rotate_over_size](./writers/struct.FileLogWriterBuilder.html#method.rotate_over_size).
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
         self.flwb = self
             .flwb

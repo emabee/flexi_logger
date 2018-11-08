@@ -15,6 +15,11 @@ use std::ops::{Add, DerefMut};
 use std::path::Path;
 use std::sync::Mutex;
 
+const CURRENT_INFIX: &str = "_rCURRENT";
+fn number_infix(idx: u32) -> String {
+    format!("_r{:0>5}", idx)
+}
+
 // The immutable configuration of a FileLogWriter.
 struct FileLogWriterConfig {
     format: FormatFunction,
@@ -86,14 +91,34 @@ impl FileLogWriterBuilder {
         self
     }
 
-    /// By default, the log file will grow indefinitely.
-    /// With this option, when the log file reaches or exceeds the specified file size,
-    /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes: instead of the timestamp,
-    /// a serial number is included into the filename.
+    /// Prevents indefinite growth of log files.
     ///
-    /// The size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
-    /// files once they reach a size of 1 kB.
+    /// By default, the log file is fixed while your program is running and will grow indefinitely.
+    /// With this option being used, when the log file reaches or exceeds the specified file size,
+    /// the file will be closed and a new file will be opened.
+    ///
+    /// The rotate-over-size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
+    /// files once they reach a size of 1000 bytes.
+    ///     
+    /// Note that also the filename pattern changes:
+    ///
+    /// - by default, no timestamp is added to the filename
+    /// - the logs are always written to a file with infix `_rCURRENT`
+    /// - if this file exceeds the specified rotate-over-size, it is closed and renamed to a file
+    ///   with a sequential number infix,
+    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`
+    ///
+    /// Example:
+    ///
+    /// After some logging with your program `my_prog`, you will find files like
+    ///
+    /// ```text
+    /// my_prog_r00000.log
+    /// my_prog_r00001.log
+    /// my_prog_r00002.log
+    /// my_prog_rCURRENT.log
+    /// ```
+    ///
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
         self.config.rotate_over_size = Some(rotate_over_size as u64);
         self.config.use_timestamp = false;
@@ -219,57 +244,53 @@ impl FileLogWriterBuilder {
 
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
-    line_writer: LineWriter<File>,
+    line_writer: Option<LineWriter<File>>,
     written_bytes: u64,
     // None if no rotation is desired, or else Some(idx) where idx is the highest existing rotate_idx
     rotate_idx: Option<u32>,
     path: String,
 }
 impl FileLogWriterState {
-    // FIXME
-    // If rotate,
-    //     the logger should always write into a file with infix `_rCURRENT`.
-    //     We have to rotate the `_rCURRENT` file
-    //         if it exists
-    //         and
-    //             if it is already too big
-    //             or if we do not append
-
+    // If rotate, the logger writes into a file with infix `_rCURRENT`.
     fn new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
         let rotate_idx = match config.rotate_over_size {
             None => None,
             Some(_) => Some({
-                let rotate_idx = get_highest_rotate_idx(&config.path_base, &config.suffix);
-                if config.append {
-                    rotate_idx
-                } else {
-                    rotate_idx + 1
+                let mut rotate_idx = get_highest_rotate_idx(&config.path_base, &config.suffix);
+                if !config.append {
+                    rotate_idx = rotate_output_file(rotate_idx, config)?;
                 }
+                rotate_idx
             }),
         };
 
-        let (line_writer, written_bytes, path) = get_linewriter(rotate_idx, config)?;
+        let (line_writer, written_bytes, path) = get_linewriter(config)?;
         Ok(FileLogWriterState {
-            line_writer,
+            line_writer: Some(line_writer),
             path,
             written_bytes,
             rotate_idx,
         })
     }
 
-    // FIXME
+    fn line_writer(&mut self) -> &mut LineWriter<File> {
+        self.line_writer
+            .as_mut()
+            .expect("FlexiLogger: line_writer unexpectedly not available")
+    }
+
     // The logger should always write into a file with infix `_rCURRENT`.
-    // On overflow, and on restart without append(),
-    // an existing `_rCURRENT` file must be renamed to the next numbered file,
+    // On overflow, an existing `_rCURRENT` file must be renamed to the next numbered file,
     // before writing into `_rCURRENT` goes on.
     fn mount_next_linewriter(
         &mut self,
         config: &FileLogWriterConfig,
     ) -> Result<(), FlexiLoggerError> {
-        self.rotate_idx.as_mut().map(|idx| *idx += 1);
+        self.line_writer = None; // close the output file
+        self.rotate_idx = Some(rotate_output_file(self.rotate_idx.take().unwrap(), config)?);
         self.written_bytes = 0;
-        let (line_writer, written_bytes, path) = get_linewriter(self.rotate_idx, config)?;
-        self.line_writer = line_writer;
+        let (line_writer, written_bytes, path) = get_linewriter(config)?;
+        self.line_writer = Some(line_writer);
         self.written_bytes = written_bytes;
         self.path = path;
         Ok(())
@@ -279,7 +300,7 @@ impl FileLogWriterState {
 impl Write for FileLogWriterState {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.line_writer.write_all(buf)?;
+        self.line_writer().write_all(buf)?;
         if self.rotate_idx.is_some() {
             self.written_bytes += buf.len() as u64;
         };
@@ -288,21 +309,24 @@ impl Write for FileLogWriterState {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.line_writer.flush()
+        self.line_writer().flush()
     }
+}
+
+fn get_infix_path(infix: &str, config: &FileLogWriterConfig) -> String {
+    let mut s_path = String::with_capacity(180) + &config.path_base;
+    if config.rotate_over_size.is_some() {
+        s_path += infix;
+    };
+    s_path += ".";
+    s_path + &config.suffix
 }
 
 // Returns line_writer, written_bytes, path.
 fn get_linewriter(
-    rotate_idx: Option<u32>,
     config: &FileLogWriterConfig,
 ) -> Result<(LineWriter<File>, u64, String), FlexiLoggerError> {
-    let mut s_path = String::with_capacity(180) + &config.path_base;
-    if let Some(idx) = rotate_idx {
-        s_path += &format!("_r{:0>5}", idx);
-    };
-    s_path += ".";
-    s_path += &config.suffix;
+    let s_path = get_infix_path(CURRENT_INFIX, &config);
 
     let (line_writer, file_size) = {
         let p_path = Path::new(&s_path);
@@ -364,6 +388,27 @@ fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
     rotate_idx
 }
 
+fn rotate_output_file(
+    rotate_idx: u32,
+    config: &FileLogWriterConfig,
+) -> Result<u32, FlexiLoggerError> {
+    // current-file must be closed already
+    // move it to the name with the next rotate_idx
+    match std::fs::rename(
+        get_infix_path(CURRENT_INFIX, config),
+        get_infix_path(&number_infix(rotate_idx), config),
+    ) {
+        Ok(()) => Ok(rotate_idx + 1),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Ok(rotate_idx)
+            } else {
+                Err(FlexiLoggerError::Io(e))
+            }
+        }
+    }
+}
+
 /// A configurable `LogWriter` that writes to a file or, if rotation is used, a sequence of files.
 pub struct FileLogWriter {
     config: FileLogWriterConfig,
@@ -383,7 +428,8 @@ impl FileLogWriter {
         }
     }
 
-    /// Returns a reference to its configuration.
+    /// Returns a reference to its configured output format function.
+    #[inline]
     pub fn format(&self) -> FormatFunction {
         self.config.format
     }
@@ -447,7 +493,7 @@ impl LogWriter for FileLogWriter {
     fn flush(&self) -> io::Result<()> {
         let guard = self.state.lock().unwrap();
         let mut state = guard.borrow_mut();
-        state.line_writer.flush()
+        state.line_writer().flush()
     }
 }
 
