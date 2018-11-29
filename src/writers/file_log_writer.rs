@@ -394,13 +394,13 @@ fn rotate_output_file(
 ) -> Result<u32, FlexiLoggerError> {
     // current-file must be closed already
     // move it to the name with the next rotate_idx
-    match std::fs::rename(
+    match ::std::fs::rename(
         get_infix_path(CURRENT_INFIX, config),
         get_infix_path(&number_infix(rotate_idx), config),
     ) {
         Ok(()) => Ok(rotate_idx + 1),
         Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
+            if e.kind() == ::std::io::ErrorKind::NotFound {
                 Ok(rotate_idx)
             } else {
                 Err(FlexiLoggerError::Io(e))
