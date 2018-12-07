@@ -120,47 +120,50 @@ impl LogSpecification {
                     continue;
                 }
                 let mut parts = s.split('=');
-                let (log_level, name) =
-                    match (parts.next(), parts.next().map(|s| s.trim()), parts.next()) {
-                        (Some(part0), None, None) => {
-                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
-                                continue;
-                            }
-                            // if the single argument is a log-level string or number,
-                            // treat that as a global fallback setting
-                            match parse_level_filter(part0.trim()) {
-                                Ok(num) => (num, None),
-                                Err(_) => (LevelFilter::max(), Some(part0)),
-                            }
-                        }
-
-                        (Some(part0), Some(""), None) => {
-                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
-                                continue;
-                            }
-                            (LevelFilter::max(), Some(part0))
-                        }
-
-                        (Some(part0), Some(part1), None) => {
-                            if contains_dash_or_whitespace(part0, &mut parse_errs) {
-                                continue;
-                            }
-                            match parse_level_filter(part1.trim()) {
-                                Ok(num) => (num, Some(part0.trim())),
-                                Err(e) => {
-                                    push_err(e.to_string(), &mut parse_errs);
-                                    continue;
-                                }
-                            }
-                        }
-                        _ => {
-                            push_err(
-                                format!("invalid part in log spec '{}', ignoring it", s),
-                                &mut parse_errs,
-                            );
+                let (log_level, name) = match (
+                    parts.next().map(|s| s.trim()),
+                    parts.next().map(|s| s.trim()),
+                    parts.next(),
+                ) {
+                    (Some(part0), None, None) => {
+                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
                             continue;
                         }
-                    };
+                        // if the single argument is a log-level string or number,
+                        // treat that as a global fallback setting
+                        match parse_level_filter(part0.trim()) {
+                            Ok(num) => (num, None),
+                            Err(_) => (LevelFilter::max(), Some(part0)),
+                        }
+                    }
+
+                    (Some(part0), Some(""), None) => {
+                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
+                            continue;
+                        }
+                        (LevelFilter::max(), Some(part0))
+                    }
+
+                    (Some(part0), Some(part1), None) => {
+                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
+                            continue;
+                        }
+                        match parse_level_filter(part1.trim()) {
+                            Ok(num) => (num, Some(part0.trim())),
+                            Err(e) => {
+                                push_err(e.to_string(), &mut parse_errs);
+                                continue;
+                            }
+                        }
+                    }
+                    _ => {
+                        push_err(
+                            format!("invalid part in log spec '{}', ignoring it", s),
+                            &mut parse_errs,
+                        );
+                        continue;
+                    }
+                };
                 dirs.push(ModuleFilter {
                     module_name: name.map(|s| s.to_string()),
                     level_filter: log_level,
@@ -424,7 +427,7 @@ fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
     if result {
         push_err(
             format!(
-                "ignoring invalid part in log spec '{}' (contains a dash)",
+                "ignoring invalid part in log spec '{}' (contains a dash or whitespace)",
                 s
             ),
             parse_errs,
