@@ -1,9 +1,6 @@
 #![feature(test)]
 extern crate test;
-
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
+use log::{error, trace};
 
 use flexi_logger::Logger;
 use test::Bencher;

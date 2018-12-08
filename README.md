@@ -8,7 +8,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "0.10"
+flexi_logger = "^0.10.3"
 log = "0.4"
 ```
 

@@ -1,8 +1,11 @@
 use crate::flexi_error::FlexiLoggerError;
 use crate::LevelFilter;
 
-use log;
+#[cfg(feature = "specfile")]
+use log::error;
 use regex::Regex;
+#[cfg(feature = "specfile")]
+use serde_derive::*;
 #[cfg(feature = "specfile")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -340,7 +343,8 @@ impl LogSpecification {
                         .level_filter
                         .to_string()
                         .to_lowercase()
-                ).as_bytes(),
+                )
+                .as_bytes(),
             )?;
         } else {
             w.write_all(b"#global_level = 'info'\n")?;
@@ -367,7 +371,8 @@ impl LogSpecification {
                         "'{}' = '{}'\n",
                         mf.module_name.as_ref().unwrap(),
                         mf.level_filter.to_string().to_lowercase()
-                    ).as_bytes(),
+                    )
+                    .as_bytes(),
                 )?;
             }
         }
@@ -531,7 +536,8 @@ impl IntoVecModuleFilter for HashMap<Option<String>, LevelFilter> {
             .map(|(k, v)| ModuleFilter {
                 module_name: k,
                 level_filter: v,
-            }).collect();
+            })
+            .collect();
         mf.level_sort()
     }
 }

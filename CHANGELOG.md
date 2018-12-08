@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.3] - 2018-12-08
+
+Advance to edition 2018.
+
 ## [0.10.2] - 2018-12-07
 
 Log-spec parsing is improved, more whitespace is tolerated.

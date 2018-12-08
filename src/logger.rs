@@ -1,4 +1,5 @@
-use log;
+#[cfg(feature = "specfile")]
+use log::{debug, error, trace};
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
