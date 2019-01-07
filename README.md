@@ -8,27 +8,23 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "^0.10.3"
+flexi_logger = "^0.10.4"
 log = "0.4"
 ```
 
-or, if you want to use the specfile feature, with
+or, if you want to use the `specfile` feature, with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.10", features = ["specfile"] }
+flexi_logger = { version = "^0.10.4", features = ["specfile"] }
 log = "0.4"
 ```
 
-(`log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
+Note: `log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
 by the [log crate](https://crates.io/crates/log),
-and you use the ```log``` macros to write log lines from your code),
+and you use the ```log``` macros to write log lines from your code.
 
-and add this to your crate root:
-
-```rust
-extern crate flexi_logger;
-```
+### Example 1
 
 To read the log specification from the environment variable  `RUST_LOG` and write the logs
 to stderr (i.e., behave like `env_logger`),
@@ -49,6 +45,8 @@ To log differently, you may
 * choose an alternative `with...` method,
 * and/or add some configuration options,
 * and/or choose an alternative `start...` method.
+
+### Example 2
 
 In the folllowing example we
 

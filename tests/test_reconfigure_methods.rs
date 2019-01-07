@@ -2,48 +2,114 @@ extern crate flexi_logger;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::{detailed_format, Logger};
+use flexi_logger::{Logger, ReconfigurationHandle};
 
 #[test]
 fn test_reconfigure_methods() {
-    let mut handle = Logger::with_str("info")
-        .format(detailed_format)
-        .o_log_to_file(true)
-        .o_rotate_over_size(Some(2000))
+    let mut log_handle = Logger::with_str("info")
+        .log_to_file()
         .start_reconfigurable()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
-    error!("This is an error message");
-    warn!("This is a warning");
-    info!("This is an info message");
-    debug!("This is a debug message - you must not see it!");
-    trace!("This is a trace message - you must not see it!");
+    test_parse_new_spec(&mut log_handle);
+    test_push_new_spec(&mut log_handle);
+    validate_logs(&mut log_handle);
+}
 
-    handle.parse_new_spec("error");
-    error!("This is an error message");
-    warn!("This is a warning - you must not see it!");
-    info!("This is an info message - you must not see it!");
-    debug!("This is a debug message - you must not see it!");
-    trace!("This is a trace message - you must not see it!");
+fn test_parse_new_spec(log_handle: &mut ReconfigurationHandle) {
+    error!("1-error message");
+    warn!("1-warning");
+    info!("1-info message");
+    debug!("1-debug message - you must not see it!");
+    trace!("1-trace message - you must not see it!");
 
-    handle.parse_new_spec("trace");
-    error!("This is an error message");
-    warn!("This is a warning");
-    info!("This is an info message");
-    debug!("This is a debug message");
-    trace!("This is a trace message");
+    log_handle.parse_new_spec("error");
+    error!("1-error message");
+    warn!("1-warning - you must not see it!");
+    info!("1-info message - you must not see it!");
+    debug!("1-debug message - you must not see it!");
+    trace!("1-trace message - you must not see it!");
 
-    handle.validate_logs(&[
-        ("ERROR", "test_reconfigure_methods", "error"),
-        ("WARN", "test_reconfigure_methods", "warning"),
-        ("INFO", "test_reconfigure_methods", "info"),
+    log_handle.parse_new_spec("trace");
+    error!("1-error message");
+    warn!("1-warning");
+    info!("1-info message");
+    debug!("1-debug message");
+    trace!("1-trace message");
+
+    log_handle.parse_new_spec("info");
+}
+
+fn test_push_new_spec(log_handle: &mut ReconfigurationHandle) {
+
+    error!("2-error message");
+    warn!("2-warning");
+    info!("2-info message");
+    debug!("2-debug message - you must not see it!");
+    trace!("2-trace message - you must not see it!");
+
+    log_handle.parse_and_push_temp_spec("error");
+    error!("2-error message");
+    warn!("2-warning - you must not see it!");
+    info!("2-info message - you must not see it!");
+    debug!("2-debug message - you must not see it!");
+    trace!("2-trace message - you must not see it!");
+
+    log_handle.parse_and_push_temp_spec("trace");
+    error!("2-error message");
+    warn!("2-warning");
+    info!("2-info message");
+    debug!("2-debug message");
+    trace!("2-trace message");
+
+    log_handle.pop_temp_spec(); // we should be back on error
+    error!("2-error message");
+    warn!("2-warning - you must not see it!");
+    info!("2-info message - you must not see it!");
+    debug!("2-debug message - you must not see it!");
+    trace!("2-trace message - you must not see it!");
+
+    log_handle.pop_temp_spec(); // we should be back on info
+
+    error!("2-error message");
+    warn!("2-warning");
+    info!("2-info message");
+    debug!("2-debug message - you must not see it!");
+    trace!("2-trace message - you must not see it!");
+
+    log_handle.pop_temp_spec(); // should be a no-op
+}
+
+fn validate_logs(log_handle: &mut ReconfigurationHandle) {
+    log_handle.validate_logs(&[
+        ("ERROR", "test_reconfigure_methods", "1-error"),
+        ("WARN", "test_reconfigure_methods", "1-warning"),
+        ("INFO", "test_reconfigure_methods", "1-info"),
         //
-        ("ERROR", "test_reconfigure_methods", "error"),
+        ("ERROR", "test_reconfigure_methods", "1-error"),
         //
-        ("ERROR", "test_reconfigure_methods", "error"),
-        ("WARN", "test_reconfigure_methods", "warning"),
-        ("INFO", "test_reconfigure_methods", "info"),
-        ("DEBUG", "test_reconfigure_methods", "debug"),
-        ("TRACE", "test_reconfigure_methods", "trace"),
+        ("ERROR", "test_reconfigure_methods", "1-error"),
+        ("WARN", "test_reconfigure_methods", "1-warning"),
+        ("INFO", "test_reconfigure_methods", "1-info"),
+        ("DEBUG", "test_reconfigure_methods", "1-debug"),
+        ("TRACE", "test_reconfigure_methods", "1-trace"),
+        // -----
+        ("ERROR", "test_reconfigure_methods", "2-error"),
+        ("WARN", "test_reconfigure_methods", "2-warning"),
+        ("INFO", "test_reconfigure_methods", "2-info"),
+        //
+        ("ERROR", "test_reconfigure_methods", "2-error"),
+        //
+        ("ERROR", "test_reconfigure_methods", "2-error"),
+        ("WARN", "test_reconfigure_methods", "2-warning"),
+        ("INFO", "test_reconfigure_methods", "2-info"),
+        ("DEBUG", "test_reconfigure_methods", "2-debug"),
+        ("TRACE", "test_reconfigure_methods", "2-trace"),
+        //
+        ("ERROR", "test_reconfigure_methods", "2-error"),
+        //
+        ("ERROR", "test_reconfigure_methods", "2-error"),
+        ("WARN", "test_reconfigure_methods", "2-warning"),
+        ("INFO", "test_reconfigure_methods", "2-info"),
     ]);
 }

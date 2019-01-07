@@ -5,7 +5,7 @@ use crate::LevelFilter;
 use log::error;
 use regex::Regex;
 #[cfg(feature = "specfile")]
-use serde_derive::*;
+use serde_derive::Deserialize;
 #[cfg(feature = "specfile")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -443,6 +443,39 @@ fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
 }
 
 /// Builder for `LogSpecification`.
+///
+/// # Example
+///
+/// Use the reconfigurability feature and build the log spec programmatically.
+///
+/// ```rust
+/// use flexi_logger::{Logger, LogSpecBuilder};
+/// use log::LevelFilter;
+///
+/// fn main() {
+///     // Build the initial log specification
+///     let mut builder = LogSpecBuilder::new();  // default is LevelFilter::Off
+///     builder.default(LevelFilter::Info);
+///     builder.module("karl", LevelFilter::Debug);
+///
+///     // Initialize Logger, keep builder alive
+///     let mut logger_reconf_handle = Logger::with(builder.build())
+///         // your logger configuration goes here, as usual
+///         .start_reconfigurable()
+///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+///
+///     // ...
+///
+///     // Modify builder and update the logger
+///     builder.default(LevelFilter::Error);
+///     builder.remove("karl");
+///     builder.module("emma", LevelFilter::Trace);
+///
+///     logger_reconf_handle.set_new_spec(builder.build());
+///
+///     // ...
+/// }
+/// ```
 #[derive(Clone, Default)]
 pub struct LogSpecBuilder {
     module_filters: HashMap<Option<String>, LevelFilter>,
