@@ -1,4 +1,6 @@
+#![feature(extern_crate_item_prelude)]
 #![feature(test)]
+
 extern crate test;
 use log::{error, trace};
 

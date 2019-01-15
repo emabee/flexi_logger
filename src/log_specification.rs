@@ -83,6 +83,15 @@ impl LogSpecification {
     pub(crate) fn reconfigure(&mut self, other_spec: LogSpecification) {
         self.module_filters = other_spec.module_filters;
         self.textfilter = other_spec.textfilter;
+        log::set_max_level(self.max_level());
+    }
+
+    pub(crate) fn max_level(&self) -> log::LevelFilter {
+        self.module_filters
+            .iter()
+            .map(|d| d.level_filter)
+            .max()
+            .unwrap_or(log::LevelFilter::Off)
     }
 
     /// Implementation of Log::enabled() with easier testable signature

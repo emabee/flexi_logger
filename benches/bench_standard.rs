@@ -1,6 +1,7 @@
+#![feature(extern_crate_item_prelude)]
 #![feature(test)]
-extern crate test;
 
+extern crate test;
 extern crate flexi_logger;
 #[macro_use]
 extern crate log;

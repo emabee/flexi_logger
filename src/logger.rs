@@ -122,13 +122,7 @@ impl Logger {
     /// If started this way, the logger cannot be influenced anymore while the program is running.
     /// This is what you want in most of the cases.
     pub fn start(mut self) -> Result<(), FlexiLoggerError> {
-        let max = self
-            .spec
-            .module_filters()
-            .iter()
-            .map(|d| d.level_filter)
-            .max()
-            .unwrap_or(log::LevelFilter::Off);
+        let max = self.spec.max_level();
 
         log::set_boxed_logger(Box::new(FlexiLogger::new(
             LogSpec::STATIC(self.spec),
@@ -149,70 +143,9 @@ impl Logger {
     ///
     /// This allows e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     ///
-    /// ```rust
-    /// use flexi_logger::Logger;
-    ///
-    /// let mut logger_handle = Logger::with_str("info")
-    ///         .start_reconfigurable()
-    ///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    ///
-    /// // ...
-    /// // intensify logging
-    /// logger_handle.parse_new_spec("trace");
-    ///
-    /// // ... critical stuff happens here ...
-    ///
-    /// // switch logging back to normal
-    /// logger_handle.parse_new_spec("info");
-    ///
-    /// // ...
-    ///
-    /// ```
-    ///
-    /// The resulting logger is still fast, but measurable slower for those log-calls (trace!() etc)
-    /// that are on a deeper level than the deepest level in the LogSpecification.
-    /// This is because the Log crate has an optimization for returning very fast from deep-level
-    /// log calls, but the deepest level needs be given at initialization and cannot be updated
-    /// later.
-    ///
-    /// Here is the output from a benchmark test, runnning on a windows laptop:
-    ///
-    ///  ```text
-    ///   1  PS C:\projects\flexi_logger> cargo bench --bench bench_standard -- --nocapture
-    ///   2      Finished release [optimized] target(s) in 0.4 secs
-    ///   3       Running target\release\deps\bench_standard-20539c2be6d4f2e0.exe
-    ///   4
-    ///   5  running 4 tests
-    ///   6  test b10_no_logger_active  ... bench:         118 ns/iter (+/- 19)
-    ///   7  test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
-    ///   8  test b30_relevant_logs     ... bench:     291,436 ns/iter (+/- 44,658)
-    ///   9  test b40_suppressed_logs   ... bench:         123 ns/iter (+/- 5)
-    ///  10
-    ///  11  test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
-    ///  12
-    ///  13  PS C:\projects\flexi_logger> cargo bench --bench bench_reconfigurable -- --nocapture
-    ///  14      Finished release [optimized] target(s) in 0.4 secs
-    ///  15       Running target\release\deps\bench_reconfigurable-2e292a8d5c887d0d.exe
-    ///  16
-    ///  17  running 4 tests
-    ///  18  test b10_no_logger_active  ... bench:         130 ns/iter (+/- 37)
-    ///  19  test b20_initialize_logger ... bench:           0 ns/iter (+/- 0)
-    ///  20  test b30_relevant_logs     ... bench:     301,092 ns/iter (+/- 87,452)
-    ///  21  test b40_suppressed_logs   ... bench:       3,482 ns/iter (+/- 339)
-    ///  22
-    ///  23  test result: ok. 0 passed; 0 failed; 0 ignored; 4 measured; 0 filtered out
-    ///  ```
-    ///
-    /// It shows that logging is fastest when no logger is active (lines 6 and 18).
-    /// And it is just as fast when the above-mentioned optimization kicks in (line 9).
-    ///
-    /// Logging has measurable costs when logs are really written (line 8 and 20), independent
-    /// of the reconfigurability feature of the flexi_logger.
-    ///
-    /// The measurable, but still in most cases not important, price for reconfigurability
-    /// can be seen by comparing lines 9 and 21.
-    ///
+    /// See [ReconfigurationHandle](struct.ReconfigurationHandle.html) for an example.
     pub fn start_reconfigurable(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        let max = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
 
         let primary_writer = Arc::new(if self.log_to_file {
@@ -229,8 +162,7 @@ impl Logger {
         );
 
         log::set_boxed_logger(Box::new(flexi_logger))?;
-        // no optimization possible, because the spec is dynamic, but max is not:
-        log::set_max_level(log::LevelFilter::Trace);
+        log::set_max_level(max);
         Ok(reconfiguration_handle(spec, primary_writer))
     }
 

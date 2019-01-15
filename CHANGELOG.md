@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5] - 2019-01-15
+
+Eliminate performance penalty for using reconfigurability.
+
 ## [0.10.4] - 2019-01-07
 
 Add methods to modify the log spec temporarily.

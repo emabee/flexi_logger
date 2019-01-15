@@ -45,7 +45,8 @@ fn multi_threaded() {
             thread::sleep(time::Duration::from_millis(1000));
             reconf_handle.set_new_spec(new_spec);
             0 as u8
-        }).unwrap();
+        })
+        .unwrap();
 
     wait_for_workers_to_close(worker_handles);
 
@@ -57,7 +58,7 @@ fn multi_threaded() {
     verify_logs(&directory);
 }
 
-/// Starts given number of worker threads and lets each execute `do_work`
+// Starts given number of worker threads and lets each execute `do_work`
 fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
     trace!("Starting {} worker threads", no_of_workers);
@@ -69,7 +70,8 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
                 .spawn(move || {
                     do_work(thread_number);
                     0 as u8
-                }).unwrap(),
+                })
+                .unwrap(),
         );
     }
     trace!("All {} worker threads started.", worker_handles.len());
