@@ -34,7 +34,7 @@ do this early in your program:
 ```rust
 flexi_logger::Logger::with_env()
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap();
 ```
 
 After that, you just use the log-macros from the log crate.
@@ -62,7 +62,7 @@ Logger::with_env_or_str("myprog=debug, mylib=warn")
             .directory("log_files")
             .format(opt_format)
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap();
 ```
 
 ## Example 3: reconfigure the log-spec programmatically
@@ -73,7 +73,7 @@ Obtain the `ReconfigurationHandle` (using `.start()`):
 let mut log_handle = flexi_logger::Logger::with_str("info")
     // ... logger configuration ...
     .start()
-    .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    .unwrap();
 ```
 
 and modify the effective log specification from within your code:
@@ -93,7 +93,7 @@ If you start  `flexi_logger` with a specfile, e.g.
 ```rust
 flexi_logger::Logger::with_str("info")
    .start_with_specfile("/server/config/logspec.toml")
-   .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+   .unwrap();
 ```
 
 then you can change the logspec dynamically, *while your program is running*,
