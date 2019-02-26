@@ -7,26 +7,21 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-pub enum LogSpec {
-    STATIC(LogSpecification),
-    DYNAMIC(Arc<RwLock<LogSpecification>>),
-}
-
 // Implements log::Log to plug into the log crate.
 //
 // Delegates the real logging to the configured PrimaryWriter and optionally to other writers.
 // The `PrimaryWriter` is either a `StdErrWriter` or an `ExtendedFileWriter`.
 // An ExtendedFileWriter logs to a file, by delegating to a FileWriter,
 // and can additionally duplicate log lines to stderr.
-pub struct FlexiLogger {
-    log_specification: LogSpec,
+pub(crate) struct FlexiLogger {
+    log_specification: Arc<RwLock<LogSpecification>>,
     primary_writer: Arc<PrimaryWriter>,
     other_writers: HashMap<String, Box<LogWriter>>,
 }
 
 impl FlexiLogger {
     pub fn new(
-        log_specification: LogSpec,
+        log_specification: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
         other_writers: HashMap<String, Box<LogWriter>>,
     ) -> FlexiLogger {
@@ -38,15 +33,10 @@ impl FlexiLogger {
     }
     // Implementation of Log::enabled() with easier testable signature
     fn fl_enabled(&self, level: log::Level, target: &str) -> bool {
-        match self.log_specification {
-            LogSpec::STATIC(ref ls) => ls.enabled(level, target),
-            LogSpec::DYNAMIC(ref locked_ls) => {
-                let guard = locked_ls.read();
-                guard.as_ref()
+        let guard = self.log_specification.read();
+        guard.as_ref()
                     .unwrap(/* not sure if we should expose this */)
                     .enabled(level, target)
-            }
-        }
     }
 }
 
@@ -95,15 +85,9 @@ impl log::Log for FlexiLogger {
             }
         };
 
-        if !match self.log_specification {
-            LogSpec::STATIC(ref ls) => check_text_filter(ls.text_filter()),
-            LogSpec::DYNAMIC(ref locked_ls) => {
-                let guard = locked_ls.read();
-                check_text_filter(
-                    guard.as_ref().unwrap(/* not sure if we should expose this */).text_filter(),
-                )
-            }
-        } {
+        if !check_text_filter(
+            self.log_specification.read().as_ref().unwrap(/* expose this? */).text_filter(),
+        ) {
             return;
         }
 

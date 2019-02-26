@@ -13,7 +13,7 @@ use std::thread;
 #[cfg(feature = "specfile")]
 use std::time::Duration;
 
-use crate::flexi_logger::{FlexiLogger, LogSpec};
+use crate::flexi_logger::FlexiLogger;
 use crate::primary_writer::PrimaryWriter;
 use crate::reconfiguration_handle::reconfiguration_handle;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
@@ -51,17 +51,22 @@ use crate::{formats, FlexiLoggerError, LogSpecification};
 /// * and finally start the logger with
 ///
 ///   * [`start()`](struct.Logger.html#method.start),
-///   * or [`start_reconfigurable()`](struct.Logger.html#method.start_reconfigurable),
 ///   * or [`start_with_specfile()`](struct.Logger.html#method.start_with_specfile).
 ///
 pub struct Logger {
     spec: LogSpecification,
     parse_errs: Option<Vec<String>>,
-    log_to_file: bool,
+    log_target: LogTarget,
     duplicate: Duplicate,
     format: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<LogWriter>>,
+}
+
+pub(crate) enum LogTarget {
+    StdErr,
+    File,
+    DevNull,
 }
 
 /// Choose a way to create a Logger instance and define how to access the (initial)
@@ -94,7 +99,7 @@ impl Logger {
         Logger {
             spec,
             parse_errs,
-            log_to_file: false,
+            log_target: LogTarget::StdErr,
             duplicate: Duplicate::None,
             format: formats::default_format,
             flwb: FileLogWriter::builder(),
@@ -117,46 +122,27 @@ impl Logger {
 
 /// Choose a way how to start logging.
 impl Logger {
-    /// Consumes the Logger object and initializes `flexi_logger`.
-    ///
-    /// If started this way, the logger cannot be influenced anymore while the program is running.
-    /// This is what you want in most of the cases.
-    pub fn start(mut self) -> Result<(), FlexiLoggerError> {
-        let max = self.spec.max_level();
-
-        log::set_boxed_logger(Box::new(FlexiLogger::new(
-            LogSpec::STATIC(self.spec),
-            Arc::new(if self.log_to_file {
-                self.flwb = self.flwb.format(self.format);
-                PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
-            } else {
-                PrimaryWriter::stderr(self.format)
-            }),
-            self.other_writers,
-        )))?;
-        log::set_max_level(max);
-        Ok(())
-    }
-
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
     /// subsequently the log specification can be updated programmatically.
     ///
     /// This allows e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     ///
     /// See [ReconfigurationHandle](struct.ReconfigurationHandle.html) for an example.
-    pub fn start_reconfigurable(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+    pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let max = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
 
-        let primary_writer = Arc::new(if self.log_to_file {
-            self.flwb = self.flwb.format(self.format);
-            PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
-        } else {
-            PrimaryWriter::stderr(self.format)
+        let primary_writer = Arc::new(match self.log_target {
+            LogTarget::File => {
+                self.flwb = self.flwb.format(self.format);
+                PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
+            }
+            LogTarget::StdErr => PrimaryWriter::stderr(self.format),
+            LogTarget::DevNull => PrimaryWriter::BlackHole,
         });
 
         let flexi_logger = FlexiLogger::new(
-            LogSpec::DYNAMIC(Arc::clone(&spec)),
+            Arc::clone(&spec),
             Arc::clone(&primary_writer),
             self.other_writers,
         );
@@ -164,6 +150,13 @@ impl Logger {
         log::set_boxed_logger(Box::new(flexi_logger))?;
         log::set_max_level(max);
         Ok(reconfiguration_handle(spec, primary_writer))
+    }
+
+    /// This method is deprecated, because there is no performance advantage any more for
+    /// the old start() implementation (which did not all roconfiguration).
+    #[deprecated(since = "0.10.6", note = "please use `start()` instead")]
+    pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        self.start()
     }
 
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
@@ -222,7 +215,7 @@ impl Logger {
     pub fn start_with_specfile<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
         let specfile = specfile.as_ref().to_owned();
         self.spec.ensure_specfile_is_valid(&specfile)?;
-        let mut handle = self.start_reconfigurable()?;
+        let mut handle = self.start()?;
 
         // now setup fs notification to automatically reread the file, and initialize from the file
         thread::Builder::new().spawn(move || {
@@ -315,7 +308,17 @@ impl Logger {
     /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
     ///  e.g. `myprog_2015-07-08_10-44-11.log`.
     pub fn log_to_file(mut self) -> Logger {
-        self.log_to_file = true;
+        self.log_target = LogTarget::File;
+        self
+    }
+
+    /// Makes the logger write no logs at all.
+    ///
+    /// This can be useful when you want to run tests of your programs with all log-levels active
+    /// to ensure they are working
+    /// (note that the log macros prevent arguments to inactive log-levels from being evaluated).
+    pub fn do_not_log(mut self) -> Logger {
+        self.log_target = LogTarget::DevNull;
         self
     }
 
@@ -440,7 +443,11 @@ impl Logger {
 impl Logger {
     /// With true, makes the logger write all logs to a file, otherwise to stderr.
     pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
-        self.log_to_file = log_to_file;
+        if log_to_file {
+            self.log_target = LogTarget::File;
+        } else {
+            self.log_target = LogTarget::StdErr;
+        }
         self
     }
 

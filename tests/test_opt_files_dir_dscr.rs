@@ -11,7 +11,7 @@ fn test_opt_files_dir_dscr() {
         .log_to_file()
         .directory("log_files")
         .discriminant("foo")
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");

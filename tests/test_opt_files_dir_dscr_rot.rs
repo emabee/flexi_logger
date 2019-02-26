@@ -14,7 +14,7 @@ fn test_opt_files_dir_dscr_rot() {
         .discriminant("foo".to_string())
         .rotate_over_size(2000)
         .create_symlink(link_name.clone())
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");

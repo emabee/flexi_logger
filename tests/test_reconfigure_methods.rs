@@ -8,7 +8,7 @@ use flexi_logger::{Logger, ReconfigurationHandle};
 fn test_reconfigure_methods() {
     let mut log_handle = Logger::with_str("info")
         .log_to_file()
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     test_parse_new_spec(&mut log_handle);

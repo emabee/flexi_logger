@@ -9,24 +9,25 @@ use std::sync::RwLock;
 ///
 /// # Example
 ///
-/// Obtain the `ReconfigurationHandle` (using `.start_reconfigurable()` instead of `.start()`):
+/// Obtain the `ReconfigurationHandle` (using `.start()`):
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
 /// let mut log_handle = Logger::with_str("info")
 ///     // ... your logger configuration goes here, as usual
-///     .start_reconfigurable()
+///     .start()
 ///     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 ///
 /// // ...
 /// ```
 ///
-/// You can permanently exchange the log specification programmatically:
+/// You can permanently exchange the log specification programmatically, anywhere in your code:
 ///
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
 /// # let mut log_handle = Logger::with_str("info")
-/// #     .start_reconfigurable()
+/// #     .start()
 /// #     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+/// // ...
 /// log_handle.parse_new_spec("warn");
 /// // ...
 /// ```
@@ -38,7 +39,7 @@ use std::sync::RwLock;
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
 /// #    let mut log_handle = Logger::with_str("info")
-/// #        .start_reconfigurable()
+/// #        .start()
 /// #        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 /// log_handle.parse_and_push_temp_spec("trace");
 /// // ...

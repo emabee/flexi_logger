@@ -10,7 +10,7 @@ fn test_detailed_files_dscr() {
         .format(detailed_format)
         .log_to_file()
         .discriminant("foo")
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");

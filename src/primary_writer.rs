@@ -9,9 +9,10 @@ use crate::FormatFunction;
 
 // Writes either to stderr or to a file.
 #[allow(clippy::large_enum_variant)]
-pub enum PrimaryWriter {
+pub(crate) enum PrimaryWriter {
     StdErrWriter(StdErrWriter),
     ExtendedFileWriter(ExtendedFileWriter),
+    BlackHole,
 }
 impl PrimaryWriter {
     pub fn file(duplicate: Duplicate, file_log_writer: FileLogWriter) -> PrimaryWriter {
@@ -29,6 +30,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.write(record),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.write(record),
+            PrimaryWriter::BlackHole => Ok(()),
         }
     }
 
@@ -37,6 +39,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.flush(),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.flush(),
+            PrimaryWriter::BlackHole => Ok(()),
         }
     }
 
@@ -47,6 +50,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(_) => false,
             PrimaryWriter::ExtendedFileWriter(ref w) => w.validate_logs(expected),
+            PrimaryWriter::BlackHole => false,
         }
     }
 }

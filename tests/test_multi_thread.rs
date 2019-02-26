@@ -26,20 +26,20 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    let mut reconf_handle = Logger::with_str("info")
+    let mut reconf_handle = Logger::with_str("debug")
         .log_to_file()
         .format(test_format)
-        .duplicate_to_stderr(Duplicate::Error)
+        .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())
         .rotate_over_size(ROTATE_OVER_SIZE)
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    error!(
+    info!(
         "create a huge number of log lines with a considerable number of threads, verify the log"
     );
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
-    let new_spec = LogSpecification::parse("debug").unwrap();
+    let new_spec = LogSpecification::parse("trace").unwrap();
     thread::Builder::new()
         .spawn(move || {
             thread::sleep(time::Duration::from_millis(1000));
@@ -51,7 +51,7 @@ fn multi_threaded() {
     wait_for_workers_to_close(worker_handles);
 
     let delta = Local::now().signed_duration_since(start).num_milliseconds();
-    info!(
+    debug!(
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
     );
@@ -80,11 +80,11 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 
 fn do_work(thread_number: usize) {
     trace!("({})     Thread started working", thread_number);
-    debug!("ERROR_IF_PRINTED");
+    trace!("ERROR_IF_PRINTED");
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
-        info!("({})  writing out line number {}", thread_number, idx);
+        debug!("({})  writing out line number {}", thread_number, idx);
     }
-    debug!("MUST_BE_PRINTED");
+    trace!("MUST_BE_PRINTED");
 }
 
 fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
@@ -149,9 +149,9 @@ fn verify_logs(directory: &str) {
     }
     assert_eq!(
         line_count,
-        NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 2 + NO_OF_THREADS
+        NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 3 + NO_OF_THREADS
     );
-    error!(
+    info!(
         "Wrote {} log lines from {} threads into {} files",
         line_count, NO_OF_THREADS, no_of_log_files
     );

@@ -1,6 +1,7 @@
 # flexi_logger
 
-A flexible and easy-to-use logger that writes logs to stderr and/or to files.
+**A flexible and easy-to-use logger that writes logs to stderr and/or to files,
+and that can be influenced while the program is running.**
 
 ## Usage
 
@@ -8,7 +9,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "^0.10.5"
+flexi_logger = "^0.10.6"
 log = "0.4"
 ```
 
@@ -16,7 +17,7 @@ or, if you want to use the `specfile` feature, with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "^0.10.5", features = ["specfile"] }
+flexi_logger = { version = "^0.10.6", features = ["specfile"] }
 log = "0.4"
 ```
 
@@ -24,16 +25,14 @@ Note: `log` is needed because `flexi_logger` plugs into the standard Rust loggin
 by the [log crate](https://crates.io/crates/log),
 and you use the ```log``` macros to write log lines from your code.
 
-### Example 1
+## Example 1: log to stderr
 
 To read the log specification from the environment variable  `RUST_LOG` and write the logs
 to stderr (i.e., behave like `env_logger`),
 do this early in your program:
 
 ```rust
-use flexi_logger::Logger;
-// ...
-Logger::with_env()
+flexi_logger::Logger::with_env()
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 ```
@@ -46,7 +45,7 @@ To log differently, you may
 * and/or add some configuration options,
 * and/or choose an alternative `start...` method.
 
-### Example 2
+## Example 2: log to files in a folder
 
 In the folllowing example we
 
@@ -56,7 +55,7 @@ In the folllowing example we
 * and write the log entries with time and location info (`opt_format`)
 
 ```rust
-use flexi_logger::{Logger,opt_format};
+use flexi_logger::{Logger, opt_format};
 // ...
 Logger::with_env_or_str("myprog=debug, mylib=warn")
             .log_to_file()
@@ -65,6 +64,44 @@ Logger::with_env_or_str("myprog=debug, mylib=warn")
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 ```
+
+## Example 3: reconfigure the log-spec programmatically
+
+Obtain the `ReconfigurationHandle` (using `.start()`):
+
+```rust
+let mut log_handle = flexi_logger::Logger::with_str("info")
+    // ... logger configuration ...
+    .start()
+    .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+```
+
+and modify the effective log specification from within your code:
+
+```rust
+// ...
+log_handle.parse_and_push_temp_spec("info, critical_mod = trace");
+// ... critical calls ...
+log_handle.pop_temp_spec();
+// ... continue with the log spec you had before.
+```
+
+## Example 4: reconfigure the log-spec dynamically by editing a spec-file
+
+If you start  `flexi_logger` with a specfile, e.g.
+
+```rust
+flexi_logger::Logger::with_str("info")
+   .start_with_specfile("/server/config/logspec.toml")
+   .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+```
+
+then you can change the logspec dynamically, *while your program is running*,
+by editing the specfile.
+
+See the API documentation of
+[`Logger::start_with_specfile()`](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.start_with_specfile)
+for more details.
 
 ## Options
 

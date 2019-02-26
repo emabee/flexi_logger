@@ -10,7 +10,7 @@ fn test_detailed_files_rot() {
         .format(detailed_format)
         .log_to_file()
         .rotate_over_size(2000)
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");

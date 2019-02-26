@@ -10,7 +10,7 @@ fn test_mods() {
         "info, test_mods::mymod1=debug, test_mods::mymod2=error",
     ).format(detailed_format)
         .log_to_file()
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");

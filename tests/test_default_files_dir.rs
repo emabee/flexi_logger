@@ -12,7 +12,7 @@ fn test_default_files_dir() {
     let handle = Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
