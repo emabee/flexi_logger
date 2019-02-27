@@ -138,7 +138,7 @@ impl Logger {
                 PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
             }
             LogTarget::StdErr => PrimaryWriter::stderr(self.format),
-            LogTarget::DevNull => PrimaryWriter::BlackHole,
+            LogTarget::DevNull => PrimaryWriter::black_hole(self.duplicate, self.format),
         });
 
         let flexi_logger = FlexiLogger::new(

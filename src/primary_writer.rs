@@ -12,7 +12,7 @@ use crate::FormatFunction;
 pub(crate) enum PrimaryWriter {
     StdErrWriter(StdErrWriter),
     ExtendedFileWriter(ExtendedFileWriter),
-    BlackHole,
+    BlackHole(BlackHoleWriter),
 }
 impl PrimaryWriter {
     pub fn file(duplicate: Duplicate, file_log_writer: FileLogWriter) -> PrimaryWriter {
@@ -25,12 +25,16 @@ impl PrimaryWriter {
         PrimaryWriter::StdErrWriter(StdErrWriter { format })
     }
 
+    pub fn black_hole(duplicate: Duplicate, format: FormatFunction) -> PrimaryWriter {
+        PrimaryWriter::BlackHole(BlackHoleWriter { duplicate, format })
+    }
+
     // Write out a log line.
     pub fn write(&self, record: &Record) -> io::Result<()> {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.write(record),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.write(record),
-            PrimaryWriter::BlackHole => Ok(()),
+            PrimaryWriter::BlackHole(ref w) => w.write(record),
         }
     }
 
@@ -39,7 +43,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.flush(),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.flush(),
-            PrimaryWriter::BlackHole => Ok(()),
+            PrimaryWriter::BlackHole(ref w) => w.flush(),
         }
     }
 
@@ -50,7 +54,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(_) => false,
             PrimaryWriter::ExtendedFileWriter(ref w) => w.validate_logs(expected),
-            PrimaryWriter::BlackHole => false,
+            PrimaryWriter::BlackHole(_) => false,
         }
     }
 }
@@ -67,6 +71,31 @@ impl StdErrWriter {
     }
 
     #[inline]
+    fn flush(&self) -> io::Result<()> {
+        io::stderr().flush()
+    }
+}
+
+/// `BlackHoleWriter` does not write any log, but can 'duplicate' messages to stderr.
+pub struct BlackHoleWriter {
+    duplicate: Duplicate,
+    format: FormatFunction,
+}
+impl BlackHoleWriter {
+    fn write(&self, record: &Record) -> io::Result<()> {
+        if match self.duplicate {
+            Duplicate::Error => record.level() == log::Level::Error,
+            Duplicate::Warn => record.level() <= log::Level::Warn,
+            Duplicate::Info => record.level() <= log::Level::Info,
+            Duplicate::Debug => record.level() <= log::Level::Debug,
+            Duplicate::Trace | Duplicate::All => true,
+            Duplicate::None => false,
+        } {
+            write_to_stderr(self.format, record)?;
+        }
+        Ok(())
+    }
+
     fn flush(&self) -> io::Result<()> {
         io::stderr().flush()
     }
