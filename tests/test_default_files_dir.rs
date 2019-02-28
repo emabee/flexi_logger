@@ -1,15 +1,8 @@
-// #![feature(test)]
-// extern crate test;
-
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
-use flexi_logger::Logger;
+use log::*;
 
 #[test]
 fn test_default_files_dir() {
-    let handle = Logger::with_str("info")
+    let handle = flexi_logger::Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
         .start()

@@ -1,13 +1,7 @@
-extern crate chrono;
-extern crate flexi_logger;
-extern crate glob;
-#[macro_use]
-extern crate log;
-
 use chrono::Local;
 use flexi_logger::{Duplicate, LogSpecification, Logger, Record};
 use glob::glob;
-
+use log::*;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::ops::Add;

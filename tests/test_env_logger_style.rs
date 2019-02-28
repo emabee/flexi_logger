@@ -1,12 +1,8 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
-use flexi_logger::Logger;
+use log::*;
 
 #[test]
 fn you_must_see_exactly_three_messages_above_1_err_1_warn_1_info() {
-    Logger::with_str("info").start().unwrap();
+    flexi_logger::Logger::with_str("info").start().unwrap();
 
     error!("This is an error message");
     warn!("This is a warning");

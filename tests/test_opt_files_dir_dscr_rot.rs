@@ -1,7 +1,4 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
+use log::*;
 use flexi_logger::{opt_format, Logger};
 
 #[test]

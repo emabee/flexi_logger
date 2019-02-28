@@ -1,9 +1,5 @@
 #[cfg(feature = "specfile")]
-extern crate flexi_logger;
-#[cfg(feature = "specfile")]
-#[macro_use]
-extern crate log;
-
+use log::*;
 #[cfg(feature = "specfile")]
 use flexi_logger::{detailed_format, Logger};
 #[cfg(feature = "specfile")]

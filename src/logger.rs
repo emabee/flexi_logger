@@ -122,11 +122,10 @@ impl Logger {
 
 /// Choose a way how to start logging.
 impl Logger {
-    /// Consumes the Logger object and initializes `flexi_logger` in a way that
-    /// subsequently the log specification can be updated programmatically.
+    /// Consumes the Logger object and initializes `flexi_logger`.
     ///
-    /// This allows e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    ///
+    /// The returned reconfiguration handle allows updating the log specification programmatically
+    /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     /// See [ReconfigurationHandle](struct.ReconfigurationHandle.html) for an example.
     pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let max = self.spec.max_level();
@@ -152,8 +151,9 @@ impl Logger {
         Ok(reconfiguration_handle(spec, primary_writer))
     }
 
-    /// This method is deprecated, because there is no performance advantage any more for
-    /// the old start() implementation (which did not all roconfiguration).
+    /// This method is deprecated. The standard `start()` method now returns a
+    /// reconfiguration handle because there is no performance penalty any more for
+    /// reconfigurability.
     #[deprecated(since = "0.10.6", note = "please use `start()` instead")]
     pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         self.start()
@@ -315,8 +315,9 @@ impl Logger {
     /// Makes the logger write no logs at all.
     ///
     /// This can be useful when you want to run tests of your programs with all log-levels active
-    /// to ensure they are working
-    /// (note that the log macros prevent arguments to inactive log-levels from being evaluated).
+    /// to ensure they log calls which are normally not active will not cause
+    /// undesired side-effects when activated
+    /// (note that the log macros prevent arguments of inactive log-calls from being evaluated).
     pub fn do_not_log(mut self) -> Logger {
         self.log_target = LogTarget::DevNull;
         self
@@ -336,14 +337,14 @@ impl Logger {
     }
 
     /// Makes the logger write all logged error messages additionally to stderr.
-    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
+    #[deprecated(since = "0.9.1", note = "use duplicate_to_stderr(Duplicate::Error)")]
     pub fn duplicate_error(mut self) -> Logger {
         self.duplicate = Duplicate::Error;
         self
     }
 
     /// Makes the logger write all logged error, warning, and info messages additionally to stderr.
-    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
+    #[deprecated(since = "0.9.1", note = "use duplicate_to_stderr(Duplicate::Info)")]
     pub fn duplicate_info(mut self) -> Logger {
         self.duplicate = Duplicate::Info;
         self
@@ -389,13 +390,46 @@ impl Logger {
 
     /// Prevents indefinite growth of log files.
     ///
-    /// For details, see
-    /// [FileLogWriterBuilder::rotate_over_size](./writers/struct.FileLogWriterBuilder.html#method.rotate_over_size).
+    /// By default, the log file is fixed while your program is running and will grow indefinitely.
+    /// With this option being used, when the log file reaches or exceeds the specified file size,
+    /// the file will be closed and a new file will be opened.
+    ///
+    /// The rotate-over-size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
+    /// files once they reach a size of 1000 bytes.
+    ///     
+    /// Note that also the filename pattern changes:
+    ///
+    /// - by default, no timestamp is added to the filename
+    /// - the logs are always written to a file with infix `_rCURRENT`
+    /// - if this file exceeds the specified rotate-over-size, it is closed and renamed to a file
+    ///   with a sequential number infix,
+    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`
+    ///
+    /// Example:
+    ///
+    /// After some logging with your program `my_prog`, you will find files like
+    ///
+    /// ```text
+    /// my_prog_r00000.log
+    /// my_prog_r00001.log
+    /// my_prog_r00002.log
+    /// my_prog_rCURRENT.log
+    /// ```
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
         self.flwb = self
             .flwb
             .rotate_over_size(rotate_over_size)
             .o_timestamp(false);
+        self
+    }
+
+    /// If file rotation is used, this option allows delimiting the number of log files
+    /// that are created by the program by deleting the oldest files, if necessary.
+    ///
+    /// Example: setting the value to 2 means that all except the last two rotated files
+    /// are being deleted.
+    pub fn max_number_of_files(mut self, max_number_of_files: usize) -> Logger {
+        self.flwb = self.flwb.max_number_of_files(max_number_of_files);
         self
     }
 

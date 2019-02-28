@@ -421,20 +421,18 @@ fn parse_err(
 
 // #[cfg(feature = "specfile")]
 fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerError> {
-    Ok(match s.as_ref().to_lowercase().as_ref() {
-        "off" => LevelFilter::Off,
-        "error" => LevelFilter::Error,
-        "warn" => LevelFilter::Warn,
-        "info" => LevelFilter::Info,
-        "debug" => LevelFilter::Debug,
-        "trace" => LevelFilter::Trace,
-        _ => {
-            return Err(FlexiLoggerError::LevelFilter(format!(
-                "unknown level filter: {}",
-                s.as_ref()
-            )))
-        }
-    })
+    match s.as_ref().to_lowercase().as_ref() {
+        "off" => Ok(LevelFilter::Off),
+        "error" => Ok(LevelFilter::Error),
+        "warn" => Ok(LevelFilter::Warn),
+        "info" => Ok(LevelFilter::Info),
+        "debug" => Ok(LevelFilter::Debug),
+        "trace" => Ok(LevelFilter::Trace),
+        _ => Err(FlexiLoggerError::LevelFilter(format!(
+            "unknown level filter: {}",
+            s.as_ref()
+        ))),
+    }
 }
 
 fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
@@ -603,7 +601,6 @@ impl LevelSort for Vec<ModuleFilter> {
 #[cfg(features = "specfile")]
 #[cfg(test)]
 mod tests {
-    extern crate log;
     use log::{Level, LevelFilter};
     use {LogSpecBuilder, LogSpecification};
 

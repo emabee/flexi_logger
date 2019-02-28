@@ -5,7 +5,6 @@ use crate::FormatFunction;
 use log::Record;
 
 use chrono::Local;
-use glob::glob;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
@@ -29,6 +28,7 @@ struct FileLogWriterConfig {
     use_timestamp: bool,
     append: bool,
     rotate_over_size: Option<u64>,
+    log_file_limit: Option<usize>,
     create_symlink: Option<String>,
 }
 impl FileLogWriterConfig {
@@ -41,6 +41,7 @@ impl FileLogWriterConfig {
             suffix: "log".to_string(),
             use_timestamp: true,
             append: false,
+            log_file_limit: None,
             rotate_over_size: None,
             create_symlink: None,
         }
@@ -122,6 +123,16 @@ impl FileLogWriterBuilder {
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
         self.config.rotate_over_size = Some(rotate_over_size as u64);
         self.config.use_timestamp = false;
+        self
+    }
+
+    /// If file rotation is used, this option allows delimiting the number of log files
+    /// that are created by the program by deleting the oldest files, if necessary.
+    ///
+    /// Example: setting the value to 2 means that all except the last two rotated files
+    /// are being deleted.
+    pub fn max_number_of_files(mut self, max_number_of_files: usize) -> FileLogWriterBuilder {
+        self.config.log_file_limit = Some(max_number_of_files + 1);
         self
     }
 
@@ -288,11 +299,18 @@ impl FileLogWriterState {
     ) -> Result<(), FlexiLoggerError> {
         self.line_writer = None; // close the output file
         self.rotate_idx = Some(rotate_output_file(self.rotate_idx.take().unwrap(), config)?);
-        self.written_bytes = 0;
+
         let (line_writer, written_bytes, path) = get_linewriter(config)?;
         self.line_writer = Some(line_writer);
         self.written_bytes = written_bytes;
         self.path = path;
+
+        // FIXME feature-feature: automatically zip logfiles after rotating to the next
+
+        if let Some(limit) = config.log_file_limit {
+            remove_too_old_logfiles(limit, &config.path_base, &config.suffix)?;
+        }
+
         Ok(())
     }
 }
@@ -358,23 +376,16 @@ fn get_linewriter(
 }
 
 fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
-    let mut rotate_idx = 0;
-    let fn_pattern = String::with_capacity(180)
-        .add(path_base)
-        .add("_r*")
-        .add(".")
-        .add(suffix);
-    match glob(&fn_pattern) {
+    match list_of_log_files(path_base, suffix) {
         Err(e) => {
-            eprintln!("Listing files with ({}) failed with {}", fn_pattern, e);
+            eprintln!("Listing files failed with {}", e);
+            0
         }
         Ok(globresults) => {
+            let mut rotate_idx = 0;
             for globresult in globresults {
                 match globresult {
-                    Err(e) => eprintln!(
-                        "Error occured when reading directory for log files: {:?}",
-                        e
-                    ),
+                    Err(e) => eprintln!("Error when reading directory for log files: {:?}", e),
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
@@ -383,9 +394,39 @@ fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
                     }
                 }
             }
+            rotate_idx
         }
     }
-    rotate_idx
+}
+
+fn list_of_log_files(path_base: &str, suffix: &str) -> Result<glob::Paths, FlexiLoggerError> {
+    let fn_pattern = String::with_capacity(180)
+        .add(path_base)
+        .add("_r*")
+        .add(".")
+        .add(suffix);
+    Ok(glob::glob(&fn_pattern)?)
+}
+
+fn remove_too_old_logfiles(
+    limit: usize,
+    path_base: &str,
+    suffix: &str,
+) -> Result<(), FlexiLoggerError> {
+    // count number of existing log files
+    let mut file_list: Vec<_> = list_of_log_files(path_base, suffix)?
+        .filter_map(|gr| gr.ok())
+        .collect();
+
+    if file_list.len() > limit {
+        // if too many, list them by name, in ascending order, and remove the first ones
+        file_list.sort_unstable();
+        for file in file_list.iter().take(file_list.len() - limit) {
+            eprintln!("remove {}", file.to_str().unwrap());
+            std::fs::remove_file(&file)?;
+        }
+    }
+    Ok(())
 }
 
 fn rotate_output_file(

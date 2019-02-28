@@ -19,9 +19,7 @@
 //! show some example calls.
 //!
 //! ```rust
-//! extern crate flexi_logger;
-//! #[macro_use]
-//! extern crate log;
+//! use log::*;
 //!
 //! use flexi_logger::Logger;
 //! use flexi_logger::writers::FileLogWriter;
@@ -75,5 +73,5 @@
 mod file_log_writer;
 mod log_writer;
 
-pub use self::log_writer::LogWriter;
 pub use self::file_log_writer::{FileLogWriter, FileLogWriterBuilder};
+pub use self::log_writer::LogWriter;

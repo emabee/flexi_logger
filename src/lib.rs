@@ -20,21 +20,6 @@
 //!
 //! See [the homepage](https://crates.io/crates/flexi_logger) for how to get started.
 
-// #[cfg_attr(feature = "specfile", macro_use)]
-// extern crate log;
-
-// #[cfg(feature = "specfile")]
-// extern crate notify;
-// #[cfg(feature = "specfile")]
-// extern crate serde;
-
-// #[cfg(feature = "specfile")]
-// #[macro_use]
-// extern crate serde_derive;
-
-// #[cfg(feature = "specfile")]
-// extern crate toml;
-
 mod flexi_error;
 mod flexi_logger;
 mod formats;

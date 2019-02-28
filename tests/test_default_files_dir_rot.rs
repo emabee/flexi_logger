@@ -1,13 +1,8 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
-use flexi_logger::{default_format, Logger};
+use log::*;
 
 #[test]
 fn test_default_files_dir_rot() {
-    Logger::with_str("info")
-        .format(default_format)
+    flexi_logger::Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
         .rotate_over_size(2000)

@@ -1,12 +1,7 @@
 use crate::log_specification::LogSpecification;
 use log;
-#[cfg(feature = "specfile")]
-use notify;
 use std::error::Error;
 use std::fmt;
-use std::io;
-#[cfg(feature = "specfile")]
-use toml;
 
 /// Describes errors in the initialization of `flexi_logger`.
 #[derive(Debug)]
@@ -14,7 +9,7 @@ pub enum FlexiLoggerError {
     /// Log file cannot be written because the specified path is not a directory.
     BadDirectory,
     /// Log cannot be written because the configured output directory is not accessible.
-    Io(io::Error),
+    Io(std::io::Error),
     /// Error with fs-notifications for the specfile
     #[cfg(feature = "specfile")]
     Notify(notify::Error),
@@ -86,11 +81,17 @@ impl From<log::SetLoggerError> for FlexiLoggerError {
         FlexiLoggerError::Log(err)
     }
 }
-impl From<io::Error> for FlexiLoggerError {
-    fn from(err: io::Error) -> FlexiLoggerError {
+impl From<std::io::Error> for FlexiLoggerError {
+    fn from(err: std::io::Error) -> FlexiLoggerError {
         FlexiLoggerError::Io(err)
     }
 }
+impl From<glob::PatternError> for FlexiLoggerError {
+    fn from(err: glob::PatternError) -> FlexiLoggerError {
+        FlexiLoggerError::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
+    }
+}
+
 #[cfg(feature = "specfile")]
 impl From<toml::de::Error> for FlexiLoggerError {
     fn from(err: toml::de::Error) -> FlexiLoggerError {

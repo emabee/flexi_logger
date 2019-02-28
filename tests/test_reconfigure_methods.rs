@@ -1,7 +1,4 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
+use log::*;
 use flexi_logger::{Logger, ReconfigurationHandle};
 
 #[test]
@@ -41,7 +38,6 @@ fn test_parse_new_spec(log_handle: &mut ReconfigurationHandle) {
 }
 
 fn test_push_new_spec(log_handle: &mut ReconfigurationHandle) {
-
     error!("2-error message");
     warn!("2-warning");
     info!("2-info message");

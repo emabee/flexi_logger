@@ -1,8 +1,6 @@
-#[macro_use]
-extern crate log;
-
 use flexi_logger::writers::{FileLogWriter, LogWriter};
 use flexi_logger::{detailed_format, Logger, Record};
+use log::*;
 
 use std::io;
 use std::sync::Arc;

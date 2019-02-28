@@ -1,8 +1,5 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
 use flexi_logger::{detailed_format, Logger};
+use log::*;
 
 #[test]
 fn test_detailed_files_rot_timestamp() {

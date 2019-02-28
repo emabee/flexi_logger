@@ -1,17 +1,14 @@
-extern crate flexi_logger;
-#[macro_use]
-extern crate log;
-
 use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
+use log::*;
 
 #[test]
 fn test_mods() {
-    let handle: ReconfigurationHandle = Logger::with_env_or_str(
-        "info, test_mods::mymod1=debug, test_mods::mymod2=error",
-    ).format(detailed_format)
-        .log_to_file()
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    let handle: ReconfigurationHandle =
+        Logger::with_env_or_str("info, test_mods::mymod1=debug, test_mods::mymod2=error")
+            .format(detailed_format)
+            .log_to_file()
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -35,6 +32,7 @@ fn test_mods() {
 }
 
 mod mymod1 {
+    use log::*;
     pub fn test_traces() {
         error!("This is an error message");
         warn!("This is a warning");
@@ -44,6 +42,7 @@ mod mymod1 {
     }
 }
 mod mymod2 {
+    use log::*;
     pub fn test_traces() {
         error!("This is an error message");
         warn!("This is a warning - you must not see it!");
