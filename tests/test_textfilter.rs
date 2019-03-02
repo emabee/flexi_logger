@@ -1,5 +1,5 @@
-use log::*;
 use flexi_logger::{default_format, LogSpecification, Logger};
+use log::*;
 
 use std::env;
 use std::fs::File;

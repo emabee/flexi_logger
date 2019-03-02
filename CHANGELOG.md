@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2019-03-02
+
+Add options to cleanup rotated log files, by deleting and/or zipping older files.
+
+Remove some deprecated methods.
+
 ## [0.10.7] - 2019-02-27
 
 Let the BlackHoleLogger, although it doesn't write a log, still duplicate to stderr.

@@ -2,7 +2,10 @@ use log::*;
 
 #[test]
 fn you_must_not_see_anything() {
-    flexi_logger::Logger::with_str("info").do_not_log().start().unwrap();
+    flexi_logger::Logger::with_str("info")
+        .do_not_log()
+        .start()
+        .unwrap();
 
     error!("This is an error message - you must not see it!");
     warn!("This is a warning - you must not see it!");

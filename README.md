@@ -9,15 +9,15 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "^0.10.7"
+flexi_logger = "0.11"
 log = "0.4"
 ```
 
-or, if you want to use the `specfile` feature, with
+or, if you want to use the optional features, with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "^0.10.7", features = ["specfile"] }
+flexi_logger = { version = "0.11", features = ["specfile", "ziplogs"] }
 log = "0.4"
 ```
 
@@ -134,6 +134,11 @@ you can change the logging behavior in real-time.
 The implementation of this feature uses some additional crates that you might
 not want to depend on with your program if you don't use this functionality.
 For that reason the feature is not active by default.
+
+### `ziplogs`
+
+The `ziplogs` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
+or all rotated log files in zipped form rather than as text files.
 
 ## Versions
 

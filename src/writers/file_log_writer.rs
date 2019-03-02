@@ -1,4 +1,5 @@
 use crate::formats::default_format;
+use crate::logger::Cleanup;
 use crate::writers::log_writer::LogWriter;
 use crate::FlexiLoggerError;
 use crate::FormatFunction;
@@ -8,8 +9,10 @@ use chrono::Local;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, BufRead, BufReader, LineWriter, Write};
+use std::fs::{File, OpenOptions};
+#[cfg(feature = "ziplogs")]
+use std::io::Read;
+use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::ops::{Add, DerefMut};
 use std::path::Path;
 use std::sync::Mutex;
@@ -28,7 +31,7 @@ struct FileLogWriterConfig {
     use_timestamp: bool,
     append: bool,
     rotate_over_size: Option<u64>,
-    log_file_limit: Option<usize>,
+    cleanup: Cleanup,
     create_symlink: Option<String>,
 }
 impl FileLogWriterConfig {
@@ -41,7 +44,7 @@ impl FileLogWriterConfig {
             suffix: "log".to_string(),
             use_timestamp: true,
             append: false,
-            log_file_limit: None,
+            cleanup: Cleanup::Never,
             rotate_over_size: None,
             create_symlink: None,
         }
@@ -120,19 +123,21 @@ impl FileLogWriterBuilder {
     /// my_prog_rCURRENT.log
     /// ```
     ///
-    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
+    /// The cleanup parameter allows defining the strategy for dealing with older files.
+    /// See [Cleanup](Cleanup) for details.
+    pub fn rotate(mut self, rotate_over_size: usize, cleanup: Cleanup) -> FileLogWriterBuilder {
+        self.config.cleanup = cleanup;
         self.config.rotate_over_size = Some(rotate_over_size as u64);
         self.config.use_timestamp = false;
         self
     }
 
-    /// If file rotation is used, this option allows delimiting the number of log files
-    /// that are created by the program by deleting the oldest files, if necessary.
+    /// Prevents indefinite growth of log files.
     ///
-    /// Example: setting the value to 2 means that all except the last two rotated files
-    /// are being deleted.
-    pub fn max_number_of_files(mut self, max_number_of_files: usize) -> FileLogWriterBuilder {
-        self.config.log_file_limit = Some(max_number_of_files + 1);
+    #[deprecated(since = "0.11.0", note = "use rotate(size, cleanup)")]
+    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
+        self.config.rotate_over_size = Some(rotate_over_size as u64);
+        self.config.use_timestamp = false;
         self
     }
 
@@ -161,8 +166,8 @@ impl FileLogWriterBuilder {
         // make sure the folder exists or create it
         let s_directory: String = self.directory.unwrap_or_else(|| ".".to_string());
         let p_directory = Path::new(&s_directory);
-        fs::create_dir_all(&p_directory)?;
-        if !fs::metadata(&p_directory)?.is_dir() {
+        std::fs::create_dir_all(&p_directory)?;
+        if !std::fs::metadata(&p_directory)?.is_dir() {
             return Err(FlexiLoggerError::BadDirectory);
         };
 
@@ -216,6 +221,32 @@ impl FileLogWriterBuilder {
     }
 
     /// By default, and with None, the log file will grow indefinitely.
+    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
+    /// the file will be closed and a new file will be opened.
+    /// Also the filename pattern changes: instead of the timestamp, a serial number
+    /// is included into the filename.
+    ///
+    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
+    /// files once they reach a size of 1 kB.
+    ///
+    /// The cleanup strategy allows delimiting the used space on disk.
+    pub fn o_rotate(mut self, rotate_config: Option<(u64, Cleanup)>) -> FileLogWriterBuilder {
+        match rotate_config {
+            Some((s, c)) => {
+                self.config.rotate_over_size = Some(s);
+                self.config.cleanup = c;
+                self.config.use_timestamp = false;
+            }
+            None => {
+                self.config.rotate_over_size = None;
+                self.config.cleanup = Cleanup::Never;
+                self.config.use_timestamp = true;
+            }
+        }
+        self
+    }
+
+    /// By default, and with None, the log file will grow indefinitely.
     /// If a size is set, when the log file reaches or exceeds the specified size,
     /// the file will be closed and a new file will be opened.
     /// Also the filename pattern changes: instead of the timestamp, a serial number
@@ -223,9 +254,10 @@ impl FileLogWriterBuilder {
     ///
     /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
     /// files once they reach a size of 1 kB.
+    #[deprecated(since = "0.11.0", note = "please use o_rotate()")]
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
         self.config.rotate_over_size = rotate_over_size.map(|r| r as u64);
-        self.config.use_timestamp = false;
+        self.config.use_timestamp = rotate_over_size.is_none();
         self
     }
 
@@ -305,11 +337,7 @@ impl FileLogWriterState {
         self.written_bytes = written_bytes;
         self.path = path;
 
-        // FIXME feature-feature: automatically zip logfiles after rotating to the next
-
-        if let Some(limit) = config.log_file_limit {
-            remove_too_old_logfiles(limit, &config.path_base, &config.suffix)?;
-        }
+        remove_or_zip_too_old_logfiles(&config)?;
 
         Ok(())
     }
@@ -317,7 +345,7 @@ impl FileLogWriterState {
 
 impl Write for FileLogWriterState {
     #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.line_writer().write_all(buf)?;
         if self.rotate_idx.is_some() {
             self.written_bytes += buf.len() as u64;
@@ -326,7 +354,7 @@ impl Write for FileLogWriterState {
     }
 
     #[inline]
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         self.line_writer().flush()
     }
 }
@@ -365,7 +393,7 @@ fn get_linewriter(
                     .open(&p_path)?,
             ),
             if config.append {
-                let metadata = fs::metadata(&s_path)?;
+                let metadata = std::fs::metadata(&s_path)?;
                 metadata.len()
             } else {
                 0
@@ -376,7 +404,7 @@ fn get_linewriter(
 }
 
 fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
-    match list_of_log_files(path_base, suffix) {
+    match list_of_log_and_zip_files(path_base, suffix) {
         Err(e) => {
             eprintln!("Listing files failed with {}", e);
             0
@@ -399,33 +427,72 @@ fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
     }
 }
 
-fn list_of_log_files(path_base: &str, suffix: &str) -> Result<glob::Paths, FlexiLoggerError> {
-    let fn_pattern = String::with_capacity(180)
-        .add(path_base)
-        .add("_r*")
-        .add(".")
-        .add(suffix);
-    Ok(glob::glob(&fn_pattern)?)
-}
-
-fn remove_too_old_logfiles(
-    limit: usize,
+fn list_of_log_and_zip_files(
     path_base: &str,
     suffix: &str,
-) -> Result<(), FlexiLoggerError> {
-    // count number of existing log files
-    let mut file_list: Vec<_> = list_of_log_files(path_base, suffix)?
+) -> Result<std::iter::Chain<glob::Paths, glob::Paths>, FlexiLoggerError> {
+    let fn_pattern = String::with_capacity(180)
+        .add(path_base)
+        .add("_r[0-9][0-9][0-9][0-9][0-9]*")
+        .add(".");
+
+    let log_pattern = fn_pattern.clone().add(suffix);
+    let zip_pattern = fn_pattern.add("zip");
+    Ok(glob::glob(&log_pattern)?.chain(glob::glob(&zip_pattern)?))
+}
+
+fn remove_or_zip_too_old_logfiles(config: &FileLogWriterConfig) -> Result<(), FlexiLoggerError> {
+    let (log_limit, zip_limit) = match config.cleanup {
+        Cleanup::Never => {
+            return Ok(());
+        }
+        Cleanup::KeepLogFiles(log_limit) => (log_limit, 0),
+        #[cfg(feature = "ziplogs")]
+        Cleanup::KeepZipFiles(zip_limit) => (0, zip_limit),
+        #[cfg(feature = "ziplogs")]
+        Cleanup::KeepLogAndZipFiles(log_limit, zip_limit) => (log_limit, zip_limit),
+    };
+    // list files by name, in ascending order
+    let mut file_list: Vec<_> = list_of_log_and_zip_files(&config.path_base, &config.suffix)?
         .filter_map(|gr| gr.ok())
         .collect();
+    file_list.sort_unstable();
+    let total_number_of_files = file_list.len();
 
-    if file_list.len() > limit {
-        // if too many, list them by name, in ascending order, and remove the first ones
-        file_list.sort_unstable();
-        for file in file_list.iter().take(file_list.len() - limit) {
-            eprintln!("remove {}", file.to_str().unwrap());
+    // now do the work
+    for (index, file) in file_list.iter().enumerate() {
+        if total_number_of_files - index > log_limit + zip_limit {
+            // delete (zip or log)
             std::fs::remove_file(&file)?;
+        } else if total_number_of_files - index > log_limit {
+            // zip, if not yet zipped
+            #[cfg(feature = "ziplogs")]
+            {
+                if let Some(extension) = file.extension() {
+                    if extension != "zip" {
+                        let mut old_file = File::open(file)?;
+                        let mut zip_file = file.clone();
+                        zip_file.set_extension("zip");
+                        let mut zip = zip::ZipWriter::new(File::create(zip_file)?);
+
+                        let options = zip::write::FileOptions::default()
+                            .compression_method(zip::CompressionMethod::Bzip2);
+                        zip.start_file(file.file_name().unwrap().to_string_lossy(), options)?;
+                        {
+                            // streaming does not work easily :-(
+                            // std::io::copy(&mut old_file, &mut zip)?;
+                            let mut buf = Vec::<u8>::new();
+                            old_file.read_to_end(&mut buf)?;
+                            zip.write_all(&buf)?;
+                        }
+                        zip.finish()?;
+                        std::fs::remove_file(&file)?;
+                    }
+                }
+            }
         }
     }
+
     Ok(())
 }
 
@@ -510,7 +577,7 @@ impl FileLogWriter {
 
 impl LogWriter for FileLogWriter {
     #[inline]
-    fn write(&self, record: &Record) -> io::Result<()> {
+    fn write(&self, record: &Record) -> std::io::Result<()> {
         let guard = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
         let mut state = guard.borrow_mut(); // : RefMut<FileLogWriterState>
         let state = state.deref_mut(); // : &mut FileLogWriterState
@@ -531,7 +598,7 @@ impl LogWriter for FileLogWriter {
     }
 
     #[inline]
-    fn flush(&self) -> io::Result<()> {
+    fn flush(&self) -> std::io::Result<()> {
         let guard = self.state.lock().unwrap();
         let mut state = guard.borrow_mut();
         state.line_writer().flush()

@@ -1,5 +1,5 @@
-use log::*;
 use flexi_logger::{opt_format, Logger};
+use log::*;
 
 #[test]
 fn test_opt_files_dir_dscr() {

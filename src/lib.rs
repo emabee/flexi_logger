@@ -36,7 +36,7 @@ pub use log::{Level, LevelFilter, Record};
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification};
-pub use crate::logger::{Duplicate, Logger};
+pub use crate::logger::{Cleanup, Duplicate, Logger};
 pub use crate::reconfiguration_handle::ReconfigurationHandle;
 
 use std::io;

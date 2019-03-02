@@ -336,20 +336,6 @@ impl Logger {
         self
     }
 
-    /// Makes the logger write all logged error messages additionally to stderr.
-    #[deprecated(since = "0.9.1", note = "use duplicate_to_stderr(Duplicate::Error)")]
-    pub fn duplicate_error(mut self) -> Logger {
-        self.duplicate = Duplicate::Error;
-        self
-    }
-
-    /// Makes the logger write all logged error, warning, and info messages additionally to stderr.
-    #[deprecated(since = "0.9.1", note = "use duplicate_to_stderr(Duplicate::Info)")]
-    pub fn duplicate_info(mut self) -> Logger {
-        self.duplicate = Duplicate::Info;
-        self
-    }
-
     /// Makes the logger use the provided format function for the log entries,
     /// rather than [formats::default_format](fn.default_format.html).
     ///
@@ -415,21 +401,24 @@ impl Logger {
     /// my_prog_r00002.log
     /// my_prog_rCURRENT.log
     /// ```
-    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
-        self.flwb = self
-            .flwb
-            .rotate_over_size(rotate_over_size)
-            .o_timestamp(false);
+    ///
+    /// The cleanup parameter allows defining the strategy for dealing with older files.
+    /// See [Cleanup](enum.Cleanup.html) for details.
+    pub fn rotate(mut self, rotate_over_size: usize, cleanup: Cleanup) -> Logger {
+        self.flwb = self.flwb.rotate(rotate_over_size, cleanup);
         self
     }
 
-    /// If file rotation is used, this option allows delimiting the number of log files
-    /// that are created by the program by deleting the oldest files, if necessary.
-    ///
-    /// Example: setting the value to 2 means that all except the last two rotated files
-    /// are being deleted.
-    pub fn max_number_of_files(mut self, max_number_of_files: usize) -> Logger {
-        self.flwb = self.flwb.max_number_of_files(max_number_of_files);
+    /// Prevents indefinite growth of log files.
+    #[deprecated(since = "0.11.0", note = "use `rotate()`")]
+    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
+        #[allow(deprecated)]
+        {
+            self.flwb = self
+                .flwb
+                .rotate_over_size(rotate_over_size)
+                .o_timestamp(false);
+        }
         self
     }
 
@@ -471,6 +460,31 @@ impl Logger {
     }
 }
 
+/// Defines the strateygy for handling of older log files.
+pub enum Cleanup {
+    /// Older log files are not touched - they remain for ever.
+    Never,
+    /// The specified number of rotated log files are kept.
+    /// Older files are deleted, if necessary.
+    KeepLogFiles(usize),
+    /// The specified number of rotated log files are zipped and kept.
+    /// Older files are deleted, if necessary.
+    ///
+    /// This option is only available with feature `ziplogs`.
+    #[cfg(feature = "ziplogs")]
+    KeepZipFiles(usize),
+    /// Allows keeping some files as text files and some as zip files.
+    ///
+    /// ## Example
+    ///
+    /// `KeepLogAndZipFiles(5,30)` ensures that the youngest five log files are kept as text files,
+    /// the next 30 are kept as zip files, and older files are removed.
+    ///
+    /// This option is only available with feature `ziplogs`.
+    #[cfg(feature = "ziplogs")]
+    KeepLogAndZipFiles(usize, usize),
+}
+
 /// Alternative set of methods to control the behavior of the Logger.
 /// Use these methods when you want to control the settings flexibly,
 /// e.g. with commandline arguments via `docopts` or `clap`.
@@ -492,31 +506,6 @@ impl Logger {
         self
     }
 
-    /// With true, makes the logger write all logged error messages additionally to stderr;
-    /// with false, no messages are duplicated.
-    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
-    pub fn o_duplicate_error(mut self, duplicate_error: bool) -> Logger {
-        if duplicate_error {
-            self.duplicate = Duplicate::Error;
-        } else {
-            self.duplicate = Duplicate::None;
-        }
-        self
-    }
-
-    /// With true, makes the logger write all logged error, warning,
-    /// and info messages additionally to stderr;
-    /// with false, no messages are duplicated.
-    #[deprecated(note = "use duplicate_to_stderr(dup: Duplicate)")]
-    pub fn o_duplicate_info(mut self, duplicate_info: bool) -> Logger {
-        if duplicate_info {
-            self.duplicate = Duplicate::Info;
-        } else {
-            self.duplicate = Duplicate::None;
-        }
-        self
-    }
-
     /// Specifies a folder for the log files.
     ///
     /// This parameter only has an effect if `log_to_file` is set to true.
@@ -524,6 +513,21 @@ impl Logger {
     /// With None, the log files are created in the folder where the program was started.
     pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> Logger {
         self.flwb = self.flwb.o_directory(directory);
+        self
+    }
+
+    /// By default, and with None, the log file will grow indefinitely.
+    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
+    /// the file will be closed and a new file will be opened.
+    /// Also the filename pattern changes: instead of the timestamp, a serial number
+    /// is included into the filename.
+    ///
+    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
+    /// files once they reach a size of 1 kB.
+    ///
+    /// The cleanup strategy allows delimiting the used space on disk.
+    pub fn o_rotate(mut self, rotate_config: Option<(u64, Cleanup)>) -> Logger {
+        self.flwb = self.flwb.o_rotate(rotate_config);
         self
     }
 
@@ -537,11 +541,12 @@ impl Logger {
     ///
     /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
     /// files once they reach a size of 1 kB.
+    #[deprecated(since = "0.11.0", note = "use `o_rotate()`")]
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
-        self.flwb = self
-            .flwb
-            .o_rotate_over_size(rotate_over_size)
-            .o_timestamp(rotate_over_size.is_none());
+        #[allow(deprecated)]
+        {
+            self.flwb = self.flwb.o_rotate_over_size(rotate_over_size);
+        }
         self
     }
 

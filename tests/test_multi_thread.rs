@@ -1,5 +1,5 @@
 use chrono::Local;
-use flexi_logger::{Duplicate, LogSpecification, Logger, Record};
+use flexi_logger::{Cleanup, Duplicate, LogSpecification, Logger, Record};
 use glob::glob;
 use log::*;
 use std::fs::File;
@@ -25,7 +25,7 @@ fn multi_threaded() {
         .format(test_format)
         .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())
-        .rotate_over_size(ROTATE_OVER_SIZE)
+        .rotate(ROTATE_OVER_SIZE, Cleanup::Never)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     info!(

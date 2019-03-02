@@ -1,5 +1,5 @@
-use log::*;
 use flexi_logger::{Logger, ReconfigurationHandle};
+use log::*;
 
 #[test]
 fn test_reconfigure_methods() {

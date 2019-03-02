@@ -1,5 +1,5 @@
+use flexi_logger::{opt_format, Cleanup, Logger};
 use log::*;
-use flexi_logger::{opt_format, Logger};
 
 #[test]
 fn test_opt_files_dir_dscr_rot() {
@@ -9,7 +9,7 @@ fn test_opt_files_dir_dscr_rot() {
         .log_to_file()
         .directory("log_files")
         .discriminant("foo".to_string())
-        .rotate_over_size(2000)
+        .rotate(2000, Cleanup::Never)
         .create_symlink(link_name.clone())
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

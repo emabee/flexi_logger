@@ -1,11 +1,11 @@
+use flexi_logger::*;
 use log::*;
-
 #[test]
 fn test_default_files_dir_rot() {
-    flexi_logger::Logger::with_str("info")
+    Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
-        .rotate_over_size(2000)
+        .rotate(2000, Cleanup::Never)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

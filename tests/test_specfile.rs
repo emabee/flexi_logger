@@ -1,7 +1,7 @@
 #[cfg(feature = "specfile")]
-use log::*;
-#[cfg(feature = "specfile")]
 use flexi_logger::{detailed_format, Logger};
+#[cfg(feature = "specfile")]
+use log::*;
 #[cfg(feature = "specfile")]
 use std::{fs, thread, time};
 

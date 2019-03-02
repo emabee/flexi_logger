@@ -1,5 +1,5 @@
-use log::*;
 use flexi_logger::{FlexiLoggerError, LogSpecification, Logger};
+use log::*;
 
 #[test]
 fn parse_errors_logspec() {
