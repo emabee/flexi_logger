@@ -570,6 +570,12 @@ impl FileLogWriter {
                 "Did not find tuple.2 = {}",
                 tuple.2
             );
+            #[cfg(target_family = "windows")]
+            assert!(
+                line.ends_with("\r\n"),
+                "Missed carriage return at end of line: {:?}",
+                line
+            );
         }
         false
     }
@@ -594,7 +600,7 @@ impl LogWriter for FileLogWriter {
         }
 
         (self.config.format)(state, record)?;
-        state.write_all(b"\n")
+        state.write_all(platform::END_OF_LINE)
     }
 
     #[inline]
@@ -611,6 +617,12 @@ mod platform {
     pub fn create_symlink_if_possible(link: &str, path: &Path) {
         linux_create_symlink(link, path);
     }
+
+    #[cfg(target_family = "windows")]
+    pub const END_OF_LINE: &'static [u8] = b"\r\n";
+
+    #[cfg(target_family = "unix")]
+    pub const END_OF_LINE: &'static [u8] = b"\n";
 
     #[cfg(target_os = "linux")]
     fn linux_create_symlink(link: &str, path: &Path) {
