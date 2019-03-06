@@ -315,7 +315,7 @@ impl Logger {
     /// Makes the logger write no logs at all.
     ///
     /// This can be useful when you want to run tests of your programs with all log-levels active
-    /// to ensure they log calls which are normally not active will not cause
+    /// to ensure the log calls which are normally not active will not cause
     /// undesired side-effects when activated
     /// (note that the log macros prevent arguments of inactive log-calls from being evaluated).
     pub fn do_not_log(mut self) -> Logger {
@@ -456,6 +456,12 @@ impl Logger {
     /// See [the module documentation of `writers`](writers/index.html).
     pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
         self.other_writers.insert(name.into(), writer);
+        self
+    }
+
+    /// Use Windows line endings, rather than just `\n`.
+    pub fn use_windows_line_ending(mut self) -> Logger {
+        self.flwb = self.flwb.use_windows_line_ending();
         self
     }
 }

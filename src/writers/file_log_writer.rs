@@ -33,6 +33,7 @@ struct FileLogWriterConfig {
     rotate_over_size: Option<u64>,
     cleanup: Cleanup,
     create_symlink: Option<String>,
+    use_windows_line_ending: bool,
 }
 impl FileLogWriterConfig {
     // Factory method; uses the same defaults as Logger.
@@ -47,6 +48,7 @@ impl FileLogWriterConfig {
             cleanup: Cleanup::Never,
             rotate_over_size: None,
             create_symlink: None,
+            use_windows_line_ending: false,
         }
     }
 }
@@ -158,6 +160,12 @@ impl FileLogWriterBuilder {
     /// a symbolic link to the current log file.
     pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> FileLogWriterBuilder {
         self.config.create_symlink = Some(symlink.into());
+        self
+    }
+
+    /// Use Windows line endings, rather than just `\n`.
+    pub fn use_windows_line_ending(mut self) -> FileLogWriterBuilder {
+        self.config.use_windows_line_ending = true;
         self
     }
 
@@ -292,6 +300,7 @@ struct FileLogWriterState {
     // None if no rotation is desired, or else Some(idx) where idx is the highest existing rotate_idx
     rotate_idx: Option<u32>,
     path: String,
+    line_ending: &'static [u8],
 }
 impl FileLogWriterState {
     // If rotate, the logger writes into a file with infix `_rCURRENT`.
@@ -313,6 +322,11 @@ impl FileLogWriterState {
             path,
             written_bytes,
             rotate_idx,
+            line_ending: if config.use_windows_line_ending {
+                b"\r\n"
+            } else {
+                b"\n"
+            },
         })
     }
 
@@ -594,7 +608,7 @@ impl LogWriter for FileLogWriter {
         }
 
         (self.config.format)(state, record)?;
-        state.write_all(b"\n")
+        state.write_all(state.line_ending)
     }
 
     #[inline]
