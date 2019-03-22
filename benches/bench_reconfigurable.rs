@@ -17,7 +17,7 @@ fn b20_initialize_logger(_: &mut Bencher) {
     Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
-        .start_reconfigurable()
+        .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 }
 

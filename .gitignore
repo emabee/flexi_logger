@@ -10,3 +10,4 @@ todo
 tests/logspec.toml
 *~
 .*~
+.vscode

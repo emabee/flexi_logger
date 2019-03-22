@@ -3,9 +3,8 @@ use crate::logger::Cleanup;
 use crate::writers::log_writer::LogWriter;
 use crate::FlexiLoggerError;
 use crate::FormatFunction;
-use log::Record;
-
 use chrono::Local;
+use log::Record;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
@@ -14,7 +13,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::io::{BufRead, BufReader, LineWriter, Write};
 use std::ops::{Add, DerefMut};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const CURRENT_INFIX: &str = "_rCURRENT";
@@ -26,13 +25,14 @@ fn number_infix(idx: u32) -> String {
 struct FileLogWriterConfig {
     format: FormatFunction,
     print_message: bool,
-    path_base: String,
+    directory: PathBuf,
+    file_basename: String,
     suffix: String,
     use_timestamp: bool,
     append: bool,
     rotate_over_size: Option<u64>,
     cleanup: Cleanup,
-    create_symlink: Option<String>,
+    create_symlink: Option<PathBuf>,
     use_windows_line_ending: bool,
 }
 impl FileLogWriterConfig {
@@ -41,7 +41,8 @@ impl FileLogWriterConfig {
         FileLogWriterConfig {
             format: default_format,
             print_message: false,
-            path_base: String::new(),
+            directory: PathBuf::from("."),
+            file_basename: String::new(),
             suffix: "log".to_string(),
             use_timestamp: true,
             append: false,
@@ -55,7 +56,6 @@ impl FileLogWriterConfig {
 
 /// Builder for `FileLogWriter`.
 pub struct FileLogWriterBuilder {
-    directory: Option<String>,
     discriminant: Option<String>,
     config: FileLogWriterConfig,
 }
@@ -80,8 +80,8 @@ impl FileLogWriterBuilder {
     ///
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<S: Into<String>>(mut self, directory: S) -> FileLogWriterBuilder {
-        self.directory = Some(directory.into());
+    pub fn directory<P: Into<PathBuf>>(mut self, directory: P) -> FileLogWriterBuilder {
+        self.config.directory = directory.into();
         self
     }
 
@@ -158,7 +158,7 @@ impl FileLogWriterBuilder {
 
     /// The specified String will be used on linux systems to create in the current folder
     /// a symbolic link to the current log file.
-    pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> FileLogWriterBuilder {
+    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> FileLogWriterBuilder {
         self.config.create_symlink = Some(symlink.into());
         self
     }
@@ -172,27 +172,21 @@ impl FileLogWriterBuilder {
     /// Produces the FileLogWriter.
     pub fn instantiate(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
         // make sure the folder exists or create it
-        let s_directory: String = self.directory.unwrap_or_else(|| ".".to_string());
-        let p_directory = Path::new(&s_directory);
+        let p_directory = Path::new(&self.config.directory);
         std::fs::create_dir_all(&p_directory)?;
         if !std::fs::metadata(&p_directory)?.is_dir() {
             return Err(FlexiLoggerError::BadDirectory);
         };
 
         let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
-        let progname = Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy();
-
-        self.config.path_base.clear();
-        self.config.path_base.reserve(180);
-        self.config.path_base += &s_directory;
-        self.config.path_base += "/";
-        self.config.path_base += &progname;
+        self.config.file_basename =
+            Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy().to_string();
 
         if let Some(discriminant) = self.discriminant {
-            self.config.path_base += &format!("_{}", discriminant);
+            self.config.file_basename += &format!("_{}", discriminant);
         }
         if self.config.use_timestamp {
-            self.config.path_base += &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
+            self.config.file_basename += &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
         };
 
         Ok(FileLogWriter {
@@ -217,8 +211,10 @@ impl FileLogWriterBuilder {
     ///
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> FileLogWriterBuilder {
-        self.directory = directory.map(|d| d.into());
+    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> FileLogWriterBuilder {
+        self.config.directory = directory
+            .map(|d| d.into())
+            .unwrap_or_else(|| PathBuf::from("."));
         self
     }
 
@@ -287,7 +283,10 @@ impl FileLogWriterBuilder {
 
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
-    pub fn o_create_symlink<S: Into<String>>(mut self, symlink: Option<S>) -> FileLogWriterBuilder {
+    pub fn o_create_symlink<S: Into<PathBuf>>(
+        mut self,
+        symlink: Option<S>,
+    ) -> FileLogWriterBuilder {
         self.config.create_symlink = symlink.map(|s| s.into());
         self
     }
@@ -299,7 +298,6 @@ struct FileLogWriterState {
     written_bytes: u64,
     // None if no rotation is desired, or else Some(idx) where idx is the highest existing rotate_idx
     rotate_idx: Option<u32>,
-    path: String,
     line_ending: &'static [u8],
 }
 impl FileLogWriterState {
@@ -308,7 +306,7 @@ impl FileLogWriterState {
         let rotate_idx = match config.rotate_over_size {
             None => None,
             Some(_) => Some({
-                let mut rotate_idx = get_highest_rotate_idx(&config.path_base, &config.suffix);
+                let mut rotate_idx = get_highest_rotate_idx(&config);
                 if !config.append {
                     rotate_idx = rotate_output_file(rotate_idx, config)?;
                 }
@@ -316,10 +314,9 @@ impl FileLogWriterState {
             }),
         };
 
-        let (line_writer, written_bytes, path) = get_linewriter(config)?;
+        let (line_writer, written_bytes) = get_linewriter(config)?;
         Ok(FileLogWriterState {
             line_writer: Some(line_writer),
-            path,
             written_bytes,
             rotate_idx,
             line_ending: if config.use_windows_line_ending {
@@ -346,10 +343,9 @@ impl FileLogWriterState {
         self.line_writer = None; // close the output file
         self.rotate_idx = Some(rotate_output_file(self.rotate_idx.take().unwrap(), config)?);
 
-        let (line_writer, written_bytes, path) = get_linewriter(config)?;
+        let (line_writer, written_bytes) = get_linewriter(config)?;
         self.line_writer = Some(line_writer);
         self.written_bytes = written_bytes;
-        self.path = path;
 
         remove_or_zip_too_old_logfiles(&config)?;
 
@@ -373,52 +369,52 @@ impl Write for FileLogWriterState {
     }
 }
 
-fn get_infix_path(infix: &str, config: &FileLogWriterConfig) -> String {
-    let mut s_path = String::with_capacity(180) + &config.path_base;
+fn get_filepath(infix: &str, config: &FileLogWriterConfig) -> PathBuf {
+    let mut s_filename =
+        String::with_capacity(config.file_basename.len() + infix.len() + 1 + config.suffix.len())
+            + &config.file_basename;
     if config.rotate_over_size.is_some() {
-        s_path += infix;
+        s_filename += infix;
     };
-    s_path += ".";
-    s_path + &config.suffix
+    s_filename += ".";
+    s_filename += &config.suffix;
+    let mut p_path = config.directory.to_path_buf();
+    p_path.push(s_filename);
+    p_path
 }
 
 // Returns line_writer, written_bytes, path.
 fn get_linewriter(
     config: &FileLogWriterConfig,
-) -> Result<(LineWriter<File>, u64, String), FlexiLoggerError> {
-    let s_path = get_infix_path(CURRENT_INFIX, &config);
+) -> Result<(LineWriter<File>, u64), FlexiLoggerError> {
+    let p_path = get_filepath(CURRENT_INFIX, &config);
+    if config.print_message {
+        println!("Log is written to {}", &p_path.display());
+    }
+    if let Some(ref link) = config.create_symlink {
+        self::platform::create_symlink_if_possible(link, &p_path);
+    }
 
-    let (line_writer, file_size) = {
-        let p_path = Path::new(&s_path);
-        if config.print_message {
-            println!("Log is written to {}", &p_path.display());
-        }
-        if let Some(ref link) = config.create_symlink {
-            self::platform::create_symlink_if_possible(link, p_path);
-        }
-
-        (
-            LineWriter::new(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(config.append)
-                    .truncate(!config.append)
-                    .open(&p_path)?,
-            ),
-            if config.append {
-                let metadata = std::fs::metadata(&s_path)?;
-                metadata.len()
-            } else {
-                0
-            },
-        )
-    };
-    Ok((line_writer, file_size, s_path))
+    Ok((
+        LineWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(config.append)
+                .truncate(!config.append)
+                .open(&p_path)?,
+        ),
+        if config.append {
+            let metadata = std::fs::metadata(&p_path)?;
+            metadata.len()
+        } else {
+            0
+        },
+    ))
 }
 
-fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
-    match list_of_log_and_zip_files(path_base, suffix) {
+fn get_highest_rotate_idx(config: &FileLogWriterConfig) -> u32 {
+    match list_of_log_and_zip_files(config) {
         Err(e) => {
             eprintln!("Listing files failed with {}", e);
             0
@@ -442,15 +438,15 @@ fn get_highest_rotate_idx(path_base: &str, suffix: &str) -> u32 {
 }
 
 fn list_of_log_and_zip_files(
-    path_base: &str,
-    suffix: &str,
+    config: &FileLogWriterConfig,
 ) -> Result<std::iter::Chain<glob::Paths, glob::Paths>, FlexiLoggerError> {
     let fn_pattern = String::with_capacity(180)
-        .add(path_base)
+        .add(&std::ffi::OsString::from(&config.directory).to_string_lossy())
+        .add(&config.file_basename)
         .add("_r[0-9][0-9][0-9][0-9][0-9]*")
         .add(".");
 
-    let log_pattern = fn_pattern.clone().add(suffix);
+    let log_pattern = fn_pattern.clone().add(&config.suffix);
     let zip_pattern = fn_pattern.add("zip");
     Ok(glob::glob(&log_pattern)?.chain(glob::glob(&zip_pattern)?))
 }
@@ -467,7 +463,7 @@ fn remove_or_zip_too_old_logfiles(config: &FileLogWriterConfig) -> Result<(), Fl
         Cleanup::KeepLogAndZipFiles(log_limit, zip_limit) => (log_limit, zip_limit),
     };
     // list files by name, in ascending order
-    let mut file_list: Vec<_> = list_of_log_and_zip_files(&config.path_base, &config.suffix)?
+    let mut file_list: Vec<_> = list_of_log_and_zip_files(&config)?
         .filter_map(|gr| gr.ok())
         .collect();
     file_list.sort_unstable();
@@ -517,8 +513,8 @@ fn rotate_output_file(
     // current-file must be closed already
     // move it to the name with the next rotate_idx
     match std::fs::rename(
-        get_infix_path(CURRENT_INFIX, config),
-        get_infix_path(&number_infix(rotate_idx), config),
+        get_filepath(CURRENT_INFIX, config),
+        get_filepath(&number_infix(rotate_idx), config),
     ) {
         Ok(()) => Ok(rotate_idx + 1),
         Err(e) => {
@@ -544,7 +540,6 @@ impl FileLogWriter {
     /// Instantiates a builder for `FileLogWriter`.
     pub fn builder() -> FileLogWriterBuilder {
         FileLogWriterBuilder {
-            directory: None,
             discriminant: None,
             config: FileLogWriterConfig::default(),
         }
@@ -559,9 +554,7 @@ impl FileLogWriter {
     // don't use this function in productive code - it exists only for flexi_loggers own tests
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        let guard = self.state.lock().unwrap();
-        let state = guard.borrow();
-        let path = Path::new(&state.path);
+        let path = get_filepath(CURRENT_INFIX, &self.config);
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);
 
@@ -592,9 +585,9 @@ impl FileLogWriter {
 impl LogWriter for FileLogWriter {
     #[inline]
     fn write(&self, record: &Record) -> std::io::Result<()> {
-        let guard = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
-        let mut state = guard.borrow_mut(); // : RefMut<FileLogWriterState>
-        let state = state.deref_mut(); // : &mut FileLogWriterState
+        let mr_state = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
+        let mut refmut_state = mr_state.borrow_mut(); // : RefMut<FileLogWriterState>
+        let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
 
         // switch to next file if necessary
         if let Some(rotate_over_size) = self.config.rotate_over_size {
@@ -613,39 +606,40 @@ impl LogWriter for FileLogWriter {
 
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
-        let guard = self.state.lock().unwrap();
-        let mut state = guard.borrow_mut();
+        let mr_state = self.state.lock().unwrap();
+        let mut state = mr_state.borrow_mut();
         state.line_writer().flush()
     }
 }
 
 mod platform {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
-    pub fn create_symlink_if_possible(link: &str, path: &Path) {
+    pub fn create_symlink_if_possible(link: &PathBuf, path: &Path) {
         linux_create_symlink(link, path);
     }
 
     #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &str, path: &Path) {
-        use std::fs;
-        use std::os::unix::fs as unix_fs;
-
-        if fs::metadata(link).is_ok() {
+    fn linux_create_symlink(link: &PathBuf, logfile: &Path) {
+        if std::fs::metadata(link).is_ok() {
             // old symlink must be removed before creating a new one
-            let _ = fs::remove_file(link);
+            let _ = std::fs::remove_file(link);
         }
 
-        if let Err(e) = unix_fs::symlink(&path, link) {
-            eprintln!(
-                "Can not create symlink \"{}\" for path \"{}\": {}",
-                link,
-                &path.display(),
-                e
-            );
+        if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
+            if !e.to_string().contains("Operation not supported") {
+                eprintln!(
+                    "Cannot create symlink {:?} for logfile \"{}\": {:?}",
+                    link,
+                    &logfile.display(),
+                    e
+                );
+            }
+            // no error output if e.g. writing from a linux VM to a
+            // windows host's filesystem...
         }
     }
 
     #[cfg(not(target_os = "linux"))]
-    fn linux_create_symlink(_: &str, _: &Path) {}
+    fn linux_create_symlink(_: &PathBuf, _: &Path) {}
 }

@@ -5,6 +5,7 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
 #[cfg(feature = "specfile")]
 use std::path::Path;
+use std::path::PathBuf;
 #[cfg(feature = "specfile")]
 use std::sync::mpsc::channel;
 use std::sync::{Arc, RwLock};
@@ -353,7 +354,7 @@ impl Logger {
     /// This parameter only has an effect if `log_to_file()` is used, too.
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<S: Into<String>>(mut self, directory: S) -> Logger {
+    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Logger {
         self.flwb = self.flwb.directory(directory);
         self
     }
@@ -440,11 +441,12 @@ impl Logger {
         self
     }
 
-    /// The specified String will be used on linux systems to create in the current folder
-    /// a symbolic link to the current log file.
+    /// The specified path will be used on linux systems to create a symbolic link
+    /// to the current log file.
     ///
+    /// This method has no effect on filesystems where symlinks are not supported.
     /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn create_symlink<S: Into<String>>(mut self, symlink: S) -> Logger {
+    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Logger {
         self.flwb = self.flwb.create_symlink(symlink);
         self
     }
@@ -517,7 +519,7 @@ impl Logger {
     /// This parameter only has an effect if `log_to_file` is set to true.
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<S: Into<String>>(mut self, directory: Option<S>) -> Logger {
+    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Logger {
         self.flwb = self.flwb.o_directory(directory);
         self
     }
@@ -590,7 +592,7 @@ impl Logger {
     ///
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
-    pub fn o_create_symlink<S: Into<String>>(mut self, symlink: Option<S>) -> Logger {
+    pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Logger {
         self.flwb = self.flwb.o_create_symlink(symlink);
         self
     }

@@ -9,7 +9,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "^0.11.1"
+flexi_logger = "^0.11.2"
 log = "0.4"
 ```
 
@@ -17,7 +17,7 @@ or, if you want to use the optional features, with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "^0.11.1", features = ["specfile", "ziplogs"] }
+flexi_logger = { version = "^0.11.2", features = ["specfile", "ziplogs"] }
 log = "0.4"
 ```
 

@@ -73,5 +73,15 @@
 mod file_log_writer;
 mod log_writer;
 
+#[cfg(feature = "syslog_writer")]
+#[cfg(target_os = "linux")]
+mod syslog_writer;
+
+#[cfg(feature = "syslog_writer")]
+#[cfg(target_os = "linux")]
+pub use self::syslog_writer::{
+    LevelToSyslogSeverity, SyslogFacility, SyslogSeverity, SyslogWriter,
+};
+
 pub use self::file_log_writer::{FileLogWriter, FileLogWriterBuilder};
 pub use self::log_writer::LogWriter;
