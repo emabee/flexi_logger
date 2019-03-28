@@ -4,38 +4,14 @@ use std::io::Error as IoError;
 use std::io::Result as IoResult;
 use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
-use std::os::unix::net::{UnixDatagram, UnixStream};
+#[cfg(target_os = "linux")]
 use std::path::Path;
 use std::sync::Mutex;
-
-/// Syslog Severity.
-///
-/// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
-#[doc(hidden)]
-pub enum SyslogSeverity {
-    /// System is unusable.
-    Emergency = 0,
-    /// Action must be taken immediately.
-    Alert = 1,
-    /// Critical conditions.
-    Critical = 2,
-    /// Error conditions.
-    Error = 3,
-    /// Warning conditions
-    Warning = 4,
-    /// Normal but significant condition
-    Notice = 5,
-    /// Informational messages.
-    Info = 6,
-    /// Debug-level messages.
-    Debug = 7,
-}
 
 /// Syslog Facility.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
 #[derive(Copy, Clone)]
-#[doc(hidden)]
 pub enum SyslogFacility {
     /// kernel messages.
     Kernel = 0 << 3,
@@ -87,99 +63,89 @@ pub enum SyslogFacility {
     LocalUse7 = 23 << 3,
 }
 
+/// SyslogConnector Severity.
+///
+/// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
+pub enum SyslogSeverity {
+    /// System is unusable.
+    Emergency = 0,
+    /// Action must be taken immediately.
+    Alert = 1,
+    /// Critical conditions.
+    Critical = 2,
+    /// Error conditions.
+    Error = 3,
+    /// Warning conditions
+    Warning = 4,
+    /// Normal but significant condition
+    Notice = 5,
+    /// Informational messages.
+    Info = 6,
+    /// Debug-level messages.
+    Debug = 7,
+}
+
 /// Signature for a custom mapping function that maps the rust log levels to
 /// values of the syslog Severity.
-#[doc(hidden)]
-pub type LevelToSyslogSeverity = fn(log::Level) -> SyslogSeverity;
+pub type LevelToSyslogSeverity = fn(level: log::Level) -> SyslogSeverity;
 
 fn default_mapping(level: log::Level) -> SyslogSeverity {
     match level {
         log::Level::Error => SyslogSeverity::Error,
-        log::Level::Warn => SyslogSeverity::Error,
-        log::Level::Info => SyslogSeverity::Error,
-        log::Level::Debug => SyslogSeverity::Error,
-        log::Level::Trace => SyslogSeverity::Error,
+        log::Level::Warn => SyslogSeverity::Warning,
+        log::Level::Info => SyslogSeverity::Info,
+        log::Level::Debug | log::Level::Trace => SyslogSeverity::Debug,
     }
 }
 
-/// Writes log messages to the syslog.
+/// A configurable `LogWriter` implementation that writes log messages to the syslog
+/// (see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424)).
 ///
-/// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
-#[doc(hidden)]
+/// See the [module description](index.html) for guidance how to use additional log writers.
 pub struct SyslogWriter {
     hostname: String,
     process: String,
-    pid: i32,
+    pid: u32,
     facility: SyslogFacility,
     message_id: String,
-    map_loglevel_to_severity: LevelToSyslogSeverity,
-    syslog: Mutex<RefCell<Syslog>>,
+    determine_severity: LevelToSyslogSeverity,
+    syslog: Mutex<RefCell<SyslogConnector>>,
 }
 impl SyslogWriter {
-    pub fn try_path<P: AsRef<Path>>(
-        path: P,
-        facility: SyslogFacility,
-        message_id: String,
-        map_loglevel_to_severity: Option<LevelToSyslogSeverity>,
-    ) -> IoResult<Box<SyslogWriter>> {
-        Ok(Box::new(SyslogWriter::try_new(
-            Syslog::try_path(path)?,
-            facility,
-            message_id,
-            map_loglevel_to_severity,
-        )?))
-    }
+    /// Returns a configured boxed instance.
+    ///
+    /// ## Parameters
+    ///
+    /// `facility`: An value representing a valid syslog facility value according to RFC 5424.
+    ///
+    /// `determine_severity`: (optional) A function that maps the rust log levels
+    /// to the syslog severities. If None is given, a trivial default mapping is used, which
+    /// should be good enough in most cases.
+    ///
+    /// `message_id`: The value being used as syslog's MSGID, which
+    /// should identify the type of message. The value itself
+    /// is a string without further semantics. It is intended for filtering
+    /// messages on a relay or collector.
+    ///
+    /// `syslog`: A [SyslogConnector](enum.SyslogConnector.html).
 
-    pub fn try_udp<T: ToSocketAddrs>(
-        local: T,
-        server: T,
+    pub fn try_new(
         facility: SyslogFacility,
+        determine_severity: Option<LevelToSyslogSeverity>,
         message_id: String,
-        map_loglevel_to_severity: Option<LevelToSyslogSeverity>,
+        syslog: SyslogConnector,
     ) -> IoResult<Box<SyslogWriter>> {
-        Ok(Box::new(SyslogWriter::try_new(
-            Syslog::try_udp(local, server)?,
-            facility,
-            message_id,
-            map_loglevel_to_severity,
-        )?))
-    }
-
-    pub fn try_tcp<T: ToSocketAddrs>(
-        server: T,
-        facility: SyslogFacility,
-        message_id: String,
-        map_loglevel_to_severity: Option<LevelToSyslogSeverity>,
-    ) -> IoResult<Box<SyslogWriter>> {
-        Ok(Box::new(SyslogWriter::try_new(
-            Syslog::try_tcp(server)?,
-            facility,
-            message_id,
-            map_loglevel_to_severity,
-        )?))
-    }
-
-    // Factory method.
-    //
-    // Regarding the parameters `facility` and `message_id`,
-    // see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
-    fn try_new(
-        syslog: Syslog,
-        facility: SyslogFacility,
-        message_id: String,
-        map_loglevel_to_severity: Option<LevelToSyslogSeverity>,
-    ) -> IoResult<SyslogWriter> {
-        Ok(SyslogWriter {
-            hostname: hostname::get_hostname().unwrap_or_else(|| "<unknown_hostname>".to_string()),
+        Ok(Box::new(SyslogWriter {
+            hostname: hostname::get_hostname().unwrap_or_else(|| "<unknown_hostname>".to_owned()),
             process: std::env::args()
                 .next()
                 .ok_or_else(|| IoError::new(ErrorKind::Other, "<no progname>".to_owned()))?,
-            pid: procinfo::pid::stat_self()?.pid,
+            pid: std::process::id(),
             facility,
             message_id,
-            map_loglevel_to_severity: map_loglevel_to_severity.unwrap_or_else(|| default_mapping),
+            determine_severity: determine_severity.unwrap_or_else(|| default_mapping),
             syslog: Mutex::new(RefCell::new(syslog)),
-        })
+        }))
     }
 }
 
@@ -188,7 +154,7 @@ impl LogWriter for SyslogWriter {
         let mr_syslog = self.syslog.lock().unwrap();
         let mut syslog = mr_syslog.borrow_mut();
 
-        let severity = (self.map_loglevel_to_severity)(record.level());
+        let severity = (self.determine_severity)(record.level());
         write!(
             syslog,
             "<{}> {} 1 {} {} {} {} - {}",
@@ -210,61 +176,96 @@ impl LogWriter for SyslogWriter {
     }
 }
 
-pub(crate) enum Syslog {
-    Local(UnixDatagram),
-    UnixStream(BufWriter<UnixStream>),
+/// Helper struct that connects to the syslog and implements Write.
+///
+/// Is used in [SyslogWriter::try_new()](struct.SyslogWriter.html#method.try_new).
+pub enum SyslogConnector {
+    /// Sends log lines to the syslog via a
+    /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+    #[cfg(target_os = "linux")]
+    Stream(BufWriter<std::os::unix::net::UnixStream>),
+
+    /// Sends log lines to the syslog via a
+    /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
+    #[cfg(target_os = "linux")]
+    Datagram(std::os::unix::net::UnixDatagram),
+
+    /// Sends log lines to the syslog via UDP.
+    ///
+    /// Due to UDP being fragile, is discouraged unless for local communication.
     Udp(UdpSocket, SocketAddr),
+
+    /// Sends log lines to the syslog via TCP.
     Tcp(BufWriter<TcpStream>),
 }
-impl Syslog {
-    pub fn try_path<P: AsRef<Path>>(path: P) -> IoResult<Syslog> {
-        let ud = UnixDatagram::unbound()?;
-        match ud.connect(&path) {
-            Ok(()) => Ok(Syslog::Local(ud)),
-            Err(ref e) if e.raw_os_error() == Some(libc::EPROTOTYPE) => Ok(Syslog::UnixStream(
-                BufWriter::new(UnixStream::connect(path)?),
-            )),
-            Err(e) => Err(e),
-        }
+impl SyslogConnector {
+    /// Returns a SyslogConnector::Datagram to the specified path.
+    #[cfg(target_os = "linux")]
+    pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
+        let ud = std::os::unix::net::UnixDatagram::unbound()?;
+        ud.connect(&path)?;
+        Ok(SyslogConnector::Datagram(ud))
     }
 
-    pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<Syslog> {
-        server
-            .to_socket_addrs()
-            .and_then(|mut addrs_iter| {
-                addrs_iter.next().ok_or_else(|| {
-                    IoError::new(ErrorKind::Other, "Server address resolution failed")
-                })
-            })
-            .and_then(|server_addr| {
-                UdpSocket::bind(local)
-                    .and_then(|local_socket| Ok(Syslog::Udp(local_socket, server_addr)))
-            })
+    /// Returns a SyslogConnector::Stream to the specified path.
+    #[cfg(target_os = "linux")]
+    pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
+        Ok(SyslogConnector::Stream(BufWriter::new(
+            std::os::unix::net::UnixStream::connect(path)?,
+        )))
     }
 
-    pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<Syslog> {
-        TcpStream::connect(server).and_then(|tcpstream| Ok(Syslog::Tcp(BufWriter::new(tcpstream))))
+    /// Returns a SyslogConnector which sends the log lines via TCP to the specified address.
+    pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<SyslogConnector> {
+        Ok(SyslogConnector::Tcp(BufWriter::new(TcpStream::connect(
+            server,
+        )?)))
+    }
+
+    /// Returns a SyslogConnector which sends log via the fragile UDP protocol from local to server.
+    pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<SyslogConnector> {
+        Ok(SyslogConnector::Udp(
+            UdpSocket::bind(local)?,
+            server.to_socket_addrs()?.next().ok_or_else(|| {
+                IoError::new(ErrorKind::Other, "Server address resolution failed")
+            })?,
+        ))
     }
 }
 
-impl Write for Syslog {
+impl Write for SyslogConnector {
     fn write(&mut self, message: &[u8]) -> IoResult<usize> {
         match *self {
-            Syslog::Local(ref ud) => ud.send(&message[..]),
-            Syslog::UnixStream(ref mut w) => w
-                .write(&message[..])
-                .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz)),
-            Syslog::Udp(ref socket, ref addr) => socket.send_to(&message[..], addr),
-            Syslog::Tcp(ref mut w) => w.write(&message[..]),
+            #[cfg(target_os = "linux")]
+            SyslogConnector::Datagram(ref ud) => {
+                // fixme: reconnect of conn is broken
+                ud.send(&message[..])
+            }
+            #[cfg(target_os = "linux")]
+            SyslogConnector::Stream(ref mut w) => {
+                // fixme: reconnect of conn is broken
+                w.write(&message[..])
+                    .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
+            }
+            SyslogConnector::Tcp(ref mut w) => {
+                // fixme: reconnect of conn is broken
+                w.write(&message[..])
+            }
+            SyslogConnector::Udp(ref socket, ref addr) => socket.send_to(&message[..], addr),
         }
     }
 
     fn flush(&mut self) -> IoResult<()> {
         match *self {
-            Syslog::Local(_) => Ok(()),
-            Syslog::UnixStream(ref mut w) => w.flush(),
-            Syslog::Udp(_, _) => Ok(()),
-            Syslog::Tcp(ref mut w) => w.flush(),
+            #[cfg(target_os = "linux")]
+            SyslogConnector::Datagram(_) => Ok(()),
+
+            #[cfg(target_os = "linux")]
+            SyslogConnector::Stream(ref mut w) => w.flush(),
+
+            SyslogConnector::Udp(_, _) => Ok(()),
+
+            SyslogConnector::Tcp(ref mut w) => w.flush(),
         }
     }
 }

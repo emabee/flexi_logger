@@ -31,10 +31,8 @@ mod platform {
     #[cfg(target_os = "linux")]
     pub fn check_link(link_name: &str) {
         match std::fs::metadata(link_name) {
-            Err(e) => {
-                eprintln!("error with symlink: {}",e)
-            }
-            Ok(_md) => {},
+            Err(e) => eprintln!("error with symlink: {}", e),
+            Ok(_md) => {}
         }
     }
 

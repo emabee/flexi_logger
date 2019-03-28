@@ -527,7 +527,9 @@ fn rotate_output_file(
     }
 }
 
-/// A configurable `LogWriter` that writes to a file or, if rotation is used, a sequence of files.
+/// A configurable `LogWriter` implementation that writes to a file or a sequence of files.
+///
+/// See the [module description](index.html) for usage guidance.
 pub struct FileLogWriter {
     config: FileLogWriterConfig,
     // the state needs to be mutable; since `Log.log()` requires an unmutable self,

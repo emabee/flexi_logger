@@ -1,7 +1,7 @@
 #[cfg(target_os = "linux")]
 #[cfg(feature = "syslog_writer")]
 mod test {
-    use flexi_logger::writers::{SyslogFacility, SyslogWriter};
+    use flexi_logger::writers::{SyslogFacility, SyslogConnector, SyslogWriter};
     use flexi_logger::{detailed_format, Logger};
     use log::*;
 
@@ -16,21 +16,20 @@ mod test {
     }
 
     #[test]
-    fn test_syslog() {
-        // more complex just to support validation:
-        let syslog_writer = SyslogWriter::try_udp(
-            "localhost:0",
-            "localhost:514",
+    fn test_syslog() -> std::io::Result<()> {
+        let boxed_syslog_writer = SyslogWriter::try_new(
             SyslogFacility::LocalUse0,
-            "JustForTest".to_owned(),
             None,
+            "JustForTest".to_owned(),
+            SyslogConnector::try_udp("localhost:0",
+            "localhost:514")?,
         )
         .unwrap();
         let log_handle = Logger::with_str("info")
             .format(detailed_format)
             .print_message()
             .log_to_file()
-            .add_writer("Syslog", syslog_writer)
+            .add_writer("Syslog", boxed_syslog_writer)
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
@@ -57,5 +56,6 @@ mod test {
         //     ("ERROR", "multi_logger", "security-relevant alert and log message"),
         //     ("ERROR", "multi_logger", "another security-relevant alert"),
         // ]);
+        Ok(())
     }
 }
