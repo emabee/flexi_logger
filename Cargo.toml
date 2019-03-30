@@ -42,4 +42,4 @@ libc = {version = "^0.2.50", optional = true}
 
 [dev-dependencies]
 serde_derive = "1.0"
-version-sync = "0.7"
+version-sync = "0.8"
