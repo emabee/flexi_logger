@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.11.3"
+version = "0.11.4"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -42,4 +42,4 @@ libc = {version = "^0.2.50", optional = true}
 
 [dev-dependencies]
 serde_derive = "1.0"
-version-sync = "0.7"
+version-sync = "0.8"

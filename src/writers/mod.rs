@@ -2,7 +2,7 @@
 //! and two concrete implementations for writing to files or to the syslog.
 //!
 //! (See [`LogWriter`](trait.LogWriter.html), [`FileLogWriter`](struct.FileLogWriter.html),
-//! and [`SysLogWriter`](struct.SysLogWriter.html) for details).
+//! and [`SyslogWriter`](struct.SyslogWriter.html) for details).
 //!
 //! Additional log writers can be used for sending log messages to additional log
 //! ouput streams than stderr or the default log file, as for example to an alert file or the syslog.
