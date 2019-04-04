@@ -34,7 +34,7 @@ notify = { version = "4.0", optional = true }
 regex = "1.1"
 serde = { version = "1.0", optional = true }
 serde_derive = {version = "1.0", optional = true}
-toml = { version = "0.4", optional = true }
+toml = { version = "0.5", optional = true }
 zip = {version = "0.5", optional = true}
 
 [target.'cfg(linux)'.dependencies]

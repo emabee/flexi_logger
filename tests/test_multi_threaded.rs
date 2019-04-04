@@ -12,7 +12,7 @@ const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
 const ROTATE_OVER_SIZE: usize = 4_000_000;
 
-// cargo test multi_threaded -- --nocapture
+// cargo test --test test_multi_threaded -- --nocapture
 #[test]
 fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
