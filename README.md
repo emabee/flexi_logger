@@ -3,6 +3,10 @@
 **A flexible and easy-to-use logger that writes logs to stderr and/or to files,
 and that can be influenced while the program is running.**
 
+[![Latest version](https://img.shields.io/crates/v/flexi_logger.svg)](https://crates.io/crates/flexi_logger)
+[![Documentation](https://docs.rs/flexi_logger/badge.svg)](https://docs.rs/flexi_logger)
+![License](https://img.shields.io/crates/l/flexi_logger.svg)
+
 ## Usage
 
 Add flexi_logger to the dependencies section in your project's `Cargo.toml`, with
