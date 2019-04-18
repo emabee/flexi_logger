@@ -1,7 +1,7 @@
 # flexi_logger
 
-**A flexible and easy-to-use logger that writes logs to stderr and/or to files,
-and that can be influenced while the program is running.**
+**A flexible and easy-to-use logger that writes logs to stderr and/or to files
+or other output streams, and that can be influenced while the program is running.**
 
 [![Latest version](https://img.shields.io/crates/v/flexi_logger.svg)](https://crates.io/crates/flexi_logger)
 [![Documentation](https://docs.rs/flexi_logger/badge.svg)](https://docs.rs/flexi_logger)
@@ -17,11 +17,19 @@ flexi_logger = "^0.12.0"
 log = "0.4"
 ```
 
-or, if you want to use the optional features, with
+or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
 flexi_logger = { version = "^0.12.0", features = ["specfile", "ziplogs"] }
+log = "0.4"
+```
+
+or, to get the smallest footprint (and no colors), with
+
+```toml
+[dependencies]
+flexi_logger = { version = "^0.12.0", default_features = false }
 log = "0.4"
 ```
 
@@ -122,7 +130,26 @@ See the API documentation for a complete reference.
 
 ## Crate Features
 
-### `specfile`
+Make use of any of these features by specifying them in your `Cargo.toml`
+(see above in the usage section).
+
+### **`colors`**
+
+Getting colored output was also possible without this feature, by adding
+colors to the logged message,
+and/or implementing and using your own coloring format function.
+
+The new default feature `colors` simplifies this by doing three things:
+
+* it activates the optional dependency to `yansi` and
+* provides additional colored pendants to the existing uncolored format functions
+* it uses `colored_default_format()` for the output to stderr,
+  and the non-colored `default_format()` for the output to files
+
+**<span style="color:red">C</span><span style="color:blue">o</span><span style="color:green">l</span><span style="color:orange">o</span><span style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
+or styles in general, are a matter of taste, and no choice will fit every need. So you can override the default formatting for stderr, using `Logger::format_for_stderr()`, and for the files using `Logger::format_for_files()`, or for both in one shot using `Logger::format()`.
+
+### **`specfile`**
 
 The `specfile` feature adds a method `Logger::start_with_specfile(specfile)`.
 
@@ -139,10 +166,14 @@ The implementation of this feature uses some additional crates that you might
 not want to depend on with your program if you don't use this functionality.
 For that reason the feature is not active by default.
 
-### `ziplogs`
+### **`ziplogs`**
 
 The `ziplogs` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
 or all rotated log files in zipped form rather than as text files.
+
+### **`syslog`**
+
+This is still an experimental feature, likely working, but not well tested. Feedback of all kinds is highly appreciated.
 
 ## Versions
 

@@ -12,6 +12,7 @@ fn main() {
         "./*.alerts",
         "./*.seclog",
         "./log_files/**/*.log",
+        "./log_files/**/*.zip",
     ] {
         for globresult in glob::glob(pattern).unwrap() {
             match globresult {

@@ -1,12 +1,14 @@
-//! A trait for extending `flexi_logger` with additional log writers,
-//! and two concrete implementations for writing to files or to the syslog.
+//! Contains a trait ([`LogWriter`](trait.LogWriter.html)) for extending `flexi_logger`
+//! with additional log writers,
+//! and two concrete implementations
+//! for writing to files
+//! ([`FileLogWriter`](struct.FileLogWriter.html))
+//! or to the syslog
+//! ([`SyslogWriter`](struct.SyslogWriter.html)).
 //!
-//! (See [`LogWriter`](trait.LogWriter.html), [`FileLogWriter`](struct.FileLogWriter.html),
-//! and [`SyslogWriter`](struct.SyslogWriter.html) for details).
 //!
 //! Additional log writers can be used for sending log messages to additional log
-//! ouput streams than stderr or the default log file, as for example to an alert file or the syslog.
-//!
+//! ouput streams, as for example to an alert file or the syslog.
 //! You can also use your own implementations of [`LogWriter`](trait.LogWriter.html).
 //!
 //! You register each additional log writer with
