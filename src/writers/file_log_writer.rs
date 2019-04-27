@@ -1,5 +1,6 @@
 use crate::formats::default_format;
 use crate::logger::Cleanup;
+use crate::logger::RotateOver;
 use crate::writers::log_writer::LogWriter;
 use crate::FlexiLoggerError;
 use crate::FormatFunction;
@@ -30,7 +31,7 @@ struct FileLogWriterConfig {
     suffix: String,
     use_timestamp: bool,
     append: bool,
-    rotate_over_size: Option<u64>,
+    rotate_over: Option<RotateOver>,
     cleanup: Cleanup,
     create_symlink: Option<PathBuf>,
     use_windows_line_ending: bool,
@@ -47,7 +48,7 @@ impl FileLogWriterConfig {
             use_timestamp: true,
             append: false,
             cleanup: Cleanup::Never,
-            rotate_over_size: None,
+            rotate_over: None,
             create_symlink: None,
             use_windows_line_ending: false,
         }
@@ -127,18 +128,22 @@ impl FileLogWriterBuilder {
     ///
     /// The cleanup parameter allows defining the strategy for dealing with older files.
     /// See [Cleanup](Cleanup) for details.
-    pub fn rotate(mut self, rotate_over_size: usize, cleanup: Cleanup) -> FileLogWriterBuilder {
+    pub fn rotate<R: Into<RotateOver>>(
+        mut self,
+        rotate_over: R,
+        cleanup: Cleanup,
+    ) -> FileLogWriterBuilder {
         self.config.cleanup = cleanup;
-        self.config.rotate_over_size = Some(rotate_over_size as u64);
+        self.config.rotate_over = Some(rotate_over.into());
         self.config.use_timestamp = false;
         self
     }
 
     /// Prevents indefinite growth of log files.
     ///
-    #[deprecated(since = "0.11.0", note = "use rotate(size, cleanup)")]
+    #[deprecated(since = "0.11.0", note = "use rotate(rotate_over, cleanup)")]
     pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
-        self.config.rotate_over_size = Some(rotate_over_size as u64);
+        self.config.rotate_over = Some(rotate_over_size.into());
         self.config.use_timestamp = false;
         self
     }
@@ -234,15 +239,18 @@ impl FileLogWriterBuilder {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate(mut self, rotate_config: Option<(u64, Cleanup)>) -> FileLogWriterBuilder {
+    pub fn o_rotate<R: Into<RotateOver>>(
+        mut self,
+        rotate_config: Option<(R, Cleanup)>,
+    ) -> FileLogWriterBuilder {
         match rotate_config {
-            Some((s, c)) => {
-                self.config.rotate_over_size = Some(s);
+            Some((r, c)) => {
+                self.config.rotate_over = Some(r.into());
                 self.config.cleanup = c;
                 self.config.use_timestamp = false;
             }
             None => {
-                self.config.rotate_over_size = None;
+                self.config.rotate_over = None;
                 self.config.cleanup = Cleanup::Never;
                 self.config.use_timestamp = true;
             }
@@ -260,7 +268,7 @@ impl FileLogWriterBuilder {
     /// files once they reach a size of 1 kB.
     #[deprecated(since = "0.11.0", note = "please use o_rotate()")]
     pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
-        self.config.rotate_over_size = rotate_over_size.map(|r| r as u64);
+        self.config.rotate_over = rotate_over_size.map(|r| r.into());
         self.config.use_timestamp = rotate_over_size.is_none();
         self
     }
@@ -303,9 +311,9 @@ struct FileLogWriterState {
 impl FileLogWriterState {
     // If rotate, the logger writes into a file with infix `_rCURRENT`.
     fn try_new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
-        let rotate_idx = match config.rotate_over_size {
+        let rotate_idx = match config.rotate_over {
             None => None,
-            Some(_) => Some({
+            Some(RotateOver::Size(_)) => Some({
                 let mut rotate_idx = get_highest_rotate_idx(&config);
                 if !config.append {
                     rotate_idx = rotate_output_file(rotate_idx, config)?;
@@ -373,7 +381,7 @@ fn get_filepath(infix: &str, config: &FileLogWriterConfig) -> PathBuf {
     let mut s_filename =
         String::with_capacity(config.file_basename.len() + infix.len() + 1 + config.suffix.len())
             + &config.file_basename;
-    if config.rotate_over_size.is_some() {
+    if config.rotate_over.is_some() {
         s_filename += infix;
     };
     s_filename += ".";
@@ -592,13 +600,17 @@ impl LogWriter for FileLogWriter {
         let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
 
         // switch to next file if necessary
-        if let Some(rotate_over_size) = self.config.rotate_over_size {
-            if state.written_bytes > rotate_over_size {
-                state
-                    .mount_next_linewriter(&self.config)
-                    .unwrap_or_else(|e| {
-                        eprintln!("FlexiLogger: opening file failed with {}", e);
-                    });
+        if let Some(ref rotate_over) = self.config.rotate_over {
+            match rotate_over {
+                RotateOver::Size(size) => {
+                    if state.written_bytes > *size {
+                        state
+                            .mount_next_linewriter(&self.config)
+                            .unwrap_or_else(|e| {
+                                eprintln!("FlexiLogger: opening file failed with {}", e);
+                            });
+                    }
+                }
             }
         }
 

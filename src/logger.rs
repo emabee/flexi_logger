@@ -405,8 +405,8 @@ impl Logger {
     ///
     /// The cleanup parameter allows defining the strategy for dealing with older files.
     /// See [Cleanup](enum.Cleanup.html) for details.
-    pub fn rotate(mut self, rotate_over_size: usize, cleanup: Cleanup) -> Logger {
-        self.flwb = self.flwb.rotate(rotate_over_size, cleanup);
+    pub fn rotate<R: Into<RotateOver>>(mut self, rotate_over: R, cleanup: Cleanup) -> Logger {
+        self.flwb = self.flwb.rotate(rotate_over, cleanup);
         self
     }
 
@@ -493,6 +493,19 @@ pub enum Cleanup {
     KeepLogAndZipFiles(usize, usize),
 }
 
+/// Criterion to rotate the log file.
+pub enum RotateOver {
+    Size(u64),
+    //Duration(Duration),
+    //Frequency()
+}
+// For compatibility of Logger::rotate()
+impl From<usize> for RotateOver {
+    fn from(input: usize) -> RotateOver {
+        RotateOver::Size(input as u64)
+    }
+}
+
 /// Alternative set of methods to control the behavior of the Logger.
 /// Use these methods when you want to control the settings flexibly,
 /// e.g. with commandline arguments via `docopts` or `clap`.
@@ -534,7 +547,7 @@ impl Logger {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate(mut self, rotate_config: Option<(u64, Cleanup)>) -> Logger {
+    pub fn o_rotate<R: Into<RotateOver>>(mut self, rotate_config: Option<(R, Cleanup)>) -> Logger {
         self.flwb = self.flwb.o_rotate(rotate_config);
         self
     }
