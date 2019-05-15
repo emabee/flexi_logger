@@ -99,8 +99,12 @@ impl LogSpecification {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for module_filter in &self.module_filters {
             match module_filter.module_name {
-                Some(ref module_name) if !target_module.starts_with(&**module_name) => {}
-                Some(..) | None => return level <= module_filter.level_filter,
+                Some(ref module_name) => {
+                    if target_module.starts_with(module_name) {
+                        return level <= module_filter.level_filter;
+                    }
+                }
+                None => return level <= module_filter.level_filter,
             }
         }
         false
