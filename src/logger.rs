@@ -11,8 +11,6 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "specfile")]
 use std::thread;
-#[cfg(feature = "specfile")]
-use std::time::Duration;
 
 use crate::flexi_logger::FlexiLogger;
 use crate::primary_writer::PrimaryWriter;
@@ -223,7 +221,7 @@ impl Logger {
             // Create a channel to receive the events.
             let (tx, rx) = channel();
             // Create a watcher object, delivering debounced events
-            let mut watcher = match watcher(tx, Duration::from_millis(800)) {
+            let mut watcher = match watcher(tx, std::time::Duration::from_millis(800)) {
                 Ok(w) => w,
                 Err(e) => {
                     error!("watcher() failed with {:?}", e);
@@ -468,7 +466,7 @@ impl Logger {
     }
 }
 
-/// Defines the strateygy for handling of older log files.
+/// Defines the strategy for handling older log files.
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
     Never,
@@ -494,10 +492,30 @@ pub enum Cleanup {
 }
 
 /// Criterion to rotate the log file.
+///
+/// See [Logger::rotate()](struct.Logger.html#method.rotate).
+///
+/// For compatibility, `From<usize>` is implemented which creates a `RotateOver::Size`.
 pub enum RotateOver {
+    /// Triggers a log file rotation when the log file size has exceeeded the specified size.
     Size(u64),
-    //Duration(Duration),
-    //Frequency()
+    // /// Triggers a log file rotation when the log file is older than the specified Duration.
+    // Duration(chrono::Duration),
+}
+impl RotateOver {
+    pub(crate) fn rotation_necessary(
+        &self,
+        written_bytes: u64,
+        // created_at: std::time::SystemTime,
+    ) -> bool {
+        match self {
+            RotateOver::Size(size) => written_bytes > *size,
+            // RotateOver::Duration(max_age) => std::time::SystemTime::now()
+            //     .duration_since(created_at)
+            //     .map(|file_age| file_age.as_secs() as i64 > max_age.num_seconds())
+            //     .unwrap_or(false),
+        }
+    }
 }
 // For compatibility of Logger::rotate()
 impl From<usize> for RotateOver {

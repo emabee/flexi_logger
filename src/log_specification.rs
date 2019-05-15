@@ -134,8 +134,8 @@ impl LogSpecification {
                 }
                 let mut parts = s.split('=');
                 let (log_level, name) = match (
-                    parts.next().map(|s| s.trim()),
-                    parts.next().map(|s| s.trim()),
+                    parts.next().map(str::trim),
+                    parts.next().map(str::trim),
                     parts.next(),
                 ) {
                     (Some(part0), None, None) => {
@@ -178,7 +178,7 @@ impl LogSpecification {
                     }
                 };
                 dirs.push(ModuleFilter {
-                    module_name: name.map(|s| s.to_string()),
+                    module_name: name.map(ToString::to_string),
                     level_filter: log_level,
                 });
             }
@@ -590,8 +590,8 @@ impl LevelSort for Vec<ModuleFilter> {
     /// this allows a little more efficient lookup at runtime.
     fn level_sort(mut self) -> Vec<ModuleFilter> {
         self.sort_by(|a, b| {
-            let alen = a.module_name.as_ref().map(|a| a.len()).unwrap_or(0);
-            let blen = b.module_name.as_ref().map(|b| b.len()).unwrap_or(0);
+            let alen = a.module_name.as_ref().map(String::len).unwrap_or(0);
+            let blen = b.module_name.as_ref().map(String::len).unwrap_or(0);
             blen.cmp(&alen)
         });
         self
