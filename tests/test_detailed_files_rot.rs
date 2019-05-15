@@ -1,4 +1,4 @@
-use flexi_logger::{detailed_format, Cleanup, Logger};
+use flexi_logger::{detailed_format, Cleanup, Logger, RotateOver};
 use log::*;
 
 #[test]
@@ -6,7 +6,7 @@ fn test_detailed_files_rot() {
     let handle = Logger::with_str("info")
         .format(detailed_format)
         .log_to_file()
-        .rotate(2000, Cleanup::Never)
+        .rotate(RotateOver::Size(2000), Cleanup::Never)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
