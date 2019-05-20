@@ -1,7 +1,9 @@
 use crate::log_specification::LogSpecification;
 use crate::primary_writer::PrimaryWriter;
+use crate::writers::LogWriter;
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -55,51 +57,71 @@ pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
     spec_stack: Vec<LogSpecification>,
     primary_writer: Arc<PrimaryWriter>,
+    other_writers: Arc<HashMap<String, Box<LogWriter>>>,
 }
 impl ReconfigurationHandle {
-    /// Allows specifying a new LogSpecification for the current logger.
-    pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        guard.reconfigure(new_spec);
+    pub(crate) fn new(
+        spec: Arc<RwLock<LogSpecification>>,
+        primary_writer: Arc<PrimaryWriter>,
+        other_writers: Arc<HashMap<String, Box<LogWriter>>>,
+    ) -> ReconfigurationHandle {
+        ReconfigurationHandle {
+            spec,
+            spec_stack: Default::default(),
+            primary_writer,
+            other_writers,
+        }
     }
 
-    /// Allows specifying a new LogSpecification for the current logger.
+    //
+    pub(crate) fn reconfigure(&self, mut max_level: log::LevelFilter) {
+        for w in self.other_writers.as_ref().values() {
+            max_level = std::cmp::max(max_level, w.max_log_level());
+        }
+        log::set_max_level(max_level);
+    }
+
+    /// Replaces the active LogSpecification.
+    pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
+        let max_level = new_spec.max_level();
+        self.spec.write().unwrap(/* catch and expose error? */).update_from(new_spec);
+        self.reconfigure(max_level);
+    }
+
+    /// Tries to replace the active LogSpecification with the result from parsing the given String.
     pub fn parse_new_spec(&mut self, spec: &str) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        guard.reconfigure(LogSpecification::parse(spec).unwrap_or_else(|e| {
+        self.set_new_spec(LogSpecification::parse(spec).unwrap_or_else(|e| {
             eprintln!("ReconfigurationHandle::parse_new_spec(): failed with {}", e);
             LogSpecification::off()
-        }));
+        }))
     }
 
-    /// Allows temporarily pushing a new LogSpecification for the current logger.
+    /// Replaces the active LogSpecification and pushes the previous one to a Stack.
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        self.spec_stack.push(guard.clone());
-        guard.reconfigure(new_spec);
+        self.spec_stack
+            .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
+        self.set_new_spec(new_spec);
     }
 
-    /// Allows temporarily pushing a new LogSpecification for the current logger.
+    /// Tries to replace the active LogSpecification with the result from parsing the given String
+    ///  and pushes the previous one to a Stack.
     pub fn parse_and_push_temp_spec(&mut self, new_spec: &str) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        let new_spec = LogSpecification::parse(new_spec).unwrap_or_else(|e| {
+        self.spec_stack
+            .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
+        self.set_new_spec(LogSpecification::parse(new_spec).unwrap_or_else(|e| {
             eprintln!(
                 "ReconfigurationHandle::parse_new_spec(): failed with {}, \
                  falling back to empty log spec",
                 e
             );
             LogSpecification::off()
-        });
-        self.spec_stack.push(guard.clone());
-        guard.reconfigure(new_spec);
+        }));
     }
 
-    /// Allows pushing a new LogSpecification for the current logger.
-    /// It will automatically be popped once the returned guard is dropped.
+    /// Reverts to the previous LogSpecification, if any.
     pub fn pop_temp_spec(&mut self) {
-        let mut guard = self.spec.write().unwrap(/* not sure if we should expose this */);
-        if let Some(new_spec) = self.spec_stack.pop() {
-            guard.reconfigure(new_spec);
+        if let Some(previous_spec) = self.spec_stack.pop() {
+            self.set_new_spec(previous_spec);
         }
     }
 
@@ -107,16 +129,5 @@ impl ReconfigurationHandle {
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
         Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
-    }
-}
-
-pub(crate) fn reconfiguration_handle(
-    spec: Arc<RwLock<LogSpecification>>,
-    primary_writer: Arc<PrimaryWriter>,
-) -> ReconfigurationHandle {
-    ReconfigurationHandle {
-        spec,
-        spec_stack: Default::default(),
-        primary_writer,
     }
 }

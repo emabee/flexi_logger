@@ -80,10 +80,9 @@ pub struct ModuleFilter {
 }
 
 impl LogSpecification {
-    pub(crate) fn reconfigure(&mut self, other_spec: LogSpecification) {
+    pub(crate) fn update_from(&mut self, other_spec: LogSpecification) {
         self.module_filters = other_spec.module_filters;
         self.textfilter = other_spec.textfilter;
-        log::set_max_level(self.max_level());
     }
 
     pub(crate) fn max_level(&self) -> log::LevelFilter {
@@ -94,13 +93,13 @@ impl LogSpecification {
             .unwrap_or(log::LevelFilter::Off)
     }
 
-    /// Implementation of Log::enabled() with easier testable signature
-    pub fn enabled(&self, level: log::Level, target_module: &str) -> bool {
+    /// Returns true if messages on the specified level from the writing module should be written
+    pub fn enabled(&self, level: log::Level, writing_module: &str) -> bool {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for module_filter in &self.module_filters {
             match module_filter.module_name {
                 Some(ref module_name) => {
-                    if target_module.starts_with(module_name) {
+                    if writing_module.starts_with(module_name) {
                         return level <= module_filter.level_filter;
                     }
                 }
@@ -472,7 +471,7 @@ fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
 ///     // Initialize Logger, keep builder alive
 ///     let mut logger_reconf_handle = Logger::with(builder.build())
 ///         // your logger configuration goes here, as usual
-///         .start_reconfigurable()
+///         .start()
 ///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 ///
 ///     // ...
@@ -602,67 +601,14 @@ impl LevelSort for Vec<ModuleFilter> {
     }
 }
 
-#[cfg(features = "specfile")]
 #[cfg(test)]
 mod tests {
+    use crate::LogSpecification;
     use log::{Level, LevelFilter};
-    use {LogSpecBuilder, LogSpecification};
-
-    #[test]
-    fn specfile() {
-        compare_specs(
-            "[modules]\n\
-             ",
-            "",
-        );
-
-        compare_specs(
-            "global_level = 'info'\n\
-             \n\
-             [modules]\n\
-             ",
-            "info",
-        );
-
-        compare_specs(
-            "global_level = 'info'\n\
-             \n\
-             [modules]\n\
-             'mod1::mod2' = 'debug'\n\
-             'mod3' = 'trace'\n\
-             ",
-            "info, mod1::mod2 = debug, mod3 = trace",
-        );
-
-        compare_specs(
-            "global_level = 'info'\n\
-             global_pattern = 'Foo'\n\
-             \n\
-             [modules]\n\
-             'mod1::mod2' = 'debug'\n\
-             'mod3' = 'trace'\n\
-             ",
-            "info, mod1::mod2 = debug, mod3 = trace /Foo",
-        );
-    }
-
-    fn compare_specs(s1: &str, s2: &str) {
-        let ls1 = LogSpecification::from_toml(s1).unwrap();
-        let ls2 = LogSpecification::parse(s2);
-
-        assert_eq!(ls1.module_filters, ls2.module_filters);
-        assert_eq!(ls1.textfilter.is_none(), ls2.textfilter.is_none());
-        if ls1.textfilter.is_some() && ls2.textfilter.is_some() {
-            assert_eq!(
-                ls1.textfilter.unwrap().to_string(),
-                ls2.textfilter.unwrap().to_string()
-            );
-        }
-    }
 
     #[test]
     fn parse_logging_spec_valid() {
-        let spec = LogSpecification::parse("crate1::mod1=error,crate1::mod2,crate2=debug");
+        let spec = LogSpecification::parse("crate1::mod1=error,crate1::mod2,crate2=debug").unwrap();
         assert_eq!(spec.module_filters().len(), 3);
         assert_eq!(
             spec.module_filters()[0].module_name,
@@ -688,59 +634,22 @@ mod tests {
     #[test]
     fn parse_logging_spec_invalid_crate() {
         // test parse_logging_spec with multiple = in specification
-        let spec = LogSpecification::parse("crate1::mod1=warn=info,crate2=debug");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(spec.text_filter().is_none());
+        assert!(LogSpecification::parse("crate1::mod1=warn=info,crate2=debug").is_err());
     }
 
     #[test]
-    fn parse_logging_spec_invalid_log_level() {
-        // test parse_logging_spec with 'noNumber' as log level
-        let spec = LogSpecification::parse("crate1::mod1=noNumber,crate2=debug");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(spec.text_filter().is_none());
-    }
-
-    #[test]
-    fn parse_logging_spec_string_log_level() {
-        // test parse_logging_spec with 'warn' as log level
-        let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=warn");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Warn);
-        assert!(spec.text_filter().is_none());
+    fn parse_logging_spec_wrong_log_level() {
+        assert!(LogSpecification::parse("crate1::mod1=wrong, crate2=warn").is_err());
     }
 
     #[test]
     fn parse_logging_spec_empty_log_level() {
-        // test parse_logging_spec with '' as log level
-        let spec = LogSpecification::parse("crate1::mod1=wrong, crate2=");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::max());
-        assert!(spec.text_filter().is_none());
+        assert!(LogSpecification::parse("crate1::mod1=wrong, crate2=").is_err());
     }
 
     #[test]
     fn parse_logging_spec_global() {
-        // test parse_logging_spec with no crate
-        let spec = LogSpecification::parse("warn,crate2=debug");
+        let spec = LogSpecification::parse("warn,crate2=debug").unwrap();
         assert_eq!(spec.module_filters().len(), 2);
 
         assert_eq!(spec.module_filters()[1].module_name, None);
@@ -757,7 +666,8 @@ mod tests {
 
     #[test]
     fn parse_logging_spec_valid_filter() {
-        let spec = LogSpecification::parse(" crate1::mod1 = error , crate1::mod2,crate2=debug/abc");
+        let spec = LogSpecification::parse(" crate1::mod1 = error , crate1::mod2,crate2=debug/abc")
+            .unwrap();
         assert_eq!(spec.module_filters().len(), 3);
 
         assert_eq!(
@@ -785,37 +695,17 @@ mod tests {
 
     #[test]
     fn parse_logging_spec_invalid_crate_filter() {
-        let spec = LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(
-            spec.text_filter().is_some()
-                && spec.text_filter().as_ref().unwrap().to_string() == "a.c"
-        );
+        assert!(LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c").is_err());
     }
 
     #[test]
     fn parse_logging_spec_invalid_crate_with_dash() {
-        let spec = LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c");
-        assert_eq!(spec.module_filters().len(), 1);
-        assert_eq!(
-            spec.module_filters()[0].module_name,
-            Some("crate2".to_string())
-        );
-        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
-        assert!(
-            spec.text_filter().is_some()
-                && spec.text_filter().as_ref().unwrap().to_string() == "a.c"
-        );
+        assert!(LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c").is_err());
     }
 
     #[test]
     fn parse_logging_spec_empty_with_filter() {
-        let spec = LogSpecification::parse("crate1/a*c");
+        let spec = LogSpecification::parse("crate1/a*c").unwrap();
         assert_eq!(spec.module_filters().len(), 1);
         assert_eq!(
             spec.module_filters()[0].module_name,
@@ -830,7 +720,7 @@ mod tests {
 
     #[test]
     fn reuse_logspec_builder() {
-        let mut builder = LogSpecBuilder::new();
+        let mut builder = crate::LogSpecBuilder::new();
 
         builder.default(LevelFilter::Info);
         builder.module("carlo", LevelFilter::Debug);
@@ -879,7 +769,7 @@ mod tests {
     ///////////////////////////////////////////////////////
     #[test]
     fn match_full_path() {
-        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn");
+        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn").unwrap();
         assert!(spec.enabled(Level::Warn, "crate1::mod1"));
         assert!(!spec.enabled(Level::Info, "crate1::mod1"));
         assert!(spec.enabled(Level::Info, "crate2"));
@@ -888,13 +778,13 @@ mod tests {
 
     #[test]
     fn no_match() {
-        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn");
+        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn").unwrap();
         assert!(!spec.enabled(Level::Warn, "crate3"));
     }
 
     #[test]
     fn match_beginning() {
-        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn");
+        let spec = LogSpecification::parse("crate2=info,crate1::mod1=warn").unwrap();
         assert!(spec.enabled(Level::Info, "crate2::mod1"));
     }
 
@@ -902,7 +792,8 @@ mod tests {
     fn match_beginning_longest_match() {
         let spec = LogSpecification::parse(
             "abcd = info, abcd::mod1 = error, klmn::mod = debug, klmn = info",
-        );
+        )
+        .unwrap();
         assert!(spec.enabled(Level::Error, "abcd::mod1::foo"));
         assert!(!spec.enabled(Level::Warn, "abcd::mod1::foo"));
         assert!(spec.enabled(Level::Warn, "abcd::mod2::foo"));
@@ -915,23 +806,94 @@ mod tests {
 
     #[test]
     fn match_default1() {
-        let spec = LogSpecification::parse("info,abcd::mod1=warn");
+        let spec = LogSpecification::parse("info,abcd::mod1=warn").unwrap();
         assert!(spec.enabled(Level::Warn, "abcd::mod1"));
         assert!(spec.enabled(Level::Info, "crate2::mod2"));
     }
 
     #[test]
     fn match_default2() {
-        let spec = LogSpecification::parse("modxyz=error, info, abcd::mod1=warn");
+        let spec = LogSpecification::parse("modxyz=error, info, abcd::mod1=warn").unwrap();
         assert!(spec.enabled(Level::Warn, "abcd::mod1"));
         assert!(spec.enabled(Level::Info, "crate2::mod2"));
     }
 
     #[test]
+    fn rocket() {
+        let spec = LogSpecification::parse("info, rocket=off, serenity=off").unwrap();
+        assert!(spec.enabled(Level::Info, "itsme"));
+        assert!(spec.enabled(Level::Warn, "abcd::mod1"));
+        assert!(!spec.enabled(Level::Debug, "abcd::mod1"));
+        assert!(!spec.enabled(Level::Error, "rocket::rocket"));
+        assert!(!spec.enabled(Level::Warn, "rocket::rocket"));
+        assert!(!spec.enabled(Level::Info, "rocket::rocket"));
+    }
+
+    #[test]
     fn zero_level() {
-        let spec = LogSpecification::parse("info,crate1::mod1=off");
+        let spec = LogSpecification::parse("info,crate1::mod1=off").unwrap();
         assert!(!spec.enabled(Level::Error, "crate1::mod1"));
         assert!(spec.enabled(Level::Info, "crate2::mod2"));
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "specfile")]
+mod test_with_specfile {
+    #[cfg(feature = "specfile")]
+    use crate::LogSpecification;
+
+    #[test]
+    fn specfile() {
+        compare_specs(
+            "[modules]\n\
+             ",
+            "",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             \n\
+             [modules]\n\
+             ",
+            "info",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             \n\
+             [modules]\n\
+             'mod1::mod2' = 'debug'\n\
+             'mod3' = 'trace'\n\
+             ",
+            "info, mod1::mod2 = debug, mod3 = trace",
+        );
+
+        compare_specs(
+            "global_level = 'info'\n\
+             global_pattern = 'Foo'\n\
+             \n\
+             [modules]\n\
+             'mod1::mod2' = 'debug'\n\
+             'mod3' = 'trace'\n\
+             ",
+            "info, mod1::mod2 = debug, mod3 = trace /Foo",
+        );
+    }
+
+    #[cfg(feature = "specfile")]
+    fn compare_specs(s1: &str, s2: &str) {
+        let ls1 = LogSpecification::from_toml(s1).unwrap();
+        let ls2 = LogSpecification::parse(s2).unwrap();
+
+        assert_eq!(ls1.module_filters, ls2.module_filters);
+        assert_eq!(ls1.textfilter.is_none(), ls2.textfilter.is_none());
+        if ls1.textfilter.is_some() && ls2.textfilter.is_some() {
+            assert_eq!(
+                ls1.textfilter.unwrap().to_string(),
+                ls2.textfilter.unwrap().to_string()
+            );
+        }
     }
 
 }

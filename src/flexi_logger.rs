@@ -16,14 +16,14 @@ use std::sync::{Arc, RwLock};
 pub(crate) struct FlexiLogger {
     log_specification: Arc<RwLock<LogSpecification>>,
     primary_writer: Arc<PrimaryWriter>,
-    other_writers: HashMap<String, Box<LogWriter>>,
+    other_writers: Arc<HashMap<String, Box<LogWriter>>>,
 }
 
 impl FlexiLogger {
     pub fn new(
         log_specification: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
-        other_writers: HashMap<String, Box<LogWriter>>,
+        other_writers: Arc<HashMap<String, Box<LogWriter>>>,
     ) -> FlexiLogger {
         FlexiLogger {
             log_specification,
@@ -31,18 +31,54 @@ impl FlexiLogger {
             other_writers,
         }
     }
-    // Implementation of Log::enabled() with easier testable signature
-    fn fl_enabled(&self, level: log::Level, target: &str) -> bool {
-        let guard = self.log_specification.read();
-        guard.as_ref()
-                    .unwrap(/* not sure if we should expose this */)
-                    .enabled(level, target)
+
+    fn primary_enabled(&self, level: log::Level, module: &str) -> bool {
+        self.log_specification.read().as_ref()
+                                .unwrap(/* catch and expose error? */)
+                                .enabled(level, module)
     }
 }
 
 impl log::Log for FlexiLogger {
+    //  If other writers are configured and the metadata target addresses them correctly,
+    //      - we should determine if the metadata-level is digested by any of the writers
+    //        (including the primary writer)
+    //  else we fall back to default behavior:
+    //      Return true if
+    //      - target is filled with module path and level is accepted by log specification
+    //      - target is filled with crap and ???
+    //
+    // Caveat:
+    // Rocket e.g. sets target explicitly to several fantasy names;
+    // these hopefully do not collide with any of the modules in the log specification;
+    // since they do not conform with the {}  syntax expected by flexi_logger, their treated as
+    // module names.
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.fl_enabled(metadata.level(), metadata.target())
+        let target = metadata.target();
+        let level = metadata.level();
+
+        // This is bad - we should have the module_path here :-(
+        if self.primary_enabled(level, target) {
+            return true
+        };
+
+        if !self.other_writers.is_empty() && target.starts_with('{') {
+            // at least one other writer is configured _and_ addressed
+            let targets: Vec<&str> = target[1..(target.len() - 1)].split(',').collect();
+            for t in targets {
+                if t != "_Default" {
+                    match self.other_writers.get(t) {
+                        None => eprintln!("bad writer spec: {}", t),
+                        Some(writer) => {
+                            if level < writer.max_log_level() {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     fn log(&self, record: &log::Record) {
@@ -72,7 +108,7 @@ impl log::Log for FlexiLogger {
             }
         }
 
-        if !self.enabled(record.metadata()) {
+        if !self.primary_enabled(record.level(), record.module_path().unwrap_or_default()) {
             return;
         }
 

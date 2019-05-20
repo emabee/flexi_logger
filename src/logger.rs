@@ -14,7 +14,6 @@ use std::thread;
 
 use crate::flexi_logger::FlexiLogger;
 use crate::primary_writer::PrimaryWriter;
-use crate::reconfiguration_handle::reconfiguration_handle;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::FormatFunction;
 use crate::ReconfigurationHandle;
@@ -127,13 +126,14 @@ impl Logger {
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     /// See [ReconfigurationHandle](struct.ReconfigurationHandle.html) for an example.
     pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
-        let max = self.spec.max_level();
+        let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
+        let other_writers = Arc::new(self.other_writers);
 
         let primary_writer = Arc::new(match self.log_target {
             LogTarget::File => {
                 self.flwb = self.flwb.format(self.format);
-                PrimaryWriter::file(self.duplicate, self.flwb.instantiate()?)
+                PrimaryWriter::file(self.duplicate, self.flwb.try_build()?)
             }
             LogTarget::StdErr => PrimaryWriter::stderr(self.format),
             LogTarget::DevNull => PrimaryWriter::black_hole(self.duplicate, self.format),
@@ -142,20 +142,13 @@ impl Logger {
         let flexi_logger = FlexiLogger::new(
             Arc::clone(&spec),
             Arc::clone(&primary_writer),
-            self.other_writers,
+            Arc::clone(&other_writers),
         );
 
         log::set_boxed_logger(Box::new(flexi_logger))?;
-        log::set_max_level(max);
-        Ok(reconfiguration_handle(spec, primary_writer))
-    }
-
-    /// This method is deprecated. The standard `start()` method now returns a
-    /// reconfiguration handle because there is no performance penalty any more for
-    /// reconfigurability.
-    #[deprecated(since = "0.10.6", note = "please use `start()` instead")]
-    pub fn start_reconfigurable(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
-        self.start()
+        let handle = ReconfigurationHandle::new(spec, primary_writer, other_writers);
+        handle.reconfigure(max_level);
+        Ok(handle)
     }
 
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
@@ -408,19 +401,6 @@ impl Logger {
         self
     }
 
-    /// Prevents indefinite growth of log files.
-    #[deprecated(since = "0.11.0", note = "use `rotate()`")]
-    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> Logger {
-        #[allow(deprecated)]
-        {
-            self.flwb = self
-                .flwb
-                .rotate_over_size(rotate_over_size)
-                .o_timestamp(false);
-        }
-        self
-    }
-
     /// Makes the logger append to the specified output file, if it exists already;
     /// by default, the file would be truncated.
     ///
@@ -567,25 +547,6 @@ impl Logger {
     /// The cleanup strategy allows delimiting the used space on disk.
     pub fn o_rotate<R: Into<RotateOver>>(mut self, rotate_config: Option<(R, Cleanup)>) -> Logger {
         self.flwb = self.flwb.o_rotate(rotate_config);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
-    /// By default, and with None, the log file will grow indefinitely.
-    /// If a size is set, when the log file reaches or exceeds the specified size,
-    /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes: instead of the timestamp, a serial number
-    /// is included into the filename.
-    ///
-    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
-    /// files once they reach a size of 1 kB.
-    #[deprecated(since = "0.11.0", note = "use `o_rotate()`")]
-    pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> Logger {
-        #[allow(deprecated)]
-        {
-            self.flwb = self.flwb.o_rotate_over_size(rotate_over_size);
-        }
         self
     }
 

@@ -5,9 +5,12 @@ use std::io;
 ///
 /// Boxed instances of `LogWriter` can be used as additional log targets.
 pub trait LogWriter: Sync + Send {
-    /// write out a log line
+    /// Writes out a log line.
     fn write(&self, record: &Record) -> io::Result<()>;
 
     /// Flushes any buffered records.
     fn flush(&self) -> io::Result<()>;
+
+    /// Provides the maximum log level that is to be written.
+    fn max_log_level(&self) -> log::LevelFilter;
 }

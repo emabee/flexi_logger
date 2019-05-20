@@ -19,7 +19,7 @@ mod macros {
 fn test() {
     // more complex just to support validation:
     let (sec_writer, sec_handle) = SecWriter::new();
-    let log_handle = Logger::with_str("info")
+    let mut log_handle = Logger::with_str("info")
         .format(detailed_format)
         .print_message()
         .log_to_file()
@@ -41,6 +41,10 @@ fn test() {
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
 
+    // Switching off logging has no effect on non-default targets
+    log_handle.parse_new_spec("Off");
+    sec_alert_error!("This is a further security-relevant alert and log message");
+
     // Verification:
     #[cfg_attr(rustfmt, rustfmt_skip)]
     log_handle.validate_logs(&[
@@ -55,6 +59,7 @@ fn test() {
         ("ERROR", "multi_logger", "a security-relevant alert"),
         ("ERROR", "multi_logger", "security-relevant alert and log message"),
         ("ERROR", "multi_logger", "another security-relevant alert"),
+        ("ERROR", "multi_logger", "a further security-relevant alert"),
     ]);
 }
 
@@ -67,7 +72,7 @@ impl SecWriter {
                 .discriminant("Security")
                 .suffix("seclog")
                 .print_message()
-                .instantiate()
+                .try_build()
                 .unwrap(),
         );
         (Box::new(SecWriter(Arc::clone(&a_flw))), a_flw)
@@ -80,6 +85,9 @@ impl LogWriter for SecWriter {
     fn flush(&self) -> io::Result<()> {
         self.0.flush()
     }
+    fn max_log_level(&self) -> log::LevelFilter {
+        log::LevelFilter::Error
+    }
 }
 
 pub fn alert_logger() -> Box<FileLogWriter> {
@@ -88,7 +96,7 @@ pub fn alert_logger() -> Box<FileLogWriter> {
             .discriminant("Alert")
             .suffix("alerts")
             .print_message()
-            .instantiate()
+            .try_build()
             .unwrap(),
     )
 }

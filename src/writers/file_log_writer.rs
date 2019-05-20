@@ -59,6 +59,7 @@ impl FileLogWriterConfig {
 pub struct FileLogWriterBuilder {
     discriminant: Option<String>,
     config: FileLogWriterConfig,
+    max_log_level: log::LevelFilter,
 }
 
 /// Simple methods for influencing the behavior of the `FileLogWriter`.
@@ -139,15 +140,6 @@ impl FileLogWriterBuilder {
         self
     }
 
-    /// Prevents indefinite growth of log files.
-    ///
-    #[deprecated(since = "0.11.0", note = "use rotate(rotate_over, cleanup)")]
-    pub fn rotate_over_size(mut self, rotate_over_size: usize) -> FileLogWriterBuilder {
-        self.config.rotate_over = Some(rotate_over_size.into());
-        self.config.use_timestamp = false;
-        self
-    }
-
     /// Makes the logger append to the given file, if it exists; by default, the file would be
     /// truncated.
     pub fn append(mut self) -> FileLogWriterBuilder {
@@ -175,7 +167,7 @@ impl FileLogWriterBuilder {
     }
 
     /// Produces the FileLogWriter.
-    pub fn instantiate(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
+    pub fn try_build(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
         // make sure the folder exists or create it
         let p_directory = Path::new(&self.config.directory);
         std::fs::create_dir_all(&p_directory)?;
@@ -192,11 +184,12 @@ impl FileLogWriterBuilder {
         }
         if self.config.use_timestamp {
             self.config.file_basename += &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
-        };
+        };  
 
         Ok(FileLogWriter {
             state: Mutex::new(RefCell::new(FileLogWriterState::try_new(&self.config)?)),
             config: self.config,
+            max_log_level: self.max_log_level,
         })
     }
 }
@@ -255,21 +248,6 @@ impl FileLogWriterBuilder {
                 self.config.use_timestamp = true;
             }
         }
-        self
-    }
-
-    /// By default, and with None, the log file will grow indefinitely.
-    /// If a size is set, when the log file reaches or exceeds the specified size,
-    /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes: instead of the timestamp, a serial number
-    /// is included into the filename.
-    ///
-    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
-    /// files once they reach a size of 1 kB.
-    #[deprecated(since = "0.11.0", note = "please use o_rotate()")]
-    pub fn o_rotate_over_size(mut self, rotate_over_size: Option<usize>) -> FileLogWriterBuilder {
-        self.config.rotate_over = rotate_over_size.map(Into::into);
-        self.config.use_timestamp = rotate_over_size.is_none();
         self
     }
 
@@ -575,6 +553,7 @@ pub struct FileLogWriter {
     // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
     // thread-safe
     state: Mutex<RefCell<FileLogWriterState>>,
+    max_log_level: log::LevelFilter,
 }
 impl FileLogWriter {
     /// Instantiates a builder for `FileLogWriter`.
@@ -582,6 +561,7 @@ impl FileLogWriter {
         FileLogWriterBuilder {
             discriminant: None,
             config: FileLogWriterConfig::default(),
+            max_log_level: log::LevelFilter::Trace,
         }
     }
 
@@ -651,6 +631,11 @@ impl LogWriter for FileLogWriter {
         let mr_state = self.state.lock().unwrap();
         let mut state = mr_state.borrow_mut();
         state.line_writer().flush()
+    }
+
+    #[inline]
+    fn max_log_level(&self)  -> log::LevelFilter {
+        self.max_log_level
     }
 }
 
@@ -849,7 +834,7 @@ mod test {
                 Cleanup::Never,
             )
             .o_append(append)
-            .instantiate()
+            .try_build()
             .unwrap()
     }
 }

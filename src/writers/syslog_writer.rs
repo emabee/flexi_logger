@@ -116,6 +116,7 @@ pub struct SyslogWriter {
     message_id: String,
     determine_severity: LevelToSyslogSeverity,
     syslog: Mutex<RefCell<SyslogConnector>>,
+    max_log_level: log::LevelFilter,
 }
 impl SyslogWriter {
     /// Returns a configured boxed instance.
@@ -138,6 +139,7 @@ impl SyslogWriter {
     pub fn try_new(
         facility: SyslogFacility,
         determine_severity: Option<LevelToSyslogSeverity>,
+        max_log_level: log::LevelFilter, 
         message_id: String,
         syslog: SyslogConnector,
     ) -> IoResult<Box<SyslogWriter>> {
@@ -148,6 +150,7 @@ impl SyslogWriter {
                 .ok_or_else(|| IoError::new(ErrorKind::Other, "<no progname>".to_owned()))?,
             pid: std::process::id(),
             facility,
+            max_log_level,
             message_id,
             determine_severity: determine_severity.unwrap_or_else(|| default_mapping),
             syslog: Mutex::new(RefCell::new(syslog)),
@@ -182,6 +185,10 @@ impl LogWriter for SyslogWriter {
         let mut syslog = mr_syslog.borrow_mut();
         syslog.flush()?;
         Ok(())
+    }
+
+    fn max_log_level(&self) -> log::LevelFilter {
+        self.max_log_level
     }
 }
 

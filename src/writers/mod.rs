@@ -36,7 +36,7 @@
 //!         .discriminant("Alert")
 //!         .suffix("alerts")
 //!         .print_message()
-//!         .instantiate()
+//!         .try_build()
 //!         .unwrap())
 //! }
 //!

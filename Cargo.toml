@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.11.5"
+version = "0.12.0-alpha"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"

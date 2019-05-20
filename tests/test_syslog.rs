@@ -22,6 +22,7 @@ mod test {
         let boxed_syslog_writer = SyslogWriter::try_new(
             SyslogFacility::LocalUse0,
             None,
+            log::LevelFilter::Trace,
             "JustForTest".to_owned(),
             syslog_connector,
         )
