@@ -5,7 +5,7 @@ fn test_default_files_dir_rot() {
     Logger::with_str("info")
         .log_to_file()
         .directory("log_files")
-        .rotate(2000, Cleanup::Never)
+        .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

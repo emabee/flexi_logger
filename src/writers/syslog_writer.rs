@@ -139,7 +139,7 @@ impl SyslogWriter {
     pub fn try_new(
         facility: SyslogFacility,
         determine_severity: Option<LevelToSyslogSeverity>,
-        max_log_level: log::LevelFilter, 
+        max_log_level: log::LevelFilter,
         message_id: String,
         syslog: SyslogConnector,
     ) -> IoResult<Box<SyslogWriter>> {

@@ -59,7 +59,7 @@ impl log::Log for FlexiLogger {
 
         // This is bad - we should have the module_path here :-(
         if self.primary_enabled(level, target) {
-            return true
+            return true;
         };
 
         if !self.other_writers.is_empty() && target.starts_with('{') {

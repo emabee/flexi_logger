@@ -1,5 +1,5 @@
 use chrono::Local;
-use flexi_logger::{Cleanup, Duplicate, LogSpecification, Logger, Record};
+use flexi_logger::{Cleanup, Criterion, Duplicate, LogSpecification, Logger, Naming, Record};
 use glob::glob;
 use log::*;
 use std::fs::File;
@@ -10,9 +10,8 @@ use std::time;
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
-const ROTATE_OVER_SIZE: usize = 4_000_000;
+const ROTATE_OVER_SIZE: u64 = 4_000_000;
 
-// cargo test --test test_multi_threaded -- --nocapture
 #[test]
 fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
@@ -25,7 +24,11 @@ fn multi_threaded() {
         .format(test_format)
         .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())
-        .rotate(ROTATE_OVER_SIZE, Cleanup::Never)
+        .rotate(
+            Criterion::Size(ROTATE_OVER_SIZE),
+            Naming::Numbers,
+            Cleanup::Never,
+        )
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     info!(

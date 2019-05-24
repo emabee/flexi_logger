@@ -3,12 +3,13 @@ use log::*;
 
 #[test]
 fn test_mods() {
-    let handle: ReconfigurationHandle =
-        Logger::with_env_or_str("info, test_mods::mymod1=debug, test_mods::mymod2=error, test_mods::mymod1::mysubmod = off")
-            .format(detailed_format)
-            .log_to_file()
-            .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    let handle: ReconfigurationHandle = Logger::with_env_or_str(
+        "info, test_mods::mymod1=debug, test_mods::mymod2=error, test_mods::mymod1::mysubmod = off",
+    )
+    .format(detailed_format)
+    .log_to_file()
+    .start()
+    .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     error!("This is an error message");
     warn!("This is a warning");

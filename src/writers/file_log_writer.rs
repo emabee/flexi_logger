@@ -1,10 +1,9 @@
+use crate::flexi_error::FlexiLoggerError;
 use crate::formats::default_format;
-use crate::logger::Cleanup;
-use crate::logger::RotateOver;
+use crate::logger::{Age, Cleanup, Criterion, Naming};
 use crate::writers::log_writer::LogWriter;
-use crate::FlexiLoggerError;
 use crate::FormatFunction;
-use chrono::Local;
+use chrono::{DateTime, Datelike, Local, Timelike};
 use log::Record;
 use std::cell::RefCell;
 use std::cmp::max;
@@ -22,18 +21,28 @@ fn number_infix(idx: u32) -> String {
     format!("_r{:0>5}", idx)
 }
 
-// The immutable configuration of a FileLogWriter.
-struct FileLogWriterConfig {
-    format: FormatFunction,
-    print_message: bool,
+// Describes how rotation should work
+struct RotationConfig {
+    // Defines if rotation should be based on size or date
+    criterion: Criterion,
+    // Defines if rotated files should be numbered or get a date-based name
+    naming: Naming,
+    // Defines the cleanup strategy
+    cleanup: Cleanup,
+}
+struct FilenameConfig {
     directory: PathBuf,
     file_basename: String,
     suffix: String,
     use_timestamp: bool,
+}
+// The immutable configuration of a FileLogWriter.
+struct FileLogWriterConfig {
+    format: FormatFunction,
+    print_message: bool,
     append: bool,
-    rotate_over: Option<RotateOver>,
-    cleanup: Cleanup,
-    create_symlink: Option<PathBuf>,
+    filename_config: FilenameConfig,
+    o_create_symlink: Option<PathBuf>,
     use_windows_line_ending: bool,
 }
 impl FileLogWriterConfig {
@@ -42,14 +51,14 @@ impl FileLogWriterConfig {
         FileLogWriterConfig {
             format: default_format,
             print_message: false,
-            directory: PathBuf::from("."),
-            file_basename: String::new(),
-            suffix: "log".to_string(),
-            use_timestamp: true,
+            filename_config: FilenameConfig {
+                directory: PathBuf::from("."),
+                file_basename: String::new(),
+                suffix: "log".to_string(),
+                use_timestamp: true,
+            },
             append: false,
-            cleanup: Cleanup::Never,
-            rotate_over: None,
-            create_symlink: None,
+            o_create_symlink: None,
             use_windows_line_ending: false,
         }
     }
@@ -59,6 +68,7 @@ impl FileLogWriterConfig {
 pub struct FileLogWriterBuilder {
     discriminant: Option<String>,
     config: FileLogWriterConfig,
+    o_rotation_config: Option<RotationConfig>,
     max_log_level: log::LevelFilter,
 }
 
@@ -83,42 +93,40 @@ impl FileLogWriterBuilder {
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
     pub fn directory<P: Into<PathBuf>>(mut self, directory: P) -> FileLogWriterBuilder {
-        self.config.directory = directory.into();
+        self.config.filename_config.directory = directory.into();
         self
     }
 
     /// Specifies a suffix for the log files. The default is "log".
     pub fn suffix<S: Into<String>>(mut self, suffix: S) -> FileLogWriterBuilder {
-        self.config.suffix = suffix.into();
+        self.config.filename_config.suffix = suffix.into();
         self
     }
 
     /// Makes the logger not include a timestamp into the names of the log files
     pub fn suppress_timestamp(mut self) -> FileLogWriterBuilder {
-        self.config.use_timestamp = false;
+        self.config.filename_config.use_timestamp = false;
         self
     }
 
-    /// Prevents indefinite growth of log files.
+    /// Use rotation to prevent indefinite growth of log files.
     ///
     /// By default, the log file is fixed while your program is running and will grow indefinitely.
-    /// With this option being used, when the log file reaches or exceeds the specified file size,
+    /// With this option being used, when the log file reaches the specified criterion,
     /// the file will be closed and a new file will be opened.
     ///
-    /// The rotate-over-size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
-    /// files once they reach a size of 1000 bytes.
-    ///     
     /// Note that also the filename pattern changes:
     ///
     /// - by default, no timestamp is added to the filename
     /// - the logs are always written to a file with infix `_rCURRENT`
-    /// - if this file exceeds the specified rotate-over-size, it is closed and renamed to a file
-    ///   with a sequential number infix,
-    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`
+    /// - when the rotation criterion is fulfilled, it is closed and renamed to a file
+    ///   with another infix (see `Naming`),
+    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`.
     ///
     /// Example:
     ///
-    /// After some logging with your program `my_prog`, you will find files like
+    /// After some logging with your program `my_prog` and rotation with `Naming::Numbers`,
+    /// you will find files like
     ///
     /// ```text
     /// my_prog_r00000.log
@@ -128,15 +136,19 @@ impl FileLogWriterBuilder {
     /// ```
     ///
     /// The cleanup parameter allows defining the strategy for dealing with older files.
-    /// See [Cleanup](Cleanup) for details.
-    pub fn rotate<R: Into<RotateOver>>(
+    /// See [Cleanup](enum.Cleanup.html) for details.
+    pub fn rotate(
         mut self,
-        rotate_over: R,
+        criterion: Criterion,
+        naming: Naming,
         cleanup: Cleanup,
     ) -> FileLogWriterBuilder {
-        self.config.cleanup = cleanup;
-        self.config.rotate_over = Some(rotate_over.into());
-        self.config.use_timestamp = false;
+        self.o_rotation_config = Some(RotationConfig {
+            criterion,
+            naming,
+            cleanup,
+        });
+        self.config.filename_config.use_timestamp = false;
         self
     }
 
@@ -156,7 +168,7 @@ impl FileLogWriterBuilder {
     /// The specified String will be used on linux systems to create in the current folder
     /// a symbolic link to the current log file.
     pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> FileLogWriterBuilder {
-        self.config.create_symlink = Some(symlink.into());
+        self.config.o_create_symlink = Some(symlink.into());
         self
     }
 
@@ -169,25 +181,29 @@ impl FileLogWriterBuilder {
     /// Produces the FileLogWriter.
     pub fn try_build(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
         // make sure the folder exists or create it
-        let p_directory = Path::new(&self.config.directory);
+        let p_directory = Path::new(&self.config.filename_config.directory);
         std::fs::create_dir_all(&p_directory)?;
         if !std::fs::metadata(&p_directory)?.is_dir() {
             return Err(FlexiLoggerError::BadDirectory);
         };
 
         let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
-        self.config.file_basename =
+        self.config.filename_config.file_basename =
             Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy().to_string();
 
         if let Some(discriminant) = self.discriminant {
-            self.config.file_basename += &format!("_{}", discriminant);
+            self.config.filename_config.file_basename += &format!("_{}", discriminant);
         }
-        if self.config.use_timestamp {
-            self.config.file_basename += &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
-        };  
+        if self.config.filename_config.use_timestamp {
+            self.config.filename_config.file_basename +=
+                &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
+        };
 
         Ok(FileLogWriter {
-            state: Mutex::new(RefCell::new(FileLogWriterState::try_new(&self.config)?)),
+            state: Mutex::new(RefCell::new(FileLogWriterState::try_new(
+                &self.config,
+                &self.o_rotation_config,
+            )?)),
             config: self.config,
             max_log_level: self.max_log_level,
         })
@@ -210,7 +226,7 @@ impl FileLogWriterBuilder {
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
     pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> FileLogWriterBuilder {
-        self.config.directory = directory
+        self.config.filename_config.directory = directory
             .map(Into::into)
             .unwrap_or_else(|| PathBuf::from("."));
         self
@@ -218,7 +234,7 @@ impl FileLogWriterBuilder {
 
     /// With true, makes the FileLogWriterBuilder include a timestamp into the names of the log files.
     pub fn o_timestamp(mut self, use_timestamp: bool) -> FileLogWriterBuilder {
-        self.config.use_timestamp = use_timestamp;
+        self.config.filename_config.use_timestamp = use_timestamp;
         self
     }
 
@@ -232,20 +248,22 @@ impl FileLogWriterBuilder {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate<R: Into<RotateOver>>(
+    pub fn o_rotate(
         mut self,
-        rotate_config: Option<(R, Cleanup)>,
+        rotate_config: Option<(Criterion, Naming, Cleanup)>,
     ) -> FileLogWriterBuilder {
         match rotate_config {
-            Some((r, c)) => {
-                self.config.rotate_over = Some(r.into());
-                self.config.cleanup = c;
-                self.config.use_timestamp = false;
+            Some((criterion, naming, cleanup)) => {
+                self.o_rotation_config = Some(RotationConfig {
+                    criterion,
+                    naming,
+                    cleanup,
+                });
+                self.config.filename_config.use_timestamp = false;
             }
             None => {
-                self.config.rotate_over = None;
-                self.config.cleanup = Cleanup::Never;
-                self.config.use_timestamp = true;
+                self.o_rotation_config = None;
+                self.config.filename_config.use_timestamp = true;
             }
         }
         self
@@ -273,60 +291,145 @@ impl FileLogWriterBuilder {
         mut self,
         symlink: Option<S>,
     ) -> FileLogWriterBuilder {
-        self.config.create_symlink = symlink.map(Into::into);
+        self.config.o_create_symlink = symlink.map(Into::into);
         self
     }
 }
 
+//  Describes the latest existing numbered log file.
 #[derive(Clone, Copy)]
-enum Rotation {
+enum IdxState {
+    // We rotate to numbered files, and no rotated numbered file exists yet
     Start,
+    // highest index of rotated numbered files
     Idx(u32),
 }
+
+// Created_at is needed both for
+//      is_rotation_necessary() -> if Criterion::Age -> NamingState::CreatedAt
+//      and rotate_to_date()    -> if Naming::Timestamps -> RollState::Age
+enum NamingState {
+    CreatedAt,
+    IdxState(IdxState),
+}
+
+enum RollState {
+    Size(u64, u64), // max_size, current_size
+    Age(Age),
+}
+
+struct RotationState {
+    naming_state: NamingState,
+    roll_state: RollState,
+    created_at: DateTime<Local>,
+    cleanup: Cleanup,
+}
+impl RotationState {
+    fn rotation_necessary(&self) -> bool {
+        match &self.roll_state {
+            RollState::Size(max_size, current_size) => current_size > max_size,
+            RollState::Age(age) => {
+                let now = Local::now();
+                match age {
+                    Age::Day => self.created_at.num_days_from_ce() != now.num_days_from_ce(),
+                    Age::Hour => {
+                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                            || self.created_at.hour() != now.hour()
+                    }
+                    Age::Minute => {
+                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                            || self.created_at.hour() != now.hour()
+                            || self.created_at.minute() != now.minute()
+                    }
+                    Age::Second => {
+                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                            || self.created_at.hour() != now.hour()
+                            || self.created_at.minute() != now.minute()
+                            || self.created_at.second() != now.second()
+                    }
+                }
+            }
+        }
+    }
+}
+
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
     line_writer: Option<LineWriter<File>>,
-    created_at: std::time::SystemTime,
-    written_bytes: u64,
-    // Contains None if no rotation is desired,
-    // or Some(rotation) if rotation is required
-    //    where rotation is Rotation::Start if no rotated file exists,
-    //    or Rotation::Idx(idx) where idx is the highest existing rotate_idx
-    o_rotation: Option<Rotation>,
+    o_rotation_state: Option<RotationState>,
     line_ending: &'static [u8],
 }
 impl FileLogWriterState {
     // If rotate, the logger writes into a file with infix `_rCURRENT`.
-    fn try_new(config: &FileLogWriterConfig) -> Result<FileLogWriterState, FlexiLoggerError> {
-        let o_rotation = match config.rotate_over {
-            None => None,
-            Some(RotateOver::Size(_)) 
-            // | Some(RotateOver::Duration(_)) 
-            => {
-                let mut rotation = get_highest_rotate_idx(&config);
-                if !config.append {
-                    rotation = rotate_output_file(rotation, config)?;
-                }
-                Some(rotation)
+    fn try_new(
+        config: &FileLogWriterConfig,
+        o_rotation_config: &Option<RotationConfig>,
+    ) -> Result<FileLogWriterState, FlexiLoggerError> {
+        let (line_writer, o_rotation_state) = match o_rotation_config {
+            None => {
+                let (line_writer, _created_at, _p_path) = get_linewriter(config, false)?;
+                (line_writer, None)
+            }
+            Some(rotate_config) => {
+                // first rotate, then open the line_writer
+                let naming_state = match rotate_config.naming {
+                    Naming::Timestamps => {
+                        if !config.append {
+                            rotate_output_file_to_date(
+                                &get_creation_date(&get_filepath(
+                                    Some(CURRENT_INFIX),
+                                    &config.filename_config,
+                                ))?,
+                                config,
+                            )?;
+                        }
+                        NamingState::CreatedAt
+                    }
+                    Naming::Numbers => {
+                        let mut rotation_state = get_highest_rotate_idx(&config.filename_config);
+                        if !config.append {
+                            rotation_state = rotate_output_file_to_idx(rotation_state, config)?;
+                        }
+                        NamingState::IdxState(rotation_state)
+                    }
+                };
+                let (line_writer, created_at, p_path) = get_linewriter(config, true)?;
+
+                let cleanup = rotate_config.cleanup;
+
+                let roll_state = match &rotate_config.criterion {
+                    Criterion::Age(age) => RollState::Age(*age),
+                    Criterion::Size(size) => {
+                        let written_bytes = if config.append {
+                            std::fs::metadata(&p_path)?.len()
+                        } else {
+                            0
+                        };
+                        RollState::Size(*size, written_bytes)
+                    } // max_size, current_size
+                };
+
+                (
+                    line_writer,
+                    Some(RotationState {
+                        naming_state,
+                        roll_state,
+                        created_at,
+                        cleanup,
+                    }),
+                )
             }
         };
 
-        let (line_writer, created_at, written_bytes) = get_linewriter(config)?;
         Ok(FileLogWriterState {
             line_writer: Some(line_writer),
-            created_at,
-            written_bytes,
-            o_rotation,
+            o_rotation_state,
             line_ending: if config.use_windows_line_ending {
                 b"\r\n"
             } else {
                 b"\n"
             },
         })
-    }
-
-    pub(crate) fn written_bytes(&self) -> u64 {
-        self.written_bytes
     }
 
     fn line_writer(&mut self) -> &mut LineWriter<File> {
@@ -338,19 +441,37 @@ impl FileLogWriterState {
     // With rotation, the logger always writes into a file with infix `_rCURRENT`.
     // On overflow, an existing `_rCURRENT` file is renamed to the next numbered file,
     // before writing into `_rCURRENT` goes on.
-    fn mount_next_linewriter(
+    #[inline]
+    fn mount_next_linewriter_if_necessary(
         &mut self,
         config: &FileLogWriterConfig,
     ) -> Result<(), FlexiLoggerError> {
-        self.line_writer = None; // close the output file
-        self.o_rotation = Some(rotate_output_file(self.o_rotation.unwrap(), config)?);
+        if let Some(ref mut rotation_state) = self.o_rotation_state {
+            if rotation_state.rotation_necessary() {
+                self.line_writer = None; // close the output file
 
-        let (line_writer, created_at, written_bytes) = get_linewriter(config)?;
-        self.line_writer = Some(line_writer);
-        self.created_at = created_at;
-        self.written_bytes = written_bytes;
+                match rotation_state.naming_state {
+                    NamingState::CreatedAt => {
+                        rotate_output_file_to_date(&rotation_state.created_at, config)?;
+                    }
+                    NamingState::IdxState(ref mut idx_state) => {
+                        *idx_state = rotate_output_file_to_idx(*idx_state, config)?;
+                    }
+                }
 
-        remove_or_zip_too_old_logfiles(&config)?;
+                let (line_writer, created_at, _) = get_linewriter(config, true)?;
+                self.line_writer = Some(line_writer);
+                rotation_state.created_at = created_at;
+                if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state
+                {
+                    *current_size = 0;
+                }
+
+                let cleanup_config: &Cleanup = &rotation_state.cleanup;
+                let filename_config: &FilenameConfig = &config.filename_config;
+                remove_or_zip_too_old_logfiles(cleanup_config, filename_config)?;
+            }
+        }
 
         Ok(())
     }
@@ -360,8 +481,10 @@ impl Write for FileLogWriterState {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.line_writer().write_all(buf)?;
-        if self.o_rotation.is_some() {
-            self.written_bytes += buf.len() as u64;
+        if let Some(ref mut rotation_state) = self.o_rotation_state {
+            if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state {
+                *current_size += buf.len() as u64;
+            }
         };
         Ok(buf.len())
     }
@@ -372,11 +495,11 @@ impl Write for FileLogWriterState {
     }
 }
 
-fn get_filepath(infix: &str, config: &FileLogWriterConfig) -> PathBuf {
-    let mut s_filename =
-        String::with_capacity(config.file_basename.len() + infix.len() + 1 + config.suffix.len())
-            + &config.file_basename;
-    if config.rotate_over.is_some() {
+fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
+    let mut s_filename = String::with_capacity(
+        config.file_basename.len() + o_infix.map(str::len).unwrap_or(0) + 1 + config.suffix.len(),
+    ) + &config.file_basename;
+    if let Some(infix) = o_infix {
         s_filename += infix;
     };
     s_filename += ".";
@@ -386,15 +509,20 @@ fn get_filepath(infix: &str, config: &FileLogWriterConfig) -> PathBuf {
     p_path
 }
 
-// Returns line_writer, written_bytes, path.
 fn get_linewriter(
     config: &FileLogWriterConfig,
-) -> Result<(LineWriter<File>, std::time::SystemTime, u64), FlexiLoggerError> {
-    let p_path = get_filepath(CURRENT_INFIX, &config);
+    with_rotation: bool,
+) -> Result<(LineWriter<File>, DateTime<Local>, PathBuf), FlexiLoggerError> {
+    let o_infix = if with_rotation {
+        Some(CURRENT_INFIX)
+    } else {
+        None
+    };
+    let p_path = get_filepath(o_infix, &config.filename_config);
     if config.print_message {
         println!("Log is written to {}", &p_path.display());
     }
-    if let Some(ref link) = config.create_symlink {
+    if let Some(ref link) = config.o_create_symlink {
         self::platform::create_symlink_if_possible(link, &p_path);
     }
 
@@ -406,25 +534,18 @@ fn get_linewriter(
             .truncate(!config.append)
             .open(&p_path)?,
     );
-    let metadata = std::fs::metadata(&p_path)?;
-    let creation_st = metadata
-        .created()
-        .unwrap_or_else(|_| std::time::SystemTime::now());
-    Ok((
-        lw,
-        creation_st,
-        if config.append { metadata.len() } else { 0 },
-    ))
+
+    Ok((lw, get_creation_date(&p_path)?, p_path))
 }
 
-fn get_highest_rotate_idx(config: &FileLogWriterConfig) -> Rotation {
-    match list_of_log_and_zip_files(config) {
+fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
+    match list_of_log_and_zip_files(filename_config) {
         Err(e) => {
-            eprintln!("Listing files failed with {}", e);
-            Rotation::Start // FIXME
+            eprintln!("Listing rotated log files failed with {}", e);
+            IdxState::Start // hope and pray ...??
         }
         Ok(globresults) => {
-            let mut highest_idx = Rotation::Start;
+            let mut highest_idx = IdxState::Start;
             for globresult in globresults {
                 match globresult {
                     Err(e) => eprintln!("Error when reading directory for log files: {:?}", e),
@@ -433,8 +554,8 @@ fn get_highest_rotate_idx(config: &FileLogWriterConfig) -> Rotation {
                         let mut it = filename.rsplit("_r");
                         let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
                         highest_idx = match highest_idx {
-                            Rotation::Start => Rotation::Idx(idx),
-                            Rotation::Idx(prev) => Rotation::Idx(max(prev, idx)),
+                            IdxState::Start => IdxState::Idx(idx),
+                            IdxState::Idx(prev) => IdxState::Idx(max(prev, idx)),
                         };
                     }
                 }
@@ -445,23 +566,26 @@ fn get_highest_rotate_idx(config: &FileLogWriterConfig) -> Rotation {
 }
 
 fn list_of_log_and_zip_files(
-    config: &FileLogWriterConfig,
+    filename_config: &FilenameConfig,
 ) -> Result<std::iter::Chain<glob::Paths, glob::Paths>, FlexiLoggerError> {
     let fn_pattern = String::with_capacity(180)
-        .add(&config.file_basename)
-        .add("_r[0-9][0-9][0-9][0-9][0-9]*")
+        .add(&filename_config.file_basename)
+        .add("_r[0-9]*")
         .add(".");
 
-    let mut log_pattern = config.directory.clone();
-    log_pattern.push(fn_pattern.clone().add(&config.suffix));
-    let mut zip_pattern = config.directory.clone();
+    let mut log_pattern = filename_config.directory.clone();
+    log_pattern.push(fn_pattern.clone().add(&filename_config.suffix));
+    let mut zip_pattern = filename_config.directory.clone();
     zip_pattern.push(fn_pattern.clone().add("zip"));
     Ok(glob::glob(&log_pattern.as_os_str().to_string_lossy())?
         .chain(glob::glob(&zip_pattern.as_os_str().to_string_lossy())?))
 }
 
-fn remove_or_zip_too_old_logfiles(config: &FileLogWriterConfig) -> Result<(), FlexiLoggerError> {
-    let (log_limit, zip_limit) = match config.cleanup {
+fn remove_or_zip_too_old_logfiles(
+    cleanup_config: &Cleanup,
+    filename_config: &FilenameConfig,
+) -> Result<(), FlexiLoggerError> {
+    let (log_limit, zip_limit) = match *cleanup_config {
         Cleanup::Never => {
             return Ok(());
         }
@@ -472,7 +596,7 @@ fn remove_or_zip_too_old_logfiles(config: &FileLogWriterConfig) -> Result<(), Fl
         Cleanup::KeepLogAndZipFiles(log_limit, zip_limit) => (log_limit, zip_limit),
     };
     // list files by name, in ascending order
-    let mut file_list: Vec<_> = list_of_log_and_zip_files(&config)?
+    let mut file_list: Vec<_> = list_of_log_and_zip_files(&filename_config)?
         .filter_map(Result::ok)
         .collect();
     file_list.sort_unstable();
@@ -515,32 +639,67 @@ fn remove_or_zip_too_old_logfiles(config: &FileLogWriterConfig) -> Result<(), Fl
     Ok(())
 }
 
-// Moves the current file to the name with the next rotate_idx
-// and returns the next rotate_idx.
-// The current file must be closed already.
-fn rotate_output_file(
-    input_rotation: Rotation,
+// Moves the current file to the timestamp of the CURRENT file's creation date.
+fn rotate_output_file_to_date(
+    creation_date: &DateTime<Local>,
     config: &FileLogWriterConfig,
-) -> Result<Rotation, FlexiLoggerError> {
-    let new_rotate_idx = match input_rotation {
-        Rotation::Start => 0,
-        Rotation::Idx(idx) => idx + 1,
-    };
-
+) -> Result<(), FlexiLoggerError> {
+    let current_path = get_filepath(Some(CURRENT_INFIX), &config.filename_config);
     match std::fs::rename(
-        get_filepath(CURRENT_INFIX, config),
-        get_filepath(&number_infix(new_rotate_idx), config),
+        &current_path,
+        get_filepath(
+            Some(&creation_date.format("_r%Y-%m-%d_%H-%M-%S").to_string()),
+            &config.filename_config,
+        ),
     ) {
-        Ok(()) => Ok(Rotation::Idx(new_rotate_idx)),
+        Ok(()) => Ok(()),
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
                 // current did not exist, so we had nothing to do
-                Ok(input_rotation)
+                Ok(())
             } else {
                 Err(FlexiLoggerError::Io(e))
             }
         }
     }
+}
+
+// Moves the current file to the name with the next rotate_idx and returns the next rotate_idx.
+// The current file must be closed already.
+fn rotate_output_file_to_idx(
+    idx_state: IdxState,
+    config: &FileLogWriterConfig,
+) -> Result<IdxState, FlexiLoggerError> {
+    let new_idx = match idx_state {
+        IdxState::Start => 0,
+        IdxState::Idx(idx) => idx + 1,
+    };
+
+    match std::fs::rename(
+        get_filepath(Some(CURRENT_INFIX), &config.filename_config),
+        get_filepath(Some(&number_infix(new_idx)), &config.filename_config),
+    ) {
+        Ok(()) => Ok(IdxState::Idx(new_idx)),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                // current did not exist, so we had nothing to do
+                Ok(idx_state)
+            } else {
+                Err(FlexiLoggerError::Io(e))
+            }
+        }
+    }
+}
+
+// See documentation of Criterion::Age.
+#[cfg(target_os = "windows")]
+fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+    Ok(Local::now())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+    Ok(std::fs::metadata(_path)?.created()?.into())
 }
 
 /// A configurable `LogWriter` implementation that writes to a file or a sequence of files.
@@ -560,6 +719,7 @@ impl FileLogWriter {
     pub fn builder() -> FileLogWriterBuilder {
         FileLogWriterBuilder {
             discriminant: None,
+            o_rotation_config: None,
             config: FileLogWriterConfig::default(),
             max_log_level: log::LevelFilter::Trace,
         }
@@ -574,7 +734,14 @@ impl FileLogWriter {
     // don't use this function in productive code - it exists only for flexi_loggers own tests
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        let path = get_filepath(CURRENT_INFIX, &self.config);
+        let mr_state = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
+        let mut refmut_state = mr_state.borrow_mut(); // : RefMut<FileLogWriterState>
+        let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
+
+        let path = get_filepath(
+            state.o_rotation_state.as_ref().map(|_| CURRENT_INFIX),
+            &self.config.filename_config,
+        );
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);
 
@@ -609,18 +776,12 @@ impl LogWriter for FileLogWriter {
         let mut refmut_state = mr_state.borrow_mut(); // : RefMut<FileLogWriterState>
         let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
 
-        // switch to next file if necessary
-        if let Some(ref rotate_over) = self.config.rotate_over {
-            if rotate_over.rotation_necessary(state.written_bytes()
-            //, state.created_at
-            ) {
-                state
-                    .mount_next_linewriter(&self.config)
-                    .unwrap_or_else(|e| {
-                        eprintln!("FlexiLogger: opening file failed with {}", e);
-                    });
-            }
-        }
+        // rotate if necessary
+        state
+            .mount_next_linewriter_if_necessary(&self.config)
+            .unwrap_or_else(|e| {
+                eprintln!("FlexiLogger: opening file failed with {}", e);
+            });
 
         (self.config.format)(state, record)?;
         state.write_all(state.line_ending)
@@ -634,7 +795,7 @@ impl LogWriter for FileLogWriter {
     }
 
     #[inline]
-    fn max_log_level(&self)  -> log::LevelFilter {
+    fn max_log_level(&self) -> log::LevelFilter {
         self.max_log_level
     }
 }
@@ -673,12 +834,12 @@ mod platform {
 
 #[cfg(test)]
 mod test {
-    use crate::writers::log_writer::LogWriter;
-    use crate::Cleanup;
-    use crate::RotateOver;
+    use crate::writers::LogWriter;
+    use crate::{Cleanup, Criterion, Naming};
     use chrono::Local;
-    use std::path::{Path, PathBuf};
 
+    use std::ops::Add;
+    use std::path::{Path, PathBuf};
     const DIRECTORY: &str = r"log_files/rotate";
     const ONE: &str = "ONE";
     const TWO: &str = "TWO";
@@ -693,9 +854,12 @@ mod test {
     // cargo test --lib -- --nocapture
 
     #[test]
-    fn test_rotate_no_append() {
+    fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now().format("false-%Y-%m-%d_%H-%M-%S").to_string();
+        let ts = Local::now()
+            .format("false-numbers-%Y-%m-%d_%H-%M-%S")
+            .to_string();
+        let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
         assert!(not_exists("00000", &ts));
@@ -703,13 +867,13 @@ mod test {
         assert!(not_exists("CURRENT", &ts));
 
         // ensure this produces -/-/ONE
-        write_loglines(false, &ts, &[ONE]);
+        write_loglines(false, naming, &ts, &[ONE]);
         assert!(not_exists("00000", &ts));
         assert!(not_exists("00001", &ts));
         assert!(contains("CURRENT", &ts, ONE));
 
         // ensure this produces ONE/-/TWO
-        write_loglines(false, &ts, &[TWO]);
+        write_loglines(false, naming, &ts, &[TWO]);
         assert!(contains("00000", &ts, ONE));
         assert!(not_exists("00001", &ts));
         assert!(contains("CURRENT", &ts, TWO));
@@ -717,22 +881,25 @@ mod test {
         // ensure this also produces ONE/-/TWO
         remove("CURRENT", &ts);
         assert!(not_exists("CURRENT", &ts));
-        write_loglines(false, &ts, &[TWO]);
+        write_loglines(false, naming, &ts, &[TWO]);
         assert!(contains("00000", &ts, ONE));
         assert!(not_exists("00001", &ts));
         assert!(contains("CURRENT", &ts, TWO));
 
         // ensure this produces ONE/TWO/THREE
-        write_loglines(false, &ts, &[THREE]);
+        write_loglines(false, naming, &ts, &[THREE]);
         assert!(contains("00000", &ts, ONE));
         assert!(contains("00001", &ts, TWO));
         assert!(contains("CURRENT", &ts, THREE));
     }
 
     #[test]
-    fn test_rotate_with_append() {
+    fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now().format("true-%Y-%m-%d_%H-%M-%S").to_string();
+        let ts = Local::now()
+            .format("true-numbers-%Y-%m-%d_%H-%M-%S")
+            .to_string();
+        let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
         assert!(not_exists("00000", &ts));
@@ -740,14 +907,14 @@ mod test {
         assert!(not_exists("CURRENT", &ts));
 
         // ensure this produces 12/-/3
-        write_loglines(true, &ts, &[ONE, TWO, THREE]);
+        write_loglines(true, naming, &ts, &[ONE, TWO, THREE]);
         assert!(contains("00000", &ts, ONE));
         assert!(contains("00000", &ts, TWO));
         assert!(not_exists("00001", &ts));
         assert!(contains("CURRENT", &ts, THREE));
 
         // ensure this produces 12/34/56
-        write_loglines(true, &ts, &[FOUR, FIVE, SIX]);
+        write_loglines(true, naming, &ts, &[FOUR, FIVE, SIX]);
         assert!(contains("00000", &ts, ONE));
         assert!(contains("00000", &ts, TWO));
         assert!(contains("00001", &ts, THREE));
@@ -759,7 +926,7 @@ mod test {
         remove("CURRENT", &ts);
         remove("00001", &ts);
         assert!(not_exists("CURRENT", &ts));
-        write_loglines(true, &ts, &[THREE, FOUR, FIVE, SIX]);
+        write_loglines(true, naming, &ts, &[THREE, FOUR, FIVE, SIX]);
         assert!(contains("00000", &ts, ONE));
         assert!(contains("00000", &ts, TWO));
         assert!(contains("00001", &ts, THREE));
@@ -768,7 +935,94 @@ mod test {
         assert!(contains("CURRENT", &ts, SIX));
 
         // ensure this produces 12/34/56/78/9
-        write_loglines(true, &ts, &[SEVEN, EIGHT, NINE]);
+        write_loglines(true, naming, &ts, &[SEVEN, EIGHT, NINE]);
+        assert!(contains("00002", &ts, FIVE));
+        assert!(contains("00002", &ts, SIX));
+        assert!(contains("00003", &ts, SEVEN));
+        assert!(contains("00003", &ts, EIGHT));
+        assert!(contains("CURRENT", &ts, NINE));
+    }
+
+    #[test]
+    fn test_rotate_no_append_timestamps() {
+        // we use timestamp as discriminant to allow repeated runs
+        let ts = Local::now()
+            .format("false-timestamps-%Y-%m-%d_%H-%M-%S")
+            .to_string();
+
+        let basename = String::from(DIRECTORY).add("/").add(
+            &Path::new(&std::env::args().next().unwrap())
+                .file_stem().unwrap(/*cannot fail*/)
+                .to_string_lossy().to_string(),
+        );
+        println!("basename: {}", basename);
+        let naming = Naming::Timestamps;
+
+        // ensure we start with -/-/-
+        assert!(list_rotated_files(&basename, &ts).is_empty());
+        assert!(not_exists("CURRENT", &ts));
+
+        // ensure this produces -/-/ONE
+        write_loglines(false, naming, &ts, &[ONE]);
+        assert!(list_rotated_files(&basename, &ts).is_empty());
+        assert!(contains("CURRENT", &ts, ONE));
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        // ensure this produces ONE/-/TWO
+        write_loglines(false, naming, &ts, &[TWO]);
+        assert_eq!(list_rotated_files(&basename, &ts).len(), 1);
+        assert!(contains("CURRENT", &ts, TWO));
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        // ensure this produces ONE/TWO/THREE
+        write_loglines(false, naming, &ts, &[THREE]);
+        assert_eq!(list_rotated_files(&basename, &ts).len(), 2);
+        assert!(contains("CURRENT", &ts, THREE));
+    }
+
+    #[test]
+    fn test_rotate_with_append_timestamps() {
+        // we use timestamp as discriminant to allow repeated runs
+        let ts = Local::now()
+            .format("true-timestamps-%Y-%m-%d_%H-%M-%S")
+            .to_string();
+        let naming = Naming::Timestamps;
+
+        // ensure we start with -/-/-
+        assert!(not_exists("00000", &ts));
+        assert!(not_exists("00001", &ts));
+        assert!(not_exists("CURRENT", &ts));
+
+        // ensure this produces 12/-/3
+        write_loglines(true, naming, &ts, &[ONE, TWO, THREE]);
+        assert!(contains("00000", &ts, ONE));
+        assert!(contains("00000", &ts, TWO));
+        assert!(not_exists("00001", &ts));
+        assert!(contains("CURRENT", &ts, THREE));
+
+        // ensure this produces 12/34/56
+        write_loglines(true, naming, &ts, &[FOUR, FIVE, SIX]);
+        assert!(contains("00000", &ts, ONE));
+        assert!(contains("00000", &ts, TWO));
+        assert!(contains("00001", &ts, THREE));
+        assert!(contains("00001", &ts, FOUR));
+        assert!(contains("CURRENT", &ts, FIVE));
+        assert!(contains("CURRENT", &ts, SIX));
+
+        // ensure this also produces 12/34/56
+        remove("CURRENT", &ts);
+        remove("00001", &ts);
+        assert!(not_exists("CURRENT", &ts));
+        write_loglines(true, naming, &ts, &[THREE, FOUR, FIVE, SIX]);
+        assert!(contains("00000", &ts, ONE));
+        assert!(contains("00000", &ts, TWO));
+        assert!(contains("00001", &ts, THREE));
+        assert!(contains("00001", &ts, FOUR));
+        assert!(contains("CURRENT", &ts, FIVE));
+        assert!(contains("CURRENT", &ts, SIX));
+
+        // ensure this produces 12/34/56/78/9
+        write_loglines(true, naming, &ts, &[SEVEN, EIGHT, NINE]);
         assert!(contains("00002", &ts, FIVE));
         assert!(contains("00002", &ts, SIX));
         assert!(contains("00003", &ts, SEVEN));
@@ -808,8 +1062,8 @@ mod test {
         path_buf.into_boxed_path()
     }
 
-    fn write_loglines(append: bool, discr: &str, texts: &[&'static str]) {
-        let flw = get_file_log_writer(append, discr);
+    fn write_loglines(append: bool, naming: Naming, discr: &str, texts: &[&'static str]) {
+        let flw = get_file_log_writer(append, naming, discr);
         for text in texts {
             flw.write(
                 &log::Record::builder()
@@ -825,16 +1079,36 @@ mod test {
         }
     }
 
-    fn get_file_log_writer(append: bool, discr: &str) -> crate::writers::FileLogWriter {
+    fn get_file_log_writer(
+        append: bool,
+        naming: Naming,
+        discr: &str,
+    ) -> crate::writers::FileLogWriter {
         super::FileLogWriter::builder()
             .directory(DIRECTORY)
             .discriminant(discr)
             .rotate(
-                RotateOver::Size(if append { 28 } else { 10 }),
+                Criterion::Size(if append { 28 } else { 10 }),
+                naming,
                 Cleanup::Never,
             )
             .o_append(append)
             .try_build()
             .unwrap()
+    }
+
+    fn list_rotated_files(basename: &str, discr: &str) -> Vec<String> {
+        let fn_pattern = String::with_capacity(180)
+            .add(basename)
+            .add("_")
+            .add(discr)
+            .add("_r2[0-9]*") // Year 3000 problem!!!
+            .add(".log");
+
+        println!("PATTERN = {}", fn_pattern);
+        glob::glob(&fn_pattern)
+            .unwrap()
+            .map(|r| r.unwrap().into_os_string().to_string_lossy().to_string())
+            .collect()
     }
 }

@@ -67,7 +67,7 @@ pub(crate) enum LogTarget {
     DevNull,
 }
 
-/// Choose a way to create a Logger instance and define how to access the (initial)
+/// Create a Logger instance and define how to access the (initial)
 /// loglevel-specification.
 impl Logger {
     /// Creates a Logger that you provide with an explicit LogSpecification.
@@ -118,7 +118,273 @@ impl Logger {
     }
 }
 
-/// Choose a way how to start logging.
+/// Simple methods for influencing the behavior of the Logger.
+impl Logger {
+    /// Allows verifying that no parsing errors have occured in the used factory method,
+    /// and examining the parse error.
+    ///
+    /// The factory methods `Logger::with_str()`, `Logger::with_env()`,
+    /// and `Logger::with_env_or_str()`,
+    /// parse a log specification String, and deduce from it a `LogSpecification` object.
+    /// Parsing errors are reported to stdout, but effectively ignored; in worst case, a
+    /// LogSpecification might be used that turns off logging completely!
+    ///
+    /// This method gives programmatic access to parse errors, if there were any.
+    ///
+    /// In the following example we just panic if the spec was not free of errors:
+    ///
+    /// ```rust
+    /// # use flexi_logger::Logger;
+    /// # let some_log_spec_string = "hello";
+    /// Logger::with_str(some_log_spec_string)
+    /// .check_parser_error()
+    /// .unwrap()
+    /// .log_to_file()
+    /// .start();
+    /// ```
+    pub fn check_parser_error(self) -> Result<Logger, FlexiLoggerError> {
+        match self.parse_errs {
+            Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
+            None => Ok(self),
+        }
+    }
+
+    /// Makes the logger write all logs to a file, rather than to stderr.
+    ///
+    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
+    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
+    pub fn log_to_file(mut self) -> Logger {
+        self.log_target = LogTarget::File;
+        self
+    }
+
+    /// Makes the logger write no logs at all.
+    ///
+    /// This can be useful when you want to run tests of your programs with all log-levels active
+    /// to ensure the log calls which are normally not active will not cause
+    /// undesired side-effects when activated
+    /// (note that the log macros prevent arguments of inactive log-calls from being evaluated).
+    pub fn do_not_log(mut self) -> Logger {
+        self.log_target = LogTarget::DevNull;
+        self
+    }
+
+    /// Makes the logger print an info message to stdout with the name of the logfile
+    /// when a logfile is opened for writing.
+    pub fn print_message(mut self) -> Logger {
+        self.flwb = self.flwb.print_message();
+        self
+    }
+
+    /// Makes the logger write messages with the specified minimum severity additionally to stderr.
+    pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Logger {
+        self.duplicate = dup;
+        self
+    }
+
+    /// Makes the logger use the provided format function for the log entries,
+    /// rather than [formats::default_format](fn.default_format.html).
+    ///
+    /// You can either choose between some predefined variants,
+    /// ```default_format```, ```opt_format```, ```detailed_format```, ```with_thread```,
+    /// or you create and use your own format function
+    /// with the signature ```fn(&Record) -> String```.
+    pub fn format(mut self, format: FormatFunction) -> Logger {
+        self.format = format;
+        self
+    }
+
+    /// Specifies a folder for the log files.
+    ///
+    /// This parameter only has an effect if `log_to_file()` is used, too.
+    /// If the specified folder does not exist, the initialization will fail.
+    /// By default, the log files are created in the folder where the program was started.
+    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Logger {
+        self.flwb = self.flwb.directory(directory);
+        self
+    }
+
+    /// Specifies a suffix for the log files.
+    ///
+    /// This parameter only has an effect if `log_to_file()` is used, too.
+    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Logger {
+        self.flwb = self.flwb.suffix(suffix);
+        self
+    }
+
+    /// Makes the logger not include a timestamp into the names of the log files.
+    ///
+    /// This option only has an effect if `log_to_file()` is used, too.
+    pub fn suppress_timestamp(mut self) -> Logger {
+        self.flwb = self.flwb.suppress_timestamp();
+        self
+    }
+
+    /// Use rotation to prevent indefinite growth of log files.
+    ///
+    /// By default, the log file is fixed while your program is running and will grow indefinitely.
+    /// With this option being used, when the log file reaches the specified criterion,
+    /// the file will be closed and a new file will be opened.
+    ///
+    /// Note that also the filename pattern changes:
+    ///
+    /// - by default, no timestamp is added to the filename
+    /// - the logs are always written to a file with infix `_rCURRENT`
+    /// - when the rotation criterion is fulfilled, it is closed and renamed to a file
+    ///   with another infix (see `Naming`),
+    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`.
+    ///
+    /// Example:
+    ///
+    /// After some logging with your program `my_prog` and rotation with `Naming::Numbers`,
+    /// you will find files like
+    ///
+    /// ```text
+    /// my_prog_r00000.log
+    /// my_prog_r00001.log
+    /// my_prog_r00002.log
+    /// my_prog_rCURRENT.log
+    /// ```
+    ///
+    /// The cleanup parameter allows defining the strategy for dealing with older files.
+    /// See [Cleanup](enum.Cleanup.html) for details.
+    pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Logger {
+        self.flwb = self.flwb.rotate(criterion, naming, cleanup);
+        self
+    }
+
+    /// Makes the logger append to the specified output file, if it exists already;
+    /// by default, the file would be truncated.
+    ///
+    /// This option only has an effect if `log_to_file()` is used, too.
+    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+    pub fn append(mut self) -> Logger {
+        self.flwb = self.flwb.append();
+        self
+    }
+
+    /// The specified String is added to the log file name after the program name.
+    ///
+    /// This option only has an effect if `log_to_file()` is used, too.
+    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Logger {
+        self.flwb = self.flwb.discriminant(discriminant);
+        self
+    }
+
+    /// The specified path will be used on linux systems to create a symbolic link
+    /// to the current log file.
+    ///
+    /// This method has no effect on filesystems where symlinks are not supported.
+    /// This option only has an effect if `log_to_file()` is used, too.
+    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Logger {
+        self.flwb = self.flwb.create_symlink(symlink);
+        self
+    }
+
+    /// Registers a LogWriter implementation under the given target name.
+    ///
+    /// The target name should not start with an underscore.
+    ///
+    /// See [the module documentation of `writers`](writers/index.html).
+    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
+        self.other_writers.insert(name.into(), writer);
+        self
+    }
+
+    /// Use Windows line endings, rather than just `\n`.
+    pub fn use_windows_line_ending(mut self) -> Logger {
+        self.flwb = self.flwb.use_windows_line_ending();
+        self
+    }
+}
+
+/// Alternative set of methods to control the behavior of the Logger.
+/// Use these methods when you want to control the settings flexibly,
+/// e.g. with commandline arguments via `docopts` or `clap`.
+impl Logger {
+    /// With true, makes the logger write all logs to a file, otherwise to stderr.
+    pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
+        if log_to_file {
+            self.log_target = LogTarget::File;
+        } else {
+            self.log_target = LogTarget::StdErr;
+        }
+        self
+    }
+
+    /// With true, makes the logger print an info message to stdout, each time
+    /// when a new file is used for log-output.
+    pub fn o_print_message(mut self, print_message: bool) -> Logger {
+        self.flwb = self.flwb.o_print_message(print_message);
+        self
+    }
+
+    /// Specifies a folder for the log files.
+    ///
+    /// This parameter only has an effect if `log_to_file` is set to true.
+    /// If the specified folder does not exist, the initialization will fail.
+    /// With None, the log files are created in the folder where the program was started.
+    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Logger {
+        self.flwb = self.flwb.o_directory(directory);
+        self
+    }
+
+    /// By default, and with None, the log file will grow indefinitely.
+    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
+    /// the file will be closed and a new file will be opened.
+    /// Also the filename pattern changes: instead of the timestamp, a serial number
+    /// is included into the filename.
+    ///
+    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
+    /// files once they reach a size of 1 kB.
+    ///
+    /// The cleanup strategy allows delimiting the used space on disk.
+    pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Logger {
+        self.flwb = self.flwb.o_rotate(rotate_config);
+        self
+    }
+
+    /// With true, makes the logger include a timestamp into the names of the log files.
+    /// `true` is the default, but `rotate_over_size` sets it to `false`.
+    /// With this method you can set it to `true` again.
+    ///
+    /// This parameter only has an effect if `log_to_file` is set to true.
+    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
+        self.flwb = self.flwb.o_timestamp(timestamp);
+        self
+    }
+
+    /// This option only has an effect if `log_to_file` is set to true.
+    ///
+    /// If append is set to true, makes the logger append to the specified output file, if it exists.
+    /// By default, or with false, the file would be truncated.
+    ///
+    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+
+    pub fn o_append(mut self, append: bool) -> Logger {
+        self.flwb = self.flwb.o_append(append);
+        self
+    }
+
+    /// This option only has an effect if `log_to_file` is set to true.
+    ///
+    /// The specified String is added to the log file name.
+    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Logger {
+        self.flwb = self.flwb.o_discriminant(discriminant);
+        self
+    }
+
+    /// This option only has an effect if `log_to_file` is set to true.
+    ///
+    /// If a String is specified, it will be used on linux systems to create in the current folder
+    /// a symbolic link with this name to the current log file.
+    pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Logger {
+        self.flwb = self.flwb.o_create_symlink(symlink);
+        self
+    }
+}
+
+/// Start logging.
 impl Logger {
     /// Consumes the Logger object and initializes `flexi_logger`.
     ///
@@ -264,189 +530,87 @@ impl Logger {
     }
 }
 
-/// Simple methods for influencing the behavior of the Logger.
-impl Logger {
-    /// Allows verifying that no parsing errors have occured in the used factory method,
-    /// and examining the parse error.
-    ///
-    /// The factory methods `Logger::with_str()`, `Logger::with_env()`,
-    /// and `Logger::with_env_or_str()`,
-    /// parse a log specification String, and deduce from it a `LogSpecification` object.
-    /// Parsing errors are reported to stdout, but effectively ignored; in worst case, a
-    /// LogSpecification might be used that turns off logging completely!
-    ///
-    /// This method gives programmatic access to parse errors, if there were any.
-    ///
-    /// In the following example we just panic if the spec was not free of errors:
-    ///
-    /// ```rust
-    /// # use flexi_logger::Logger;
-    /// # let some_log_spec_string = "hello";
-    /// Logger::with_str(some_log_spec_string)
-    /// .check_parser_error()
-    /// .unwrap()
-    /// .log_to_file()
-    /// .start();
-    /// ```
-    pub fn check_parser_error(self) -> Result<Logger, FlexiLoggerError> {
-        match self.parse_errs {
-            Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
-            None => Ok(self),
-        }
-    }
+// Maybe I get it correctly working on linux only.
+// Windows has a sick feature that the created_at-info of a file that is being deleted
+// (or renamed to another name) and recreated stays the same!! See
+// https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to
+//
+// Rotation by time needs the creation time of the rCURRENT file, which becomes in a
+// fatal way incorrect on windows.
+// So we use the current time...
+// So we behave incorrect if append is used. the rCURRENT file is treated at program start
+// as if it were just created, its real age is not known and thus not considered.
 
-    /// Makes the logger write all logs to a file, rather than to stderr.
+/// Criterion when to rotate the log file.
+///
+/// Used in [Logger::rotate()](struct.Logger.html#method.rotate).
+pub enum Criterion {
+    /// Rotate the log file when it exceeds the specified size.
+    Size(u64),
+    /// Rotate the log file when it has become older than the specified age.
     ///
-    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
-    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
-    pub fn log_to_file(mut self) -> Logger {
-        self.log_target = LogTarget::File;
-        self
-    }
+    /// ## Note for Windows users
+    ///
+    /// For compatibility with DOS (sic!), Windows magically and unexpectedly
+    /// transfers the created_at-info
+    /// of a file that is deleted (or renamed) and recreated to its successor.
+    ///
+    /// If the file property were used by `flexi_logger`,
+    /// the rCURRENT file would always appear to be as old as the
+    /// first one that ever was created - rotation by time would completely fail.
+    ///
+    /// To minimize the impact on age-based file-rotation,
+    /// `flexi_logger` uses on Windows its initialization time rather than the real file property
+    /// as the created_at-info of an rCURRENT file that already exists, and the
+    /// current timestamp when file rotation happens during further execution.
+    /// Consequently, a left-over rCURRENT file from a previous program run will look newer
+    /// than it is, and will be used longer than it should be.
+    ///
+    /// TL,DR: the combination of `Logger::append()`
+    /// with `Criterion::Age` does not behave perfectly correct on Windows.
+    Age(Age),
+}
 
-    /// Makes the logger write no logs at all.
-    ///
-    /// This can be useful when you want to run tests of your programs with all log-levels active
-    /// to ensure the log calls which are normally not active will not cause
-    /// undesired side-effects when activated
-    /// (note that the log macros prevent arguments of inactive log-calls from being evaluated).
-    pub fn do_not_log(mut self) -> Logger {
-        self.log_target = LogTarget::DevNull;
-        self
-    }
+/// The age after which a log file rotation will be triggered,
+/// when [`Criterion::Age`](enum.Criterion.html#variant.Age) is chosen.
+#[derive(Copy, Clone)]
+pub enum Age {
+    /// Rotate the log file when the local clock has started a new day since the
+    /// current file had been created.
+    Day,
+    /// Rotate the log file when the local clock has started a new hour since the
+    /// current file had been created.
+    Hour,
+    /// Rotate the log file when the local clock has started a new minute since the
+    /// current file had been created.
+    Minute,
+    /// Rotate the log file when the local clock has started a new second since the
+    /// current file had been created.
+    Second,
+}
 
-    /// Makes the logger print an info message to stdout with the name of the logfile
-    /// when a logfile is opened for writing.
-    pub fn print_message(mut self) -> Logger {
-        self.flwb = self.flwb.print_message();
-        self
-    }
-
-    /// Makes the logger write messages with the specified minimum severity additionally to stderr.
-    pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Logger {
-        self.duplicate = dup;
-        self
-    }
-
-    /// Makes the logger use the provided format function for the log entries,
-    /// rather than [formats::default_format](fn.default_format.html).
+/// The naming convention for rotated log files.
+///
+/// With file rotation, the logs are written to a file with infix "_rCURRENT".
+/// When rotation happens, the CURRENT log file will be renamed to a file with
+/// another infix of the form `"_r..."`. `Naming` defines which other infix will be used.
+///
+/// Used in [Logger::rotate()](struct.Logger.html#method.rotate).
+#[derive(Copy, Clone)]
+pub enum Naming {
+    /// The output files are opened with an infix with the current timestamp.
     ///
-    /// You can either choose between some predefined variants,
-    /// ```default_format```, ```opt_format```, ```detailed_format```, ```with_thread```,
-    /// or you create and use your own format function
-    /// with the signature ```fn(&Record) -> String```.
-    pub fn format(mut self, format: FormatFunction) -> Logger {
-        self.format = format;
-        self
-    }
-
-    /// Specifies a folder for the log files.
+    /// File rotation rotates to files with a timestamp in their name.
+    Timestamps,
+    /// The output file always uses _rCURRENT as infix.
     ///
-    /// This parameter only has an effect if `log_to_file()` is used, too.
-    /// If the specified folder does not exist, the initialization will fail.
-    /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Logger {
-        self.flwb = self.flwb.directory(directory);
-        self
-    }
-
-    /// Specifies a suffix for the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file()` is used, too.
-    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Logger {
-        self.flwb = self.flwb.suffix(suffix);
-        self
-    }
-
-    /// Makes the logger not include a timestamp into the names of the log files.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn suppress_timestamp(mut self) -> Logger {
-        self.flwb = self.flwb.suppress_timestamp();
-        self
-    }
-
-    /// Prevents indefinite growth of log files.
-    ///
-    /// By default, the log file is fixed while your program is running and will grow indefinitely.
-    /// With this option being used, when the log file reaches or exceeds the specified file size,
-    /// the file will be closed and a new file will be opened.
-    ///
-    /// The rotate-over-size is given in bytes, e.g. `rotate_over_size(1_000)` will rotate
-    /// files once they reach a size of 1000 bytes.
-    ///     
-    /// Note that also the filename pattern changes:
-    ///
-    /// - by default, no timestamp is added to the filename
-    /// - the logs are always written to a file with infix `_rCURRENT`
-    /// - if this file exceeds the specified rotate-over-size, it is closed and renamed to a file
-    ///   with a sequential number infix,
-    ///   and then the logging continues again to the (fresh) file with infix `_rCURRENT`
-    ///
-    /// Example:
-    ///
-    /// After some logging with your program `my_prog`, you will find files like
-    ///
-    /// ```text
-    /// my_prog_r00000.log
-    /// my_prog_r00001.log
-    /// my_prog_r00002.log
-    /// my_prog_rCURRENT.log
-    /// ```
-    ///
-    /// The cleanup parameter allows defining the strategy for dealing with older files.
-    /// See [Cleanup](enum.Cleanup.html) for details.
-    pub fn rotate<R: Into<RotateOver>>(mut self, rotate_over: R, cleanup: Cleanup) -> Logger {
-        self.flwb = self.flwb.rotate(rotate_over, cleanup);
-        self
-    }
-
-    /// Makes the logger append to the specified output file, if it exists already;
-    /// by default, the file would be truncated.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
-    pub fn append(mut self) -> Logger {
-        self.flwb = self.flwb.append();
-        self
-    }
-
-    /// The specified String is added to the log file name after the program name.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Logger {
-        self.flwb = self.flwb.discriminant(discriminant);
-        self
-    }
-
-    /// The specified path will be used on linux systems to create a symbolic link
-    /// to the current log file.
-    ///
-    /// This method has no effect on filesystems where symlinks are not supported.
-    /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Logger {
-        self.flwb = self.flwb.create_symlink(symlink);
-        self
-    }
-
-    /// Registers a LogWriter implementation under the given target name.
-    ///
-    /// The target name should not start with an underscore.
-    ///
-    /// See [the module documentation of `writers`](writers/index.html).
-    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
-        self.other_writers.insert(name.into(), writer);
-        self
-    }
-
-    /// Use Windows line endings, rather than just `\n`.
-    pub fn use_windows_line_ending(mut self) -> Logger {
-        self.flwb = self.flwb.use_windows_line_ending();
-        self
-    }
+    /// File rotation closes the file, renames it
+    /// to a file with a number-infix, and opens a new file with the rCURRENT infix.
+    Numbers,
 }
 
 /// Defines the strategy for handling older log files.
+#[derive(Copy, Clone)]
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
     Never,
@@ -469,125 +633,6 @@ pub enum Cleanup {
     /// This option is only available with feature `ziplogs`.
     #[cfg(feature = "ziplogs")]
     KeepLogAndZipFiles(usize, usize),
-}
-
-/// Criterion to rotate the log file.
-///
-/// See [Logger::rotate()](struct.Logger.html#method.rotate).
-///
-/// For compatibility, `From<usize>` is implemented which creates a `RotateOver::Size`.
-pub enum RotateOver {
-    /// Triggers a log file rotation when the log file size has exceeeded the specified size.
-    Size(u64),
-    // /// Triggers a log file rotation when the log file is older than the specified Duration.
-    // Duration(chrono::Duration),
-}
-impl RotateOver {
-    pub(crate) fn rotation_necessary(
-        &self,
-        written_bytes: u64,
-        // created_at: std::time::SystemTime,
-    ) -> bool {
-        match self {
-            RotateOver::Size(size) => written_bytes > *size,
-            // RotateOver::Duration(max_age) => std::time::SystemTime::now()
-            //     .duration_since(created_at)
-            //     .map(|file_age| file_age.as_secs() as i64 > max_age.num_seconds())
-            //     .unwrap_or(false),
-        }
-    }
-}
-// For compatibility of Logger::rotate()
-impl From<usize> for RotateOver {
-    fn from(input: usize) -> RotateOver {
-        RotateOver::Size(input as u64)
-    }
-}
-
-/// Alternative set of methods to control the behavior of the Logger.
-/// Use these methods when you want to control the settings flexibly,
-/// e.g. with commandline arguments via `docopts` or `clap`.
-impl Logger {
-    /// With true, makes the logger write all logs to a file, otherwise to stderr.
-    pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
-        if log_to_file {
-            self.log_target = LogTarget::File;
-        } else {
-            self.log_target = LogTarget::StdErr;
-        }
-        self
-    }
-
-    /// With true, makes the logger print an info message to stdout, each time
-    /// when a new file is used for log-output.
-    pub fn o_print_message(mut self, print_message: bool) -> Logger {
-        self.flwb = self.flwb.o_print_message(print_message);
-        self
-    }
-
-    /// Specifies a folder for the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
-    /// If the specified folder does not exist, the initialization will fail.
-    /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Logger {
-        self.flwb = self.flwb.o_directory(directory);
-        self
-    }
-
-    /// By default, and with None, the log file will grow indefinitely.
-    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
-    /// the file will be closed and a new file will be opened.
-    /// Also the filename pattern changes: instead of the timestamp, a serial number
-    /// is included into the filename.
-    ///
-    /// The size is given in bytes, e.g. `o_rotate_over_size(Some(1_000))` will rotate
-    /// files once they reach a size of 1 kB.
-    ///
-    /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate<R: Into<RotateOver>>(mut self, rotate_config: Option<(R, Cleanup)>) -> Logger {
-        self.flwb = self.flwb.o_rotate(rotate_config);
-        self
-    }
-
-    /// With true, makes the logger include a timestamp into the names of the log files.
-    /// `true` is the default, but `rotate_over_size` sets it to `false`.
-    /// With this method you can set it to `true` again.
-    ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
-    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
-        self.flwb = self.flwb.o_timestamp(timestamp);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
-    /// If append is set to true, makes the logger append to the specified output file, if it exists.
-    /// By default, or with false, the file would be truncated.
-    ///
-    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
-
-    pub fn o_append(mut self, append: bool) -> Logger {
-        self.flwb = self.flwb.o_append(append);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
-    /// The specified String is added to the log file name.
-    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Logger {
-        self.flwb = self.flwb.o_discriminant(discriminant);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
-    /// If a String is specified, it will be used on linux systems to create in the current folder
-    /// a symbolic link with this name to the current log file.
-    pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Logger {
-        self.flwb = self.flwb.o_create_symlink(symlink);
-        self
-    }
 }
 
 /// Used to control which messages are to be duplicated to stderr, when log_to_file() is used.
