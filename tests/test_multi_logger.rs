@@ -1,5 +1,5 @@
 use flexi_logger::writers::{FileLogWriter, LogWriter};
-use flexi_logger::{detailed_format, Logger, Record};
+use flexi_logger::{detailed_format, DeferredNow, Logger, Record};
 use log::*;
 
 use std::io;
@@ -79,8 +79,8 @@ impl SecWriter {
     }
 }
 impl LogWriter for SecWriter {
-    fn write(&self, record: &Record) -> io::Result<()> {
-        self.0.write(record)
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> io::Result<()> {
+        self.0.write(now, record)
     }
     fn flush(&self) -> io::Result<()> {
         self.0.flush()

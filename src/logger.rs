@@ -130,22 +130,21 @@ impl Logger {
     /// Allows verifying that no parsing errors have occured in the used factory method,
     /// and examining the parse error.
     ///
-    /// The factory methods `Logger::with_str()`, `Logger::with_env()`,
-    /// and `Logger::with_env_or_str()`,
+    /// Most of the factory methods for Logger (`Logger::with_...()`)
     /// parse a log specification String, and deduce from it a `LogSpecification` object.
-    /// Parsing errors are reported to stdout, but effectively ignored; in worst case, if the
-    /// log specification is completely broken, logging might be turned off completely!
+    /// If parsing fails, errors are reported to stdout, but effectively ignored.
+    /// In worst case, nothing is logged!
     ///
-    /// This method gives programmatic access to parse errors, if there were any.
+    /// This method gives programmatic access to parse errors, if there were any, so that errors
+    /// don't happen unnoticed.
     ///
     /// In the following example we just panic if the spec was not free of errors:
     ///
-    /// ```rust
+    /// ```should_panic
     /// # use flexi_logger::Logger;
-    /// # let some_log_spec_string = "hello";
-    /// Logger::with_str(some_log_spec_string)
+    /// Logger::with_str("hello world")
     /// .check_parser_error()
-    /// .unwrap()
+    /// .unwrap()       // <-- here we could do better than panic
     /// .log_to_file()
     /// .start();
     /// ```

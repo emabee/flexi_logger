@@ -28,6 +28,7 @@
 //! for specifying which logs should really be written (but is more graceful with the syntax,
 //! and can provide error information).
 
+mod deferred_now;
 mod flexi_error;
 mod flexi_logger;
 mod formats;
@@ -41,6 +42,7 @@ pub mod writers;
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
 
+pub use crate::deferred_now::DeferredNow;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification};
@@ -50,4 +52,23 @@ pub use crate::reconfiguration_handle::ReconfigurationHandle;
 use std::io;
 
 /// Function type for Format functions.
-pub type FormatFunction = fn(&mut io::Write, &Record) -> Result<(), io::Error>;
+///
+/// If you want to write the log lines in your own format,
+/// implement a function with this signature and provide it to one of the methods
+/// [`Logger::format()`](struct.Logger.html#method.format),
+/// [`Logger::format_for_files()`](struct.Logger.html#method.format_for_files),
+/// or [`Logger::format_for_stderr()`](struct.Logger.html#method.format_for_stderr).
+///
+/// Checkout the code of the provided [format functions](index.html#functions)
+/// if you want to start with a template.
+///
+/// ## Parameters
+///
+/// - `write`: the output stream
+///
+/// - `now`: the timestamp that you should use if you want a timestamp to appear in the log line
+///
+/// - `record`: the log line's content and metadata, as provided by the log crate's macros.
+///
+pub type FormatFunction =
+    fn(write: &mut io::Write, now: &mut DeferredNow, record: &Record) -> Result<(), io::Error>;

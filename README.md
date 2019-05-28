@@ -1,7 +1,7 @@
 # flexi_logger
 
-**A flexible and easy-to-use logger that writes logs to stderr and/or to files
-or other output streams, and that can be influenced while the program is running.**
+**A flexible and easy-to-use logger that writes logs to stderr and/or to files, and/or to
+other output streams, and that can be influenced while the program is running.**
 
 [![Latest version](https://img.shields.io/crates/v/flexi_logger.svg)](https://crates.io/crates/flexi_logger)
 [![Documentation](https://docs.rs/flexi_logger/badge.svg)](https://docs.rs/flexi_logger)
@@ -13,7 +13,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "^0.12.0"
+flexi_logger = "^0.13.0"
 log = "0.4"
 ```
 
@@ -21,7 +21,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "^0.12.0", features = ["specfile", "ziplogs"] }
+flexi_logger = { version = "^0.13.0", features = ["specfile", "ziplogs"] }
 log = "0.4"
 ```
 
@@ -29,7 +29,7 @@ or, to get the smallest footprint (and no colors), with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "^0.12.0", default_features = false }
+flexi_logger = { version = "^0.13.0", default_features = false }
 log = "0.4"
 ```
 

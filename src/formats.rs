@@ -1,10 +1,14 @@
-use chrono::Local;
+use crate::DeferredNow;
 use log::Record;
 use std::thread;
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
-pub fn default_format(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn default_format(
+    w: &mut std::io::Write,
+    _now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     write!(
         w,
         "{} [{}] {}",
@@ -22,6 +26,7 @@ pub fn default_format(w: &mut std::io::Write, record: &Record) -> Result<(), std
 #[cfg(feature = "colors")]
 pub fn colored_default_format(
     w: &mut std::io::Write,
+    _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
@@ -39,11 +44,15 @@ pub fn colored_default_format(
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [src/foo/bar:26] Task successfully read from conf.json```
 /// <br>
 /// i.e. with timestamp and file location.
-pub fn opt_format(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn opt_format(
+    w: &mut std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
@@ -55,12 +64,16 @@ pub fn opt_format(w: &mut std::io::Write, record: &Record) -> Result<(), std::io
 ///
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
-pub fn colored_opt_format(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn colored_opt_format(
+    w: &mut std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     let level = record.level();
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        style(level, Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
+        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
         style(level, level),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
@@ -73,11 +86,15 @@ pub fn colored_opt_format(w: &mut std::io::Write, record: &Record) -> Result<(),
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [foo::bar] src/foo/bar.rs:26: Task successfully read from conf.json```
 /// <br>
 /// i.e. with timestamp, module path and file location.
-pub fn detailed_format(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn detailed_format(
+    w: &mut std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         record.level(),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
@@ -92,13 +109,14 @@ pub fn detailed_format(w: &mut std::io::Write, record: &Record) -> Result<(), st
 #[cfg(feature = "colors")]
 pub fn colored_detailed_format(
     w: &mut std::io::Write,
+    now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        style(level, Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
+        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
         style(level, record.level()),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
@@ -112,11 +130,15 @@ pub fn colored_detailed_format(
 /// ```[2016-01-13 15:25:01.640870 +01:00] T[taskreader] INFO [src/foo/bar:26] Task successfully read from conf.json```
 /// <br>
 /// i.e. with timestamp, thread name and file location.
-pub fn with_thread(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn with_thread(
+    w: &mut std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
@@ -129,12 +151,16 @@ pub fn with_thread(w: &mut std::io::Write, record: &Record) -> Result<(), std::i
 ///
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
-pub fn colored_with_thread(w: &mut std::io::Write, record: &Record) -> Result<(), std::io::Error> {
+pub fn colored_with_thread(
+    w: &mut std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
     let level = record.level();
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        style(level, Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
+        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
         style(level, thread::current().name().unwrap_or("<unnamed>")),
         style(level, level),
         record.file().unwrap_or("<unnamed>"),

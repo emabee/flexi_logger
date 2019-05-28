@@ -1,5 +1,7 @@
 use chrono::Local;
-use flexi_logger::{Age, Cleanup, Criterion, Duplicate, LogSpecification, Logger, Naming, Record};
+use flexi_logger::{
+    Age, Cleanup, Criterion, DeferredNow, Duplicate, LogSpecification, Logger, Naming, Record,
+};
 use glob::glob;
 use log::*;
 use std::fs::File;
@@ -99,11 +101,11 @@ fn define_directory() -> String {
     )
 }
 
-pub fn test_format(w: &mut io::Write, record: &Record) -> io::Result<()> {
+pub fn test_format(w: &mut io::Write, now: &mut DeferredNow, record: &Record) -> io::Result<()> {
     write!(
         w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-        Local::now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),

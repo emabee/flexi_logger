@@ -83,6 +83,7 @@ impl log::Log for FlexiLogger {
 
     fn log(&self, record: &log::Record) {
         let target = record.metadata().target();
+        let mut now = crate::DeferredNow::new();
         if target.starts_with('{') {
             let mut use_default = false;
             let targets: Vec<&str> = target[1..(target.len() - 1)].split(',').collect();
@@ -91,9 +92,9 @@ impl log::Log for FlexiLogger {
                     use_default = true;
                 } else {
                     match self.other_writers.get(t) {
-                        None => eprintln!("bad writer spec: {}", t),
+                        None => eprintln!("FlexiLogger::log() found bad writer spec: {}", t),
                         Some(writer) => {
-                            writer.write(record).unwrap_or_else(|e| {
+                            writer.write(&mut now, record).unwrap_or_else(|e| {
                                 eprintln!(
                                     "FlexiLogger: writing log line to custom_writer failed with {}",
                                     e
@@ -127,12 +128,11 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        self.primary_writer.write(record).unwrap_or_else(|e| {
-            eprintln!(
-                "FlexiLogger: writing log line to primary_writer failed with {}",
-                e
-            );
-        });
+        self.primary_writer
+            .write(&mut now, record)
+            .unwrap_or_else(|e| {
+                eprintln!("FlexiLogger: writing log line failed with {}", e);
+            });
     }
 
     fn flush(&self) {

@@ -1,3 +1,4 @@
+use crate::deferred_now::DeferredNow;
 use crate::writers::log_writer::LogWriter;
 use std::cell::RefCell;
 use std::io::Error as IoError;
@@ -159,7 +160,7 @@ impl SyslogWriter {
 }
 
 impl LogWriter for SyslogWriter {
-    fn write(&self, record: &log::Record) -> IoResult<()> {
+    fn write(&self, now: &mut DeferredNow, record: &log::Record) -> IoResult<()> {
         let mr_syslog = self.syslog.lock().unwrap();
         let mut syslog = mr_syslog.borrow_mut();
 
@@ -170,7 +171,8 @@ impl LogWriter for SyslogWriter {
             format!(
                 "<{}>1 {} {} {} {} {} - {}\n",
                 self.facility as u8 | severity as u8,
-                chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, false),
+                now.now()
+                    .to_rfc3339_opts(chrono::SecondsFormat::Micros, false),
                 self.hostname,
                 self.process,
                 self.pid,

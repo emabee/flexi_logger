@@ -1,3 +1,4 @@
+use crate::deferred_now::DeferredNow;
 use crate::flexi_error::FlexiLoggerError;
 use crate::formats::default_format;
 use crate::logger::{Age, Cleanup, Criterion, Naming};
@@ -5,6 +6,8 @@ use crate::writers::log_writer::LogWriter;
 use crate::FormatFunction;
 use chrono::{DateTime, Datelike, Local, Timelike};
 use log::Record;
+
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
@@ -200,10 +203,10 @@ impl FileLogWriterBuilder {
         };
 
         Ok(FileLogWriter {
-            state: Mutex::new(RefCell::new(FileLogWriterState::try_new(
+            state: Mutex::new(FileLogWriterState::try_new(
                 &self.config,
                 &self.o_rotation_config,
-            )?)),
+            )?),
             config: self.config,
             max_log_level: self.max_log_level,
         })
@@ -723,9 +726,8 @@ pub struct FileLogWriter {
     config: FileLogWriterConfig,
     // the state needs to be mutable; since `Log.log()` requires an unmutable self,
     // which translates into a non-mutating `LogWriter::write()`,
-    // we need the internal mutability of RefCell, and we have to wrap it with a Mutex to be
-    // thread-safe
-    state: Mutex<RefCell<FileLogWriterState>>,
+    // we need internal mutability and thread-safety.
+    state: Mutex<FileLogWriterState>,
     max_log_level: log::LevelFilter,
 }
 impl FileLogWriter {
@@ -748,12 +750,14 @@ impl FileLogWriter {
     // don't use this function in productive code - it exists only for flexi_loggers own tests
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        let mr_state = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
-        let mut refmut_state = mr_state.borrow_mut(); // : RefMut<FileLogWriterState>
-        let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
+        let mut state_guard = self.state.lock().unwrap(); // : MutexGuard<FileLogWriterState>
 
         let path = get_filepath(
-            state.o_rotation_state.as_ref().map(|_| CURRENT_INFIX),
+            state_guard
+                .borrow_mut()
+                .o_rotation_state
+                .as_ref()
+                .map(|_| CURRENT_INFIX),
             &self.config.filename_config,
         );
         let f = File::open(path).unwrap();
@@ -785,33 +789,62 @@ impl FileLogWriter {
 
 impl LogWriter for FileLogWriter {
     #[inline]
-    fn write(&self, record: &Record) -> std::io::Result<()> {
-        let mr_state = self.state.lock().unwrap(); // : MutexGuard<RefCell<FileLogWriterState>>
-        let mut refmut_state = mr_state.borrow_mut(); // : RefMut<FileLogWriterState>
-        let state = refmut_state.deref_mut(); // : &mut FileLogWriterState
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+        // the thread-local RefCell is used to differentiate recursive calls from
+        // cross-thread collisions; recursive calls would create a deadlock if they'd try to
+        // lock the mutex
+        thread_local! {
+            static RECURSION_DETECTOR: RefCell<()> = RefCell::new(());
+        }
 
-        // rotate if necessary
-        state
-            .mount_next_linewriter_if_necessary(&self.config)
-            .unwrap_or_else(|e| {
-                eprintln!("FlexiLogger: opening file failed with {}", e);
-            });
+        RECURSION_DETECTOR.with(|rd| match rd.try_borrow_mut() {
+            Ok(_) => {
+                let mut state_guard = self.state.lock().unwrap();
+                let state = state_guard.deref_mut();
 
-        (self.config.format)(state, record)?;
-        state.write_all(state.line_ending)
+                // rotate if necessary
+                state
+                    .mount_next_linewriter_if_necessary(&self.config)
+                    .unwrap_or_else(|e| {
+                        eprintln!("FlexiLogger: opening file failed with {}", e);
+                    });
+
+                (self.config.format)(state, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+                state
+                    .write_all(state.line_ending)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+            }
+            Err(_e) => {
+                // We arrive here in the rare cases of recursive logging
+                // (e.g. log calls in Debug or Display implementations)
+
+                // we suppress the inner message!
+                // alternatively, we could write it to a buffer which then would have to be checked
+                // and written at the beginning of each (non-recursive) call
+                // but we'd need a further thread-local for the buffer
+            }
+        });
+
+        Ok(())
     }
 
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
-        let mr_state = self.state.lock().unwrap();
-        let mut state = mr_state.borrow_mut();
-        state.line_writer().flush()
+        let mut state_guard = self.state.lock().unwrap();
+        state_guard.deref_mut().line_writer().flush()
     }
 
     #[inline]
     fn max_log_level(&self) -> log::LevelFilter {
         self.max_log_level
     }
+}
+
+const ERR_1: &str = "FileLogWriter: formatting failed with ";
+const ERR_2: &str = "FileLogWriter: writing failed with ";
+
+fn write_err(msg: &str, err: std::io::Error) {
+    eprintln!("{} with {}", msg, err);
 }
 
 mod platform {
@@ -849,7 +882,7 @@ mod platform {
 #[cfg(test)]
 mod test {
     use crate::writers::LogWriter;
-    use crate::{Cleanup, Criterion, Naming};
+    use crate::{Cleanup, Criterion, DeferredNow, Naming};
     use chrono::Local;
 
     use std::ops::Add;
@@ -1064,6 +1097,7 @@ mod test {
         let flw = get_file_log_writer(append, naming, discr);
         for text in texts {
             flw.write(
+                &mut DeferredNow::new(),
                 &log::Record::builder()
                     .args(format_args!("{}", text))
                     .level(log::Level::Error)

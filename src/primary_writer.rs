@@ -1,7 +1,8 @@
-use log;
 use log::Record;
+use std::cell::RefCell;
 use std::io::Write;
 
+use crate::deferred_now::DeferredNow;
 use crate::logger::Duplicate;
 use crate::writers::{FileLogWriter, LogWriter};
 use crate::FormatFunction;
@@ -36,11 +37,11 @@ impl PrimaryWriter {
     }
 
     // Write out a log line.
-    pub fn write(&self, record: &Record) -> std::io::Result<()> {
+    pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {
-            PrimaryWriter::StdErrWriter(ref w) => w.write(record),
-            PrimaryWriter::ExtendedFileWriter(ref w) => w.write(record),
-            PrimaryWriter::BlackHole(ref w) => w.write(record),
+            PrimaryWriter::StdErrWriter(ref w) => w.write(now, record),
+            PrimaryWriter::ExtendedFileWriter(ref w) => w.write(now, record),
+            PrimaryWriter::BlackHole(ref w) => w.write(now, record),
         }
     }
 
@@ -72,10 +73,9 @@ impl StdErrWriter {
         StdErrWriter { format }
     }
     #[inline]
-    fn write(&self, record: &Record) -> std::io::Result<()> {
-        let mut out = std::io::stderr();
-        (self.format)(&mut out, record)?;
-        out.write_all(b"\n")
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+        write_buffered_to_stderr(self.format, now, record);
+        Ok(())
     }
 
     #[inline]
@@ -90,7 +90,7 @@ pub(crate) struct BlackHoleWriter {
     format: FormatFunction,
 }
 impl BlackHoleWriter {
-    fn write(&self, record: &Record) -> std::io::Result<()> {
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         let dupl = match self.duplicate {
             Duplicate::Error => record.level() == log::Level::Error,
             Duplicate::Warn => record.level() <= log::Level::Warn,
@@ -100,7 +100,7 @@ impl BlackHoleWriter {
             Duplicate::None => false,
         };
         if dupl {
-            (self.format)(&mut std::io::stderr(), record)?;
+            (self.format)(&mut std::io::stderr(), now, record)?;
             std::io::stderr().write_all(b"\n")?;
         }
         Ok(())
@@ -123,7 +123,7 @@ impl ExtendedFileWriter {
         self.file_log_writer.validate_logs(expected)
     }
 
-    fn write(&self, record: &Record) -> std::io::Result<()> {
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         let dupl = match self.duplicate {
             Duplicate::Error => record.level() == log::Level::Error,
             Duplicate::Warn => record.level() <= log::Level::Warn,
@@ -133,14 +133,51 @@ impl ExtendedFileWriter {
             Duplicate::None => false,
         };
         if dupl {
-            (self.format_for_stderr)(&mut std::io::stderr(), record)?;
-            std::io::stderr().write_all(b"\n")?;
+            write_buffered_to_stderr(self.format_for_stderr, now, record);
         }
-        self.file_log_writer.write(record)
+        self.file_log_writer.write(now, record)
     }
 
     fn flush(&self) -> std::io::Result<()> {
         self.file_log_writer.flush()?;
         std::io::stderr().flush()
     }
+}
+
+// Use a thread-local buffer for writing to stderr
+fn write_buffered_to_stderr(
+    format_function: FormatFunction,
+    now: &mut DeferredNow,
+    record: &Record,
+) {
+    thread_local! {
+        static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));
+    }
+    let mut w = std::io::stderr();
+
+    BUFFER.with(|tl_buf| match tl_buf.try_borrow_mut() {
+        Ok(mut buffer) => {
+            (format_function)(&mut *buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            w.write_all(&*buffer)
+                .unwrap_or_else(|e| write_err(ERR_2, e));
+            w.write_all(b"\n").unwrap_or_else(|e| write_err(ERR_2, e));
+            buffer.clear();
+        }
+        Err(_e) => {
+            // We arrive here in the rare cases of recursive logging
+            // (e.g. log calls in Debug or Display implementations)
+            let mut tmp_buf = Vec::<u8>::with_capacity(200);
+            (format_function)(&mut tmp_buf, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            w.write_all(&tmp_buf)
+                .unwrap_or_else(|e| write_err(ERR_2, e));
+            w.write_all(b"\n").unwrap_or_else(|e| write_err(ERR_2, e));
+        }
+    });
+}
+
+const ERR_1: &str = "FlexiLogger: formatting failed with ";
+const ERR_2: &str = "FlexiLogger: writing failed with ";
+
+fn write_err(msg: &str, err: std::io::Error) {
+    eprintln!("{} with {}", msg, err);
 }
