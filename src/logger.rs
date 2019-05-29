@@ -588,7 +588,27 @@ pub enum Criterion {
     Size(u64),
     /// Rotate the log file when it has become older than the specified age.
     ///
-    /// ## Note for Windows users
+    /// ## Note
+    ///
+    /// *TL,DR*: the combination of `Logger::append()`
+    /// with `Criterion::Age` does not behave perfectly correct on Windows or Linux.
+    ///
+    /// Applying the age criterion works fine while your program is running.
+    /// Ideally, we should also apply it to the rCURRENT file when the program is restarted
+    /// and you chose the `Logger::append()` option.
+    ///
+    /// Unfortunately, this does not work on Windows, and it does not work on linux,
+    /// for different reasons.
+    ///
+    /// To minimize the impact on age-based file-rotation,
+    /// `flexi_logger` uses on Windows and linux its initialization time
+    /// rather than the real file property
+    /// as the created_at-info of an rCURRENT file that already exists, and the
+    /// current timestamp when file rotation happens during further execution.
+    /// Consequently, a left-over rCURRENT file from a previous program run will look newer
+    /// than it is, and will be used longer than it should be.
+    ///
+    /// ### Issue on Windows
     ///
     /// For compatibility with DOS (sic!), Windows magically and unexpectedly
     /// transfers the created_at-info
@@ -598,15 +618,10 @@ pub enum Criterion {
     /// the rCURRENT file would always appear to be as old as the
     /// first one that ever was created - rotation by time would completely fail.
     ///
-    /// To minimize the impact on age-based file-rotation,
-    /// `flexi_logger` uses on Windows its initialization time rather than the real file property
-    /// as the created_at-info of an rCURRENT file that already exists, and the
-    /// current timestamp when file rotation happens during further execution.
-    /// Consequently, a left-over rCURRENT file from a previous program run will look newer
-    /// than it is, and will be used longer than it should be.
+    /// ### Issue on Linux
     ///
-    /// TL,DR: the combination of `Logger::append()`
-    /// with `Criterion::Age` does not behave perfectly correct on Windows.
+    /// std::fs::metadata.created() returns Err on linux.  
+    ///
     Age(Age),
 }
 
