@@ -709,12 +709,12 @@ fn rotate_output_file_to_idx(
 }
 
 // See documentation of Criterion::Age.
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(Local::now())
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(_path)?.created()?.into())
 }
