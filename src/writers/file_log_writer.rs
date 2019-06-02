@@ -708,15 +708,31 @@ fn rotate_output_file_to_idx(
     }
 }
 
+
 // See documentation of Criterion::Age.
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+#[allow(unused_variables)]
+fn get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+    // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
+    // On linux, we know that try_get_creation_date() returns an error.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    return get_fake_creation_date();
+
+    // On all others of the many platforms, we give the real creation date a try,
+    // and fall back to the fake if it is not available.
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    match try_get_creation_date(path) {
+        Ok(d) => Ok(d),
+        Err(e) => get_fake_creation_date(),
+    }
+}
+
+fn get_fake_creation_date() -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(Local::now())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn get_creation_date(_path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
-    Ok(std::fs::metadata(_path)?.created()?.into())
+fn try_get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+    Ok(std::fs::metadata(path)?.created()?.into())
 }
 
 /// A configurable `LogWriter` implementation that writes to a file or a sequence of files.

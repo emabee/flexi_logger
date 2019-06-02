@@ -569,16 +569,6 @@ impl Logger {
     }
 }
 
-// Maybe I get it correctly working on linux only.
-// Windows has a sick feature that the created_at-info of a file that is being deleted
-// (or renamed to another name) and recreated stays the same!! See
-// https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to
-//
-// Rotation by time needs the creation time of the rCURRENT file, which becomes in a
-// fatal way incorrect on windows.
-// So we use the current time...
-// So we behave incorrect if append is used. the rCURRENT file is treated at program start
-// as if it were just created, its real age is not known and thus not considered.
 
 /// Criterion when to rotate the log file.
 ///
@@ -591,7 +581,8 @@ pub enum Criterion {
     /// ## Note
     ///
     /// *TL,DR*: the combination of `Logger::append()`
-    /// with `Criterion::Age` does not behave perfectly correct on Windows or Linux.
+    /// with `Criterion::Age` works, but not perfectly correct on Windows or Linux,
+    /// when the program is restarted.
     ///
     /// Applying the age criterion works fine while your program is running.
     /// Ideally, we should also apply it to the rCURRENT file when the program is restarted
@@ -610,9 +601,11 @@ pub enum Criterion {
     ///
     /// ### Issue on Windows
     ///
-    /// For compatibility with DOS (sic!), Windows magically and unexpectedly
-    /// transfers the created_at-info
-    /// of a file that is deleted (or renamed) and recreated to its successor.
+    /// For compatibility with DOS (sic!), Windows magically transfers the created_at-info
+    /// of a file that is deleted (or renamed) to its successor,
+    /// when the recreation happens within some seconds [1].
+    ///
+    /// [1: https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
     ///
     /// If the file property were used by `flexi_logger`,
     /// the rCURRENT file would always appear to be as old as the
@@ -620,7 +613,8 @@ pub enum Criterion {
     ///
     /// ### Issue on Linux
     ///
-    /// std::fs::metadata.created() returns Err on linux.  
+    /// `std::fs::metadata.created()` returns `Err`, because linux does not maintain a
+    /// created-at-timestamp.
     ///
     Age(Age),
 }

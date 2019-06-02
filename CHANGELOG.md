@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2019-06-02
+
+Make get_creation_date() more robust on all platforms.
+
 ## [0.13.1] - 2019-05-29
 
 Fix fatal issue with get_creation_date() on linux
