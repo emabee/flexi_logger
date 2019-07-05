@@ -1,8 +1,6 @@
 use crate::flexi_error::FlexiLoggerError;
 use crate::LevelFilter;
 
-#[cfg(feature = "specfile")]
-use log::error;
 use regex::Regex;
 #[cfg(feature = "specfile")]
 use serde_derive::Deserialize;
@@ -250,7 +248,7 @@ impl LogSpecification {
 
         if let Some(specfolder) = specfile.parent() {
             if let Err(e) = fs::DirBuilder::new().recursive(true).create(specfolder) {
-                error!(
+                eprintln!(
                     "cannot create the folder for the logspec file under the specified name \
                      {:?}, caused by: {}",
                     &specfile, e
@@ -265,7 +263,7 @@ impl LogSpecification {
             .open(specfile)
         {
             Err(e) => {
-                error!(
+                eprintln!(
                     "cannot create an initial logspec file under the specified name \
                      {:?}, caused by: {}",
                     &specfile, e
@@ -282,7 +280,7 @@ impl LogSpecification {
 
     /// Reads a log specification from a file.
     #[cfg(feature = "specfile")]
-    pub fn file<P: AsRef<Path>>(specfile: P) -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn from_file<P: AsRef<Path>>(specfile: P) -> Result<LogSpecification, FlexiLoggerError> {
         // Open the file in read-only mode.
         let mut file = fs::File::open(specfile)?;
 
