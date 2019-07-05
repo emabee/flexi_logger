@@ -12,6 +12,7 @@ use crate::FormatFunction;
 // or to nowhere (with optional "duplication" to stderr).
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum PrimaryWriter {
+    StdOutWriter(StdOutWriter),
     StdErrWriter(StdErrWriter),
     ExtendedFileWriter(ExtendedFileWriter),
     BlackHole(BlackHoleWriter),
@@ -32,6 +33,10 @@ impl PrimaryWriter {
         PrimaryWriter::StdErrWriter(StdErrWriter::new(format))
     }
 
+    pub fn stdout(format: FormatFunction) -> PrimaryWriter {
+        PrimaryWriter::StdOutWriter(StdOutWriter::new(format))
+    }
+
     pub fn black_hole(duplicate: Duplicate, format: FormatFunction) -> PrimaryWriter {
         PrimaryWriter::BlackHole(BlackHoleWriter { duplicate, format })
     }
@@ -40,6 +45,7 @@ impl PrimaryWriter {
     pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.write(now, record),
+            PrimaryWriter::StdOutWriter(ref w) => w.write(now, record),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.write(now, record),
             PrimaryWriter::BlackHole(ref w) => w.write(now, record),
         }
@@ -49,6 +55,7 @@ impl PrimaryWriter {
     pub fn flush(&self) -> std::io::Result<()> {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.flush(),
+            PrimaryWriter::StdOutWriter(ref w) => w.flush(),
             PrimaryWriter::ExtendedFileWriter(ref w) => w.flush(),
             PrimaryWriter::BlackHole(ref w) => w.flush(),
         }
@@ -57,6 +64,7 @@ impl PrimaryWriter {
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
         match *self {
             PrimaryWriter::StdErrWriter(_) => false,
+            PrimaryWriter::StdOutWriter(_) => false,
             PrimaryWriter::ExtendedFileWriter(ref w) => w.validate_logs(expected),
             PrimaryWriter::BlackHole(_) => false,
         }
@@ -74,13 +82,34 @@ impl StdErrWriter {
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        write_buffered_to_stderr(self.format, now, record);
+        write_buffered(self.format, now, record, &mut std::io::stderr().lock());
         Ok(())
     }
 
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
         std::io::stderr().flush()
+    }
+}
+
+// `StdOutWriter` writes logs to stderr.
+pub(crate) struct StdOutWriter {
+    format: FormatFunction,
+}
+
+impl StdOutWriter {
+    fn new(format: FormatFunction) -> StdOutWriter {
+        StdOutWriter { format }
+    }
+    #[inline]
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+        write_buffered(self.format, now, record, &mut std::io::stdout().lock());
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&self) -> std::io::Result<()> {
+        std::io::stdout().flush()
     }
 }
 
@@ -133,7 +162,7 @@ impl ExtendedFileWriter {
             Duplicate::None => false,
         };
         if dupl {
-            write_buffered_to_stderr(self.format_for_stderr, now, record);
+            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr());
         }
         self.file_log_writer.write(now, record)
     }
@@ -145,16 +174,15 @@ impl ExtendedFileWriter {
 }
 
 // Use a thread-local buffer for writing to stderr
-fn write_buffered_to_stderr(
+fn write_buffered(
     format_function: FormatFunction,
     now: &mut DeferredNow,
     record: &Record,
+    w: &mut Write,
 ) {
     thread_local! {
         static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));
     }
-    let mut w = std::io::stderr();
-
     BUFFER.with(|tl_buf| match tl_buf.try_borrow_mut() {
         Ok(mut buffer) => {
             (format_function)(&mut *buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, e));

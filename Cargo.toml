@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.13.2"
+version = "0.13.3"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -45,3 +45,4 @@ libc = {version = "^0.2.50", optional = true}
 [dev-dependencies]
 serde_derive = "1.0"
 version-sync = "0.8"
+#env_logger = '*' # optionally needed for the performance example

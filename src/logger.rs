@@ -62,9 +62,24 @@ pub struct Logger {
     other_writers: HashMap<String, Box<LogWriter>>,
 }
 
-pub(crate) enum LogTarget {
+/// Describes the target to which `flexi_logger`'s standard log output stream writes to.
+///
+/// See the [writers](writers/index.html) module for the usage of _additional_ log writers.
+pub enum LogTarget {
+    /// Log is written to stderr.
     StdErr,
+    /// Log is written to stdout.
+    StdOut,
+    /// Log is written to a file.
+    ///
+    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
+    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
     File,
+    /// Log is processed as if it were written, but is finally not written.
+    ///
+    /// This can be useful for running tests with all log-levels active to ensure that the log calls
+    /// which are normally not active will not cause undesired side-effects when activated
+    /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
     DevNull,
 }
 
@@ -141,11 +156,11 @@ impl Logger {
     /// In the following example we just panic if the spec was not free of errors:
     ///
     /// ```should_panic
-    /// # use flexi_logger::Logger;
+    /// # use flexi_logger::{Logger,LogTarget};
     /// Logger::with_str("hello world")
     /// .check_parser_error()
     /// .unwrap()       // <-- here we could do better than panic
-    /// .log_to_file()
+    /// .log_target(LogTarget::File)
     /// .start();
     /// ```
     pub fn check_parser_error(self) -> Result<Logger, FlexiLoggerError> {
@@ -155,12 +170,19 @@ impl Logger {
         }
     }
 
-    /// Makes the logger write all logs to a file, rather than to stderr.
-    ///
-    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
-    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
+    /// Is equivalent to
+    /// [`log_target`](struct.Logger.html#method.log_target)`(`[`LogTarget::File`](
+    /// enum.LogTarget.html#variant.File)`)`.
     pub fn log_to_file(mut self) -> Logger {
         self.log_target = LogTarget::File;
+        self
+    }
+
+    /// Write the main log output to the specified target.
+    ///
+    /// By default, i.e. if this method is not called, the standard output goes to `stderr`.
+    pub fn log_target(mut self, log_target: LogTarget) -> Logger {
+        self.log_target = log_target;
         self
     }
 
@@ -215,7 +237,8 @@ impl Logger {
         self
     }
 
-    /// Makes the logger use the provided format function for messages that are written to stderr.
+    /// Makes the logger use the provided format function for messages
+    /// that are written to stderr or to stdout.
     ///
     /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Logger {
@@ -338,6 +361,7 @@ impl Logger {
 /// e.g. with commandline arguments via `docopts` or `clap`.
 impl Logger {
     /// With true, makes the logger write all logs to a file, otherwise to stderr.
+    #[deprecated(since = "0.13.3", note = "please use `log_target` instead")]
     pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
         if log_to_file {
             self.log_target = LogTarget::File;
@@ -440,6 +464,7 @@ impl Logger {
                     self.flwb.try_build()?,
                 )
             }
+            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stderr),
             LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_stderr),
             LogTarget::DevNull => PrimaryWriter::black_hole(self.duplicate, self.format_for_stderr),
         });
@@ -568,7 +593,6 @@ impl Logger {
         Ok(())
     }
 }
-
 
 /// Criterion when to rotate the log file.
 ///
