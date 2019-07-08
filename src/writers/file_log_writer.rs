@@ -708,7 +708,6 @@ fn rotate_output_file_to_idx(
     }
 }
 
-
 // See documentation of Criterion::Age.
 #[allow(unused_variables)]
 fn get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {

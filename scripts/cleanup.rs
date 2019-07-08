@@ -11,6 +11,7 @@ fn main() {
         "./*.log",
         "./*.alerts",
         "./*.seclog",
+        "./*logspec.toml",
         "./log_files/**/*.log",
         "./log_files/**/*.zip",
     ] {

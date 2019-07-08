@@ -1,16 +1,8 @@
 #[cfg(feature = "specfile")]
-use log::{debug, error, trace};
-#[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
-#[cfg(feature = "specfile")]
-use std::path::Path;
 use std::path::PathBuf;
-#[cfg(feature = "specfile")]
-use std::sync::mpsc::channel;
 use std::sync::{Arc, RwLock};
-#[cfg(feature = "specfile")]
-use std::thread;
 
 use crate::flexi_logger::FlexiLogger;
 use crate::primary_writer::PrimaryWriter;
@@ -534,7 +526,10 @@ impl Logger {
     /// previous logspec remains active.
     /// If the file is corrected subsequently, the log spec update will work again.
     #[cfg(feature = "specfile")]
-    pub fn start_with_specfile<P: AsRef<Path>>(self, specfile: P) -> Result<(), FlexiLoggerError> {
+    pub fn start_with_specfile<P: AsRef<std::path::Path>>(
+        self,
+        specfile: P,
+    ) -> Result<(), FlexiLoggerError> {
         let specfile = specfile.as_ref().to_owned();
         self.spec.ensure_specfile_is_valid(&specfile)?;
         // Now that the file exists, we can canonicalize the path
@@ -543,32 +538,24 @@ impl Logger {
         let mut handle = self.start()?;
 
         // now setup fs notification to automatically reread the file, and initialize from the file
-        thread::Builder::new().spawn(move || {
+        std::thread::Builder::new().spawn(move || {
             // Create a channel to receive the events.
-            let (tx, rx) = channel();
+            let (tx, rx) = std::sync::mpsc::channel();
 
             // Create a watcher object, delivering debounced events
-            let mut watcher = match watcher(tx, std::time::Duration::from_millis(800)) {
-                Ok(w) => w,
-                Err(e) => {
-                    error!("watcher() failed with {:?}", e);
-                    return;
-                }
-            };
-            // watch the spec file
-            if let Err(e) = watcher.watch(&specfile, RecursiveMode::NonRecursive) {
-                error!(
-                    "cannot watch the log specification file {:?}, caused by {:?}",
-                    specfile, e
-                );
-                ::std::process::exit(-1);
-            }
-            // and watch the parent folder
+            let mut watcher =
+                watcher(tx, std::time::Duration::from_millis(500)).unwrap_or_else(|e| {
+                    log::error!("Creating watcher failed with {:?}", e);
+                    ::std::process::exit(-1);
+                });
+
+            // watch the parent folder
             if let Err(e) = watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
             {
-                error!(
+                log::error!(
                     "cannot watch the folder of the log specification file {:?}, caused by {:?}",
-                    specfile, e
+                    specfile,
+                    e
                 );
                 ::std::process::exit(-1);
             }
@@ -576,29 +563,29 @@ impl Logger {
             // initial read of the file: if that fails, just print an error and continue
             match LogSpecification::from_file(&specfile) {
                 Ok(spec) => handle.set_new_spec(spec),
-                Err(e) => error!("Can't read the log specification file, due to {:?}", e),
+                Err(e) => log::error!("Can't read the log specification file, due to {:?}", e),
             }
 
             loop {
                 match rx.recv() {
                     Ok(debounced_event) => {
-                        debug!("got debounced event {:?}", debounced_event);
+                        //log::trace!("got debounced event {:?}", debounced_event);
                         match debounced_event {
                             DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
                                 if path.canonicalize().unwrap() == specfile {
                                     reread_logspecfile(&mut handle, &specfile);
                                 } else {
-                                    trace!(
-                                        "ignored because path {:?} does not match specfile {:?}",
-                                        path,
-                                        specfile
-                                    );
+                                    // log::trace!(
+                                    //     "ignored because path {:?} does not match specfile {:?}",
+                                    //     path,
+                                    //     specfile
+                                    // );
                                 }
                             }
-                            event => trace!("ignoring event {:?}", event),
+                            _event => {} //log::trace!("ignoring event {:?}", _event),
                         }
                     }
-                    Err(e) => error!("watch error: {:?}", e),
+                    Err(e) => log::error!("watch error: {:?}", e),
                 }
             }
         })?;
@@ -608,14 +595,15 @@ impl Logger {
 }
 
 #[cfg(feature = "specfile")]
-fn reread_logspecfile(log_handle: &mut ReconfigurationHandle, specfile: &Path) {
-    trace!("rereading specfile");
+fn reread_logspecfile(log_handle: &mut ReconfigurationHandle, specfile: &std::path::Path) {
     match LogSpecification::from_file(&specfile) {
-        Ok(spec) => log_handle.set_new_spec(spec),
+        Ok(spec) => {
+            log::trace!("reread the log specification file successfully");
+            log_handle.set_new_spec(spec)
+        }
         Err(e) => eprintln!(
-            "Continuing with current log specification \
-             because the log specification file is not readable, \
-             due to {:?}",
+            "rereading log specification file failed with {:?}, \
+             continuing with previous log specification",
             e
         ),
     }
