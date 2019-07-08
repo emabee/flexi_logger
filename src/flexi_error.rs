@@ -10,15 +10,15 @@ pub enum FlexiLoggerError {
     BadDirectory,
     /// Log cannot be written because the configured output directory is not accessible.
     Io(std::io::Error),
-    /// Error with fs-notifications for the specfile
+    /// Error with the filesystem notifications for the specfile.
     #[cfg(feature = "specfile")]
     Notify(notify::Error),
-    /// The configured logspec file cannot be read
+    /// The configured logspec file cannot be read.
     #[cfg(feature = "specfile")]
     Toml(toml::de::Error),
-    /// Invalid level filter
+    /// Invalid level filter.
     LevelFilter(String),
-    /// Some error occured during parsing
+    /// Some error occured during parsing.
     Parse(Vec<String>, LogSpecification),
     /// Logger initialization failed.
     Log(log::SetLoggerError),

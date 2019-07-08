@@ -70,10 +70,14 @@ pub struct LogSpecification {
     textfilter: Option<Regex>,
 }
 
-/// Defines which loglevel filter to use for a given module (or as default, if no module is given).
+/// Defines which loglevel filter to use for the specified module.
+///
+/// A `ModuleFilter`, whose `module_name` is not set, describes the default loglevel filter.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleFilter {
+    /// The module name.
     pub module_name: Option<String>,
+    /// The level filter.
     pub level_filter: LevelFilter,
 }
 
