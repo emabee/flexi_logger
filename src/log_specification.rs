@@ -341,7 +341,7 @@ impl LogSpecification {
     }
 
     /// Serializes itself in toml format
-    pub fn to_toml(&self, w: &mut Write) -> Result<(), FlexiLoggerError> {
+    pub fn to_toml(&self, w: &mut dyn Write) -> Result<(), FlexiLoggerError> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();
         if last.is_some() && last.as_ref().unwrap().module_name.is_none() {

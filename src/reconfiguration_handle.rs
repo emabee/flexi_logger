@@ -57,13 +57,13 @@ pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
     spec_stack: Vec<LogSpecification>,
     primary_writer: Arc<PrimaryWriter>,
-    other_writers: Arc<HashMap<String, Box<LogWriter>>>,
+    other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
 }
 impl ReconfigurationHandle {
     pub(crate) fn new(
         spec: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
-        other_writers: Arc<HashMap<String, Box<LogWriter>>>,
+        other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     ) -> ReconfigurationHandle {
         ReconfigurationHandle {
             spec,

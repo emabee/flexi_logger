@@ -5,7 +5,7 @@ use std::thread;
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
 pub fn default_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -25,7 +25,7 @@ pub fn default_format(
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
 pub fn colored_default_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -45,7 +45,7 @@ pub fn colored_default_format(
 /// <br>
 /// i.e. with timestamp and file location.
 pub fn opt_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -65,7 +65,7 @@ pub fn opt_format(
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
 pub fn colored_opt_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -87,7 +87,7 @@ pub fn colored_opt_format(
 /// <br>
 /// i.e. with timestamp, module path and file location.
 pub fn detailed_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -108,7 +108,7 @@ pub fn detailed_format(
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
 pub fn colored_detailed_format(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -131,7 +131,7 @@ pub fn colored_detailed_format(
 /// <br>
 /// i.e. with timestamp, thread name and file location.
 pub fn with_thread(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -152,7 +152,7 @@ pub fn with_thread(
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
 pub fn colored_with_thread(
-    w: &mut std::io::Write,
+    w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {

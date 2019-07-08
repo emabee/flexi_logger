@@ -115,7 +115,7 @@ impl Logger {
             format_for_file: default_format,
             format_for_stderr: default_format,
             flwb: FileLogWriter::builder(),
-            other_writers: HashMap::<String, Box<LogWriter>>::new(),
+            other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
     }
 
@@ -336,7 +336,7 @@ impl Logger {
     /// The target name should not start with an underscore.
     ///
     /// See [the module documentation of `writers`](writers/index.html).
-    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<LogWriter>) -> Logger {
+    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<dyn LogWriter>) -> Logger {
         self.other_writers.insert(name.into(), writer);
         self
     }

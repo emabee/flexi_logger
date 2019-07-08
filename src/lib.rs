@@ -49,8 +49,6 @@ pub use crate::log_specification::{LogSpecBuilder, LogSpecification};
 pub use crate::logger::{Age, Cleanup, Criterion, Duplicate, LogTarget, Logger, Naming};
 pub use crate::reconfiguration_handle::ReconfigurationHandle;
 
-use std::io;
-
 /// Function type for Format functions.
 ///
 /// If you want to write the log lines in your own format,
@@ -70,5 +68,8 @@ use std::io;
 ///
 /// - `record`: the log line's content and metadata, as provided by the log crate's macros.
 ///
-pub type FormatFunction =
-    fn(write: &mut io::Write, now: &mut DeferredNow, record: &Record) -> Result<(), io::Error>;
+pub type FormatFunction = fn(
+    write: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error>;

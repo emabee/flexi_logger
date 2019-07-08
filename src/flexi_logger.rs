@@ -16,14 +16,14 @@ use std::sync::{Arc, RwLock};
 pub(crate) struct FlexiLogger {
     log_specification: Arc<RwLock<LogSpecification>>,
     primary_writer: Arc<PrimaryWriter>,
-    other_writers: Arc<HashMap<String, Box<LogWriter>>>,
+    other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
 }
 
 impl FlexiLogger {
     pub fn new(
         log_specification: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
-        other_writers: Arc<HashMap<String, Box<LogWriter>>>,
+        other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     ) -> FlexiLogger {
         FlexiLogger {
             log_specification,

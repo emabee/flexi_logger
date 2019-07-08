@@ -5,9 +5,9 @@ use flexi_logger::{
 use glob::glob;
 use log::*;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{BufRead, BufReader};
 use std::ops::Add;
-use std::thread::{self, JoinHandle};
+use std::thread::{JoinHandle};
 use std::time;
 
 const NO_OF_THREADS: usize = 5;
@@ -39,9 +39,9 @@ fn multi_threaded() {
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("trace").unwrap();
-    thread::Builder::new()
+    std::thread::Builder::new()
         .spawn(move || {
-            thread::sleep(time::Duration::from_millis(1000));
+            std::thread::sleep(time::Duration::from_millis(1000));
             reconf_handle.set_new_spec(new_spec);
             0 as u8
         })
@@ -64,7 +64,7 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
         worker_handles.push(
-            thread::Builder::new()
+            std::thread::Builder::new()
                 .name(thread_number.to_string())
                 .spawn(move || {
                     do_work(thread_number);
@@ -102,12 +102,16 @@ fn define_directory() -> String {
     )
 }
 
-pub fn test_format(w: &mut io::Write, now: &mut DeferredNow, record: &Record) -> io::Result<()> {
+pub fn test_format(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> std::io::Result<()> {
     write!(
         w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
         now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-        thread::current().name().unwrap_or("<unnamed>"),
+        std::thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),

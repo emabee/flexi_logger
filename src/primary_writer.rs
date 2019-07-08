@@ -178,7 +178,7 @@ fn write_buffered(
     format_function: FormatFunction,
     now: &mut DeferredNow,
     record: &Record,
-    w: &mut Write,
+    w: &mut dyn Write,
 ) {
     thread_local! {
         static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));

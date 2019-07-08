@@ -20,8 +20,6 @@ script:
   - cargo build --all-features
   - cargo build --release
   - cargo build --release --all-features
-  - cargo clippy -- -D warnings
-  - cargo clippy --all-features -- -D warnings
   - cargo test --release --all-features
   - cargo test
   - cargo doc --all-features --no-deps

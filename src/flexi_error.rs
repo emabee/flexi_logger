@@ -61,7 +61,7 @@ impl Error for FlexiLoggerError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match *self {
             FlexiLoggerError::BadDirectory
             | FlexiLoggerError::LevelFilter(_)
