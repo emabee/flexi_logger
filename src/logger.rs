@@ -617,12 +617,14 @@ pub enum Criterion {
     Size(u64),
     /// Rotate the log file when it has become older than the specified age.
     ///
-    /// ## Note
+    /// ## Minor limitation
     ///
-    /// *TL,DR*: the combination of `Logger::append()`
-    /// with `Criterion::Age` works, but not perfectly correct on Windows or Linux,
+    /// ### TL,DR
+    /// the combination of `Logger::append()`
+    /// with `Criterion::Age` works OK, but not perfectly correct on Windows or Linux
     /// when the program is restarted.
     ///
+    /// ### Details
     /// Applying the age criterion works fine while your program is running.
     /// Ideally, we should also apply it to the rCURRENT file when the program is restarted
     /// and you chose the `Logger::append()` option.
@@ -638,19 +640,19 @@ pub enum Criterion {
     /// Consequently, a left-over rCURRENT file from a previous program run will look newer
     /// than it is, and will be used longer than it should be.
     ///
-    /// ### Issue on Windows
+    /// #### Issue on Windows
     ///
     /// For compatibility with DOS (sic!), Windows magically transfers the created_at-info
     /// of a file that is deleted (or renamed) to its successor,
-    /// when the recreation happens within some seconds [1].
+    /// when the recreation happens within some seconds [[1]](#ref-1).
     ///
-    /// [1: https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
+    /// <a name="ref-1">[1]</a> [https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
     ///
     /// If the file property were used by `flexi_logger`,
     /// the rCURRENT file would always appear to be as old as the
     /// first one that ever was created - rotation by time would completely fail.
     ///
-    /// ### Issue on Linux
+    /// #### Issue on Linux
     ///
     /// `std::fs::metadata.created()` returns `Err`, because linux does not maintain a
     /// created-at-timestamp.
