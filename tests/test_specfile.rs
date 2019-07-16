@@ -49,7 +49,7 @@ mod a {
         ",
         )
         .unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(700));
+        std::thread::sleep(std::time::Duration::from_millis(1_000));
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");
@@ -70,7 +70,7 @@ mod a {
         ",
         )
         .unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(700));
+        std::thread::sleep(std::time::Duration::from_millis(1_000));
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");
