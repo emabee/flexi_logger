@@ -180,10 +180,11 @@ impl Logger {
 
     /// Makes the logger write no logs at all.
     ///
-    /// This can be useful when you want to run tests of your programs with all log-levels active
-    /// to ensure the log calls which are normally not active will not cause
-    /// undesired side-effects when activated
-    /// (note that the log macros prevent arguments of inactive log-calls from being evaluated).
+    /// This can be useful when you want to run tests of your programs with all log-levels active.
+    /// Such tests can ensure that those parts of your code, which are only executed
+    /// within normally unused log calls (like `std::fmt::Display` implementations),
+    /// will not cause undesired side-effects when activated (note that the log macros prevent
+    /// arguments of inactive log-calls from being evaluated).
     pub fn do_not_log(mut self) -> Logger {
         self.log_target = LogTarget::DevNull;
         self
@@ -537,6 +538,12 @@ impl Logger {
 
         let mut handle = self.start()?;
 
+        // initial read of the file: if that fails, just print an error and continue
+        match LogSpecification::from_file(&specfile) {
+            Ok(spec) => handle.set_new_spec(spec),
+            Err(e) => log::error!("Can't read the log specification file, due to {:?}", e),
+        }
+
         // now setup fs notification to automatically reread the file, and initialize from the file
         std::thread::Builder::new().spawn(move || {
             // Create a channel to receive the events.
@@ -549,21 +556,19 @@ impl Logger {
                     ::std::process::exit(-1);
                 });
 
-            // watch the parent folder
-            if let Err(e) = watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
+            // watch the spec file and the parent folder
+            if let Err(e) = watcher
+                .watch(&specfile, RecursiveMode::NonRecursive)
+                .and_then(|_| {
+                    watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
+                })
             {
                 log::error!(
-                    "cannot watch the folder of the log specification file {:?}, caused by {:?}",
+                    "watching the log spec file {:?} or its parent folder failed with {:?}",
                     specfile,
                     e
                 );
                 ::std::process::exit(-1);
-            }
-
-            // initial read of the file: if that fails, just print an error and continue
-            match LogSpecification::from_file(&specfile) {
-                Ok(spec) => handle.set_new_spec(spec),
-                Err(e) => log::error!("Can't read the log specification file, due to {:?}", e),
             }
 
             loop {
