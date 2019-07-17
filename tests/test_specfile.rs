@@ -30,7 +30,7 @@ mod a {
             .suppress_timestamp()
             .start_with_specfile(specfile)
             .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
-        
+
         // eprintln!("Current specfile: \n{}\n",std::fs::read_to_string(specfile).unwrap());
 
         error!("This is an error message");
@@ -39,19 +39,21 @@ mod a {
         debug!("This is a debug message");
         trace!("This is a trace message");
 
-        // eprintln!("update to warn");
-        let mut file = std::fs::OpenOptions::new()
-            .truncate(true)
-            .write(true)
-            .open(specfile)
+        eprintln!("===== truncate and rewrite, update to warn");
+        {
+            let mut file = std::fs::OpenOptions::new()
+                .truncate(true)
+                .write(true)
+                .open(specfile)
+                .unwrap();
+            file.write_all(
+                b"
+                global_level = 'warn'
+                [modules]
+                ",
+            )
             .unwrap();
-        file.write_all(
-            b"
-        global_level = 'warn'
-        [modules]
-        ",
-        )
-        .unwrap();
+        }
 
         std::thread::sleep(std::time::Duration::from_millis(400));
 
@@ -61,21 +63,25 @@ mod a {
         debug!("This is a debug message");
         trace!("This is a trace message");
 
-        // eprintln!("behave like many editors: rename and recreate as err");
-        std::fs::rename(&specfile, "old_logspec.toml").unwrap();
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(specfile)
+        eprintln!("===== behave like many editors: rename and recreate, as err");
+        {
+            std::fs::rename(&specfile, "old_logspec.toml").unwrap();
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(specfile)
+                .unwrap();
+            file.write_all(
+                b"
+                global_level = 'error'
+                [modules]
+                ",
+            )
             .unwrap();
-        file.write_all(
-            b"
-        global_level = 'error'
-        [modules]
-        ",
-        )
-        .unwrap();
+        }
+
         std::thread::sleep(std::time::Duration::from_millis(400));
+
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");

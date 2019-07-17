@@ -559,15 +559,11 @@ impl Logger {
                     ::std::process::exit(-1);
                 });
 
-            // watch the spec file and the parent folder
-            if let Err(e) = watcher
-                .watch(&specfile, RecursiveMode::NonRecursive)
-                .and_then(|_| {
-                    watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
-                })
+            // watch the spec file's parent folder
+            if let Err(e) = watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
             {
                 eprintln!(
-                    "watching the log spec file {:?} or its parent folder failed with {:?}",
+                    "watching the parent folder of the log spec file {:?} failed with {:?}",
                     specfile, e
                 );
                 ::std::process::exit(-1);
@@ -577,19 +573,20 @@ impl Logger {
                 match rx.recv() {
                     Ok(debounced_event) => {
                         match debounced_event {
-                            DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
+                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
                                 if path.canonicalize().unwrap() == specfile {
-                                    // eprintln!("got debounced event {:?}", debounced_event);
+                                    eprintln!("re-reading specfile after {:?}", debounced_event);
                                     reread_logspecfile(&mut handle, &specfile);
                                 } else {
-                                    // eprintln!(
-                                    //     "ignored because path {:?} does not match specfile {:?}",
-                                    //     path,
-                                    //     specfile
-                                    // );
+                                    eprintln!(
+                                        "event {:?} ignored because path {:?} does not match specfile {:?}",
+                                        debounced_event,
+                                        path,
+                                        specfile
+                                    );
                                 }
                             }
-                            _event => {} //eprintln!("ignoring event {:?}", _event),
+                            _event => eprintln!("ignoring event {:?}", _event),
                         }
                     }
                     Err(e) => eprintln!("watch error: {:?}", e),

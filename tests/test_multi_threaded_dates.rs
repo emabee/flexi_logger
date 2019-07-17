@@ -7,7 +7,7 @@ use log::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Add;
-use std::thread::{JoinHandle};
+use std::thread::JoinHandle;
 use std::time;
 
 const NO_OF_THREADS: usize = 5;
@@ -101,7 +101,11 @@ fn define_directory() -> String {
     )
 }
 
-pub fn test_format(w: &mut dyn std::io::Write, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+pub fn test_format(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> std::io::Result<()> {
     write!(
         w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
