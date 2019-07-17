@@ -532,7 +532,7 @@ impl Logger {
         specfile: P,
     ) -> Result<(), FlexiLoggerError> {
         let specfile = specfile.as_ref().to_owned();
-        self.spec.ensure_specfile_is_valid(&specfile)?;
+        self.spec.ensure_specfile_exists(&specfile)?;
         // Now that the file exists, we can canonicalize the path
         let specfile = specfile.canonicalize().map_err(FlexiLoggerError::Io)?;
 
@@ -541,7 +541,7 @@ impl Logger {
         // initial read of the file: if that fails, just print an error and continue
         match LogSpecification::from_file(&specfile) {
             Ok(spec) => handle.set_new_spec(spec),
-            Err(e) => log::error!("Can't read the log specification file, due to {:?}", e),
+            Err(e) => eprintln!("Can't read the log specification file, due to {:?}", e),
         }
 
         // now setup fs notification to automatically reread the file, and initialize from the file
@@ -551,8 +551,11 @@ impl Logger {
 
             // Create a watcher object, delivering debounced events
             let mut watcher =
-                watcher(tx, std::time::Duration::from_millis(500)).unwrap_or_else(|e| {
-                    log::error!("Creating watcher failed with {:?}", e);
+                watcher(tx, std::time::Duration::from_millis(100)).unwrap_or_else(|e| {
+                    eprintln!(
+                        "Creating filesystem watcher for specfile failed with {:?}",
+                        e
+                    );
                     ::std::process::exit(-1);
                 });
 
@@ -563,10 +566,9 @@ impl Logger {
                     watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
                 })
             {
-                log::error!(
+                eprintln!(
                     "watching the log spec file {:?} or its parent folder failed with {:?}",
-                    specfile,
-                    e
+                    specfile, e
                 );
                 ::std::process::exit(-1);
             }
@@ -574,23 +576,23 @@ impl Logger {
             loop {
                 match rx.recv() {
                     Ok(debounced_event) => {
-                        //log::trace!("got debounced event {:?}", debounced_event);
                         match debounced_event {
                             DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
                                 if path.canonicalize().unwrap() == specfile {
+                                    // eprintln!("got debounced event {:?}", debounced_event);
                                     reread_logspecfile(&mut handle, &specfile);
                                 } else {
-                                    // log::trace!(
+                                    // eprintln!(
                                     //     "ignored because path {:?} does not match specfile {:?}",
                                     //     path,
                                     //     specfile
                                     // );
                                 }
                             }
-                            _event => {} //log::trace!("ignoring event {:?}", _event),
+                            _event => {} //eprintln!("ignoring event {:?}", _event),
                         }
                     }
-                    Err(e) => log::error!("watch error: {:?}", e),
+                    Err(e) => eprintln!("watch error: {:?}", e),
                 }
             }
         })?;
@@ -602,10 +604,7 @@ impl Logger {
 #[cfg(feature = "specfile")]
 fn reread_logspecfile(log_handle: &mut ReconfigurationHandle, specfile: &std::path::Path) {
     match LogSpecification::from_file(&specfile) {
-        Ok(spec) => {
-            log::trace!("reread the log specification file successfully");
-            log_handle.set_new_spec(spec)
-        }
+        Ok(spec) => log_handle.set_new_spec(spec),
         Err(e) => eprintln!(
             "rereading log specification file failed with {:?}, \
              continuing with previous log specification",

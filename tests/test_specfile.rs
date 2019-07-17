@@ -22,6 +22,7 @@ mod a {
             .add(".log");
 
         std::fs::remove_file(specfile).ok();
+        assert!(!std::path::Path::new(specfile).exists());
 
         Logger::with_str("info")
             .format(detailed_format)
@@ -29,6 +30,8 @@ mod a {
             .suppress_timestamp()
             .start_with_specfile(specfile)
             .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+        
+        // eprintln!("Current specfile: \n{}\n",std::fs::read_to_string(specfile).unwrap());
 
         error!("This is an error message");
         warn!("This is a warning");
@@ -36,7 +39,7 @@ mod a {
         debug!("This is a debug message");
         trace!("This is a trace message");
 
-        // update to warn
+        // eprintln!("update to warn");
         let mut file = std::fs::OpenOptions::new()
             .truncate(true)
             .write(true)
@@ -49,14 +52,16 @@ mod a {
         ",
         )
         .unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(1_000));
+
+        std::thread::sleep(std::time::Duration::from_millis(400));
+
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");
         debug!("This is a debug message");
         trace!("This is a trace message");
 
-        // behave like many editors: rename and recreate as err
+        // eprintln!("behave like many editors: rename and recreate as err");
         std::fs::rename(&specfile, "old_logspec.toml").unwrap();
         let mut file = std::fs::OpenOptions::new()
             .create(true)
@@ -70,7 +75,7 @@ mod a {
         ",
         )
         .unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(1_000));
+        std::thread::sleep(std::time::Duration::from_millis(400));
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");

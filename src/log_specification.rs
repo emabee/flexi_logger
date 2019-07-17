@@ -232,7 +232,7 @@ impl LogSpecification {
     /// If the specfile does not exist, try to create it, with the current spec as content,
     /// under the specified name.
     #[cfg(feature = "specfile")]
-    pub fn ensure_specfile_is_valid(&self, specfile: &PathBuf) -> Result<(), FlexiLoggerError> {
+    pub fn ensure_specfile_exists(&self, specfile: &PathBuf) -> Result<(), FlexiLoggerError> {
         if specfile
             .extension()
             .unwrap_or_else(|| OsStr::new(""))
@@ -247,39 +247,39 @@ impl LogSpecification {
         }
 
         if Path::is_file(specfile) {
-            return Ok(());
+            Ok(())
+        } else {
+            if let Some(specfolder) = specfile.parent() {
+                if let Err(e) = fs::DirBuilder::new().recursive(true).create(specfolder) {
+                    eprintln!(
+                        "cannot create the folder for the logspec file under the specified name \
+                         {:?}, caused by: {}",
+                        &specfile, e
+                    );
+                    return Err(FlexiLoggerError::from(e));
+                }
+            }
+
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(specfile)
+            {
+                Err(e) => {
+                    eprintln!(
+                        "cannot create an initial logspec file under the specified name \
+                         {:?}, caused by: {}",
+                        &specfile, e
+                    );
+                    return Err(FlexiLoggerError::from(e));
+                }
+                Ok(mut file) => {
+                    self.to_toml(&mut file)?;
+                }
+            };
+
+            Ok(())
         }
-
-        if let Some(specfolder) = specfile.parent() {
-            if let Err(e) = fs::DirBuilder::new().recursive(true).create(specfolder) {
-                eprintln!(
-                    "cannot create the folder for the logspec file under the specified name \
-                     {:?}, caused by: {}",
-                    &specfile, e
-                );
-                return Err(FlexiLoggerError::from(e));
-            }
-        }
-
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(specfile)
-        {
-            Err(e) => {
-                eprintln!(
-                    "cannot create an initial logspec file under the specified name \
-                     {:?}, caused by: {}",
-                    &specfile, e
-                );
-                return Err(FlexiLoggerError::from(e));
-            }
-            Ok(mut file) => {
-                self.to_toml(&mut file)?;
-            }
-        };
-
-        Ok(())
     }
 
     /// Reads a log specification from a file.

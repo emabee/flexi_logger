@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.13.4] - 2019-07-16
+## [0.13.4] - 2019-07-17
 
-Do the initial read of  the specfile in the main thread, i.e. synchronously,
-to ensure a deterministic behavior.
+Specfile-feature only: do the initial read of the specfile in the main thread, i.e. synchronously,
+to ensure a deterministic behavior during startup.
 
 ## [0.13.3] - 2019-07-08
 
