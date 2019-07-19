@@ -127,7 +127,7 @@ impl ReconfigurationHandle {
 
     // Allows checking the logs written so far to the writer
     #[doc(hidden)]
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
     }
 }

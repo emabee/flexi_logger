@@ -96,8 +96,8 @@ impl log::Log for FlexiLogger {
                         Some(writer) => {
                             writer.write(&mut now, record).unwrap_or_else(|e| {
                                 eprintln!(
-                                    "FlexiLogger: writing log line to custom_writer failed with {}",
-                                    e
+                                    "FlexiLogger: writing log line to custom writer \"{}\" failed with: \"{}\"",
+                                    t, e
                                 );
                             });
                         }
@@ -137,11 +137,11 @@ impl log::Log for FlexiLogger {
 
     fn flush(&self) {
         self.primary_writer.flush().unwrap_or_else(|e| {
-            eprintln!("FlexiLogger: flushing primary_writer failed with {}", e);
+            eprintln!("FlexiLogger: flushing primary writer failed with {}", e);
         });
         for writer in self.other_writers.values() {
             writer.flush().unwrap_or_else(|e| {
-                eprintln!("FlexiLogger: flushing custom_writer failed with {}", e);
+                eprintln!("FlexiLogger: flushing custom writer failed with {}", e);
             });
         }
     }

@@ -61,12 +61,9 @@ impl PrimaryWriter {
         }
     }
 
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
-        match *self {
-            PrimaryWriter::StdErrWriter(_) => false,
-            PrimaryWriter::StdOutWriter(_) => false,
-            PrimaryWriter::ExtendedFileWriter(ref w) => w.validate_logs(expected),
-            PrimaryWriter::BlackHole(_) => false,
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
+        if let PrimaryWriter::ExtendedFileWriter(ref w) = *self {
+            w.validate_logs(expected);
         }
     }
 }
@@ -148,7 +145,7 @@ pub(crate) struct ExtendedFileWriter {
     file_log_writer: FileLogWriter,
 }
 impl ExtendedFileWriter {
-    fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
+    fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         self.file_log_writer.validate_logs(expected)
     }
 

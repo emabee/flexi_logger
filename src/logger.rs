@@ -531,6 +531,8 @@ impl Logger {
         self,
         specfile: P,
     ) -> Result<(), FlexiLoggerError> {
+        const DEBOUNCING_DELAY: u64 = 1000;
+
         let specfile = specfile.as_ref().to_owned();
         self.spec.ensure_specfile_exists(&specfile)?;
         // Now that the file exists, we can canonicalize the path
@@ -550,8 +552,8 @@ impl Logger {
             let (tx, rx) = std::sync::mpsc::channel();
 
             // Create a watcher object, delivering debounced events
-            let mut watcher =
-                watcher(tx, std::time::Duration::from_millis(100)).unwrap_or_else(|e| {
+            let mut watcher = watcher(tx, std::time::Duration::from_millis(DEBOUNCING_DELAY))
+                .unwrap_or_else(|e| {
                     eprintln!(
                         "Creating filesystem watcher for specfile failed with {:?}",
                         e
@@ -575,21 +577,22 @@ impl Logger {
                         match debounced_event {
                             DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
                                 if path.canonicalize().unwrap() == specfile {
-                                    eprintln!("re-reading specfile after {:?}", debounced_event);
+                                    // eprintln!("[{}] re-reading specfile after {:?}", chrono::Local::now(), debounced_event);
                                     reread_logspecfile(&mut handle, &specfile);
-                                } else {
-                                    eprintln!(
-                                        "event {:?} ignored because path {:?} does not match specfile {:?}",
-                                        debounced_event,
-                                        path,
-                                        specfile
-                                    );
                                 }
+                                // else {
+                                //     eprintln!(
+                                //         "[{}] event {:?} ignored because path {:?} does not match specfile {:?}", chrono::Local::now(),
+                                //         debounced_event,
+                                //         path,
+                                //         specfile
+                                //     );
+                                // }
                             }
-                            _event => eprintln!("ignoring event {:?}", _event),
+                            _event => {} // eprintln!("[{}] ignoring event {:?}", chrono::Local::now(), _event),
                         }
                     }
-                    Err(e) => eprintln!("watch error: {:?}", e),
+                    Err(e) => eprintln!("flexi_logger: error while watching the specfile: {:?}", e),
                 }
             }
         })?;
@@ -603,7 +606,7 @@ fn reread_logspecfile(log_handle: &mut ReconfigurationHandle, specfile: &std::pa
     match LogSpecification::from_file(&specfile) {
         Ok(spec) => log_handle.set_new_spec(spec),
         Err(e) => eprintln!(
-            "rereading log specification file failed with {:?}, \
+            "rereading the log specification file failed with {:?}, \
              continuing with previous log specification",
             e
         ),

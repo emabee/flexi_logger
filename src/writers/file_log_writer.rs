@@ -764,7 +764,7 @@ impl FileLogWriter {
 
     // don't use this function in productive code - it exists only for flexi_loggers own tests
     #[doc(hidden)]
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) -> bool {
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         let mut state_guard = self.state.lock().unwrap(); // : MutexGuard<FileLogWriterState>
 
         let path = get_filepath(
@@ -778,27 +778,22 @@ impl FileLogWriter {
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);
 
-        let mut line = String::new();
+        let mut buf = String::new();
         for tuple in expected {
-            line.clear();
-            reader.read_line(&mut line).unwrap();
-            assert!(
-                line.contains(&tuple.0),
-                "Did not find tuple.0 = {}",
-                tuple.0
-            );
-            assert!(
-                line.contains(&tuple.1),
-                "Did not find tuple.1 = {}",
-                tuple.1
-            );
-            assert!(
-                line.contains(&tuple.2),
-                "Did not find tuple.2 = {}",
-                tuple.2
-            );
+            buf.clear();
+            reader.read_line(&mut buf).unwrap();
+            assert!(buf.contains(&tuple.0), "Did not find tuple.0 = {}", tuple.0);
+            assert!(buf.contains(&tuple.1), "Did not find tuple.1 = {}", tuple.1);
+            assert!(buf.contains(&tuple.2), "Did not find tuple.2 = {}", tuple.2);
         }
-        false
+
+        buf.clear();
+        reader.read_line(&mut buf).unwrap();
+        assert!(
+            buf.is_empty(),
+            "Found more log lines than expected: {} ",
+            buf
+        );
     }
 }
 

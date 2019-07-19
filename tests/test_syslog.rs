@@ -62,6 +62,7 @@ mod test {
                 "syslog",
                 "another syslog- and log-relevant error message",
             ),
+            ("WARN", "syslog", "This is a warning message"),
         ]);
         Ok(())
     }
