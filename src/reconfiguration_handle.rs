@@ -73,6 +73,11 @@ impl ReconfigurationHandle {
         }
     }
 
+    #[cfg(feature = "specfile")]
+    pub(crate) fn current_spec(&self) -> Arc<RwLock<LogSpecification>> {
+        Arc::clone(&self.spec)
+    }
+
     //
     pub(crate) fn reconfigure(&self, mut max_level: log::LevelFilter) {
         for w in self.other_writers.as_ref().values() {

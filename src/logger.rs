@@ -533,12 +533,17 @@ impl Logger {
     ) -> Result<(), FlexiLoggerError> {
         const DEBOUNCING_DELAY: u64 = 1000;
 
+        // Make logging work, before caring for the specfile
+        let mut handle = self.start()?;
+
         let specfile = specfile.as_ref().to_owned();
-        self.spec.ensure_specfile_exists(&specfile)?;
+        handle
+            .current_spec()
+            .read()
+            .unwrap()
+            .ensure_specfile_exists(&specfile)?;
         // Now that the file exists, we can canonicalize the path
         let specfile = specfile.canonicalize().map_err(FlexiLoggerError::Io)?;
-
-        let mut handle = self.start()?;
 
         // initial read of the file: if that fails, just print an error and continue
         match LogSpecification::from_file(&specfile) {
@@ -558,7 +563,7 @@ impl Logger {
                         "Creating filesystem watcher for specfile failed with {:?}",
                         e
                     );
-                    ::std::process::exit(-1);
+                    std::process::exit(-1);
                 });
 
             // watch the spec file's parent folder
@@ -568,7 +573,7 @@ impl Logger {
                     "watching the parent folder of the log spec file {:?} failed with {:?}",
                     specfile, e
                 );
-                ::std::process::exit(-1);
+                std::process::exit(-1);
             }
 
             loop {
