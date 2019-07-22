@@ -26,37 +26,14 @@ mod a {
             .start_with_specfile(specfile)
             .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
 
-        // eprintln!("Current specfile: \n{}\n",std::fs::read_to_string(specfile).unwrap());
-
-        std::thread::sleep(std::time::Duration::from_millis(500));
-
         error!("This is an error message");
         warn!("This is a warning");
         info!("This is an info message");
         debug!("This is a debug message");
         trace!("This is a trace message");
 
-        // eprintln!(
-        //     "[{}]===== truncate and rewrite, update to warn",
-        //     chrono::Local::now()
-        // );
-        // {
-        //     let mut file = std::fs::OpenOptions::new()
-        //         .truncate(true)
-        //         .write(true)
-        //         .open(specfile)
-        //         .unwrap();
-        //     file.write_all(
-        //         b"
-        //         global_level = 'warn'
-        //         [modules]
-        //         ",
-        //     )
-        //     .unwrap();
-        // }
-
         eprintln!(
-            "[{}]===== behave like many editors: rename and recreate, as warn",
+            "[{}] ===== behave like many editors: rename and recreate, as warn",
             chrono::Local::now()
         );
         {
@@ -74,8 +51,6 @@ mod a {
             )
             .unwrap();
         }
-
-        // eprintln!("Current specfile: \n{}\n",std::fs::read_to_string(specfile).unwrap());
 
         std::thread::sleep(std::time::Duration::from_millis(WAIT));
 
@@ -103,28 +78,6 @@ mod a {
             )
             .unwrap();
         }
-
-        // eprintln!(
-        //     "[{}] ===== behave like many editors: rename and recreate, as error",
-        //     chrono::Local::now()
-        // );
-        // {
-        //     std::fs::rename(&specfile, "old_logspec.toml").unwrap();
-        //     let mut file = std::fs::OpenOptions::new()
-        //         .create(true)
-        //         .write(true)
-        //         .open(specfile)
-        //         .unwrap();
-        //     file.write_all(
-        //         b"
-        //         global_level = 'error'
-        //         [modules]
-        //         ",
-        //     )
-        //     .unwrap();
-        // }
-
-        // eprintln!("Current specfile: \n{}\n",std::fs::read_to_string(specfile).unwrap());
 
         std::thread::sleep(std::time::Duration::from_millis(WAIT));
 
@@ -176,5 +129,4 @@ mod a {
             buf
         );
     }
-
 }

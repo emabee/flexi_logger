@@ -544,14 +544,17 @@ fn get_linewriter(
 fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
     match list_of_log_and_zip_files(filename_config) {
         Err(e) => {
-            eprintln!("Listing rotated log files failed with {}", e);
+            eprintln!("[flexi_logger] listing rotated log files failed with {}", e);
             IdxState::Start // hope and pray ...??
         }
         Ok(globresults) => {
             let mut highest_idx = IdxState::Start;
             for globresult in globresults {
                 match globresult {
-                    Err(e) => eprintln!("Error when reading directory for log files: {:?}", e),
+                    Err(e) => eprintln!(
+                        "[flexi_logger] error when reading directory for log files: {:?}",
+                        e
+                    ),
                     Ok(pathbuf) => {
                         let filename = pathbuf.file_stem().unwrap().to_string_lossy();
                         let mut it = filename.rsplit("_r");
@@ -816,7 +819,7 @@ impl LogWriter for FileLogWriter {
                 state
                     .mount_next_linewriter_if_necessary(&self.config)
                     .unwrap_or_else(|e| {
-                        eprintln!("FlexiLogger: opening file failed with {}", e);
+                        eprintln!("[flexi_logger] opening file failed with {}", e);
                     });
 
                 (self.config.format)(state, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
@@ -854,7 +857,7 @@ const ERR_1: &str = "FileLogWriter: formatting failed with ";
 const ERR_2: &str = "FileLogWriter: writing failed with ";
 
 fn write_err(msg: &str, err: std::io::Error) {
-    eprintln!("{} with {}", msg, err);
+    eprintln!("[flexi_logger] {} with {}", msg, err);
 }
 
 mod platform {
@@ -874,7 +877,7 @@ mod platform {
         if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
             if !e.to_string().contains("Operation not supported") {
                 eprintln!(
-                    "Cannot create symlink {:?} for logfile \"{}\": {:?}",
+                    "[flexi_logger] cannot create symlink {:?} for logfile \"{}\": {:?}",
                     link,
                     &logfile.display(),
                     e

@@ -200,9 +200,9 @@ fn write_buffered(
     });
 }
 
-const ERR_1: &str = "FlexiLogger: formatting failed with ";
-const ERR_2: &str = "FlexiLogger: writing failed with ";
+const ERR_1: &str = "formatting failed with ";
+const ERR_2: &str = "writing failed with ";
 
 fn write_err(msg: &str, err: std::io::Error) {
-    eprintln!("{} with {}", msg, err);
+    eprintln!("[flexi_logger] {} with {}", msg, err);
 }

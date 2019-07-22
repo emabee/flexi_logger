@@ -96,7 +96,10 @@ impl ReconfigurationHandle {
     /// Tries to replace the active LogSpecification with the result from parsing the given String.
     pub fn parse_new_spec(&mut self, spec: &str) {
         self.set_new_spec(LogSpecification::parse(spec).unwrap_or_else(|e| {
-            eprintln!("ReconfigurationHandle::parse_new_spec(): failed with {}", e);
+            eprintln!(
+                "[flexi_logger] ReconfigurationHandle::parse_new_spec(): failed with {}",
+                e
+            );
             LogSpecification::off()
         }))
     }
@@ -115,7 +118,7 @@ impl ReconfigurationHandle {
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
         self.set_new_spec(LogSpecification::parse(new_spec).unwrap_or_else(|e| {
             eprintln!(
-                "ReconfigurationHandle::parse_new_spec(): failed with {}, \
+                "[flexi_logger] ReconfigurationHandle::parse_new_spec(): failed with {}, \
                  falling back to empty log spec",
                 e
             );

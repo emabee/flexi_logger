@@ -68,7 +68,7 @@ impl log::Log for FlexiLogger {
             for t in targets {
                 if t != "_Default" {
                     match self.other_writers.get(t) {
-                        None => eprintln!("bad writer spec: {}", t),
+                        None => eprintln!("[flexi_logger] bad writer spec: {}", t),
                         Some(writer) => {
                             if level < writer.max_log_level() {
                                 return true;
@@ -92,11 +92,12 @@ impl log::Log for FlexiLogger {
                     use_default = true;
                 } else {
                     match self.other_writers.get(t) {
-                        None => eprintln!("FlexiLogger::log() found bad writer spec: {}", t),
+                        None => eprintln!("[flexi_logger] found bad writer spec: {}", t),
                         Some(writer) => {
                             writer.write(&mut now, record).unwrap_or_else(|e| {
                                 eprintln!(
-                                    "FlexiLogger: writing log line to custom writer \"{}\" failed with: \"{}\"",
+                                    "[flexi_logger] writing log line to custom writer \"{}\" \
+                                     failed with: \"{}\"",
                                     t, e
                                 );
                             });
@@ -131,17 +132,17 @@ impl log::Log for FlexiLogger {
         self.primary_writer
             .write(&mut now, record)
             .unwrap_or_else(|e| {
-                eprintln!("FlexiLogger: writing log line failed with {}", e);
+                eprintln!("[flexi_logger] writing log line failed with {}", e);
             });
     }
 
     fn flush(&self) {
         self.primary_writer.flush().unwrap_or_else(|e| {
-            eprintln!("FlexiLogger: flushing primary writer failed with {}", e);
+            eprintln!("[flexi_logger] flushing primary writer failed with {}", e);
         });
         for writer in self.other_writers.values() {
             writer.flush().unwrap_or_else(|e| {
-                eprintln!("FlexiLogger: flushing custom writer failed with {}", e);
+                eprintln!("[flexi_logger] flushing custom writer failed with {}", e);
             });
         }
     }

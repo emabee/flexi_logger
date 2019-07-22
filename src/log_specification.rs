@@ -9,16 +9,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
 #[cfg(feature = "specfile")]
-use std::ffi::OsStr;
-#[cfg(feature = "specfile")]
-use std::fs;
-#[cfg(feature = "specfile")]
-use std::io::Read;
 use std::io::Write;
-#[cfg(feature = "specfile")]
-use std::path::{Path, PathBuf};
-#[cfg(feature = "specfile")]
-use toml;
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -229,74 +220,11 @@ impl LogSpecification {
         }
     }
 
-    /// If the specfile does not exist, try to create it, with the current spec as content,
-    /// under the specified name.
+    /// Reads a log specification from an appropriate toml document.
+    ///
+    /// This method is only avaible with feature `specfile`.
     #[cfg(feature = "specfile")]
-    pub fn ensure_specfile_exists(&self, specfile: &PathBuf) -> Result<(), FlexiLoggerError> {
-        if specfile
-            .extension()
-            .unwrap_or_else(|| OsStr::new(""))
-            .to_str()
-            .unwrap_or("")
-            != "toml"
-        {
-            return Err(FlexiLoggerError::Parse(
-                vec!["only files with suffix toml are supported".to_owned()],
-                LogSpecification::off(),
-            ));
-        }
-
-        if Path::is_file(specfile) {
-            Ok(())
-        } else {
-            if let Some(specfolder) = specfile.parent() {
-                if let Err(e) = fs::DirBuilder::new().recursive(true).create(specfolder) {
-                    eprintln!(
-                        "cannot create the folder for the logspec file under the specified name \
-                         {:?}, caused by: {}",
-                        &specfile, e
-                    );
-                    return Err(FlexiLoggerError::from(e));
-                }
-            }
-
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(specfile)
-            {
-                Err(e) => {
-                    eprintln!(
-                        "cannot create an initial logspec file under the specified name \
-                         {:?}, caused by: {}",
-                        &specfile, e
-                    );
-                    return Err(FlexiLoggerError::from(e));
-                }
-                Ok(mut file) => {
-                    self.to_toml(&mut file)?;
-                }
-            };
-
-            Ok(())
-        }
-    }
-
-    /// Reads a log specification from a file.
-    #[cfg(feature = "specfile")]
-    pub fn from_file<P: AsRef<Path>>(specfile: P) -> Result<LogSpecification, FlexiLoggerError> {
-        // Open the file in read-only mode.
-        let mut file = fs::File::open(specfile)?;
-
-        // Read the content toml file as an instance of `LogSpecFileFormat`.
-        let mut s = String::new();
-        file.read_to_string(&mut s)?;
-        LogSpecification::from_toml(&s)
-    }
-
-    //
-    #[cfg(feature = "specfile")]
-    fn from_toml(s: &str) -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn from_toml(s: &str) -> Result<LogSpecification, FlexiLoggerError> {
         #[derive(Clone, Debug, Deserialize)]
         struct LogSpecFileFormat {
             pub global_level: Option<String>,
@@ -344,7 +272,10 @@ impl LogSpecification {
         }
     }
 
-    /// Serializes itself in toml format
+    /// Serializes itself in toml format.
+    ///
+    /// This method is only avaible with feature `specfile`.
+    #[cfg(feature = "specfile")]
     pub fn to_toml(&self, w: &mut dyn Write) -> Result<(), FlexiLoggerError> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();

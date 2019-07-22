@@ -1,6 +1,12 @@
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
+#[cfg(feature = "specfile")]
+use std::ffi::OsStr;
+#[cfg(feature = "specfile")]
+use std::io::Read;
+#[cfg(feature = "specfile")]
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
@@ -531,73 +537,46 @@ impl Logger {
         self,
         specfile: P,
     ) -> Result<(), FlexiLoggerError> {
-        const DEBOUNCING_DELAY: u64 = 1000;
-
         // Make logging work, before caring for the specfile
         let mut handle = self.start()?;
 
         let specfile = specfile.as_ref().to_owned();
-        handle
-            .current_spec()
-            .read()
-            .unwrap()
-            .ensure_specfile_exists(&specfile)?;
+
+        synchronize_logspec_and_specfile(&mut handle.current_spec().write().unwrap(), &specfile)?;
+
         // Now that the file exists, we can canonicalize the path
         let specfile = specfile.canonicalize().map_err(FlexiLoggerError::Io)?;
 
-        // initial read of the file: if that fails, just print an error and continue
-        match LogSpecification::from_file(&specfile) {
-            Ok(spec) => handle.set_new_spec(spec),
-            Err(e) => eprintln!("Can't read the log specification file, due to {:?}", e),
-        }
+        // Watch the parent folder of the specfile, using debounced events
+        let (tx, rx) = std::sync::mpsc::channel();
+        let debouncing_delay = std::time::Duration::from_millis(1000);
+        let mut watcher = watcher(tx, debouncing_delay)?;
+        watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
 
-        // now setup fs notification to automatically reread the file, and initialize from the file
+        // in a separate thread, reread the specfile when it was updated
         std::thread::Builder::new().spawn(move || {
-            // Create a channel to receive the events.
-            let (tx, rx) = std::sync::mpsc::channel();
-
-            // Create a watcher object, delivering debounced events
-            let mut watcher = watcher(tx, std::time::Duration::from_millis(DEBOUNCING_DELAY))
-                .unwrap_or_else(|e| {
-                    eprintln!(
-                        "Creating filesystem watcher for specfile failed with {:?}",
-                        e
-                    );
-                    std::process::exit(-1);
-                });
-
-            // watch the spec file's parent folder
-            if let Err(e) = watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)
-            {
-                eprintln!(
-                    "watching the parent folder of the log spec file {:?} failed with {:?}",
-                    specfile, e
-                );
-                std::process::exit(-1);
-            }
-
+            let _watcher = watcher; // keep it alive!
             loop {
                 match rx.recv() {
-                    Ok(debounced_event) => {
-                        match debounced_event {
-                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                                if path.canonicalize().unwrap() == specfile {
-                                    // eprintln!("[{}] re-reading specfile after {:?}", chrono::Local::now(), debounced_event);
-                                    reread_logspecfile(&mut handle, &specfile);
+                    Ok(debounced_event) => match debounced_event {
+                        DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
+                            if path.canonicalize().unwrap() == specfile {
+                                match log_specification_from_file(&specfile) {
+                                    Ok(spec) => handle.set_new_spec(spec),
+                                    Err(e) => eprintln!(
+                                        "[flexi_logger] rereading the log specification file \
+                                         failed with {:?}, \
+                                         continuing with previous log specification",
+                                        e
+                                    ),
                                 }
-                                // else {
-                                //     eprintln!(
-                                //         "[{}] event {:?} ignored because path {:?} does not match specfile {:?}", chrono::Local::now(),
-                                //         debounced_event,
-                                //         path,
-                                //         specfile
-                                //     );
-                                // }
                             }
-                            _event => {} // eprintln!("[{}] ignoring event {:?}", chrono::Local::now(), _event),
                         }
+                        _event => {}
+                    },
+                    Err(e) => {
+                        eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
                     }
-                    Err(e) => eprintln!("flexi_logger: error while watching the specfile: {:?}", e),
                 }
             }
         })?;
@@ -606,16 +585,78 @@ impl Logger {
     }
 }
 
+/// If the specfile exists, read the file and update the log_spec from it;
+/// otherwise try to create the file, with the current spec as content, under the specified name.
 #[cfg(feature = "specfile")]
-fn reread_logspecfile(log_handle: &mut ReconfigurationHandle, specfile: &std::path::Path) {
-    match LogSpecification::from_file(&specfile) {
-        Ok(spec) => log_handle.set_new_spec(spec),
-        Err(e) => eprintln!(
-            "rereading the log specification file failed with {:?}, \
-             continuing with previous log specification",
-            e
-        ),
+fn synchronize_logspec_and_specfile(
+    log_spec: &mut LogSpecification,
+    specfile: &PathBuf,
+) -> Result<(), FlexiLoggerError> {
+    if specfile
+        .extension()
+        .unwrap_or_else(|| OsStr::new(""))
+        .to_str()
+        .unwrap_or("")
+        != "toml"
+    {
+        return Err(FlexiLoggerError::Parse(
+            vec!["[flexi_logger] only spec files with suffix toml are supported".to_owned()],
+            LogSpecification::off(),
+        ));
     }
+
+    if Path::is_file(specfile) {
+        log_spec.update_from(log_specification_from_file(&specfile).map_err(|e| {
+            eprintln!(
+                "[flexi_logger] reading the log specification file failed with {:?}",
+                e
+            );
+            e
+        })?);
+        Ok(())
+    } else {
+        if let Some(specfolder) = specfile.parent() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(specfolder)
+                .map_err(|e| {
+                    eprintln!(
+                        "[flexi_logger] cannot create the folder for the logspec file \
+                         under the specified name {:?}, caused by: {}",
+                        &specfile, e
+                    );
+                    e
+                })?;
+        }
+
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(specfile)
+            .map_err(|e| {
+                eprintln!(
+                    "[flexi_logger] cannot create an initial logspec file \
+                     under the specified name {:?}, caused by: {}",
+                    &specfile, e
+                );
+                e
+            })?;
+        log_spec.to_toml(&mut file)
+    }
+}
+
+// Reads a log specification from a file.
+#[cfg(feature = "specfile")]
+pub fn log_specification_from_file<P: AsRef<Path>>(
+    specfile: P,
+) -> Result<LogSpecification, FlexiLoggerError> {
+    // Open the file in read-only mode.
+    let mut file = std::fs::File::open(specfile)?;
+
+    // Read the content toml file as an instance of `LogSpecFileFormat`.
+    let mut s = String::new();
+    file.read_to_string(&mut s)?;
+    LogSpecification::from_toml(&s)
 }
 
 /// Criterion when to rotate the log file.
