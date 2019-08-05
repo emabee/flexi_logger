@@ -51,7 +51,7 @@ impl log::Log for FlexiLogger {
     // Caveat:
     // Rocket e.g. sets target explicitly to several fantasy names;
     // these hopefully do not collide with any of the modules in the log specification;
-    // since they do not conform with the {}  syntax expected by flexi_logger, their treated as
+    // since they do not conform with the {}  syntax expected by flexi_logger, they're treated as
     // module names.
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         let target = metadata.target();

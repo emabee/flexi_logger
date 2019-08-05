@@ -2,19 +2,19 @@ use crate::deferred_now::DeferredNow;
 use crate::flexi_error::FlexiLoggerError;
 use crate::formats::default_format;
 use crate::logger::{Age, Cleanup, Criterion, Naming};
+use crate::primary_writer::buffer_with;
 use crate::writers::log_writer::LogWriter;
 use crate::FormatFunction;
 use chrono::{DateTime, Datelike, Local, Timelike};
 use log::Record;
 
 use std::borrow::BorrowMut;
-use std::cell::RefCell;
 use std::cmp::max;
 use std::env;
 use std::fs::{File, OpenOptions};
 #[cfg(feature = "ziplogs")]
 use std::io::Read;
-use std::io::{BufRead, BufReader, LineWriter, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::ops::{Add, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -358,7 +358,7 @@ impl RotationState {
 
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
-    line_writer: Option<LineWriter<File>>,
+    line_writer: Option<File>,
     o_rotation_state: Option<RotationState>,
     line_ending: &'static [u8],
 }
@@ -435,7 +435,7 @@ impl FileLogWriterState {
         })
     }
 
-    fn line_writer(&mut self) -> &mut LineWriter<File> {
+    fn line_writer(&mut self) -> &mut File {
         self.line_writer
             .as_mut()
             .expect("FlexiLogger: line_writer unexpectedly not available")
@@ -515,7 +515,7 @@ fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
 fn get_linewriter(
     config: &FileLogWriterConfig,
     with_rotation: bool,
-) -> Result<(LineWriter<File>, DateTime<Local>, PathBuf), FlexiLoggerError> {
+) -> Result<(File, DateTime<Local>, PathBuf), FlexiLoggerError> {
     let o_infix = if with_rotation {
         Some(CURRENT_INFIX)
     } else {
@@ -529,14 +529,12 @@ fn get_linewriter(
         self::platform::create_symlink_if_possible(link, &p_path);
     }
 
-    let lw = LineWriter::new(
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(config.append)
-            .truncate(!config.append)
-            .open(&p_path)?,
-    );
+    let lw = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(config.append)
+        .truncate(!config.append)
+        .open(&p_path)?;
 
     Ok((lw, get_creation_date(&p_path)?, p_path))
 }
@@ -803,17 +801,17 @@ impl FileLogWriter {
 impl LogWriter for FileLogWriter {
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        // the thread-local RefCell is used to differentiate recursive calls from
-        // cross-thread collisions; recursive calls would create a deadlock if they'd try to
-        // lock the mutex
-        thread_local! {
-            static RECURSION_DETECTOR: RefCell<()> = RefCell::new(());
-        }
+        buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
+            Ok(mut buffer) => {
+                (self.config.format)(&mut *buffer, now, record)
+                    .unwrap_or_else(|e| write_err(ERR_1, e));
 
-        RECURSION_DETECTOR.with(|rd| match rd.try_borrow_mut() {
-            Ok(_) => {
                 let mut state_guard = self.state.lock().unwrap();
                 let state = state_guard.deref_mut();
+
+                buffer
+                    .write_all(state.line_ending)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
 
                 // rotate if necessary
                 state
@@ -822,19 +820,30 @@ impl LogWriter for FileLogWriter {
                         eprintln!("[flexi_logger] opening file failed with {}", e);
                     });
 
-                (self.config.format)(state, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
                 state
-                    .write_all(state.line_ending)
+                    .write_all(&*buffer)
                     .unwrap_or_else(|e| write_err(ERR_2, e));
+                buffer.clear();
             }
             Err(_e) => {
                 // We arrive here in the rare cases of recursive logging
                 // (e.g. log calls in Debug or Display implementations)
+                // we print the inner calls, in chronological order, before finally the
+                // outer most message is printed
+                let mut tmp_buf = Vec::<u8>::with_capacity(200);
+                (self.config.format)(&mut tmp_buf, now, record)
+                    .unwrap_or_else(|e| write_err(ERR_1, e));
 
-                // we suppress the inner message!
-                // alternatively, we could write it to a buffer which then would have to be checked
-                // and written at the beginning of each (non-recursive) call
-                // but we'd need a further thread-local for the buffer
+                let mut state_guard = self.state.lock().unwrap();
+                let state = state_guard.deref_mut();
+
+                tmp_buf
+                    .write_all(state.line_ending)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+
+                state
+                    .write_all(&tmp_buf)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
             }
         });
 

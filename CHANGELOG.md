@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.13.5] - 2019-07-22
+## [0.14.1] - 2019-08-04
+
+Support recursive logging also with FileLogWriter, sharing the buffer with the PrimaryWriter.
+
+Fix multi-threading issue (incorrect line-break handling with stderr).
+
+## [0.14.0] - 2019-07-22
 
 Further stabilize the specfile feature.
 

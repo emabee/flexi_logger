@@ -14,7 +14,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "0.14"
+flexi_logger = "0.14.1"
 log = "0.4"
 ```
 
@@ -22,7 +22,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.14", features = ["specfile", "ziplogs"] }
+flexi_logger = { version = "0.14.1", features = ["specfile", "ziplogs"] }
 log = "0.4"
 ```
 
@@ -30,7 +30,7 @@ or, to get the smallest footprint (and no colors), with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.14", default_features = false }
+flexi_logger = { version = "0.14.1", default_features = false }
 log = "0.4"
 ```
 
@@ -105,6 +105,7 @@ If you start  `flexi_logger` with a specfile, e.g.
 
 ```rust
 flexi_logger::Logger::with_str("info")
+    // ... logger configuration ...
    .start_with_specfile("/server/config/logspec.toml")
    .unwrap();
 ```

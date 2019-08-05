@@ -177,27 +177,40 @@ fn write_buffered(
     record: &Record,
     w: &mut dyn Write,
 ) {
-    thread_local! {
-        static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));
-    }
-    BUFFER.with(|tl_buf| match tl_buf.try_borrow_mut() {
+    buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
         Ok(mut buffer) => {
             (format_function)(&mut *buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            buffer
+                .write_all(b"\n")
+                .unwrap_or_else(|e| write_err(ERR_2, e));
             w.write_all(&*buffer)
                 .unwrap_or_else(|e| write_err(ERR_2, e));
-            w.write_all(b"\n").unwrap_or_else(|e| write_err(ERR_2, e));
             buffer.clear();
         }
         Err(_e) => {
             // We arrive here in the rare cases of recursive logging
             // (e.g. log calls in Debug or Display implementations)
+            // we print the inner calls, in chronological order, before finally the
+            // outer most message is printed
             let mut tmp_buf = Vec::<u8>::with_capacity(200);
             (format_function)(&mut tmp_buf, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            tmp_buf
+                .write_all(b"\n")
+                .unwrap_or_else(|e| write_err(ERR_2, e));
             w.write_all(&tmp_buf)
                 .unwrap_or_else(|e| write_err(ERR_2, e));
-            w.write_all(b"\n").unwrap_or_else(|e| write_err(ERR_2, e));
         }
     });
+}
+
+pub(crate) fn buffer_with<F>(f: F)
+where
+    F: FnOnce(&RefCell<Vec<u8>>) -> (),
+{
+    thread_local! {
+        static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));
+    }
+    BUFFER.with(f);
 }
 
 const ERR_1: &str = "formatting failed with ";
