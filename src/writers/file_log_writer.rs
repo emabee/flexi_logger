@@ -15,7 +15,7 @@ use std::fs::{File, OpenOptions};
 #[cfg(feature = "ziplogs")]
 use std::io::Read;
 use std::io::{BufRead, BufReader, Write};
-use std::ops::{Add, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -358,7 +358,7 @@ impl RotationState {
 
 // The mutable state of a FileLogWriter.
 struct FileLogWriterState {
-    line_writer: Option<File>,
+    o_log_file: Option<File>,
     o_rotation_state: Option<RotationState>,
     line_ending: &'static [u8],
 }
@@ -368,13 +368,13 @@ impl FileLogWriterState {
         config: &FileLogWriterConfig,
         o_rotation_config: &Option<RotationConfig>,
     ) -> Result<FileLogWriterState, FlexiLoggerError> {
-        let (line_writer, o_rotation_state) = match o_rotation_config {
+        let (log_file, o_rotation_state) = match o_rotation_config {
             None => {
-                let (line_writer, _created_at, _p_path) = get_linewriter(config, false)?;
-                (line_writer, None)
+                let (log_file, _created_at, _p_path) = open_log_file(config, false)?;
+                (log_file, None)
             }
             Some(rotate_config) => {
-                // first rotate, then open the line_writer
+                // first rotate, then open the log file
                 let naming_state = match rotate_config.naming {
                     Naming::Timestamps => {
                         if !config.append {
@@ -396,7 +396,7 @@ impl FileLogWriterState {
                         NamingState::IdxState(rotation_state)
                     }
                 };
-                let (line_writer, created_at, p_path) = get_linewriter(config, true)?;
+                let (log_file, created_at, p_path) = open_log_file(config, true)?;
 
                 let cleanup = rotate_config.cleanup;
 
@@ -413,7 +413,7 @@ impl FileLogWriterState {
                 };
 
                 (
-                    line_writer,
+                    log_file,
                     Some(RotationState {
                         naming_state,
                         roll_state,
@@ -425,7 +425,7 @@ impl FileLogWriterState {
         };
 
         Ok(FileLogWriterState {
-            line_writer: Some(line_writer),
+            o_log_file: Some(log_file),
             o_rotation_state,
             line_ending: if config.use_windows_line_ending {
                 b"\r\n"
@@ -433,12 +433,6 @@ impl FileLogWriterState {
                 b"\n"
             },
         })
-    }
-
-    fn line_writer(&mut self) -> &mut File {
-        self.line_writer
-            .as_mut()
-            .expect("FlexiLogger: line_writer unexpectedly not available")
     }
 
     // With rotation, the logger always writes into a file with infix `_rCURRENT`.
@@ -451,7 +445,7 @@ impl FileLogWriterState {
     ) -> Result<(), FlexiLoggerError> {
         if let Some(ref mut rotation_state) = self.o_rotation_state {
             if rotation_state.rotation_necessary() {
-                self.line_writer = None; // close the output file
+                self.o_log_file = None; // close the output file
 
                 match rotation_state.naming_state {
                     NamingState::CreatedAt => {
@@ -462,8 +456,8 @@ impl FileLogWriterState {
                     }
                 }
 
-                let (line_writer, created_at, _) = get_linewriter(config, true)?;
-                self.line_writer = Some(line_writer);
+                let (line_writer, created_at, _) = open_log_file(config, true)?;
+                self.o_log_file = Some(line_writer);
                 rotation_state.created_at = created_at;
                 if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state
                 {
@@ -478,23 +472,19 @@ impl FileLogWriterState {
 
         Ok(())
     }
-}
 
-impl Write for FileLogWriterState {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.line_writer().write_all(buf)?;
+    fn write_buffer(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.o_log_file
+            .as_mut()
+            .expect("FlexiLogger: log_file unexpectedly not available")
+            .write_all(buf)?;
+
         if let Some(ref mut rotation_state) = self.o_rotation_state {
             if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state {
                 *current_size += buf.len() as u64;
             }
         };
-        Ok(buf.len())
-    }
-
-    #[inline]
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.line_writer().flush()
+        Ok(())
     }
 }
 
@@ -512,7 +502,7 @@ fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
     p_path
 }
 
-fn get_linewriter(
+fn open_log_file(
     config: &FileLogWriterConfig,
     with_rotation: bool,
 ) -> Result<(File, DateTime<Local>, PathBuf), FlexiLoggerError> {
@@ -529,14 +519,14 @@ fn get_linewriter(
         self::platform::create_symlink_if_possible(link, &p_path);
     }
 
-    let lw = OpenOptions::new()
+    let log_file = OpenOptions::new()
         .write(true)
         .create(true)
         .append(config.append)
         .truncate(!config.append)
         .open(&p_path)?;
 
-    Ok((lw, get_creation_date(&p_path)?, p_path))
+    Ok((log_file, get_creation_date(&p_path)?, p_path))
 }
 
 fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
@@ -763,9 +753,94 @@ impl FileLogWriter {
         self.config.format
     }
 
-    // don't use this function in productive code - it exists only for flexi_loggers own tests
     #[doc(hidden)]
-    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
+    pub fn current_filename(&self) -> PathBuf {
+        let o_infix = if self
+            .state
+            .lock()
+            .unwrap()
+            .deref()
+            .o_rotation_state
+            .is_some()
+        {
+            Some(CURRENT_INFIX)
+        } else {
+            None
+        };
+        let p_path = get_filepath(o_infix, &self.config.filename_config);
+        p_path.clone()
+    }
+}
+
+impl LogWriter for FileLogWriter {
+    #[inline]
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+        buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
+            Ok(mut buffer) => {
+                (self.config.format)(&mut *buffer, now, record)
+                    .unwrap_or_else(|e| write_err(ERR_1, e));
+
+                let mut state_guard = self.state.lock().unwrap();
+                let state = state_guard.deref_mut();
+
+                buffer
+                    .write_all(state.line_ending)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+
+                // rotate if necessary
+                state
+                    .mount_next_linewriter_if_necessary(&self.config)
+                    .unwrap_or_else(|e| {
+                        eprintln!("[flexi_logger] opening file failed with {}", e);
+                    });
+
+                state
+                    .write_buffer(&*buffer)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+                buffer.clear();
+            }
+            Err(_e) => {
+                // We arrive here in the rare cases of recursive logging
+                // (e.g. log calls in Debug or Display implementations)
+                // we print the inner calls, in chronological order, before finally the
+                // outer most message is printed
+                let mut tmp_buf = Vec::<u8>::with_capacity(200);
+                (self.config.format)(&mut tmp_buf, now, record)
+                    .unwrap_or_else(|e| write_err(ERR_1, e));
+
+                let mut state_guard = self.state.lock().unwrap();
+                let state = state_guard.deref_mut();
+
+                tmp_buf
+                    .write_all(state.line_ending)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+
+                state
+                    .write_buffer(&tmp_buf)
+                    .unwrap_or_else(|e| write_err(ERR_2, e));
+            }
+        });
+
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&self) -> std::io::Result<()> {
+        let mut state_guard = self.state.lock().unwrap();
+        if let Some(file) = state_guard.deref_mut().o_log_file.as_mut() {
+            file.flush()
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn max_log_level(&self) -> log::LevelFilter {
+        self.max_log_level
+    }
+
+    #[doc(hidden)]
+    fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         let mut state_guard = self.state.lock().unwrap(); // : MutexGuard<FileLogWriterState>
 
         let path = get_filepath(
@@ -795,70 +870,6 @@ impl FileLogWriter {
             "Found more log lines than expected: {} ",
             buf
         );
-    }
-}
-
-impl LogWriter for FileLogWriter {
-    #[inline]
-    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
-            Ok(mut buffer) => {
-                (self.config.format)(&mut *buffer, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, e));
-
-                let mut state_guard = self.state.lock().unwrap();
-                let state = state_guard.deref_mut();
-
-                buffer
-                    .write_all(state.line_ending)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
-
-                // rotate if necessary
-                state
-                    .mount_next_linewriter_if_necessary(&self.config)
-                    .unwrap_or_else(|e| {
-                        eprintln!("[flexi_logger] opening file failed with {}", e);
-                    });
-
-                state
-                    .write_all(&*buffer)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
-                buffer.clear();
-            }
-            Err(_e) => {
-                // We arrive here in the rare cases of recursive logging
-                // (e.g. log calls in Debug or Display implementations)
-                // we print the inner calls, in chronological order, before finally the
-                // outer most message is printed
-                let mut tmp_buf = Vec::<u8>::with_capacity(200);
-                (self.config.format)(&mut tmp_buf, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, e));
-
-                let mut state_guard = self.state.lock().unwrap();
-                let state = state_guard.deref_mut();
-
-                tmp_buf
-                    .write_all(state.line_ending)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
-
-                state
-                    .write_all(&tmp_buf)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
-            }
-        });
-
-        Ok(())
-    }
-
-    #[inline]
-    fn flush(&self) -> std::io::Result<()> {
-        let mut state_guard = self.state.lock().unwrap();
-        state_guard.deref_mut().line_writer().flush()
-    }
-
-    #[inline]
-    fn max_log_level(&self) -> log::LevelFilter {
-        self.max_log_level
     }
 }
 

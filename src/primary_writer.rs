@@ -4,7 +4,7 @@ use std::io::Write;
 
 use crate::deferred_now::DeferredNow;
 use crate::logger::Duplicate;
-use crate::writers::{FileLogWriter, LogWriter};
+use crate::writers::LogWriter;
 use crate::FormatFunction;
 
 // Writes either to stderr,
@@ -14,19 +14,19 @@ use crate::FormatFunction;
 pub(crate) enum PrimaryWriter {
     StdOutWriter(StdOutWriter),
     StdErrWriter(StdErrWriter),
-    ExtendedFileWriter(ExtendedFileWriter),
+    MultiWriter(MultiWriter),
     BlackHole(BlackHoleWriter),
 }
 impl PrimaryWriter {
-    pub fn file(
+    pub fn multi(
         duplicate: Duplicate,
         format_for_stderr: FormatFunction,
-        file_log_writer: FileLogWriter,
+        writers: Vec<Box<dyn LogWriter>>,
     ) -> PrimaryWriter {
-        PrimaryWriter::ExtendedFileWriter(ExtendedFileWriter {
+        PrimaryWriter::MultiWriter(MultiWriter {
             duplicate,
             format_for_stderr,
-            file_log_writer,
+            writers,
         })
     }
     pub fn stderr(format: FormatFunction) -> PrimaryWriter {
@@ -46,7 +46,7 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.write(now, record),
             PrimaryWriter::StdOutWriter(ref w) => w.write(now, record),
-            PrimaryWriter::ExtendedFileWriter(ref w) => w.write(now, record),
+            PrimaryWriter::MultiWriter(ref w) => w.write(now, record),
             PrimaryWriter::BlackHole(ref w) => w.write(now, record),
         }
     }
@@ -56,13 +56,13 @@ impl PrimaryWriter {
         match *self {
             PrimaryWriter::StdErrWriter(ref w) => w.flush(),
             PrimaryWriter::StdOutWriter(ref w) => w.flush(),
-            PrimaryWriter::ExtendedFileWriter(ref w) => w.flush(),
+            PrimaryWriter::MultiWriter(ref w) => w.flush(),
             PrimaryWriter::BlackHole(ref w) => w.flush(),
         }
     }
 
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        if let PrimaryWriter::ExtendedFileWriter(ref w) = *self {
+        if let PrimaryWriter::MultiWriter(ref w) = *self {
             w.validate_logs(expected);
         }
     }
@@ -135,16 +135,18 @@ impl BlackHoleWriter {
     }
 }
 
-// The `ExtendedFileWriter` writes logs to stderr or to a `FileLogWriter`, and in the latter case
+// The `MultiWriter` writes logs to stderr or to a set of `Writer`s, and in the latter case
 // can duplicate messages to stderr.
-pub(crate) struct ExtendedFileWriter {
+pub(crate) struct MultiWriter {
     duplicate: Duplicate,
     format_for_stderr: FormatFunction,
-    file_log_writer: FileLogWriter,
+    writers: Vec<Box<dyn LogWriter>>,
 }
-impl ExtendedFileWriter {
+impl LogWriter for MultiWriter {
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        self.file_log_writer.validate_logs(expected)
+        for writer in &self.writers {
+            (*writer).validate_logs(expected);
+        }
     }
 
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
@@ -159,11 +161,25 @@ impl ExtendedFileWriter {
         if dupl {
             write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr())?;
         }
-        self.file_log_writer.write(now, record)
+        for writer in &self.writers {
+            writer.write(now, record)?;
+        }
+        Ok(())
+    }
+
+    /// Provides the maximum log level that is to be written.
+    fn max_log_level(&self) -> log::LevelFilter {
+        self.writers
+            .iter()
+            .map(|w| w.max_log_level())
+            .max()
+            .unwrap()
     }
 
     fn flush(&self) -> std::io::Result<()> {
-        self.file_log_writer.flush()?;
+        for writer in &self.writers {
+            writer.flush()?;
+        }
         std::io::stderr().flush()
     }
 }

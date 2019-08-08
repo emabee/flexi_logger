@@ -60,11 +60,18 @@ pub struct Logger {
     other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
 
-/// Describes the target to which `flexi_logger`'s standard log output stream writes to.
+/// Describes the default log target.
 ///
-/// See the [writers](writers/index.html) module for the usage of _additional_ log writers.
+/// All log messages, in which no target is explicitly defined, will be written to
+/// the default log target.
+///
+/// See the [writers](writers/index.html) module for
+/// how to specify non-default log targets in log macro calls,
+/// and the usage of non-default log writers.
 pub enum LogTarget {
     /// Log is written to stderr.
+    ///
+    /// This is the default behavior of `flexi_logger`.
     StdErr,
     /// Log is written to stdout.
     StdOut,
@@ -73,6 +80,12 @@ pub enum LogTarget {
     /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
     ///  e.g. `myprog_2015-07-08_10-44-11.log`.
     File,
+    /// Log is written to an alternative `LogWriter` implementation.
+    ///
+    Writer(Box<dyn LogWriter>),
+    /// Log is written to a file, as with `LogTarget::File`, _and_ to an alternative
+    /// `LogWriter` implementation.
+    FileAndWriter(Box<dyn LogWriter>),
     /// Log is processed as if it were written, but is finally not written.
     ///
     /// This can be useful for running tests with all log-levels active to ensure that the log calls
@@ -340,11 +353,15 @@ impl Logger {
 
     /// Registers a LogWriter implementation under the given target name.
     ///
-    /// The target name should not start with an underscore.
+    /// The target name must not start with an underscore.
     ///
     /// See [the module documentation of `writers`](writers/index.html).
-    pub fn add_writer<S: Into<String>>(mut self, name: S, writer: Box<dyn LogWriter>) -> Logger {
-        self.other_writers.insert(name.into(), writer);
+    pub fn add_writer<S: Into<String>>(
+        mut self,
+        target_name: S,
+        writer: Box<dyn LogWriter>,
+    ) -> Logger {
+        self.other_writers.insert(target_name.into(), writer);
         self
     }
 
@@ -457,10 +474,22 @@ impl Logger {
         let primary_writer = Arc::new(match self.log_target {
             LogTarget::File => {
                 self.flwb = self.flwb.format(self.format_for_file);
-                PrimaryWriter::file(
+                PrimaryWriter::multi(
                     self.duplicate,
                     self.format_for_stderr,
-                    self.flwb.try_build()?,
+                    vec![Box::new(self.flwb.try_build()?)],
+                )
+            }
+            LogTarget::Writer(w) => {
+                self.flwb = self.flwb.format(self.format_for_file);
+                PrimaryWriter::multi(self.duplicate, self.format_for_stderr, vec![w])
+            }
+            LogTarget::FileAndWriter(w) => {
+                self.flwb = self.flwb.format(self.format_for_file);
+                PrimaryWriter::multi(
+                    self.duplicate,
+                    self.format_for_stderr,
+                    vec![Box::new(self.flwb.try_build()?), w],
                 )
             }
             LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stderr),

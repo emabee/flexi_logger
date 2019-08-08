@@ -273,17 +273,17 @@ impl Write for SyslogConnector {
         match *self {
             #[cfg(target_os = "linux")]
             SyslogConnector::Datagram(ref ud) => {
-                // fixme: reconnect of conn is broken
+                // todo: reconnect of conn is broken
                 ud.send(&message[..])
             }
             #[cfg(target_os = "linux")]
             SyslogConnector::Stream(ref mut w) => {
-                // fixme: reconnect of conn is broken
+                // todo: reconnect of conn is broken
                 w.write(&message[..])
                     .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
             }
             SyslogConnector::Tcp(ref mut w) => {
-                // fixme: reconnect of conn is broken
+                // todo: reconnect of conn is broken
                 w.write(&message[..])
             }
             SyslogConnector::Udp(ref socket) => {
