@@ -40,6 +40,9 @@ fn run_script(s: &str) {
 }
 
 fn main() {
+    // format
+    run_command!("cargo", "fmt");
+
     // Build in important variants
     run_command!("cargo", "build");
     run_command!("cargo", "build", "--all-features");
