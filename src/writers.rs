@@ -14,7 +14,7 @@
 //!   i.e. from log macro calls without explicit target specification.
 //!
 //!   See [`LogTarget`](../enum.LogTarget.html) for the available options.
-//!   
+//!
 //!   These log calls will only be written if they match the current
 //!   [`log specification`](../struct.LogSpecification.html).
 //!
@@ -38,10 +38,10 @@
 //!
 //!   ```rust
 //!   use log::*;
-//!  
+//!
 //!   use flexi_logger::Logger;
 //!   use flexi_logger::writers::FileLogWriter;
-//!  
+//!
 //!   // Configure a FileLogWriter for alert messages
 //!   pub fn alert_logger() -> Box<FileLogWriter> {
 //!       Box::new(FileLogWriter::builder()
@@ -51,7 +51,7 @@
 //!           .try_build()
 //!           .unwrap())
 //!   }
-//!  
+//!
 //!   // Define a macro for writing messages to the alert log and to the normal log
 //!   #[macro_use]
 //!   mod macros {
@@ -62,7 +62,7 @@
 //!           )
 //!       }
 //!   }
-//!  
+//!
 //!   fn main() {
 //!       Logger::with_env_or_str("info")
 //!           .print_message()
@@ -70,15 +70,15 @@
 //!           .add_writer("Alert", alert_logger())
 //!           .start()
 //!           .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-//!  
-//!  
+//!
+//!
 //!       // Explicitly send logs to different loggers
 //!       error!(target : "{Alert}", "This is only an alert");
 //!       error!(target : "{Alert,_Default}", "This is an alert and log message");
-//!  
+//!
 //!       // Nicer: use the explicit macro
 //!       alert_error!("This is another alert and log message");
-//!  
+//!
 //!       // Standard log macros write only to the normal log
 //!       error!("This is a normal error message");
 //!       warn!("This is a warning");
@@ -86,9 +86,9 @@
 //!       debug!("This is a debug message - you will not see it");
 //!       trace!("This is a trace message - you will not see it");
 //!   }
-//!  
+//!
 //!   ```
-//!  
+//!
 
 mod file_log_writer;
 mod log_writer;

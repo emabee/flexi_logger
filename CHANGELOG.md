@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.3] - 2019-08-04
+
+Allow defining custom handlers for the default log target.
+
+## [0.14.2] - 2019-08-04
+
+Use implicit locking of stderr in StdErrWriter.
+
+Allow failures in travis' windows build.
+
+Add license files.
+
 ## [0.14.1] - 2019-08-04
 
 Support recursive logging also with FileLogWriter, sharing the buffer with the PrimaryWriter.
