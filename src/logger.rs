@@ -57,7 +57,7 @@ pub struct Logger {
     format_for_file: FormatFunction,
     format_for_stderr: FormatFunction,
     flwb: FileLogWriterBuilder,
-    other_writers: HashMap<String, Box<LogWriter>>,
+    other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
 
 /// Describes the target to which `flexi_logger`'s standard log output stream writes to.

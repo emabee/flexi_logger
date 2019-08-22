@@ -79,8 +79,7 @@ impl StdErrWriter {
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        write_buffered(self.format, now, record, &mut std::io::stderr().lock());
-        Ok(())
+        write_buffered(self.format, now, record, &mut std::io::stderr())
     }
 
     #[inline]
@@ -100,8 +99,7 @@ impl StdOutWriter {
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        write_buffered(self.format, now, record, &mut std::io::stdout().lock());
-        Ok(())
+        write_buffered(self.format, now, record, &mut std::io::stdout())
     }
 
     #[inline]
@@ -159,7 +157,7 @@ impl ExtendedFileWriter {
             Duplicate::None => false,
         };
         if dupl {
-            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr());
+            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr())?;
         }
         self.file_log_writer.write(now, record)
     }
@@ -176,15 +174,22 @@ fn write_buffered(
     now: &mut DeferredNow,
     record: &Record,
     w: &mut dyn Write,
-) {
+) -> Result<(), std::io::Error> {
+    let mut result: Result<(), std::io::Error> = Ok(());
+
     buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
         Ok(mut buffer) => {
-            (format_function)(&mut *buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            (format_function)(&mut *buffer, now, record)
+                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
             buffer
                 .write_all(b"\n")
-                .unwrap_or_else(|e| write_err(ERR_2, e));
-            w.write_all(&*buffer)
-                .unwrap_or_else(|e| write_err(ERR_2, e));
+                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+
+            result = w.write_all(&*buffer).map_err(|e| {
+                write_err(ERR_WRITING, &e);
+                e
+            });
+
             buffer.clear();
         }
         Err(_e) => {
@@ -193,14 +198,19 @@ fn write_buffered(
             // we print the inner calls, in chronological order, before finally the
             // outer most message is printed
             let mut tmp_buf = Vec::<u8>::with_capacity(200);
-            (format_function)(&mut tmp_buf, now, record).unwrap_or_else(|e| write_err(ERR_1, e));
+            (format_function)(&mut tmp_buf, now, record)
+                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
             tmp_buf
                 .write_all(b"\n")
-                .unwrap_or_else(|e| write_err(ERR_2, e));
-            w.write_all(&tmp_buf)
-                .unwrap_or_else(|e| write_err(ERR_2, e));
+                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+
+            result = w.write_all(&tmp_buf).map_err(|e| {
+                write_err(ERR_WRITING, &e);
+                e
+            });
         }
     });
+    result
 }
 
 pub(crate) fn buffer_with<F>(f: F)
@@ -213,9 +223,9 @@ where
     BUFFER.with(f);
 }
 
-const ERR_1: &str = "formatting failed with ";
-const ERR_2: &str = "writing failed with ";
+const ERR_FORMATTING: &str = "formatting failed with ";
+const ERR_WRITING: &str = "writing failed with ";
 
-fn write_err(msg: &str, err: std::io::Error) {
+fn write_err(msg: &str, err: &std::io::Error) {
     eprintln!("[flexi_logger] {} with {}", msg, err);
 }
