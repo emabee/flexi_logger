@@ -9,22 +9,22 @@ fn test_recursion() {
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
 
-    let foo = Foo();
+    let dummy = Dummy();
 
     for _ in 0..10 {
-        error!("This is an error message for {}", foo);
-        warn!("This is a warning for {}", foo);
-        info!("This is an info message for {}", foo);
-        debug!("This is a debug message for {}", foo);
-        trace!("This is a trace message for {}", foo);
+        error!("This is an error message for {}", dummy);
+        warn!("This is a warning for {}", dummy);
+        info!("This is an info message for {}", dummy);
+        debug!("This is a debug message for {}", dummy);
+        trace!("This is a trace message for {}", dummy);
     }
 }
 
-struct Foo();
-impl std::fmt::Display for Foo {
+struct Dummy();
+impl std::fmt::Display for Dummy {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         info!("Here comes the inner message :-| ");
-        f.write_str("Foo!!")?;
+        f.write_str("Dummy!!")?;
         Ok(())
     }
 }

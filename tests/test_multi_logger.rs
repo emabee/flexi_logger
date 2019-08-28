@@ -46,14 +46,14 @@ fn test() {
     sec_alert_error!("This is a further security-relevant alert and log message");
 
     // Verification:
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     log_handle.validate_logs(&[
         ("ERROR", "multi_logger", "a security-relevant alert and log message"),
         ("ERROR", "multi_logger", "another security-relevant alert and log message"),
         ("WARN", "multi_logger", "warning"),
         ("INFO", "multi_logger", "info"),
     ]);
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     sec_handle.validate_logs(&[
         ("ERROR", "multi_logger", "security-relevant error"),
         ("ERROR", "multi_logger", "a security-relevant alert"),

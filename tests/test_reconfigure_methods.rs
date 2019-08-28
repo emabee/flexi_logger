@@ -37,6 +37,7 @@ fn test_parse_new_spec(log_handle: &mut ReconfigurationHandle) {
     log_handle.parse_new_spec("info");
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn test_push_new_spec(log_handle: &mut ReconfigurationHandle) {
     error!("2-error message");
     warn!("2-warning");
@@ -76,6 +77,7 @@ fn test_push_new_spec(log_handle: &mut ReconfigurationHandle) {
     log_handle.pop_temp_spec(); // should be a no-op
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn validate_logs(log_handle: &mut ReconfigurationHandle) {
     log_handle.validate_logs(&[
         ("ERROR", "test_reconfigure_methods", "1-error"),

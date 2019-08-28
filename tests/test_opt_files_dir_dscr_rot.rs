@@ -30,9 +30,9 @@ fn test_opt_files_dir_dscr_rot() {
 mod platform {
     #[cfg(target_os = "linux")]
     pub fn check_link(link_name: &str) {
-        match std::fs::metadata(link_name) {
-            Err(e) => eprintln!("error with symlink: {}", e),
-            Ok(_md) => {}
+        match std::fs::symlink_metadata(link_name) {
+            Err(e) => panic!("error with symlink: {}", e),
+            Ok(metadata) => assert!(metadata.file_type().is_symlink(), "not a symlink"),
         }
     }
 

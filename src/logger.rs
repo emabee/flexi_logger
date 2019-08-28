@@ -344,8 +344,20 @@ impl Logger {
     /// The specified path will be used on linux systems to create a symbolic link
     /// to the current log file.
     ///
-    /// This method has no effect on filesystems where symlinks are not supported.
-    /// This option only has an effect if `log_to_file()` is used, too.
+    /// This option has no effect on filesystems where symlinks are not supported,
+    /// and it only has an effect if `log_to_file()` is used, too.
+    ///
+    /// ### Example
+    ///
+    /// You can use the symbolic link to follow the log output with `tail`,
+    /// even if the log files are rotated.
+    ///
+    /// Assuming the link has the name `link_to_log_file`, then use:
+    ///
+    /// ```text
+    /// tail --follow=name --max-unchanged-stats=1 --retry link_to_log_file
+    /// ```
+    ///
     pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Logger {
         self.flwb = self.flwb.create_symlink(symlink);
         self

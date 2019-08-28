@@ -142,10 +142,7 @@ fn verify_logs(directory: &str) {
             if buffer.starts_with("XXXXX") {
                 line_count += 1;
             } else {
-                assert!(
-                    false,
-                    format!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer)
-                );
+                panic!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer);
             }
             buffer.clear();
         }

@@ -889,22 +889,26 @@ mod platform {
 
     #[cfg(target_os = "linux")]
     fn linux_create_symlink(link: &PathBuf, logfile: &Path) {
-        if std::fs::metadata(link).is_ok() {
-            // old symlink must be removed before creating a new one
-            let _ = std::fs::remove_file(link);
-        }
-
-        if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
-            if !e.to_string().contains("Operation not supported") {
+        if std::fs::symlink_metadata(link).is_ok() {
+            // remove old symlink before creating a new one
+            if let Err(e) = std::fs::remove_file(link) {
                 eprintln!(
-                    "[flexi_logger] cannot create symlink {:?} for logfile \"{}\": {:?}",
-                    link,
-                    &logfile.display(),
+                    "[flexi_logger] deleting old symlink to log file failed with {:?}",
                     e
                 );
             }
-            // no error output if e.g. writing from a linux VM to a
-            // windows host's filesystem...
+        }
+
+        // create new symlink
+        if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
+            // if !e.to_string().contains("Operation not supported") {}
+            // no error output if e.g. writing from a linux VM to a windows host's filesystem...
+            eprintln!(
+                "[flexi_logger] cannot create symlink {:?} for logfile \"{}\" due to {:?}",
+                link,
+                &logfile.display(),
+                e
+            );
         }
     }
 

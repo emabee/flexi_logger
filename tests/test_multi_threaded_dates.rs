@@ -23,6 +23,7 @@ fn multi_threaded() {
     let mut reconf_handle = Logger::with_str("debug")
         .log_to_file()
         .format(test_format)
+        .create_symlink("link_to_mt_log")
         .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())
         .rotate(
@@ -141,10 +142,7 @@ fn verify_logs(directory: &str) {
             if buffer.starts_with("XXXXX") {
                 line_count += 1;
             } else {
-                assert!(
-                    false,
-                    format!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer)
-                );
+                panic!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer);
             }
             buffer.clear();
         }

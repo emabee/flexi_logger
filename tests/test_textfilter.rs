@@ -40,12 +40,9 @@ fn test_textfilter() {
     let mut count = 0;
     while reader.read_line(&mut buffer).unwrap() > 0 {
         if buffer.find("Hello").is_none() {
-            assert!(
-                false,
-                format!(
-                    "line in log file without Hello {:?}: \"{}\"",
-                    filename, buffer
-                )
+            panic!(
+                "line in log file without Hello {:?}: \"{}\"",
+                filename, buffer
             );
         } else {
             count += 1;

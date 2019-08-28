@@ -5,6 +5,7 @@ Cargo.lock
 *.log
 *.seclog
 link_to_log
+link_to_mt_log
 log_files
 todo
 *logspec.toml
