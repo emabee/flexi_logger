@@ -6,7 +6,6 @@ mod d {
     };
     use glob::glob;
     use log::*;
-    use std::io;
     use std::ops::Add;
     use std::thread::{self, JoinHandle};
     use std::time;
@@ -106,10 +105,10 @@ mod d {
     }
 
     pub fn test_format(
-        w: &mut io::Write,
+        w: &mut dyn std::io::Write,
         now: &mut DeferredNow,
         record: &Record,
-    ) -> io::Result<()> {
+    ) -> std::io::Result<()> {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",

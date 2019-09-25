@@ -14,6 +14,7 @@ fn main() {
         "./*logspec.toml",
         "./log_files/**/*.log",
         "./log_files/**/*.zip",
+        "./test_spec/*.toml",
     ] {
         for globresult in glob::glob(pattern).unwrap() {
             match globresult {
@@ -38,4 +39,7 @@ fn main() {
     for pathbuf in dirs.iter().rev() {
         std::fs::remove_dir(&pathbuf).unwrap();
     }
+
+    std::fs::remove_dir("./log_files/").unwrap();
+    std::fs::remove_dir("./test_spec/").unwrap();
 }

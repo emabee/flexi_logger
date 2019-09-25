@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
 #[cfg(feature = "specfile")]
-use std::io::Write;
+use std::io::{Read, Write};
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -73,9 +73,20 @@ pub struct ModuleFilter {
 }
 
 impl LogSpecification {
-    pub(crate) fn update_from(&mut self, other_spec: LogSpecification) {
-        self.module_filters = other_spec.module_filters;
-        self.textfilter = other_spec.textfilter;
+    #[cfg(feature = "specfile")]
+    pub(crate) fn try_from_file<P: AsRef<std::path::Path>>(
+        specfile: P,
+    ) -> Result<LogSpecification, FlexiLoggerError> {
+        let mut buf = String::new();
+
+        let mut file = std::fs::File::open(specfile)?;
+        file.read_to_string(&mut buf)?;
+        LogSpecification::from_toml(&buf)
+    }
+
+    pub(crate) fn update_from(&mut self, other: LogSpecification) {
+        self.module_filters = other.module_filters;
+        self.textfilter = other.textfilter;
     }
 
     pub(crate) fn max_level(&self) -> log::LevelFilter {

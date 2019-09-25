@@ -14,7 +14,7 @@ mod a {
     /// less or more lines should be printed.
     #[test]
     fn test_specfile() {
-        let specfile = "tmp1/test_specfile_logspec.toml";
+        let specfile = "test_spec/test_specfile_logspec.toml";
 
         std::fs::remove_file(specfile).ok();
         assert!(!std::path::Path::new(specfile).exists());

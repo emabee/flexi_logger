@@ -901,8 +901,6 @@ mod platform {
 
         // create new symlink
         if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
-            // if !e.to_string().contains("Operation not supported") {}
-            // no error output if e.g. writing from a linux VM to a windows host's filesystem...
             eprintln!(
                 "[flexi_logger] cannot create symlink {:?} for logfile \"{}\" due to {:?}",
                 link,
