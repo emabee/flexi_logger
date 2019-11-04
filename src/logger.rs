@@ -486,8 +486,9 @@ impl Logger {
                     vec![Box::new(self.flwb.try_build()?)],
                 )
             }
-            LogTarget::Writer(w) => {
+            LogTarget::Writer(mut w) => {
                 self.flwb = self.flwb.format(self.format_for_file);
+                w.format(self.format_for_file);
                 PrimaryWriter::multi(self.duplicate, self.format_for_stderr, vec![w])
             }
             LogTarget::FileAndWriter(w) => {

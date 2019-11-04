@@ -1,4 +1,5 @@
 use crate::deferred_now::DeferredNow;
+use crate::FormatFunction;
 use log::Record;
 use std::io;
 
@@ -14,6 +15,14 @@ pub trait LogWriter: Sync + Send {
 
     /// Provides the maximum log level that is to be written.
     fn max_log_level(&self) -> log::LevelFilter;
+
+    /// Sets the format function. Defaults to ([formats::default_format](fn.default_format.html)),
+    /// but can be changed with a call to [`Logger::format()`](struct.Logger.html#method.format).
+    ///
+    /// The default implementation is a no-op.
+    fn format(&mut self, format: FormatFunction) {
+        let _ = format;
+    }
 
     /// Takes a vec with three patterns per line that represent the log out,
     /// compares the written log with the expected lines,
