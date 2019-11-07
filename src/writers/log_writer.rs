@@ -5,7 +5,8 @@ use std::io;
 
 /// Writes to a single log output stream.
 ///
-/// Boxed instances of `LogWriter` can be used as additional log targets.
+/// Boxed instances of `LogWriter` can be used as additional log targets
+/// (see [module description](index.html) for more details).
 pub trait LogWriter: Sync + Send {
     /// Writes out a log line.
     fn write(&self, now: &mut DeferredNow, record: &Record) -> io::Result<()>;
@@ -17,7 +18,8 @@ pub trait LogWriter: Sync + Send {
     fn max_log_level(&self) -> log::LevelFilter;
 
     /// Sets the format function. Defaults to ([formats::default_format](fn.default_format.html)),
-    /// but can be changed with a call to [`Logger::format()`](struct.Logger.html#method.format).
+    /// but can be changed with a call to
+    /// [`Logger::format_for_writer()`](struct.Logger.html#method.format_for_writer).
     ///
     /// The default implementation is a no-op.
     fn format(&mut self, format: FormatFunction) {

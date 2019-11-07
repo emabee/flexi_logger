@@ -839,5 +839,4 @@ mod test_with_specfile {
             );
         }
     }
-
 }

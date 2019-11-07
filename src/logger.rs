@@ -50,6 +50,7 @@ pub struct Logger {
     duplicate: Duplicate,
     format_for_file: FormatFunction,
     format_for_stderr: FormatFunction,
+    format_for_writer: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
@@ -127,6 +128,7 @@ impl Logger {
             duplicate: Duplicate::None,
             format_for_file: default_format,
             format_for_stderr: default_format,
+            format_for_writer: default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
@@ -217,7 +219,7 @@ impl Logger {
     }
 
     /// Makes the logger use the provided format function for all messages
-    /// that are written to files or to stderr.
+    /// that are written to files or to stderr or to an additional writer.
     ///
     /// You can either choose one of the provided log-line formatters,
     /// or you create and use your own format function with the signature <br>
@@ -232,10 +234,12 @@ impl Logger {
     pub fn format(mut self, format: FormatFunction) -> Logger {
         self.format_for_file = format;
         self.format_for_stderr = format;
+        self.format_for_writer = format;
         self
     }
 
-    /// Makes the logger use the provided format function for messages that are written to files.
+    /// Makes the logger use the provided format function for messages
+    /// that are written to files.
     ///
     /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
     pub fn format_for_files(mut self, format: FormatFunction) -> Logger {
@@ -249,6 +253,16 @@ impl Logger {
     /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Logger {
         self.format_for_stderr = format;
+        self
+    }
+
+    /// Allows specifying a format function for an additional writer.
+    /// Note that it is up to the implementation of the additional writer
+    /// whether it evaluates this setting or not.
+    ///
+    /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
+    pub fn format_for_writer(mut self, format: FormatFunction) -> Logger {
+        self.format_for_writer = format;
         self
     }
 
@@ -487,12 +501,12 @@ impl Logger {
                 )
             }
             LogTarget::Writer(mut w) => {
-                self.flwb = self.flwb.format(self.format_for_file);
-                w.format(self.format_for_file);
+                w.format(self.format_for_writer);
                 PrimaryWriter::multi(self.duplicate, self.format_for_stderr, vec![w])
             }
-            LogTarget::FileAndWriter(w) => {
+            LogTarget::FileAndWriter(mut w) => {
                 self.flwb = self.flwb.format(self.format_for_file);
+                w.format(self.format_for_writer);
                 PrimaryWriter::multi(
                     self.duplicate,
                     self.format_for_stderr,
