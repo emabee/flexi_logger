@@ -4,10 +4,11 @@ use chrono::{DateTime, Local};
 ///
 /// Is used to ensure that a log record that is sent to multiple outputs
 /// (in maybe different formats) always uses the same timestamp.
+#[derive(Debug)]
 pub struct DeferredNow(Option<DateTime<Local>>);
 impl<'a> DeferredNow {
-    pub(crate) fn new() -> DeferredNow {
-        DeferredNow(None)
+    pub(crate) fn new() -> Self {
+        Self(None)
     }
 
     /// Retrieve the timestamp.

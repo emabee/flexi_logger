@@ -50,8 +50,8 @@ struct FileLogWriterConfig {
 }
 impl FileLogWriterConfig {
     // Factory method; uses the same defaults as Logger.
-    pub fn default() -> FileLogWriterConfig {
-        FileLogWriterConfig {
+    pub fn default() -> Self {
+        Self {
             format: default_format,
             print_message: false,
             filename_config: FilenameConfig {
@@ -68,6 +68,7 @@ impl FileLogWriterConfig {
 }
 
 /// Builder for `FileLogWriter`.
+#[allow(clippy::module_name_repetitions)]
 pub struct FileLogWriterBuilder {
     discriminant: Option<String>,
     config: FileLogWriterConfig,
@@ -79,14 +80,15 @@ pub struct FileLogWriterBuilder {
 impl FileLogWriterBuilder {
     /// Makes the `FileLogWriter` print an info message to stdout
     /// when a new file is used for log-output.
-    pub fn print_message(mut self) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn print_message(mut self) -> Self {
         self.config.print_message = true;
         self
     }
 
     /// Makes the `FileLogWriter` use the provided format function for the log entries,
-    /// rather than the default ([formats::default_format](fn.default_format.html)).
-    pub fn format(mut self, format: FormatFunction) -> FileLogWriterBuilder {
+    /// rather than the default ([`formats::default_format`](fn.default_format.html)).
+    pub fn format(mut self, format: FormatFunction) -> Self {
         self.config.format = format;
         self
     }
@@ -95,19 +97,20 @@ impl FileLogWriterBuilder {
     ///
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<P: Into<PathBuf>>(mut self, directory: P) -> FileLogWriterBuilder {
+    pub fn directory<P: Into<PathBuf>>(mut self, directory: P) -> Self {
         self.config.filename_config.directory = directory.into();
         self
     }
 
     /// Specifies a suffix for the log files. The default is "log".
-    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> FileLogWriterBuilder {
+    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Self {
         self.config.filename_config.suffix = suffix.into();
         self
     }
 
     /// Makes the logger not include a timestamp into the names of the log files
-    pub fn suppress_timestamp(mut self) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn suppress_timestamp(mut self) -> Self {
         self.config.filename_config.use_timestamp = false;
         self
     }
@@ -140,12 +143,8 @@ impl FileLogWriterBuilder {
     ///
     /// The cleanup parameter allows defining the strategy for dealing with older files.
     /// See [Cleanup](enum.Cleanup.html) for details.
-    pub fn rotate(
-        mut self,
-        criterion: Criterion,
-        naming: Naming,
-        cleanup: Cleanup,
-    ) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.o_rotation_config = Some(RotationConfig {
             criterion,
             naming,
@@ -157,31 +156,33 @@ impl FileLogWriterBuilder {
 
     /// Makes the logger append to the given file, if it exists; by default, the file would be
     /// truncated.
-    pub fn append(mut self) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn append(mut self) -> Self {
         self.config.append = true;
         self
     }
 
     /// The specified String is added to the log file name.
-    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> FileLogWriterBuilder {
+    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Self {
         self.discriminant = Some(discriminant.into());
         self
     }
 
     /// The specified String will be used on linux systems to create in the current folder
     /// a symbolic link to the current log file.
-    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> FileLogWriterBuilder {
+    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Self {
         self.config.o_create_symlink = Some(symlink.into());
         self
     }
 
     /// Use Windows line endings, rather than just `\n`.
-    pub fn use_windows_line_ending(mut self) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn use_windows_line_ending(mut self) -> Self {
         self.config.use_windows_line_ending = true;
         self
     }
 
-    /// Produces the FileLogWriter.
+    /// Produces the `FileLogWriter`.
     pub fn try_build(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
         // make sure the folder exists or create it
         let p_directory = Path::new(&self.config.filename_config.directory);
@@ -217,9 +218,10 @@ impl FileLogWriterBuilder {
 /// Use these methods when you want to control the settings flexibly,
 /// e.g. with commandline arguments via `docopts` or `clap`.
 impl FileLogWriterBuilder {
-    /// With true, makes the FileLogWriterBuilder print an info message to stdout, each time
+    /// With true, makes the `FileLogWriterBuilder` print an info message to stdout, each time
     /// when a new file is used for log-output.
-    pub fn o_print_message(mut self, print_message: bool) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn o_print_message(mut self, print_message: bool) -> Self {
         self.config.print_message = print_message;
         self
     }
@@ -228,21 +230,22 @@ impl FileLogWriterBuilder {
     ///
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> FileLogWriterBuilder {
-        self.config.filename_config.directory = directory
-            .map(Into::into)
-            .unwrap_or_else(|| PathBuf::from("."));
+    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Self {
+        self.config.filename_config.directory =
+            directory.map_or_else(|| PathBuf::from("."), Into::into);
         self
     }
 
-    /// With true, makes the FileLogWriterBuilder include a timestamp into the names of the log files.
-    pub fn o_timestamp(mut self, use_timestamp: bool) -> FileLogWriterBuilder {
+    /// With true, makes the `FileLogWriterBuilder` include a timestamp into the names of the
+    /// log files.
+    #[must_use]
+    pub fn o_timestamp(mut self, use_timestamp: bool) -> Self {
         self.config.filename_config.use_timestamp = use_timestamp;
         self
     }
 
     /// By default, and with None, the log file will grow indefinitely.
-    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
+    /// If a `rotate_config` is set, when the log file reaches or exceeds the specified size,
     /// the file will be closed and a new file will be opened.
     /// Also the filename pattern changes: instead of the timestamp, a serial number
     /// is included into the filename.
@@ -251,49 +254,39 @@ impl FileLogWriterBuilder {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate(
-        mut self,
-        rotate_config: Option<(Criterion, Naming, Cleanup)>,
-    ) -> FileLogWriterBuilder {
-        match rotate_config {
-            Some((criterion, naming, cleanup)) => {
-                self.o_rotation_config = Some(RotationConfig {
-                    criterion,
-                    naming,
-                    cleanup,
-                });
-                self.config.filename_config.use_timestamp = false;
-            }
-            None => {
-                self.o_rotation_config = None;
-                self.config.filename_config.use_timestamp = true;
-            }
+    #[must_use]
+    pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Self {
+        if let Some((criterion, naming, cleanup)) = rotate_config {
+            self.o_rotation_config = Some(RotationConfig {
+                criterion,
+                naming,
+                cleanup,
+            });
+            self.config.filename_config.use_timestamp = false;
+        } else {
+            self.o_rotation_config = None;
+            self.config.filename_config.use_timestamp = true;
         }
         self
     }
 
     /// If append is set to true, makes the logger append to the given file, if it exists.
     /// By default, or with false, the file would be truncated.
-    pub fn o_append(mut self, append: bool) -> FileLogWriterBuilder {
+    #[must_use]
+    pub fn o_append(mut self, append: bool) -> Self {
         self.config.append = append;
         self
     }
 
     /// The specified String is added to the log file name.
-    pub fn o_discriminant<S: Into<String>>(
-        mut self,
-        discriminant: Option<S>,
-    ) -> FileLogWriterBuilder {
+    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Self {
         self.discriminant = discriminant.map(Into::into);
         self
     }
 
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
-    pub fn o_create_symlink<S: Into<PathBuf>>(
-        mut self,
-        symlink: Option<S>,
-    ) -> FileLogWriterBuilder {
+    pub fn o_create_symlink<S: Into<PathBuf>>(mut self, symlink: Option<S>) -> Self {
         self.config.o_create_symlink = symlink.map(Into::into);
         self
     }
@@ -367,7 +360,7 @@ impl FileLogWriterState {
     fn try_new(
         config: &FileLogWriterConfig,
         o_rotation_config: &Option<RotationConfig>,
-    ) -> Result<FileLogWriterState, FlexiLoggerError> {
+    ) -> Result<Self, FlexiLoggerError> {
         let (log_file, o_rotation_state) = match o_rotation_config {
             None => {
                 let (log_file, _created_at, _p_path) = open_log_file(config, false)?;
@@ -424,7 +417,7 @@ impl FileLogWriterState {
             }
         };
 
-        Ok(FileLogWriterState {
+        Ok(Self {
             o_log_file: Some(log_file),
             o_rotation_state,
             line_ending: if config.use_windows_line_ending {
@@ -463,10 +456,7 @@ impl FileLogWriterState {
                 {
                     *current_size = 0;
                 }
-
-                let cleanup_config: &Cleanup = &rotation_state.cleanup;
-                let filename_config: &FilenameConfig = &config.filename_config;
-                remove_or_zip_too_old_logfiles(cleanup_config, filename_config)?;
+                remove_or_zip_too_old_logfiles(&rotation_state.cleanup, &config.filename_config)?;
             }
         }
 
@@ -490,7 +480,7 @@ impl FileLogWriterState {
 
 fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
     let mut s_filename = String::with_capacity(
-        config.file_basename.len() + o_infix.map(str::len).unwrap_or(0) + 1 + config.suffix.len(),
+        config.file_basename.len() + o_infix.map_or(0, str::len) + 1 + config.suffix.len(),
     ) + &config.file_basename;
     if let Some(infix) = o_infix {
         s_filename += infix;
@@ -570,7 +560,7 @@ fn list_of_log_and_zip_files(
     let mut log_pattern = filename_config.directory.clone();
     log_pattern.push(fn_pattern.clone().add(&filename_config.suffix));
     let mut zip_pattern = filename_config.directory.clone();
-    zip_pattern.push(fn_pattern.clone().add("zip"));
+    zip_pattern.push(fn_pattern.add("zip"));
     Ok(glob::glob(&log_pattern.as_os_str().to_string_lossy())?
         .chain(glob::glob(&zip_pattern.as_os_str().to_string_lossy())?))
 }
@@ -738,6 +728,7 @@ pub struct FileLogWriter {
 }
 impl FileLogWriter {
     /// Instantiates a builder for `FileLogWriter`.
+    #[must_use]
     pub fn builder() -> FileLogWriterBuilder {
         FileLogWriterBuilder {
             discriminant: None,
@@ -767,8 +758,7 @@ impl FileLogWriter {
         } else {
             None
         };
-        let p_path = get_filepath(o_infix, &self.config.filename_config);
-        p_path.clone()
+        get_filepath(o_infix, &self.config.filename_config)
     }
 }
 
@@ -778,14 +768,14 @@ impl LogWriter for FileLogWriter {
         buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
             Ok(mut buffer) => {
                 (self.config.format)(&mut *buffer, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, e));
+                    .unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
                 let state = state_guard.deref_mut();
 
                 buffer
                     .write_all(state.line_ending)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
+                    .unwrap_or_else(|e| write_err(ERR_2, &e));
 
                 // rotate if necessary
                 state
@@ -796,7 +786,7 @@ impl LogWriter for FileLogWriter {
 
                 state
                     .write_buffer(&*buffer)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
+                    .unwrap_or_else(|e| write_err(ERR_2, &e));
                 buffer.clear();
             }
             Err(_e) => {
@@ -806,18 +796,18 @@ impl LogWriter for FileLogWriter {
                 // outer most message is printed
                 let mut tmp_buf = Vec::<u8>::with_capacity(200);
                 (self.config.format)(&mut tmp_buf, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, e));
+                    .unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
                 let state = state_guard.deref_mut();
 
                 tmp_buf
                     .write_all(state.line_ending)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
+                    .unwrap_or_else(|e| write_err(ERR_2, &e));
 
                 state
                     .write_buffer(&tmp_buf)
-                    .unwrap_or_else(|e| write_err(ERR_2, e));
+                    .unwrap_or_else(|e| write_err(ERR_2, &e));
             }
         });
 
@@ -876,7 +866,7 @@ impl LogWriter for FileLogWriter {
 const ERR_1: &str = "FileLogWriter: formatting failed with ";
 const ERR_2: &str = "FileLogWriter: writing failed with ";
 
-fn write_err(msg: &str, err: std::io::Error) {
+fn write_err(msg: &str, err: &std::io::Error) {
     eprintln!("[flexi_logger] {} with {}", msg, err);
 }
 

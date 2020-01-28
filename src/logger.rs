@@ -92,36 +92,40 @@ pub enum LogTarget {
 /// Create a Logger instance and define how to access the (initial)
 /// loglevel-specification.
 impl Logger {
-    /// Creates a Logger that you provide with an explicit LogSpecification.
+    /// Creates a Logger that you provide with an explicit `LogSpecification`.
     /// By default, logs are written with `default_format` to `stderr`.
-    pub fn with(logspec: LogSpecification) -> Logger {
-        Logger::from_spec_and_errs(logspec, None)
+    #[must_use]
+    pub fn with(logspec: LogSpecification) -> Self {
+        Self::from_spec_and_errs(logspec, None)
     }
 
-    /// Creates a Logger that reads the LogSpecification from a String or &str.
-    /// [See LogSpecification](struct.LogSpecification.html) for the syntax.
-    pub fn with_str<S: AsRef<str>>(s: S) -> Logger {
-        Logger::from_result(LogSpecification::parse(s.as_ref()))
+    /// Creates a Logger that reads the `LogSpecification` from a String or &str.
+    /// [See `LogSpecification`](struct.LogSpecification.html) for the syntax.
+    #[must_use]
+    pub fn with_str<S: AsRef<str>>(s: S) -> Self {
+        Self::from_result(LogSpecification::parse(s.as_ref()))
     }
 
-    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG.
-    pub fn with_env() -> Logger {
-        Logger::from_result(LogSpecification::env())
+    /// Creates a Logger that reads the `LogSpecification` from the environment variable `RUST_LOG`.
+    #[must_use]
+    pub fn with_env() -> Self {
+        Self::from_result(LogSpecification::env())
     }
 
-    /// Creates a Logger that reads the LogSpecification from the environment variable RUST_LOG,
-    /// or derives it from the given String, if RUST_LOG is not set.
-    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Logger {
-        Logger::from_result(LogSpecification::env_or_parse(s))
+    /// Creates a Logger that reads the `LogSpecification` from the environment variable `RUST_LOG`,
+    /// or derives it from the given String, if `RUST_LOG` is not set.
+    #[must_use]
+    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Self {
+        Self::from_result(LogSpecification::env_or_parse(s))
     }
 
-    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<Vec<String>>) -> Logger {
+    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<Vec<String>>) -> Self {
         #[cfg(feature = "colors")]
         let default_format = formats::colored_default_format;
         #[cfg(not(feature = "colors"))]
         let default_format = formats::default_format;
 
-        Logger {
+        Self {
             spec,
             parse_errs,
             log_target: LogTarget::StdErr,
@@ -134,14 +138,14 @@ impl Logger {
         }
     }
 
-    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Logger {
+    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Self {
         match result {
-            Ok(logspec) => Logger::from_spec_and_errs(logspec, None),
+            Ok(logspec) => Self::from_spec_and_errs(logspec, None),
             Err(e) => match e {
                 FlexiLoggerError::Parse(parse_errs, logspec) => {
-                    Logger::from_spec_and_errs(logspec, Some(parse_errs))
+                    Self::from_spec_and_errs(logspec, Some(parse_errs))
                 }
-                _ => Logger::from_spec_and_errs(LogSpecification::off(), None),
+                _ => Self::from_spec_and_errs(LogSpecification::off(), None),
             },
         }
     }
@@ -170,7 +174,7 @@ impl Logger {
     /// .log_target(LogTarget::File)
     /// .start();
     /// ```
-    pub fn check_parser_error(self) -> Result<Logger, FlexiLoggerError> {
+    pub fn check_parser_error(self) -> Result<Self, FlexiLoggerError> {
         match self.parse_errs {
             Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
             None => Ok(self),
@@ -180,7 +184,7 @@ impl Logger {
     /// Is equivalent to
     /// [`log_target`](struct.Logger.html#method.log_target)`(`[`LogTarget::File`](
     /// enum.LogTarget.html#variant.File)`)`.
-    pub fn log_to_file(mut self) -> Logger {
+    pub fn log_to_file(mut self) -> Self {
         self.log_target = LogTarget::File;
         self
     }
@@ -188,7 +192,7 @@ impl Logger {
     /// Write the main log output to the specified target.
     ///
     /// By default, i.e. if this method is not called, the standard output goes to `stderr`.
-    pub fn log_target(mut self, log_target: LogTarget) -> Logger {
+    pub fn log_target(mut self, log_target: LogTarget) -> Self {
         self.log_target = log_target;
         self
     }
@@ -200,20 +204,20 @@ impl Logger {
     /// within normally unused log calls (like `std::fmt::Display` implementations),
     /// will not cause undesired side-effects when activated (note that the log macros prevent
     /// arguments of inactive log-calls from being evaluated).
-    pub fn do_not_log(mut self) -> Logger {
+    pub fn do_not_log(mut self) -> Self {
         self.log_target = LogTarget::DevNull;
         self
     }
 
     /// Makes the logger print an info message to stdout with the name of the logfile
     /// when a logfile is opened for writing.
-    pub fn print_message(mut self) -> Logger {
+    pub fn print_message(mut self) -> Self {
         self.flwb = self.flwb.print_message();
         self
     }
 
     /// Makes the logger write messages with the specified minimum severity additionally to stderr.
-    pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Logger {
+    pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Self {
         self.duplicate = dup;
         self
     }
@@ -231,7 +235,7 @@ impl Logger {
     ///
     /// If the feature `colors` is switched off,
     /// `default_format()` is used for all outputs.
-    pub fn format(mut self, format: FormatFunction) -> Logger {
+    pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self.format_for_stderr = format;
         self.format_for_writer = format;
@@ -241,8 +245,8 @@ impl Logger {
     /// Makes the logger use the provided format function for messages
     /// that are written to files.
     ///
-    /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
-    pub fn format_for_files(mut self, format: FormatFunction) -> Logger {
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    pub fn format_for_files(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self
     }
@@ -250,8 +254,8 @@ impl Logger {
     /// Makes the logger use the provided format function for messages
     /// that are written to stderr or to stdout.
     ///
-    /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
-    pub fn format_for_stderr(mut self, format: FormatFunction) -> Logger {
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
         self.format_for_stderr = format;
         self
     }
@@ -260,8 +264,8 @@ impl Logger {
     /// Note that it is up to the implementation of the additional writer
     /// whether it evaluates this setting or not.
     ///
-    /// Regarding the default, see [Logger::format()](struct.Logger.html#method.format).
-    pub fn format_for_writer(mut self, format: FormatFunction) -> Logger {
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    pub fn format_for_writer(mut self, format: FormatFunction) -> Self {
         self.format_for_writer = format;
         self
     }
@@ -271,7 +275,7 @@ impl Logger {
     /// This parameter only has an effect if `log_to_file()` is used, too.
     /// If the specified folder does not exist, the initialization will fail.
     /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Logger {
+    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Self {
         self.flwb = self.flwb.directory(directory);
         self
     }
@@ -279,7 +283,7 @@ impl Logger {
     /// Specifies a suffix for the log files.
     ///
     /// This parameter only has an effect if `log_to_file()` is used, too.
-    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Logger {
+    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Self {
         self.flwb = self.flwb.suffix(suffix);
         self
     }
@@ -287,7 +291,7 @@ impl Logger {
     /// Makes the logger not include a timestamp into the names of the log files.
     ///
     /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn suppress_timestamp(mut self) -> Logger {
+    pub fn suppress_timestamp(mut self) -> Self {
         self.flwb = self.flwb.suppress_timestamp();
         self
     }
@@ -326,7 +330,7 @@ impl Logger {
     ///     
     /// `cleanup` defines the strategy for dealing with older files.
     /// See [Cleanup](enum.Cleanup.html) for details.
-    pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Logger {
+    pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.flwb = self.flwb.rotate(criterion, naming, cleanup);
         self
     }
@@ -336,7 +340,7 @@ impl Logger {
     ///
     /// This option only has an effect if `log_to_file()` is used, too.
     /// This option will hardly make an effect if `suppress_timestamp()` is not used.
-    pub fn append(mut self) -> Logger {
+    pub fn append(mut self) -> Self {
         self.flwb = self.flwb.append();
         self
     }
@@ -344,7 +348,7 @@ impl Logger {
     /// The specified String is added to the log file name after the program name.
     ///
     /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Logger {
+    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Self {
         self.flwb = self.flwb.discriminant(discriminant);
         self
     }
@@ -366,12 +370,12 @@ impl Logger {
     /// tail --follow=name --max-unchanged-stats=1 --retry link_to_log_file
     /// ```
     ///
-    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Logger {
+    pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Self {
         self.flwb = self.flwb.create_symlink(symlink);
         self
     }
 
-    /// Registers a LogWriter implementation under the given target name.
+    /// Registers a `LogWriter` implementation under the given target name.
     ///
     /// The target name must not start with an underscore.
     ///
@@ -380,13 +384,13 @@ impl Logger {
         mut self,
         target_name: S,
         writer: Box<dyn LogWriter>,
-    ) -> Logger {
+    ) -> Self {
         self.other_writers.insert(target_name.into(), writer);
         self
     }
 
     /// Use Windows line endings, rather than just `\n`.
-    pub fn use_windows_line_ending(mut self) -> Logger {
+    pub fn use_windows_line_ending(mut self) -> Self {
         self.flwb = self.flwb.use_windows_line_ending();
         self
     }
@@ -398,7 +402,7 @@ impl Logger {
 impl Logger {
     /// With true, makes the logger write all logs to a file, otherwise to stderr.
     #[deprecated(since = "0.13.3", note = "please use `log_target` instead")]
-    pub fn o_log_to_file(mut self, log_to_file: bool) -> Logger {
+    pub fn o_log_to_file(mut self, log_to_file: bool) -> Self {
         if log_to_file {
             self.log_target = LogTarget::File;
         } else {
@@ -409,7 +413,7 @@ impl Logger {
 
     /// With true, makes the logger print an info message to stdout, each time
     /// when a new file is used for log-output.
-    pub fn o_print_message(mut self, print_message: bool) -> Logger {
+    pub fn o_print_message(mut self, print_message: bool) -> Self {
         self.flwb = self.flwb.o_print_message(print_message);
         self
     }
@@ -419,13 +423,13 @@ impl Logger {
     /// This parameter only has an effect if `log_to_file` is set to true.
     /// If the specified folder does not exist, the initialization will fail.
     /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Logger {
+    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Self {
         self.flwb = self.flwb.o_directory(directory);
         self
     }
 
     /// By default, and with None, the log file will grow indefinitely.
-    /// If a rotate_config is set, when the log file reaches or exceeds the specified size,
+    /// If a `rotate_config` is set, when the log file reaches or exceeds the specified size,
     /// the file will be closed and a new file will be opened.
     /// Also the filename pattern changes: instead of the timestamp, a serial number
     /// is included into the filename.
@@ -434,7 +438,7 @@ impl Logger {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
-    pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Logger {
+    pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Self {
         self.flwb = self.flwb.o_rotate(rotate_config);
         self
     }
@@ -444,7 +448,7 @@ impl Logger {
     /// With this method you can set it to `true` again.
     ///
     /// This parameter only has an effect if `log_to_file` is set to true.
-    pub fn o_timestamp(mut self, timestamp: bool) -> Logger {
+    pub fn o_timestamp(mut self, timestamp: bool) -> Self {
         self.flwb = self.flwb.o_timestamp(timestamp);
         self
     }
@@ -456,7 +460,7 @@ impl Logger {
     ///
     /// This option will hardly make an effect if `suppress_timestamp()` is not used.
 
-    pub fn o_append(mut self, append: bool) -> Logger {
+    pub fn o_append(mut self, append: bool) -> Self {
         self.flwb = self.flwb.o_append(append);
         self
     }
@@ -464,7 +468,7 @@ impl Logger {
     /// This option only has an effect if `log_to_file` is set to true.
     ///
     /// The specified String is added to the log file name.
-    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Logger {
+    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Self {
         self.flwb = self.flwb.o_discriminant(discriminant);
         self
     }
@@ -473,7 +477,7 @@ impl Logger {
     ///
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
-    pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Logger {
+    pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Self {
         self.flwb = self.flwb.o_create_symlink(symlink);
         self
     }
@@ -485,7 +489,7 @@ impl Logger {
     ///
     /// The returned reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [ReconfigurationHandle](struct.ReconfigurationHandle.html) for an example.
+    /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
     pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
@@ -605,7 +609,7 @@ impl Logger {
 
         // in a separate thread, reread the specfile when it was updated
         std::thread::Builder::new().spawn(move || {
-            let _watcher = watcher; // keep it alive!
+            let _anchor_for_watcher = watcher; // keep it alive!
             loop {
                 match rx.recv() {
                     Ok(debounced_event) => match debounced_event {
@@ -637,7 +641,7 @@ impl Logger {
 
 /// Criterion when to rotate the log file.
 ///
-/// Used in [Logger::rotate()](struct.Logger.html#method.rotate).
+/// Used in [`Logger::rotate`](struct.Logger.html#method.rotate).
 pub enum Criterion {
     /// Rotate the log file when it exceeds the specified size in bytes.
     Size(u64),
@@ -706,21 +710,16 @@ pub enum Age {
 
 /// The naming convention for rotated log files.
 ///
-/// With file rotation, the logs are written to a file with infix "_rCURRENT".
+/// With file rotation, the logs are written to a file with infix `_rCURRENT`.
 /// When rotation happens, the CURRENT log file will be renamed to a file with
 /// another infix of the form `"_r..."`. `Naming` defines which other infix will be used.
 ///
-/// Used in [Logger::rotate()](struct.Logger.html#method.rotate).
+/// Used in [`Logger::rotate`](struct.Logger.html#method.rotate).
 #[derive(Copy, Clone)]
 pub enum Naming {
-    /// The output files are opened with an infix with the current timestamp.
-    ///
-    /// File rotation rotates to files with a timestamp in their name.
+    /// File rotation rotates to files with a timestamp-infix, like `"r2020-01-27_14-41-08"`.
     Timestamps,
-    /// The output file always uses _rCURRENT as infix.
-    ///
-    /// File rotation closes the file, renames it
-    /// to a file with a number-infix, and opens a new file with the rCURRENT infix.
+    /// File rotation rotates to files with a number-infix.
     Numbers,
 }
 
@@ -750,7 +749,8 @@ pub enum Cleanup {
     KeepLogAndZipFiles(usize, usize),
 }
 
-/// Used to control which messages are to be duplicated to stderr, when log_to_file() is used.
+/// Used to control which messages are to be duplicated to stderr, when `log_to_file()` is used.
+#[derive(Debug)]
 pub enum Duplicate {
     /// No messages are duplicated.
     None,

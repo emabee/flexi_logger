@@ -76,15 +76,15 @@ impl LogSpecification {
     #[cfg(feature = "specfile")]
     pub(crate) fn try_from_file<P: AsRef<std::path::Path>>(
         specfile: P,
-    ) -> Result<LogSpecification, FlexiLoggerError> {
+    ) -> Result<Self, FlexiLoggerError> {
         let mut buf = String::new();
 
         let mut file = std::fs::File::open(specfile)?;
         file.read_to_string(&mut buf)?;
-        LogSpecification::from_toml(&buf)
+        Self::from_toml(&buf)
     }
 
-    pub(crate) fn update_from(&mut self, other: LogSpecification) {
+    pub(crate) fn update_from(&mut self, other: Self) {
         self.module_filters = other.module_filters;
         self.textfilter = other.textfilter;
     }
@@ -114,12 +114,14 @@ impl LogSpecification {
     }
 
     /// Returns a `LogSpecification` where all traces are switched off.
-    pub fn off() -> LogSpecification {
+    #[must_use]
+    pub fn off() -> Self {
+        #[allow(clippy::default_trait_access)]
         Default::default()
     }
 
     /// Returns a log specification from a String.
-    pub fn parse(spec: &str) -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn parse(spec: &str) -> Result<Self, FlexiLoggerError> {
         let mut parse_errs = Vec::<String>::new();
         let mut dirs = Vec::<ModuleFilter>::new();
 
@@ -131,7 +133,7 @@ impl LogSpecification {
                 format!("invalid log spec '{}' (too many '/'s), ignoring it", spec),
                 &mut parse_errs,
             );
-            return parse_err(parse_errs, LogSpecification::off());
+            return parse_err(parse_errs, Self::off());
         }
         if let Some(m) = mods {
             for s in m.split(',') {
@@ -145,31 +147,31 @@ impl LogSpecification {
                     parts.next().map(str::trim),
                     parts.next(),
                 ) {
-                    (Some(part0), None, None) => {
-                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
+                    (Some(part_0), None, None) => {
+                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
                         // if the single argument is a log-level string or number,
                         // treat that as a global fallback setting
-                        match parse_level_filter(part0.trim()) {
+                        match parse_level_filter(part_0.trim()) {
                             Ok(num) => (num, None),
-                            Err(_) => (LevelFilter::max(), Some(part0)),
+                            Err(_) => (LevelFilter::max(), Some(part_0)),
                         }
                     }
 
-                    (Some(part0), Some(""), None) => {
-                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
+                    (Some(part_0), Some(""), None) => {
+                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
-                        (LevelFilter::max(), Some(part0))
+                        (LevelFilter::max(), Some(part_0))
                     }
 
-                    (Some(part0), Some(part1), None) => {
-                        if contains_dash_or_whitespace(part0, &mut parse_errs) {
+                    (Some(part_0), Some(part_1), None) => {
+                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
-                        match parse_level_filter(part1.trim()) {
-                            Ok(num) => (num, Some(part0.trim())),
+                        match parse_level_filter(part_1.trim()) {
+                            Ok(num) => (num, Some(part_0.trim())),
                             Err(e) => {
                                 push_err(e.to_string(), &mut parse_errs);
                                 continue;
@@ -199,7 +201,7 @@ impl LogSpecification {
             }
         });
 
-        let logspec = LogSpecification {
+        let logspec = Self {
             module_filters: dirs.level_sort(),
             textfilter,
         };
@@ -211,23 +213,21 @@ impl LogSpecification {
         }
     }
 
-    /// Returns a log specification based on the value of the environment variable RUST_LOG,
+    /// Returns a log specification based on the value of the environment variable `RUST_LOG`,
     /// or an empty one.
-    pub fn env() -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn env() -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
-            Ok(spec) => LogSpecification::parse(&spec),
-            Err(..) => Ok(LogSpecification::off()),
+            Ok(spec) => Self::parse(&spec),
+            Err(..) => Ok(Self::off()),
         }
     }
 
-    /// Returns a log specification based on the value of the environment variable RUST_LOG,
+    /// Returns a log specification based on the value of the environment variable `RUST_LOG`,
     /// or on the given String.
-    pub fn env_or_parse<S: AsRef<str>>(
-        given_spec: S,
-    ) -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
-            Ok(spec) => LogSpecification::parse(&spec),
-            Err(..) => LogSpecification::parse(given_spec.as_ref()),
+            Ok(spec) => Self::parse(&spec),
+            Err(..) => Self::parse(given_spec.as_ref()),
         }
     }
 
@@ -235,7 +235,7 @@ impl LogSpecification {
     ///
     /// This method is only avaible with feature `specfile`.
     #[cfg(feature = "specfile")]
-    pub fn from_toml(s: &str) -> Result<LogSpecification, FlexiLoggerError> {
+    pub fn from_toml(s: &str) -> Result<Self, FlexiLoggerError> {
         #[derive(Clone, Debug, Deserialize)]
         struct LogSpecFileFormat {
             pub global_level: Option<String>,
@@ -272,7 +272,7 @@ impl LogSpecification {
             },
         };
 
-        let logspec = LogSpecification {
+        let logspec = Self {
             module_filters: module_filters.level_sort(),
             textfilter,
         };
@@ -335,7 +335,8 @@ impl LogSpecification {
         Ok(())
     }
 
-    /// Creates a LogSpecBuilder, setting the default log level.
+    /// Creates a `LogSpecBuilder`, setting the default log level.
+    #[must_use]
     pub fn default(level_filter: LevelFilter) -> LogSpecBuilder {
         LogSpecBuilder::from_module_filters(&[ModuleFilter {
             module_name: None,
@@ -396,6 +397,7 @@ fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
     result
 }
 
+#[allow(clippy::needless_doctest_main)]
 /// Builder for `LogSpecification`.
 ///
 /// # Example
@@ -430,57 +432,56 @@ fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
 ///     // ...
 /// }
 /// ```
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LogSpecBuilder {
     module_filters: HashMap<Option<String>, LevelFilter>,
 }
 
 impl LogSpecBuilder {
-    /// Creates a LogSpecBuilder with all logging turned off.
-    pub fn new() -> LogSpecBuilder {
+    /// Creates a `LogSpecBuilder` with all logging turned off.
+    #[must_use]
+    pub fn new() -> Self {
         let mut modfilmap = HashMap::new();
         modfilmap.insert(None, LevelFilter::Off);
-        LogSpecBuilder {
+        Self {
             module_filters: modfilmap,
         }
     }
 
-    /// Creates a LogSpecBuilder from given module filters.
-    pub fn from_module_filters(module_filters: &[ModuleFilter]) -> LogSpecBuilder {
+    /// Creates a `LogSpecBuilder` from given module filters.
+    #[must_use]
+    pub fn from_module_filters(module_filters: &[ModuleFilter]) -> Self {
         let mut modfilmap = HashMap::new();
         for mf in module_filters {
             modfilmap.insert(mf.module_name.clone(), mf.level_filter);
         }
-        LogSpecBuilder {
+        Self {
             module_filters: modfilmap,
         }
     }
 
     /// Adds a default log level filter, or updates the default log level filter.
-    pub fn default(&mut self, lf: LevelFilter) -> &mut LogSpecBuilder {
+    pub fn default(&mut self, lf: LevelFilter) -> &mut Self {
         self.module_filters.insert(None, lf);
         self
     }
 
     /// Adds a log level filter, or updates the log level filter, for a module.
-    pub fn module<M: AsRef<str>>(
-        &mut self,
-        module_name: M,
-        lf: LevelFilter,
-    ) -> &mut LogSpecBuilder {
+    pub fn module<M: AsRef<str>>(&mut self, module_name: M, lf: LevelFilter) -> &mut Self {
         self.module_filters
             .insert(Some(module_name.as_ref().to_owned()), lf);
         self
     }
 
     /// Adds a log level filter, or updates the log level filter, for a module.
-    pub fn remove<M: AsRef<str>>(&mut self, module_name: M) -> &mut LogSpecBuilder {
+    pub fn remove<M: AsRef<str>>(&mut self, module_name: M) -> &mut Self {
         self.module_filters
             .remove(&Some(module_name.as_ref().to_owned()));
         self
     }
 
     /// Creates a log specification without text filter.
+    #[must_use]
     pub fn finalize(self) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.into_vec_module_filter(),
@@ -497,6 +498,7 @@ impl LogSpecBuilder {
     }
 
     /// Creates a log specification without being consumed.
+    #[must_use]
     pub fn build(&self) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.clone().into_vec_module_filter(),
@@ -537,9 +539,9 @@ impl LevelSort for Vec<ModuleFilter> {
     /// this allows a little more efficient lookup at runtime.
     fn level_sort(mut self) -> Vec<ModuleFilter> {
         self.sort_by(|a, b| {
-            let alen = a.module_name.as_ref().map(String::len).unwrap_or(0);
-            let blen = b.module_name.as_ref().map(String::len).unwrap_or(0);
-            blen.cmp(&alen)
+            let a_len = a.module_name.as_ref().map_or(0, String::len);
+            let b_len = b.module_name.as_ref().map_or(0, String::len);
+            b_len.cmp(&a_len)
         });
         self
     }

@@ -24,8 +24,8 @@ impl FlexiLogger {
         log_specification: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
         other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
-    ) -> FlexiLogger {
-        FlexiLogger {
+    ) -> Self {
+        Self {
             log_specification,
             primary_writer,
             other_writers,

@@ -64,7 +64,7 @@ pub enum SyslogFacility {
     LocalUse7 = 23 << 3,
 }
 
-/// SyslogConnector Severity.
+/// `SyslogConnector`'s severity.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
 pub enum SyslogSeverity {
@@ -102,11 +102,11 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 /// An experimental configurable `LogWriter` implementation that writes log messages to the syslog
 /// (see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424)).
 ///
-/// Only available with optional crate feature "syslog_writer".
+/// Only available with optional crate feature `syslog_writer`.
 ///
-/// For using the SyslogWriter, you need to know how the syslog is managed on your system,  
+/// For using the `SyslogWriter`, you need to know how the syslog is managed on your system,  
 /// how you can access it and with which protocol you can write to it,
-/// so that you can choose a variant of the SyslogConnector that fits to your environment.
+/// so that you can choose a variant of the `SyslogConnector` that fits to your environment.
 ///
 /// See the [module description](index.html) for guidance how to use additional log writers.
 pub struct SyslogWriter {
@@ -135,7 +135,7 @@ impl SyslogWriter {
     /// is a string without further semantics. It is intended for filtering
     /// messages on a relay or collector.
     ///
-    /// `syslog`: A [SyslogConnector](enum.SyslogConnector.html).
+    /// `syslog`: A [`SyslogConnector`](enum.SyslogConnector.html).
 
     pub fn try_new(
         facility: SyslogFacility,
@@ -143,8 +143,8 @@ impl SyslogWriter {
         max_log_level: log::LevelFilter,
         message_id: String,
         syslog: SyslogConnector,
-    ) -> IoResult<Box<SyslogWriter>> {
-        Ok(Box::new(SyslogWriter {
+    ) -> IoResult<Box<Self>> {
+        Ok(Box::new(Self {
             hostname: hostname::get_hostname().unwrap_or_else(|| "<unknown_hostname>".to_owned()),
             process: std::env::args()
                 .next()
@@ -196,7 +196,7 @@ impl LogWriter for SyslogWriter {
 
 /// Helper struct that connects to the syslog and implements Write.
 ///
-/// Is used in [SyslogWriter::try_new()](struct.SyslogWriter.html#method.try_new).
+/// Is used in [`SyslogWriter::try_new`](struct.SyslogWriter.html#method.try_new).
 ///
 /// ## Example
 ///
@@ -229,7 +229,7 @@ pub enum SyslogConnector {
     Tcp(BufWriter<TcpStream>),
 }
 impl SyslogConnector {
-    /// Returns a SyslogConnector::Datagram to the specified path.
+    /// Returns a `SyslogConnector::Datagram` to the specified path.
     ///
     /// Is only available on linux.
     #[cfg(target_os = "linux")]
@@ -239,7 +239,7 @@ impl SyslogConnector {
         Ok(SyslogConnector::Datagram(ud))
     }
 
-    /// Returns a SyslogConnector::Stream to the specified path.
+    /// Returns a `SyslogConnector::Stream` to the specified path.
     ///
     /// Is only available on linux.
     #[cfg(target_os = "linux")]
@@ -249,18 +249,16 @@ impl SyslogConnector {
         )))
     }
 
-    /// Returns a SyslogConnector which sends the log lines via TCP to the specified address.
-    pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<SyslogConnector> {
-        Ok(SyslogConnector::Tcp(BufWriter::new(TcpStream::connect(
-            server,
-        )?)))
+    /// Returns a `SyslogConnector` which sends the log lines via TCP to the specified address.
+    pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<Self> {
+        Ok(Self::Tcp(BufWriter::new(TcpStream::connect(server)?)))
     }
 
-    /// Returns a SyslogConnector which sends log via the fragile UDP protocol from local to server.
-    pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<SyslogConnector> {
+    /// Returns a `SyslogConnector` which sends log via the fragile UDP protocol from local to server.
+    pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<Self> {
         let socket = UdpSocket::bind(local)?;
         socket.connect(server)?;
-        Ok(SyslogConnector::Udp(socket))
+        Ok(Self::Udp(socket))
     }
 }
 
@@ -272,21 +270,21 @@ impl Write for SyslogConnector {
         // );
         match *self {
             #[cfg(target_os = "linux")]
-            SyslogConnector::Datagram(ref ud) => {
+            Self::Datagram(ref ud) => {
                 // todo: reconnect of conn is broken
                 ud.send(&message[..])
             }
             #[cfg(target_os = "linux")]
-            SyslogConnector::Stream(ref mut w) => {
+            Self::Stream(ref mut w) => {
                 // todo: reconnect of conn is broken
                 w.write(&message[..])
                     .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
             }
-            SyslogConnector::Tcp(ref mut w) => {
+            Self::Tcp(ref mut w) => {
                 // todo: reconnect of conn is broken
                 w.write(&message[..])
             }
-            SyslogConnector::Udp(ref socket) => {
+            Self::Udp(ref socket) => {
                 // ??
                 socket.send(&message[..])
             }
@@ -296,14 +294,14 @@ impl Write for SyslogConnector {
     fn flush(&mut self) -> IoResult<()> {
         match *self {
             #[cfg(target_os = "linux")]
-            SyslogConnector::Datagram(_) => Ok(()),
+            Self::Datagram(_) => Ok(()),
 
             #[cfg(target_os = "linux")]
-            SyslogConnector::Stream(ref mut w) => w.flush(),
+            Self::Stream(ref mut w) => w.flush(),
 
-            SyslogConnector::Udp(_) => Ok(()),
+            Self::Udp(_) => Ok(()),
 
-            SyslogConnector::Tcp(ref mut w) => w.flush(),
+            Self::Tcp(ref mut w) => w.flush(),
         }
     }
 }

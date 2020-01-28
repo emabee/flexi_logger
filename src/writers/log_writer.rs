@@ -17,9 +17,10 @@ pub trait LogWriter: Sync + Send {
     /// Provides the maximum log level that is to be written.
     fn max_log_level(&self) -> log::LevelFilter;
 
-    /// Sets the format function. Defaults to ([formats::default_format](fn.default_format.html)),
+    /// Sets the format function.
+    /// Defaults to ([`formats::default_format`](fn.default_format.html)),
     /// but can be changed with a call to
-    /// [`Logger::format_for_writer()`](struct.Logger.html#method.format_for_writer).
+    /// [`Logger::format_for_writer`](struct.Logger.html#method.format_for_writer).
     ///
     /// The default implementation is a no-op.
     fn format(&mut self, format: FormatFunction) {

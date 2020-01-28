@@ -18,9 +18,12 @@ pub fn default_format(
     )
 }
 
+#[allow(clippy::doc_markdown)]
 /// A colored version of the logline-formatter `default_format`
 /// that produces log lines like <br>
-/// <code><span style="color:red">ERROR</span> &#91;my_prog::some_submodule&#93; <span style="color:red">File not found</span></code>
+/// <code><span style="color:red">ERROR</span>
+/// &#91;my_prog::some_submodule&#93;
+/// <span style="color:red">File not found</span></code>
 ///
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
@@ -39,11 +42,10 @@ pub fn colored_default_format(
     )
 }
 
-/// A logline-formatter that produces log lines like
+/// A logline-formatter that produces log lines with timestamp and file location, like
 /// <br>
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [src/foo/bar:26] Task successfully read from conf.json```
 /// <br>
-/// i.e. with timestamp and file location.
 pub fn opt_format(
     w: &mut dyn std::io::Write,
     now: &mut DeferredNow,

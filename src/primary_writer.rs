@@ -22,47 +22,47 @@ impl PrimaryWriter {
         duplicate: Duplicate,
         format_for_stderr: FormatFunction,
         writers: Vec<Box<dyn LogWriter>>,
-    ) -> PrimaryWriter {
-        PrimaryWriter::MultiWriter(MultiWriter {
+    ) -> Self {
+        Self::MultiWriter(MultiWriter {
             duplicate,
             format_for_stderr,
             writers,
         })
     }
-    pub fn stderr(format: FormatFunction) -> PrimaryWriter {
-        PrimaryWriter::StdErrWriter(StdErrWriter::new(format))
+    pub fn stderr(format: FormatFunction) -> Self {
+        Self::StdErrWriter(StdErrWriter::new(format))
     }
 
-    pub fn stdout(format: FormatFunction) -> PrimaryWriter {
-        PrimaryWriter::StdOutWriter(StdOutWriter::new(format))
+    pub fn stdout(format: FormatFunction) -> Self {
+        Self::StdOutWriter(StdOutWriter::new(format))
     }
 
-    pub fn black_hole(duplicate: Duplicate, format: FormatFunction) -> PrimaryWriter {
-        PrimaryWriter::BlackHole(BlackHoleWriter { duplicate, format })
+    pub fn black_hole(duplicate: Duplicate, format: FormatFunction) -> Self {
+        Self::BlackHole(BlackHoleWriter { duplicate, format })
     }
 
     // Write out a log line.
     pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {
-            PrimaryWriter::StdErrWriter(ref w) => w.write(now, record),
-            PrimaryWriter::StdOutWriter(ref w) => w.write(now, record),
-            PrimaryWriter::MultiWriter(ref w) => w.write(now, record),
-            PrimaryWriter::BlackHole(ref w) => w.write(now, record),
+            Self::StdErrWriter(ref w) => w.write(now, record),
+            Self::StdOutWriter(ref w) => w.write(now, record),
+            Self::MultiWriter(ref w) => w.write(now, record),
+            Self::BlackHole(ref w) => w.write(now, record),
         }
     }
 
     // Flush any buffered records.
     pub fn flush(&self) -> std::io::Result<()> {
         match *self {
-            PrimaryWriter::StdErrWriter(ref w) => w.flush(),
-            PrimaryWriter::StdOutWriter(ref w) => w.flush(),
-            PrimaryWriter::MultiWriter(ref w) => w.flush(),
-            PrimaryWriter::BlackHole(ref w) => w.flush(),
+            Self::StdErrWriter(ref w) => w.flush(),
+            Self::StdOutWriter(ref w) => w.flush(),
+            Self::MultiWriter(ref w) => w.flush(),
+            Self::BlackHole(ref w) => w.flush(),
         }
     }
 
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        if let PrimaryWriter::MultiWriter(ref w) = *self {
+        if let Self::MultiWriter(ref w) = *self {
             w.validate_logs(expected);
         }
     }
@@ -74,8 +74,8 @@ pub(crate) struct StdErrWriter {
 }
 
 impl StdErrWriter {
-    fn new(format: FormatFunction) -> StdErrWriter {
-        StdErrWriter { format }
+    fn new(format: FormatFunction) -> Self {
+        Self { format }
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
@@ -94,8 +94,8 @@ pub(crate) struct StdOutWriter {
 }
 
 impl StdOutWriter {
-    fn new(format: FormatFunction) -> StdOutWriter {
-        StdOutWriter { format }
+    fn new(format: FormatFunction) -> Self {
+        Self { format }
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {

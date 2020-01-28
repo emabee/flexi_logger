@@ -27,21 +27,21 @@ pub enum FlexiLoggerError {
 impl fmt::Display for FlexiLoggerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FlexiLoggerError::BadDirectory => Ok(()),
-            FlexiLoggerError::Io(ref err) => fmt::Display::fmt(err, f),
-            FlexiLoggerError::LevelFilter(ref s) => f.write_str(s),
+            Self::BadDirectory => Ok(()),
+            Self::Io(ref err) => fmt::Display::fmt(err, f),
+            Self::LevelFilter(ref s) => f.write_str(s),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Notify(ref err) => fmt::Display::fmt(err, f),
+            Self::Notify(ref err) => fmt::Display::fmt(err, f),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Toml(ref err) => fmt::Display::fmt(err, f),
-            FlexiLoggerError::Parse(ref vec, ref logspec) => {
+            Self::Toml(ref err) => fmt::Display::fmt(err, f),
+            Self::Parse(ref vec, ref logspec) => {
                 for s in vec {
                     f.write_str(&format!("parse error: \'{}\', ", s))?;
                 }
                 f.write_str(&format!("resulting logspec: {:?}", logspec))?;
                 Ok(())
             }
-            FlexiLoggerError::Log(ref err) => fmt::Display::fmt(err, f),
+            Self::Log(ref err) => fmt::Display::fmt(err, f),
         }
     }
 }
@@ -49,64 +49,68 @@ impl fmt::Display for FlexiLoggerError {
 impl Error for FlexiLoggerError {
     fn description(&self) -> &str {
         match *self {
-            FlexiLoggerError::BadDirectory => "not a directory",
-            FlexiLoggerError::Io(ref err) => err.description(),
-            FlexiLoggerError::LevelFilter(_) => "invalid level filter",
+            Self::BadDirectory => "not a directory",
+            Self::Io(ref err) => err.description(),
+            Self::LevelFilter(_) => "invalid level filter",
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Notify(ref err) => err.description(),
+            Self::Notify(ref err) => err.description(),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Toml(ref err) => err.description(),
-            FlexiLoggerError::Parse(_, _) => "Error during parsing",
-            FlexiLoggerError::Log(ref err) => err.description(),
+            Self::Toml(ref err) => err.description(),
+            Self::Parse(_, _) => "Error during parsing",
+            Self::Log(ref err) => err.description(),
         }
     }
 
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
-            FlexiLoggerError::BadDirectory
-            | FlexiLoggerError::LevelFilter(_)
-            | FlexiLoggerError::Parse(_, _) => None,
-            FlexiLoggerError::Io(ref err) => Some(err),
+            Self::BadDirectory | Self::LevelFilter(_) | Self::Parse(_, _) => None,
+            Self::Io(ref err) => Some(err),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Notify(ref err) => Some(err),
+            Self::Notify(ref err) => Some(err),
             #[cfg(feature = "specfile")]
-            FlexiLoggerError::Toml(ref err) => Some(err),
-            FlexiLoggerError::Log(ref err) => Some(err),
+            Self::Toml(ref err) => Some(err),
+            Self::Log(ref err) => Some(err),
         }
     }
 }
 
 impl From<log::SetLoggerError> for FlexiLoggerError {
-    fn from(err: log::SetLoggerError) -> FlexiLoggerError {
-        FlexiLoggerError::Log(err)
+    #[must_use]
+    fn from(err: log::SetLoggerError) -> Self {
+        Self::Log(err)
     }
 }
 impl From<std::io::Error> for FlexiLoggerError {
-    fn from(err: std::io::Error) -> FlexiLoggerError {
-        FlexiLoggerError::Io(err)
+    #[must_use]
+    fn from(err: std::io::Error) -> Self {
+        Self::Io(err)
     }
 }
 impl From<glob::PatternError> for FlexiLoggerError {
-    fn from(err: glob::PatternError) -> FlexiLoggerError {
-        FlexiLoggerError::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
+    #[must_use]
+    fn from(err: glob::PatternError) -> Self {
+        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
     }
 }
 #[cfg(feature = "ziplogs")]
 impl From<zip::result::ZipError> for FlexiLoggerError {
-    fn from(err: zip::result::ZipError) -> FlexiLoggerError {
-        FlexiLoggerError::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
+    #[must_use]
+    fn from(err: zip::result::ZipError) -> Self {
+        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
     }
 }
 
 #[cfg(feature = "specfile")]
 impl From<toml::de::Error> for FlexiLoggerError {
-    fn from(err: toml::de::Error) -> FlexiLoggerError {
-        FlexiLoggerError::Toml(err)
+    #[must_use]
+    fn from(err: toml::de::Error) -> Self {
+        Self::Toml(err)
     }
 }
 #[cfg(feature = "specfile")]
 impl From<notify::Error> for FlexiLoggerError {
-    fn from(err: notify::Error) -> FlexiLoggerError {
-        FlexiLoggerError::Notify(err)
+    #[must_use]
+    fn from(err: notify::Error) -> Self {
+        Self::Notify(err)
     }
 }
