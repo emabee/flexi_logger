@@ -405,6 +405,8 @@ impl FileLogWriterState {
                     } // max_size, current_size
                 };
 
+                remove_or_zip_too_old_logfiles(&cleanup, &config.filename_config)?;
+
                 (
                     log_file,
                     Some(RotationState {
@@ -583,7 +585,12 @@ fn remove_or_zip_too_old_logfiles(
     let mut file_list: Vec<_> = list_of_log_and_zip_files(&filename_config)?
         .filter_map(Result::ok)
         .collect();
-    file_list.sort_unstable();
+    file_list.sort_by(|a, b| {
+        a.file_stem()
+            .unwrap(/*Ok*/)
+            .partial_cmp(b.file_stem().unwrap(/*Ok*/))
+            .unwrap(/*Ok*/)
+    });
     let total_number_of_files = file_list.len();
 
     // now do the work
@@ -624,6 +631,11 @@ fn remove_or_zip_too_old_logfiles(
 }
 
 // Moves the current file to the timestamp of the CURRENT file's creation date.
+// If the rotation comes very fast, the new timestamp would be equal to the old one.
+// To avoid file collisions, we insert an additional string to the filename ("-restart-<number>").
+// The number is incremented in case of repeated collisions.
+// Cleaning up can leave some restart-files with higher numbers; if we still are in the same
+// second, we need to continue with the restart-incrementing.
 fn rotate_output_file_to_date(
     creation_date: &DateTime<Local>,
     config: &FileLogWriterConfig,
@@ -634,19 +646,44 @@ fn rotate_output_file_to_date(
         Some(&creation_date.format("_r%Y-%m-%d_%H-%M-%S").to_string()),
         &config.filename_config,
     );
-    // Check that the target of rename does not yet exist
-    let mut i = 0_u32;
-    while (*rotated_path).exists() {
-        rotated_path = get_filepath(
-            Some(
-                &creation_date
-                    .format("_r%Y-%m-%d_%H-%M-%S")
-                    .to_string()
-                    .add(&format!("-restart-{}", i)),
-            ),
-            &config.filename_config,
-        );
-        i += 1;
+
+    // Search for rotated_path as is and for restart-siblings;
+    // if any exists, find highest restart and add 1, else continue without restart
+    let mut pattern = rotated_path.clone();
+    pattern.set_extension("");
+    let mut pattern = pattern.to_string_lossy().to_string();
+    pattern.push_str("-restart-*");
+
+    let file_list = glob::glob(&pattern).unwrap();
+    let mut vec: Vec<PathBuf> = file_list.map(Result::unwrap).collect();
+    vec.sort_unstable();
+
+    if (*rotated_path).exists() || !vec.is_empty() {
+        let mut number = if vec.is_empty() {
+            0
+        } else {
+            rotated_path = vec.pop().unwrap(/*Ok*/);
+            let file_stem = rotated_path
+                .file_stem()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            let index = file_stem.find("-restart-").unwrap();
+            file_stem[(index + 9)..].parse::<usize>().unwrap()
+        };
+
+        while (*rotated_path).exists() {
+            rotated_path = get_filepath(
+                Some(
+                    &creation_date
+                        .format("_r%Y-%m-%d_%H-%M-%S")
+                        .to_string()
+                        .add(&format!("-restart-{:04}", number)),
+                ),
+                &config.filename_config,
+            );
+            number += 1;
+        }
     }
 
     match std::fs::rename(&current_path, &rotated_path) {
@@ -1086,6 +1123,63 @@ mod test {
         // assert!(contains("CURRENT", &ts, NINE));
     }
 
+    #[test]
+    fn issue_38() {
+        const NUMBER_OF_FILES: usize = 5;
+        const NUMBER_OF_PSEUDO_PROCESSES: usize = 11;
+
+        for _ in 0..NUMBER_OF_PSEUDO_PROCESSES {
+            let flw = super::FileLogWriter::builder()
+                .directory("issue_38")
+                .discriminant("issue_38")
+                .rotate(
+                    Criterion::Size(500),
+                    Naming::Timestamps,
+                    Cleanup::KeepLogFiles(NUMBER_OF_FILES),
+                )
+                .o_append(false)
+                .try_build()
+                .unwrap();
+
+            // write some lines, but not enough to rotate
+            for i in 0..4 {
+                flw.write(
+                    &mut DeferredNow::new(),
+                    &log::Record::builder()
+                        .args(format_args!("{}", i))
+                        .level(log::Level::Error)
+                        .target("myApp")
+                        .file(Some("server.rs"))
+                        .line(Some(144))
+                        .module_path(Some("server"))
+                        .build(),
+                )
+                .unwrap();
+            }
+        }
+
+        let fn_pattern = String::with_capacity(180)
+            .add(
+                &String::from("issue_38").add("/").add(
+                    &Path::new(&std::env::args().next().unwrap())
+            .file_stem().unwrap(/*cannot fail*/)
+            .to_string_lossy().to_string(),
+                ),
+            )
+            .add("_")
+            .add("issue_38")
+            .add("_r[0-9]*")
+            .add(".log");
+
+        assert_eq!(
+            glob::glob(&fn_pattern)
+                .unwrap()
+                .map(|r| r.unwrap().into_os_string().to_string_lossy().to_string())
+                .count(),
+            NUMBER_OF_FILES
+        );
+    }
+
     fn remove(s: &str, discr: &str) {
         std::fs::remove_file(get_hackyfilepath(s, discr)).unwrap();
     }
@@ -1162,7 +1256,6 @@ mod test {
             .add("_r2[0-9]*") // Year 3000 problem!!!
             .add(".log");
 
-        println!("PATTERN = {}", fn_pattern);
         glob::glob(&fn_pattern)
             .unwrap()
             .map(|r| r.unwrap().into_os_string().to_string_lossy().to_string())

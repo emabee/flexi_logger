@@ -1,6 +1,7 @@
 use crate::deferred_now::DeferredNow;
 use crate::writers::log_writer::LogWriter;
 use std::cell::RefCell;
+use std::ffi::OsString;
 use std::io::Error as IoError;
 use std::io::Result as IoResult;
 use std::io::{BufWriter, ErrorKind, Write};
@@ -110,7 +111,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 ///
 /// See the [module description](index.html) for guidance how to use additional log writers.
 pub struct SyslogWriter {
-    hostname: String,
+    hostname: OsString,
     process: String,
     pid: u32,
     facility: SyslogFacility,
@@ -145,7 +146,7 @@ impl SyslogWriter {
         syslog: SyslogConnector,
     ) -> IoResult<Box<Self>> {
         Ok(Box::new(Self {
-            hostname: hostname::get_hostname().unwrap_or_else(|| "<unknown_hostname>".to_owned()),
+            hostname: hostname::get().unwrap_or_else(|_| OsString::from("<unknown_hostname>")),
             process: std::env::args()
                 .next()
                 .ok_or_else(|| IoError::new(ErrorKind::Other, "<no progname>".to_owned()))?,
@@ -169,7 +170,7 @@ impl LogWriter for SyslogWriter {
             syslog,
             "{}",
             format!(
-                "<{}>1 {} {} {} {} {} - {}\n",
+                "<{}>1 {} {:?} {} {} {} - {}\n",
                 self.facility as u8 | severity as u8,
                 now.now()
                     .to_rfc3339_opts(chrono::SecondsFormat::Micros, false),
