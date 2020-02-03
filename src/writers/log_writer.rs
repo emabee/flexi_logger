@@ -1,7 +1,6 @@
 use crate::deferred_now::DeferredNow;
 use crate::FormatFunction;
 use log::Record;
-use std::io;
 
 /// Writes to a single log output stream.
 ///
@@ -9,10 +8,18 @@ use std::io;
 /// (see [module description](index.html) for more details).
 pub trait LogWriter: Sync + Send {
     /// Writes out a log line.
-    fn write(&self, now: &mut DeferredNow, record: &Record) -> io::Result<()>;
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error`
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()>;
 
     /// Flushes any buffered records.
-    fn flush(&self) -> io::Result<()>;
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error`
+    fn flush(&self) -> std::io::Result<()>;
 
     /// Provides the maximum log level that is to be written.
     fn max_log_level(&self) -> log::LevelFilter;

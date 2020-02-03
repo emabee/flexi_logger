@@ -174,6 +174,10 @@ impl Logger {
     /// .log_target(LogTarget::File)
     /// .start();
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the input for the log specification is malformed.
     pub fn check_parser_error(self) -> Result<Self, FlexiLoggerError> {
         match self.parse_errs {
             Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
@@ -490,6 +494,10 @@ impl Logger {
     /// The returned reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
+    ///
+    /// # Errors
+    ///
+    /// Several variants of `FlexiLoggerError` can occur.
     pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
@@ -586,6 +594,10 @@ impl Logger {
     /// If the file cannot be read anymore, e.g. because the format is not correct, the
     /// previous logspec remains active.
     /// If the file is corrected subsequently, the log spec update will work again.
+    ///
+    /// # Errors
+    ///
+    /// Several variants of `FlexiLoggerError` can occur.
     #[cfg(feature = "specfile")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,

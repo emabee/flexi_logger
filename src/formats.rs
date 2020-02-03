@@ -4,6 +4,10 @@ use std::thread;
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
+///
+/// # Errors
+///
+/// See `std::write`
 pub fn default_format(
     w: &mut dyn std::io::Write,
     _now: &mut DeferredNow,
@@ -26,6 +30,10 @@ pub fn default_format(
 /// <span style="color:red">File not found</span></code>
 ///
 /// Only available with feature `colors`.
+///
+/// # Errors
+///
+/// See `std::write`
 #[cfg(feature = "colors")]
 pub fn colored_default_format(
     w: &mut dyn std::io::Write,
@@ -46,6 +54,10 @@ pub fn colored_default_format(
 /// <br>
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [src/foo/bar:26] Task successfully read from conf.json```
 /// <br>
+///
+/// # Errors
+///
+/// See `std::write`
 pub fn opt_format(
     w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
@@ -65,6 +77,10 @@ pub fn opt_format(
 /// A colored version of the logline-formatter `opt_format`.
 ///
 /// Only available with feature `colors`.
+///
+/// # Errors
+///
+/// See `std::write`
 #[cfg(feature = "colors")]
 pub fn colored_opt_format(
     w: &mut dyn std::io::Write,
@@ -88,6 +104,10 @@ pub fn colored_opt_format(
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [foo::bar] src/foo/bar.rs:26: Task successfully read from conf.json```
 /// <br>
 /// i.e. with timestamp, module path and file location.
+///
+/// # Errors
+///
+/// See `std::write`
 pub fn detailed_format(
     w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
@@ -108,6 +128,10 @@ pub fn detailed_format(
 /// A colored version of the logline-formatter `detailed_format`.
 ///
 /// Only available with feature `colors`.
+///
+/// # Errors
+///
+/// See `std::write`
 #[cfg(feature = "colors")]
 pub fn colored_detailed_format(
     w: &mut dyn std::io::Write,
@@ -132,6 +156,10 @@ pub fn colored_detailed_format(
 /// ```[2016-01-13 15:25:01.640870 +01:00] T[taskreader] INFO [src/foo/bar:26] Task successfully read from conf.json```
 /// <br>
 /// i.e. with timestamp, thread name and file location.
+///
+/// # Errors
+///
+/// See `std::write`
 pub fn with_thread(
     w: &mut dyn std::io::Write,
     now: &mut DeferredNow,
@@ -152,6 +180,10 @@ pub fn with_thread(
 /// A colored version of the logline-formatter `with_thread`.
 ///
 /// Only available with feature `colors`.
+///
+/// # Errors
+///
+/// See `std::write`
 #[cfg(feature = "colors")]
 pub fn colored_with_thread(
     w: &mut dyn std::io::Write,

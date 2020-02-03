@@ -121,6 +121,10 @@ impl LogSpecification {
     }
 
     /// Returns a log specification from a String.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the input is malformed.
     pub fn parse(spec: &str) -> Result<Self, FlexiLoggerError> {
         let mut parse_errs = Vec::<String>::new();
         let mut dirs = Vec::<ModuleFilter>::new();
@@ -215,6 +219,10 @@ impl LogSpecification {
 
     /// Returns a log specification based on the value of the environment variable `RUST_LOG`,
     /// or an empty one.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the input is malformed.
     pub fn env() -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
             Ok(spec) => Self::parse(&spec),
@@ -224,6 +232,10 @@ impl LogSpecification {
 
     /// Returns a log specification based on the value of the environment variable `RUST_LOG`,
     /// or on the given String.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the input is malformed.
     pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
             Ok(spec) => Self::parse(&spec),
@@ -234,6 +246,10 @@ impl LogSpecification {
     /// Reads a log specification from an appropriate toml document.
     ///
     /// This method is only avaible with feature `specfile`.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the input is malformed.
     #[cfg(feature = "specfile")]
     pub fn from_toml(s: &str) -> Result<Self, FlexiLoggerError> {
         #[derive(Clone, Debug, Deserialize)]
@@ -286,6 +302,10 @@ impl LogSpecification {
     /// Serializes itself in toml format.
     ///
     /// This method is only avaible with feature `specfile`.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Io` if writing fails.
     #[cfg(feature = "specfile")]
     pub fn to_toml(&self, w: &mut dyn Write) -> Result<(), FlexiLoggerError> {
         w.write_all(b"### Optional: Default log level\n")?;

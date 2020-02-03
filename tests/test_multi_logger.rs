@@ -1,8 +1,6 @@
 use flexi_logger::writers::{FileLogWriter, LogWriter};
 use flexi_logger::{detailed_format, DeferredNow, Logger, Record};
 use log::*;
-
-use std::io;
 use std::sync::Arc;
 
 #[macro_use]
@@ -79,10 +77,10 @@ impl SecWriter {
     }
 }
 impl LogWriter for SecWriter {
-    fn write(&self, now: &mut DeferredNow, record: &Record) -> io::Result<()> {
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         self.0.write(now, record)
     }
-    fn flush(&self) -> io::Result<()> {
+    fn flush(&self) -> std::io::Result<()> {
         self.0.flush()
     }
     fn max_log_level(&self) -> log::LevelFilter {

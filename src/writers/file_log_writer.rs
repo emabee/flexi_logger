@@ -183,6 +183,10 @@ impl FileLogWriterBuilder {
     }
 
     /// Produces the `FileLogWriter`.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Io`.
     pub fn try_build(mut self) -> Result<FileLogWriter, FlexiLoggerError> {
         // make sure the folder exists or create it
         let p_directory = Path::new(&self.config.filename_config.directory);

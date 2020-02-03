@@ -137,7 +137,10 @@ impl SyslogWriter {
     /// messages on a relay or collector.
     ///
     /// `syslog`: A [`SyslogConnector`](enum.SyslogConnector.html).
-
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error`
     pub fn try_new(
         facility: SyslogFacility,
         determine_severity: Option<LevelToSyslogSeverity>,
@@ -251,11 +254,19 @@ impl SyslogConnector {
     }
 
     /// Returns a `SyslogConnector` which sends the log lines via TCP to the specified address.
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error` if opening the stream fails.
     pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<Self> {
         Ok(Self::Tcp(BufWriter::new(TcpStream::connect(server)?)))
     }
 
     /// Returns a `SyslogConnector` which sends log via the fragile UDP protocol from local to server.
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error` if opening the stream fails.
     pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<Self> {
         let socket = UdpSocket::bind(local)?;
         socket.connect(server)?;
