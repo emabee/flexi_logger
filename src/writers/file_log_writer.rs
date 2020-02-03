@@ -31,6 +31,7 @@ struct RotationConfig {
     // Defines the cleanup strategy
     cleanup: Cleanup,
 }
+#[derive(Clone)]
 struct FilenameConfig {
     directory: PathBuf,
     file_basename: String,
@@ -1122,11 +1123,13 @@ mod test {
     fn issue_38() {
         const NUMBER_OF_FILES: usize = 5;
         const NUMBER_OF_PSEUDO_PROCESSES: usize = 11;
+        const ISSUE_38: &str = "issue_38";
+        const LOG_FOLDER: &str = "log_files/issue_38";
 
         for _ in 0..NUMBER_OF_PSEUDO_PROCESSES {
             let flw = super::FileLogWriter::builder()
-                .directory("issue_38")
-                .discriminant("issue_38")
+                .directory(LOG_FOLDER)
+                .discriminant(ISSUE_38)
                 .rotate(
                     Criterion::Size(500),
                     Naming::Timestamps,
@@ -1155,14 +1158,14 @@ mod test {
 
         let fn_pattern = String::with_capacity(180)
             .add(
-                &String::from("issue_38").add("/").add(
+                &String::from(LOG_FOLDER).add("/").add(
                     &Path::new(&std::env::args().next().unwrap())
             .file_stem().unwrap(/*cannot fail*/)
             .to_string_lossy().to_string(),
                 ),
             )
             .add("_")
-            .add("issue_38")
+            .add(ISSUE_38)
             .add("_r[0-9]*")
             .add(".log");
 

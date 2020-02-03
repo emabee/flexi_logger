@@ -40,6 +40,6 @@ fn main() {
         std::fs::remove_dir(&pathbuf).unwrap();
     }
 
-    std::fs::remove_dir("./log_files/").unwrap();
-    std::fs::remove_dir("./test_spec/").unwrap();
+    std::fs::remove_dir("./log_files/").ok();
+    std::fs::remove_dir("./test_spec/").ok();
 }
