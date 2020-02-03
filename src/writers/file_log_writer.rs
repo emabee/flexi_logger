@@ -12,8 +12,6 @@ use std::borrow::BorrowMut;
 use std::cmp::max;
 use std::env;
 use std::fs::{File, OpenOptions};
-#[cfg(feature = "ziplogs")]
-use std::io::Read;
 use std::io::{BufRead, BufReader, Write};
 use std::ops::{Add, Deref, DerefMut};
 use std::path::{Path, PathBuf};
@@ -610,19 +608,12 @@ fn remove_or_zip_too_old_logfiles(
                     if extension != "zip" {
                         let mut old_file = File::open(file)?;
                         let mut zip_file = file.clone();
-                        zip_file.set_extension("zip");
-                        let mut zip = zip::ZipWriter::new(File::create(zip_file)?);
-
-                        let options = zip::write::FileOptions::default()
-                            .compression_method(zip::CompressionMethod::Bzip2);
-                        zip.start_file(file.file_name().unwrap().to_string_lossy(), options)?;
-                        {
-                            // streaming does not work easily :-(
-                            // std::io::copy(&mut old_file, &mut zip)?;
-                            let mut buf = Vec::<u8>::new();
-                            old_file.read_to_end(&mut buf)?;
-                            zip.write_all(&buf)?;
-                        }
+                        zip_file.set_extension("log.zip");
+                        let mut zip = flate2::write::GzEncoder::new(
+                            File::create(zip_file)?,
+                            flate2::Compression::fast(),
+                        );
+                        std::io::copy(&mut old_file, &mut zip)?;
                         zip.finish()?;
                         std::fs::remove_file(&file)?;
                     }

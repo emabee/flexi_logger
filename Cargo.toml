@@ -24,7 +24,7 @@ default = ["colors"]
 colors = ["yansi"]
 specfile = ["serde","toml","notify", "serde_derive"]
 syslog_writer = ["libc", "hostname"]
-ziplogs = ["zip"]
+ziplogs = ["flate2"]
 
 [dependencies]
 chrono = "0.4"
@@ -37,7 +37,7 @@ serde = { version = "1.0", optional = true }
 serde_derive = {version = "1.0", optional = true}
 toml = { version = "0.5", optional = true }
 yansi = {version = "0.5", optional = true}
-zip = {version = "0.5", optional = true}
+flate2 = {version = "1.0", optional = true}
 
 [target.'cfg(linux)'.dependencies]
 libc = {version = "^0.2.50", optional = true}

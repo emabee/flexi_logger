@@ -92,13 +92,6 @@ impl From<glob::PatternError> for FlexiLoggerError {
         Self::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
     }
 }
-#[cfg(feature = "ziplogs")]
-impl From<zip::result::ZipError> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: zip::result::ZipError) -> Self {
-        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
-    }
-}
 
 #[cfg(feature = "specfile")]
 impl From<toml::de::Error> for FlexiLoggerError {

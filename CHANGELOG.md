@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.7-unpublished] - 2020-02-03
+
+For the ziplog feauture, switch from `zip` crate to `flate2`.
+
 ## [0.14.6] - 2020-01-28
 
 Fix issue 38 (Old log files are not removed if rCURRENT doesn't overflow).
