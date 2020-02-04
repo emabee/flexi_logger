@@ -8,7 +8,6 @@ mod d {
     use log::*;
     use std::ops::Add;
     use std::thread::{self, JoinHandle};
-    use std::time;
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
@@ -36,14 +35,15 @@ mod d {
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
         info!(
-        "create a huge number of log lines with a considerable number of threads, verify the log"
-    );
+            "create a huge number of log lines with a considerable number of threads, \
+             verify the log"
+        );
 
         let worker_handles = start_worker_threads(NO_OF_THREADS);
         let new_spec = LogSpecification::parse("trace").unwrap();
         thread::Builder::new()
             .spawn(move || {
-                thread::sleep(time::Duration::from_millis(1000));
+                thread::sleep(std::time::Duration::from_millis(1000));
                 reconf_handle.set_new_spec(new_spec);
                 0 as u8
             })
@@ -56,6 +56,8 @@ mod d {
             "Task executed with {} threads in {}ms.",
             NO_OF_THREADS, delta
         );
+
+        thread::sleep(std::time::Duration::from_millis(200));
         verify_logs(&directory);
     }
 

@@ -50,33 +50,7 @@ impl fmt::Display for FlexiLoggerError {
     }
 }
 
-impl Error for FlexiLoggerError {
-    fn description(&self) -> &str {
-        match *self {
-            Self::BadDirectory => "not a directory",
-            Self::CleanupThread(ref err) | Self::Io(ref err) => err.description(),
-            Self::LevelFilter(_) => "invalid level filter",
-            #[cfg(feature = "specfile")]
-            Self::Notify(ref err) => err.description(),
-            #[cfg(feature = "specfile")]
-            Self::Toml(ref err) => err.description(),
-            Self::Parse(_, _) => "Error during parsing",
-            Self::Log(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        match *self {
-            Self::BadDirectory | Self::LevelFilter(_) | Self::Parse(_, _) => None,
-            Self::CleanupThread(ref err) | Self::Io(ref err) => Some(err),
-            #[cfg(feature = "specfile")]
-            Self::Notify(ref err) => Some(err),
-            #[cfg(feature = "specfile")]
-            Self::Toml(ref err) => Some(err),
-            Self::Log(ref err) => Some(err),
-        }
-    }
-}
+impl Error for FlexiLoggerError {}
 
 impl From<log::SetLoggerError> for FlexiLoggerError {
     #[must_use]
