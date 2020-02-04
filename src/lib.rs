@@ -1,13 +1,8 @@
-// #![warn(missing_docs)]
 #![deny(missing_docs)]
-// #![deny(missing_debug_implementations)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(clippy::unused_self)]
 #![allow(clippy::needless_doctest_main)]
-// #![allow(clippy::module_name_repetitions)]
-// #![allow(clippy::non_ascii_literal)]
-// #![allow(clippy::must_use_candidate)]
 
 //! A flexible and easy-to-use logger that writes logs to stderr and/or to files
 //! or other output streams.

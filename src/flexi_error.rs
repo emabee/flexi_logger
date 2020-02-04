@@ -8,6 +8,10 @@ use std::fmt;
 pub enum FlexiLoggerError {
     /// Log file cannot be written because the specified path is not a directory.
     BadDirectory,
+    /// Spawning the cleanup thread failed.
+    ///
+    /// This error can safely be avoided with `Logger::cleanup_in_background_thread(false)`.
+    CleanupThread(std::io::Error),
     /// Log cannot be written because the configured output directory is not accessible.
     Io(std::io::Error),
     /// Error with the filesystem notifications for the specfile.
@@ -28,7 +32,7 @@ impl fmt::Display for FlexiLoggerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::BadDirectory => Ok(()),
-            Self::Io(ref err) => fmt::Display::fmt(err, f),
+            Self::CleanupThread(ref err) | Self::Io(ref err) => fmt::Display::fmt(err, f),
             Self::LevelFilter(ref s) => f.write_str(s),
             #[cfg(feature = "specfile")]
             Self::Notify(ref err) => fmt::Display::fmt(err, f),
@@ -50,7 +54,7 @@ impl Error for FlexiLoggerError {
     fn description(&self) -> &str {
         match *self {
             Self::BadDirectory => "not a directory",
-            Self::Io(ref err) => err.description(),
+            Self::CleanupThread(ref err) | Self::Io(ref err) => err.description(),
             Self::LevelFilter(_) => "invalid level filter",
             #[cfg(feature = "specfile")]
             Self::Notify(ref err) => err.description(),
@@ -64,7 +68,7 @@ impl Error for FlexiLoggerError {
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
             Self::BadDirectory | Self::LevelFilter(_) | Self::Parse(_, _) => None,
-            Self::Io(ref err) => Some(err),
+            Self::CleanupThread(ref err) | Self::Io(ref err) => Some(err),
             #[cfg(feature = "specfile")]
             Self::Notify(ref err) => Some(err),
             #[cfg(feature = "specfile")]

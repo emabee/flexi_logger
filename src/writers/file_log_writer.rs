@@ -46,6 +46,7 @@ struct FileLogWriterConfig {
     filename_config: FilenameConfig,
     o_create_symlink: Option<PathBuf>,
     use_windows_line_ending: bool,
+    o_cleanup_channel: Option<Mutex<std::sync::mpsc::Sender<()>>>,
 }
 impl FileLogWriterConfig {
     // Factory method; uses the same defaults as Logger.
@@ -62,6 +63,7 @@ impl FileLogWriterConfig {
             append: false,
             o_create_symlink: None,
             use_windows_line_ending: false,
+            o_cleanup_channel: None,
         }
     }
 }
@@ -73,6 +75,7 @@ pub struct FileLogWriterBuilder {
     config: FileLogWriterConfig,
     o_rotation_config: Option<RotationConfig>,
     max_log_level: log::LevelFilter,
+    cleanup_in_background_thread: bool,
 }
 
 /// Simple methods for influencing the behavior of the `FileLogWriter`.
@@ -111,6 +114,24 @@ impl FileLogWriterBuilder {
     #[must_use]
     pub fn suppress_timestamp(mut self) -> Self {
         self.config.filename_config.use_timestamp = false;
+        self
+    }
+
+    /// When rotation is used with some `Cleanup` variant, then this option defines
+    /// if the cleanup activities (finding files, deleting files, evtl zipping files) is done in
+    /// the current thread (in the current log-call), or whether cleanup is delegated to a
+    /// background thread.
+    ///
+    /// As of `flexi_logger` version `0.14.7`,
+    /// the cleanup activities are done by default in a background thread.
+    /// This minimizes the blocking impact to your application caused by IO operations.
+    ///
+    /// In earlier versions of `flexi_logger`, or if you call this method with
+    /// `use_background_thread = false`,
+    /// the cleanup is done in the thread that is currently causing a file rotation.
+    #[must_use]
+    pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
+        self.cleanup_in_background_thread = use_background_thread;
         self
     }
 
@@ -205,6 +226,33 @@ impl FileLogWriterBuilder {
             self.config.filename_config.file_basename +=
                 &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
         };
+
+        if let Some(ref rotation_config) = self.o_rotation_config {
+            if rotation_config.cleanup.do_cleanup() && self.cleanup_in_background_thread {
+                // Some cleanup is to be done, and it is supposed to happen in a background thread
+                // We start the background thread and store the sender part of a channel to it
+                let (sender, receiver) = std::sync::mpsc::channel();
+                let cleanup_config = rotation_config.cleanup;
+                let filename_config = self.config.filename_config.clone();
+                std::thread::Builder::new()
+                    .name("flexi_logger-cleanup".to_string())
+                    .stack_size(512 * 1024)
+                    .spawn(move || loop {
+                        match receiver.recv() {
+                            Ok(_) => {
+                                remove_or_zip_too_old_logfiles_impl(
+                                    &cleanup_config,
+                                    &filename_config,
+                                )
+                                .ok();
+                            }
+                            Err(_e) => return,
+                        }
+                    })
+                    .map_err(FlexiLoggerError::CleanupThread)?;
+                self.config.o_cleanup_channel = Some(Mutex::new(sender));
+            }
+        }
 
         Ok(FileLogWriter {
             state: Mutex::new(FileLogWriterState::try_new(
@@ -408,7 +456,11 @@ impl FileLogWriterState {
                     } // max_size, current_size
                 };
 
-                remove_or_zip_too_old_logfiles(&cleanup, &config.filename_config)?;
+                remove_or_zip_too_old_logfiles(
+                    &config.o_cleanup_channel,
+                    &cleanup,
+                    &config.filename_config,
+                )?;
 
                 (
                     log_file,
@@ -461,7 +513,11 @@ impl FileLogWriterState {
                 {
                     *current_size = 0;
                 }
-                remove_or_zip_too_old_logfiles(&rotation_state.cleanup, &config.filename_config)?;
+                remove_or_zip_too_old_logfiles(
+                    &config.o_cleanup_channel,
+                    &rotation_state.cleanup,
+                    &config.filename_config,
+                )?;
             }
         }
 
@@ -571,6 +627,19 @@ fn list_of_log_and_zip_files(
 }
 
 fn remove_or_zip_too_old_logfiles(
+    o_cleanup_channel: &Option<Mutex<std::sync::mpsc::Sender<()>>>,
+    cleanup_config: &Cleanup,
+    filename_config: &FilenameConfig,
+) -> Result<(), FlexiLoggerError> {
+    if let Some(ref sender) = o_cleanup_channel {
+        sender.lock().unwrap().send(()).ok();
+        Ok(())
+    } else {
+        remove_or_zip_too_old_logfiles_impl(cleanup_config, filename_config)
+    }
+}
+
+fn remove_or_zip_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
 ) -> Result<(), FlexiLoggerError> {
@@ -768,6 +837,7 @@ impl FileLogWriter {
             o_rotation_config: None,
             config: FileLogWriterConfig::default(),
             max_log_level: log::LevelFilter::Trace,
+            cleanup_in_background_thread: true,
         }
     }
 
@@ -1155,6 +1225,9 @@ mod test {
                 .unwrap();
             }
         }
+
+        // give the cleanup thread a short moment of time
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
         let fn_pattern = String::with_capacity(180)
             .add(

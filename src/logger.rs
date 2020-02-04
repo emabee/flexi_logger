@@ -300,6 +300,26 @@ impl Logger {
         self
     }
 
+    /// When rotation is used with some `Cleanup` variant, then this option defines
+    /// if the cleanup activities (finding files, deleting files, evtl zipping files) is done in
+    /// the current thread (in the current log-call), or whether cleanup is delegated to a
+    /// background thread.
+    ///
+    /// As of `flexi_logger` version `0.14.7`,
+    /// the cleanup activities are done by default in a background thread.
+    /// This minimizes the blocking impact to your application caused by IO operations.
+    ///
+    /// In earlier versions of `flexi_logger`, or if you call this method with
+    /// `use_background_thread = false`,
+    /// the cleanup is done in the thread that is currently causing a file rotation.
+    #[must_use]
+    pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
+        self.flwb = self
+            .flwb
+            .cleanup_in_background_thread(use_background_thread);
+        self
+    }
+
     /// Prevent indefinite growth of the log file by applying file rotation
     /// and a clean-up strategy for older log files.
     ///
@@ -759,6 +779,16 @@ pub enum Cleanup {
     /// This option is only available with feature `ziplogs`.
     #[cfg(feature = "ziplogs")]
     KeepLogAndZipFiles(usize, usize),
+}
+impl Cleanup {
+    /// Returns true if some cleanup is to be done.
+    #[must_use]
+    pub fn do_cleanup(&self) -> bool {
+        match self {
+            Self::Never => false,
+            _ => true,
+        }
+    }
 }
 
 /// Used to control which messages are to be duplicated to stderr, when `log_to_file()` is used.

@@ -5,13 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.7-unpublished] - 2020-02-03
+## [0.14.7] - 2020-02-04
 
-For the ziplog feauture, switch from `zip` crate to `flate2`.
+If rotation is used with cleanup, do the cleanup by default in a background thread
+(solves [issue 39](https://github.com/emabee/flexi_logger/issues/39)).
+
+For the ziplog feature, switch from `zip` crate to `flate2`.
 
 ## [0.14.6] - 2020-01-28
 
-Fix issue 38 (Old log files are not removed if rCURRENT doesn't overflow).
+Fix [issue 38](https://github.com/emabee/flexi_logger/issues/38)
+(Old log files are not removed if rCURRENT doesn't overflow).
 
 ## [0.14.5] - 2019-11-06
 
@@ -19,7 +23,7 @@ Pass format option into custom loggers (pull request 37).
 
 ## [0.14.4] - 2019-09-25
 
-Fix bug in specfile handling (issue 36).
+Fix bug in specfile handling ([issue 36](https://github.com/emabee/flexi_logger/issues/36)).
 
 Improve docu and implementation of create_symlink.
 
@@ -27,7 +31,8 @@ Minor other stuff.
 
 ## [0.14.3] - 2019-08-04
 
-Allow defining custom handlers for the default log target.
+Allow defining custom handlers for the default log target
+(solves [issue 32](https://github.com/emabee/flexi_logger/issues/32)).
 
 ## [0.14.2] - 2019-08-04
 
@@ -47,7 +52,8 @@ Fix multi-threading issue (incorrect line-break handling with stderr).
 
 Further stabilize the specfile feature.
 
-Remove `LogSpecification::ensure_specfile_exists()` and `LogSpecification::from_file()` from public API, where they should not be (-> version bump).
+Remove `LogSpecification::ensure_specfile_exists()` and `LogSpecification::from_file()`
+from public API, where they should not be (-> version bump).
 
 Harmonize all eprintln! calls to
 prefix the output with "`[flexi_logger]` ".
@@ -57,7 +63,8 @@ prefix the output with "`[flexi_logger]` ".
 Only relevant for the `specfile` feature:
 initialize the logger before dealing in any way with the specfile,
 and do the initial read of the specfile in the main thread,
-i.e. synchronously, to ensure a deterministic behavior during startup.
+i.e. synchronously, to ensure a deterministic behavior during startup
+(fixes [issue 31](https://github.com/emabee/flexi_logger/issues/31)).
 
 ## [0.13.3] - 2019-07-08
 
@@ -97,11 +104,12 @@ Remove the deprecated `Logger::start_reconfigurable()` and `Logger::rotate_over_
 
 ## [0.11.5] - 2019-05-15
 
-Fix issue #26 (logging off for specific modules).
+Fix [issue 26](https://github.com/emabee/flexi_logger/issues/26) (logging off for specific modules).
 
-Fix issue #27 (log files blank after restart).
+Fix [issue 27](https://github.com/emabee/flexi_logger/issues/27) (log files blank after restart).
 
-Fix issue #28 (add a corresponding set of unit tests to FileLogWriter).
+Fix [issue 28](https://github.com/emabee/flexi_logger/issues/28)
+(add a corresponding set of unit tests to FileLogWriter).
 
 ## [0.11.4] - 2019-04-01
 
@@ -160,7 +168,9 @@ When file rotation is used, the name of the file to which the logs are written i
 Details:
 
 * the logs are always written to a file with infix _rCURRENT
-* if this file exceeds the specified rotate-over-size, it is closed and renamed to a file with a sequential number infix, and then the logging continues again to the (fresh) file with infix _rCURRENT
+* if this file exceeds the specified rotate-over-size, it is closed and renamed
+  to a file with a sequential number infix, and then the logging continues again
+  to the (fresh) file with infix _rCURRENT
 
 Example:
 
