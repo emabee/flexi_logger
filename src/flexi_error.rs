@@ -31,7 +31,7 @@ pub enum FlexiLoggerError {
 impl fmt::Display for FlexiLoggerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::BadDirectory => Ok(()),
+            Self::BadDirectory => f.write_str("Bad directory"),
             Self::CleanupThread(ref err) | Self::Io(ref err) => fmt::Display::fmt(err, f),
             Self::LevelFilter(ref s) => f.write_str(s),
             #[cfg(feature = "specfile")]

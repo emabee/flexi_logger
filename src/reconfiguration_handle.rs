@@ -1,10 +1,8 @@
 #[cfg(feature = "specfile")]
 use crate::flexi_error::FlexiLoggerError;
-
 use crate::log_specification::LogSpecification;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
-
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -54,7 +52,6 @@ use std::sync::{Arc, RwLock};
 /// // Continue with the log spec you had before.
 /// // ...
 /// ```
-
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
     spec_stack: Vec<LogSpecification>,
@@ -193,6 +190,21 @@ impl ReconfigurationHandle {
     pub fn pop_temp_spec(&mut self) {
         if let Some(previous_spec) = self.spec_stack.pop() {
             self.set_new_spec(previous_spec);
+        }
+    }
+
+    /// Shutdown all participating writers.
+    ///
+    /// This method is supposed to be called at the very end of your program, in case you use
+    /// your own writers, or if you want to securely shutdown the cleanup thread.
+    ///
+    /// See [`LogWriter::shutdown`](writers/trait.LogWriter.html#method.shutdown).
+    pub fn shutdown(&self) {
+        if let PrimaryWriter::MultiWriter(writer) = &*self.primary_writer {
+            writer.shutdown();
+        }
+        for writer in self.other_writers.values() {
+            writer.shutdown();
         }
     }
 

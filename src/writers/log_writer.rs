@@ -34,6 +34,9 @@ pub trait LogWriter: Sync + Send {
         let _ = format;
     }
 
+    /// Cleanup open resources, if necessary.
+    fn shutdown(&self) {}
+
     /// Takes a vec with three patterns per line that represent the log out,
     /// compares the written log with the expected lines,
     /// and asserts that both are in sync.

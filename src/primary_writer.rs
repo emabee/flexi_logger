@@ -182,6 +182,11 @@ impl LogWriter for MultiWriter {
         }
         std::io::stderr().flush()
     }
+    fn shutdown(&self) {
+        for writer in &self.writers {
+            writer.shutdown();
+        }
+    }
 }
 
 // Use a thread-local buffer for writing to stderr

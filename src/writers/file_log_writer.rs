@@ -38,6 +38,7 @@ struct FilenameConfig {
     suffix: String,
     use_timestamp: bool,
 }
+
 // The immutable configuration of a FileLogWriter.
 struct FileLogWriterConfig {
     format: FormatFunction,
@@ -46,7 +47,6 @@ struct FileLogWriterConfig {
     filename_config: FilenameConfig,
     o_create_symlink: Option<PathBuf>,
     use_windows_line_ending: bool,
-    o_cleanup_channel: Option<Mutex<std::sync::mpsc::Sender<()>>>,
 }
 impl FileLogWriterConfig {
     // Factory method; uses the same defaults as Logger.
@@ -63,7 +63,6 @@ impl FileLogWriterConfig {
             append: false,
             o_create_symlink: None,
             use_windows_line_ending: false,
-            o_cleanup_channel: None,
         }
     }
 }
@@ -227,38 +226,14 @@ impl FileLogWriterBuilder {
                 &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
         };
 
-        if let Some(ref rotation_config) = self.o_rotation_config {
-            if rotation_config.cleanup.do_cleanup() && self.cleanup_in_background_thread {
-                // Some cleanup is to be done, and it is supposed to happen in a background thread
-                // We start the background thread and store the sender part of a channel to it
-                let (sender, receiver) = std::sync::mpsc::channel();
-                let cleanup_config = rotation_config.cleanup;
-                let filename_config = self.config.filename_config.clone();
-                std::thread::Builder::new()
-                    .name("flexi_logger-cleanup".to_string())
-                    .stack_size(512 * 1024)
-                    .spawn(move || loop {
-                        match receiver.recv() {
-                            Ok(_) => {
-                                remove_or_zip_too_old_logfiles_impl(
-                                    &cleanup_config,
-                                    &filename_config,
-                                )
-                                .ok();
-                            }
-                            Err(_e) => return,
-                        }
-                    })
-                    .map_err(FlexiLoggerError::CleanupThread)?;
-                self.config.o_cleanup_channel = Some(Mutex::new(sender));
-            }
-        }
+        let state = FileLogWriterState::try_new(
+            &self.config,
+            &self.o_rotation_config,
+            self.cleanup_in_background_thread,
+        )?;
 
         Ok(FileLogWriter {
-            state: Mutex::new(FileLogWriterState::try_new(
-                &self.config,
-                &self.o_rotation_config,
-            )?),
+            state: Mutex::new(state),
             config: self.config,
             max_log_level: self.max_log_level,
         })
@@ -365,11 +340,20 @@ enum RollState {
     Age(Age),
 }
 
+enum MessageToCleanupThread {
+    Act,
+    Die,
+}
+struct CleanupThreadHandle {
+    sender: std::sync::mpsc::Sender<MessageToCleanupThread>,
+    join_handle: std::thread::JoinHandle<()>,
+}
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
     created_at: DateTime<Local>,
     cleanup: Cleanup,
+    o_cleanup_thread_handle: Option<CleanupThreadHandle>,
 }
 impl RotationState {
     fn rotation_necessary(&self) -> bool {
@@ -411,6 +395,7 @@ impl FileLogWriterState {
     fn try_new(
         config: &FileLogWriterConfig,
         o_rotation_config: &Option<RotationConfig>,
+        cleanup_in_background_thread: bool,
     ) -> Result<Self, FlexiLoggerError> {
         let (log_file, o_rotation_state) = match o_rotation_config {
             None => {
@@ -442,8 +427,6 @@ impl FileLogWriterState {
                 };
                 let (log_file, created_at, p_path) = open_log_file(config, true)?;
 
-                let cleanup = rotate_config.cleanup;
-
                 let roll_state = match &rotate_config.criterion {
                     Criterion::Age(age) => RollState::Age(*age),
                     Criterion::Size(size) => {
@@ -456,11 +439,44 @@ impl FileLogWriterState {
                     } // max_size, current_size
                 };
 
-                remove_or_zip_too_old_logfiles(
-                    &config.o_cleanup_channel,
-                    &cleanup,
-                    &config.filename_config,
-                )?;
+                let mut o_cleanup_thread_handle = None;
+                if rotate_config.cleanup.do_cleanup() {
+                    remove_or_zip_too_old_logfiles(
+                        &None,
+                        &rotate_config.cleanup,
+                        &config.filename_config,
+                    )?;
+
+                    if cleanup_in_background_thread {
+                        let cleanup = rotate_config.cleanup;
+                        let filename_config = config.filename_config.clone();
+                        let (sender, receiver) = std::sync::mpsc::channel();
+                        let join_handle = std::thread::Builder::new()
+                            .name("flexi_logger-cleanup".to_string())
+                            .stack_size(512 * 1024)
+                            .spawn(move || loop {
+                                match receiver.recv() {
+                                    Ok(MessageToCleanupThread::Act) => {
+                                        //println!("FIXME woken to act");
+                                        remove_or_zip_too_old_logfiles_impl(
+                                            &cleanup,
+                                            &filename_config,
+                                        )
+                                        .ok();
+                                    }
+                                    Ok(MessageToCleanupThread::Die) | Err(_) => {
+                                        //println!("FIXME woken to die");
+                                        return;
+                                    }
+                                }
+                            })
+                            .map_err(FlexiLoggerError::CleanupThread)?;
+                        o_cleanup_thread_handle = Some(CleanupThreadHandle {
+                            sender,
+                            join_handle,
+                        });
+                    }
+                }
 
                 (
                     log_file,
@@ -468,7 +484,8 @@ impl FileLogWriterState {
                         naming_state,
                         roll_state,
                         created_at,
-                        cleanup,
+                        cleanup: rotate_config.cleanup,
+                        o_cleanup_thread_handle,
                     }),
                 )
             }
@@ -513,8 +530,9 @@ impl FileLogWriterState {
                 {
                     *current_size = 0;
                 }
+
                 remove_or_zip_too_old_logfiles(
-                    &config.o_cleanup_channel,
+                    &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
                     &config.filename_config,
                 )?;
@@ -627,12 +645,16 @@ fn list_of_log_and_zip_files(
 }
 
 fn remove_or_zip_too_old_logfiles(
-    o_cleanup_channel: &Option<Mutex<std::sync::mpsc::Sender<()>>>,
+    o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
 ) -> Result<(), FlexiLoggerError> {
-    if let Some(ref sender) = o_cleanup_channel {
-        sender.lock().unwrap().send(()).ok();
+    // if let Some(ref sender) = o_sender {
+    if let Some(ref cleanup_thread_handle) = o_cleanup_thread_handle {
+        cleanup_thread_handle
+            .sender
+            .send(MessageToCleanupThread::Act)
+            .ok();
         Ok(())
     } else {
         remove_or_zip_too_old_logfiles_impl(cleanup_config, filename_config)
@@ -963,6 +985,23 @@ impl LogWriter for FileLogWriter {
             "Found more log lines than expected: {} ",
             buf
         );
+    }
+
+    fn shutdown(&self) {
+        // do nothing in case of poison errors
+        if let Ok(ref mut state) = self.state.lock() {
+            if let Some(ref mut rotation_state) = state.o_rotation_state {
+                // this sets o_cleanup_thread_handle in self.state.o_rotation_state to None:
+                let o_cleanup_thread_handle = rotation_state.o_cleanup_thread_handle.take();
+                if let Some(cleanup_thread_handle) = o_cleanup_thread_handle {
+                    cleanup_thread_handle
+                        .sender
+                        .send(MessageToCleanupThread::Die)
+                        .ok();
+                    cleanup_thread_handle.join_handle.join().ok();
+                }
+            }
+        }
     }
 }
 

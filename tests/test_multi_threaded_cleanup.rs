@@ -41,13 +41,8 @@ mod d {
 
         let worker_handles = start_worker_threads(NO_OF_THREADS);
         let new_spec = LogSpecification::parse("trace").unwrap();
-        thread::Builder::new()
-            .spawn(move || {
-                thread::sleep(std::time::Duration::from_millis(1000));
-                reconf_handle.set_new_spec(new_spec);
-                0 as u8
-            })
-            .unwrap();
+        thread::sleep(std::time::Duration::from_millis(1000));
+        reconf_handle.set_new_spec(new_spec);
 
         wait_for_workers_to_close(worker_handles);
 
@@ -57,7 +52,7 @@ mod d {
             NO_OF_THREADS, delta
         );
 
-        thread::sleep(std::time::Duration::from_millis(200));
+        reconf_handle.shutdown();
         verify_logs(&directory);
     }
 
