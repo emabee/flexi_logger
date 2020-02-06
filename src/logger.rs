@@ -640,32 +640,39 @@ impl Logger {
         watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
 
         // in a separate thread, reread the specfile when it was updated
-        std::thread::Builder::new().spawn(move || {
-            let _anchor_for_watcher = watcher; // keep it alive!
-            loop {
-                match rx.recv() {
-                    Ok(debounced_event) => match debounced_event {
-                        DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                            if path.canonicalize().unwrap() == specfile {
-                                match LogSpecification::try_from_file(&specfile) {
-                                    Ok(spec) => handle.set_new_spec(spec),
-                                    Err(e) => eprintln!(
-                                        "[flexi_logger] rereading the log specification file \
+        std::thread::Builder::new()
+            .name("flexi_logger-specfile-watcher".to_string())
+            .stack_size(128 * 1024)
+            .spawn(move || {
+                let _anchor_for_watcher = watcher; // keep it alive!
+                loop {
+                    match rx.recv() {
+                        Ok(debounced_event) => {
+                            // println!("got debounced event {:?}", debounced_event);
+                            match debounced_event {
+                                DebouncedEvent::Create(ref path)
+                                | DebouncedEvent::Write(ref path) => {
+                                    if path.canonicalize().unwrap() == specfile {
+                                        match LogSpecification::try_from_file(&specfile) {
+                                            Ok(spec) => handle.set_new_spec(spec),
+                                            Err(e) => eprintln!(
+                                            "[flexi_logger] rereading the log specification file \
                                          failed with {:?}, \
                                          continuing with previous log specification",
-                                        e
-                                    ),
+                                            e
+                                        ),
+                                        }
+                                    }
                                 }
+                                _event => {}
                             }
                         }
-                        _event => {}
-                    },
-                    Err(e) => {
-                        eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
+                        Err(e) => {
+                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
+                        }
                     }
                 }
-            }
-        })?;
+            })?;
 
         Ok(())
     }
