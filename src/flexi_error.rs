@@ -22,10 +22,12 @@ pub enum FlexiLoggerError {
     Toml(toml::de::Error),
     /// Invalid level filter.
     LevelFilter(String),
-    /// Some error occured during parsing.
+    /// Some error occured during parsing as log specification.
     Parse(Vec<String>, LogSpecification),
     /// Logger initialization failed.
     Log(log::SetLoggerError),
+    /// Some synchronization object is poisoned
+    Poison,
 }
 
 impl fmt::Display for FlexiLoggerError {
@@ -46,6 +48,7 @@ impl fmt::Display for FlexiLoggerError {
                 Ok(())
             }
             Self::Log(ref err) => fmt::Display::fmt(err, f),
+            Self::Poison => fmt::Display::fmt("Some synchronization object is poisoned", f),
         }
     }
 }

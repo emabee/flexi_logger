@@ -138,16 +138,14 @@ mod d {
             .unwrap()
             .map(Result::unwrap)
             .inspect(|p| println!("found: {:?}", p))
-            .collect::<Vec<std::path::PathBuf>>()
-            .len();
+            .count();
 
         let zip_pattern = fn_pattern.add("zip");
         let no_of_zip_files = glob(&zip_pattern)
             .unwrap()
             .map(Result::unwrap)
             .inspect(|p| println!("found: {:?}", p))
-            .collect::<Vec<std::path::PathBuf>>()
-            .len();
+            .count();
 
         assert_eq!(no_of_log_files, NO_OF_LOG_FILES);
         assert_eq!(no_of_zip_files, NO_OF_ZIP_FILES);

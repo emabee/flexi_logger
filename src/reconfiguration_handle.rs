@@ -52,6 +52,7 @@ use std::sync::{Arc, RwLock};
 /// // Continue with the log spec you had before.
 /// // ...
 /// ```
+#[derive(Clone)]
 pub struct ReconfigurationHandle {
     spec: Arc<RwLock<LogSpecification>>,
     spec_stack: Vec<LogSpecification>,
@@ -133,7 +134,10 @@ impl ReconfigurationHandle {
                     );
                     e
                 })?;
-            self.current_spec().read().unwrap().to_toml(&mut file)?;
+            self.current_spec()
+                .read()
+                .map_err(|_e| FlexiLoggerError::Poison)?
+                .to_toml(&mut file)?;
             Ok(())
         }
     }
@@ -196,9 +200,13 @@ impl ReconfigurationHandle {
     /// Shutdown all participating writers.
     ///
     /// This method is supposed to be called at the very end of your program, in case you use
-    /// your own writers, or if you want to securely shutdown the cleanup thread.
+    /// your own writers, or if you want to securely shutdown the cleanup-thread of the
+    /// `FileLogWriter`. If you use a [`Cleanup`](enum.Cleanup.html) strategy with zipping,
+    /// and your process terminates
+    /// without correctly shutting down the cleanup-thread, then you might stop the cleanup-thread
+    /// while it is zipping a log file, which can leave unexpected files in the filesystem.
     ///
-    /// See [`LogWriter::shutdown`](writers/trait.LogWriter.html#method.shutdown).
+    /// See also [`LogWriter::shutdown`](writers/trait.LogWriter.html#method.shutdown).
     pub fn shutdown(&self) {
         if let PrimaryWriter::MultiWriter(writer) = &*self.primary_writer {
             writer.shutdown();

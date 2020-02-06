@@ -618,14 +618,19 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of `FlexiLoggerError` can occur.
+    ///
+    /// # Returns
+    ///
+    /// A `ReconfigurationHandle` is returned, predominantly to allow using its
+    /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
     #[cfg(feature = "specfile")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,
         specfile: P,
-    ) -> Result<(), FlexiLoggerError> {
+    ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         // Make logging work, before caring for the specfile
         let mut handle = self.start()?;
-
+        let handle2 = handle.clone();
         let specfile = specfile.as_ref().to_owned();
 
         handle.synchronize_with_specfile(&specfile)?;
@@ -674,7 +679,7 @@ impl Logger {
                 }
             })?;
 
-        Ok(())
+        Ok(handle2)
     }
 }
 
@@ -763,6 +768,14 @@ pub enum Naming {
 }
 
 /// Defines the strategy for handling older log files.
+///
+/// Is used in [`Logger::rotate`](struct.Logger.html#method.rotate).
+///
+/// Note that if you use a strategy other than `Cleanup::Never`, then the cleanup work is
+/// by default done in an extra thread, to minimize the impact on the program.
+/// See
+/// [`Logger::cleanup_in_background_thread`](struct.Logger.html#method.cleanup_in_background_thread)
+/// if you want to control whether this extra thread is created and used.
 #[derive(Copy, Clone)]
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
@@ -778,6 +791,8 @@ pub enum Cleanup {
     KeepZipFiles(usize),
     /// Allows keeping some files as text files and some as zip files.
     ///
+    /// Is used in
+    ///
     /// ## Example
     ///
     /// `KeepLogAndZipFiles(5,30)` ensures that the youngest five log files are kept as text files,
@@ -788,9 +803,9 @@ pub enum Cleanup {
     KeepLogAndZipFiles(usize, usize),
 }
 impl Cleanup {
-    /// Returns true if some cleanup is to be done.
+    // Returns true if some cleanup is to be done.
     #[must_use]
-    pub fn do_cleanup(&self) -> bool {
+    pub(crate) fn do_cleanup(&self) -> bool {
         match self {
             Self::Never => false,
             _ => true,

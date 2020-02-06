@@ -604,23 +604,20 @@ fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
             eprintln!("[flexi_logger] listing rotated log files failed with {}", e);
             IdxState::Start // hope and pray ...??
         }
-        Ok(globresults) => {
+        Ok(files) => {
             let mut highest_idx = IdxState::Start;
-            for globresult in globresults {
-                match globresult {
-                    Err(e) => eprintln!(
-                        "[flexi_logger] error when reading directory for log files: {:?}",
-                        e
-                    ),
-                    Ok(pathbuf) => {
-                        let filename = pathbuf.file_stem().unwrap().to_string_lossy();
-                        let mut it = filename.rsplit("_r");
-                        let idx: u32 = it.next().unwrap().parse().unwrap_or(0);
+            for file in files {
+                let filename = file.file_stem().unwrap(/*ok*/).to_string_lossy();
+                let mut it = filename.rsplit("_r");
+                match it.next() {
+                    Some(next) => {
+                        let idx: u32 = next.parse().unwrap_or(0);
                         highest_idx = match highest_idx {
                             IdxState::Start => IdxState::Idx(idx),
                             IdxState::Idx(prev) => IdxState::Idx(max(prev, idx)),
                         };
                     }
+                    None => continue, // ignore unexpected files
                 }
             }
             highest_idx
@@ -630,7 +627,10 @@ fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
 
 fn list_of_log_and_zip_files(
     filename_config: &FilenameConfig,
-) -> Result<std::iter::Chain<glob::Paths, glob::Paths>, FlexiLoggerError> {
+) -> Result<
+    std::iter::Chain<std::vec::IntoIter<PathBuf>, std::vec::IntoIter<PathBuf>>,
+    FlexiLoggerError,
+> {
     let fn_pattern = String::with_capacity(180)
         .add(&filename_config.file_basename)
         .add("_r[0-9]*")
@@ -638,10 +638,19 @@ fn list_of_log_and_zip_files(
 
     let mut log_pattern = filename_config.directory.clone();
     log_pattern.push(fn_pattern.clone().add(&filename_config.suffix));
+    let log_pattern = log_pattern.as_os_str().to_string_lossy();
+
     let mut zip_pattern = filename_config.directory.clone();
     zip_pattern.push(fn_pattern.add("zip"));
-    Ok(glob::glob(&log_pattern.as_os_str().to_string_lossy())?
-        .chain(glob::glob(&zip_pattern.as_os_str().to_string_lossy())?))
+    let zip_pattern = zip_pattern.as_os_str().to_string_lossy();
+
+    Ok(list_of_files(&log_pattern)?.chain(list_of_files(&zip_pattern)?))
+}
+
+fn list_of_files(pattern: &str) -> Result<std::vec::IntoIter<PathBuf>, FlexiLoggerError> {
+    let mut log_files: Vec<PathBuf> = glob::glob(pattern)?.filter_map(Result::ok).collect();
+    log_files.reverse();
+    Ok(log_files.into_iter())
 }
 
 fn remove_or_zip_too_old_logfiles(
@@ -649,7 +658,6 @@ fn remove_or_zip_too_old_logfiles(
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
 ) -> Result<(), FlexiLoggerError> {
-    // if let Some(ref sender) = o_sender {
     if let Some(ref cleanup_thread_handle) = o_cleanup_thread_handle {
         cleanup_thread_handle
             .sender
@@ -675,30 +683,18 @@ fn remove_or_zip_too_old_logfiles_impl(
         #[cfg(feature = "ziplogs")]
         Cleanup::KeepLogAndZipFiles(log_limit, zip_limit) => (log_limit, zip_limit),
     };
-    // list files by name, in ascending order
-    let mut file_list: Vec<_> = list_of_log_and_zip_files(&filename_config)?
-        .filter_map(Result::ok)
-        .collect();
-    file_list.sort_by(|a, b| {
-        a.file_stem()
-            .unwrap(/*Ok*/)
-            .partial_cmp(b.file_stem().unwrap(/*Ok*/))
-            .unwrap(/*Ok*/)
-    });
-    let total_number_of_files = file_list.len();
 
-    // now do the work
-    for (index, file) in file_list.iter().enumerate() {
-        if total_number_of_files - index > log_limit + zip_limit {
+    for (index, file) in list_of_log_and_zip_files(&filename_config)?.enumerate() {
+        if index >= log_limit + zip_limit {
             // delete (zip or log)
             std::fs::remove_file(&file)?;
-        } else if total_number_of_files - index > log_limit {
-            // zip, if not yet zipped
+        } else if index >= log_limit {
             #[cfg(feature = "ziplogs")]
             {
+                // zip, if not yet zipped
                 if let Some(extension) = file.extension() {
                     if extension != "zip" {
-                        let mut old_file = File::open(file)?;
+                        let mut old_file = File::open(file.clone())?;
                         let mut zip_file = file.clone();
                         zip_file.set_extension("log.zip");
                         let mut zip = flate2::write::GzEncoder::new(
@@ -719,7 +715,7 @@ fn remove_or_zip_too_old_logfiles_impl(
 
 // Moves the current file to the timestamp of the CURRENT file's creation date.
 // If the rotation comes very fast, the new timestamp would be equal to the old one.
-// To avoid file collisions, we insert an additional string to the filename ("-restart-<number>").
+// To avoid file collisions, we insert an additional string to the filename (".restart-<number>").
 // The number is incremented in case of repeated collisions.
 // Cleaning up can leave some restart-files with higher numbers; if we still are in the same
 // second, we need to continue with the restart-incrementing.
@@ -739,9 +735,9 @@ fn rotate_output_file_to_date(
     let mut pattern = rotated_path.clone();
     pattern.set_extension("");
     let mut pattern = pattern.to_string_lossy().to_string();
-    pattern.push_str("-restart-*");
+    pattern.push_str(".restart-*");
 
-    let file_list = glob::glob(&pattern).unwrap();
+    let file_list = glob::glob(&pattern).unwrap(/*ok*/);
     let mut vec: Vec<PathBuf> = file_list.map(Result::unwrap).collect();
     vec.sort_unstable();
 
@@ -752,10 +748,10 @@ fn rotate_output_file_to_date(
             rotated_path = vec.pop().unwrap(/*Ok*/);
             let file_stem = rotated_path
                 .file_stem()
-                .unwrap()
+                .unwrap(/*ok*/)
                 .to_string_lossy()
                 .to_string();
-            let index = file_stem.find("-restart-").unwrap();
+            let index = file_stem.find(".restart-").unwrap();
             file_stem[(index + 9)..].parse::<usize>().unwrap()
         };
 
@@ -765,7 +761,7 @@ fn rotate_output_file_to_date(
                     &creation_date
                         .format("_r%Y-%m-%d_%H-%M-%S")
                         .to_string()
-                        .add(&format!("-restart-{:04}", number)),
+                        .add(&format!(".restart-{:04}", number)),
                 ),
                 &config.filename_config,
             );
@@ -1107,6 +1103,7 @@ mod test {
         assert!(contains("CURRENT", &ts, THREE));
     }
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
@@ -1284,7 +1281,7 @@ mod test {
         assert_eq!(
             glob::glob(&fn_pattern)
                 .unwrap()
-                .map(|r| r.unwrap().into_os_string().to_string_lossy().to_string())
+                .filter_map(Result::ok)
                 .count(),
             NUMBER_OF_FILES
         );

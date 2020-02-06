@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.8] - 2020-02-06
+
+Make cleanup more robust, and allow controlling the cleanup-thread also with
+`Logger::start_with_specfile()`.
+
 ## [0.14.7] - 2020-02-04
 
 If rotation is used with cleanup, do the cleanup by default in a background thread
