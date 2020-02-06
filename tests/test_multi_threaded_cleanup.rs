@@ -137,6 +137,7 @@ mod d {
         let no_of_log_files = glob(&log_pattern)
             .unwrap()
             .map(Result::unwrap)
+            .inspect(|p| println!("found: {:?}", p))
             .collect::<Vec<std::path::PathBuf>>()
             .len();
 
@@ -144,6 +145,7 @@ mod d {
         let no_of_zip_files = glob(&zip_pattern)
             .unwrap()
             .map(Result::unwrap)
+            .inspect(|p| println!("found: {:?}", p))
             .collect::<Vec<std::path::PathBuf>>()
             .len();
 
