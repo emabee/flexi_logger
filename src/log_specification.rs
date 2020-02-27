@@ -2,14 +2,8 @@ use crate::flexi_error::FlexiLoggerError;
 use crate::LevelFilter;
 
 use regex::Regex;
-#[cfg(feature = "specfile")]
-use serde_derive::Deserialize;
-#[cfg(feature = "specfile")]
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
-#[cfg(feature = "specfile")]
-use std::io::{Read, Write};
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -73,17 +67,6 @@ pub struct ModuleFilter {
 }
 
 impl LogSpecification {
-    #[cfg(feature = "specfile")]
-    pub(crate) fn try_from_file<P: AsRef<std::path::Path>>(
-        specfile: P,
-    ) -> Result<Self, FlexiLoggerError> {
-        let mut buf = String::new();
-
-        let mut file = std::fs::File::open(specfile)?;
-        file.read_to_string(&mut buf)?;
-        Self::from_toml(&buf)
-    }
-
     pub(crate) fn update_from(&mut self, other: Self) {
         self.module_filters = other.module_filters;
         self.textfilter = other.textfilter;
@@ -252,11 +235,11 @@ impl LogSpecification {
     /// `FlexiLoggerError::Parse` if the input is malformed.
     #[cfg(feature = "specfile")]
     pub fn from_toml(s: &str) -> Result<Self, FlexiLoggerError> {
-        #[derive(Clone, Debug, Deserialize)]
+        #[derive(Clone, Debug, serde_derive::Deserialize)]
         struct LogSpecFileFormat {
             pub global_level: Option<String>,
             pub global_pattern: Option<String>,
-            pub modules: BTreeMap<String, String>,
+            pub modules: std::collections::BTreeMap<String, String>,
         }
 
         let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
@@ -307,7 +290,7 @@ impl LogSpecification {
     ///
     /// `FlexiLoggerError::Io` if writing fails.
     #[cfg(feature = "specfile")]
-    pub fn to_toml(&self, w: &mut dyn Write) -> Result<(), FlexiLoggerError> {
+    pub fn to_toml(&self, w: &mut dyn std::io::Write) -> Result<(), FlexiLoggerError> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();
         if last.is_some() && last.as_ref().unwrap().module_name.is_none() {

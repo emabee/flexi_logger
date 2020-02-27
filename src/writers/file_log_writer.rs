@@ -211,7 +211,7 @@ impl FileLogWriterBuilder {
         let p_directory = Path::new(&self.config.filename_config.directory);
         std::fs::create_dir_all(&p_directory)?;
         if !std::fs::metadata(&p_directory)?.is_dir() {
-            return Err(FlexiLoggerError::BadDirectory);
+            return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
         let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
@@ -457,7 +457,6 @@ impl FileLogWriterState {
                             .spawn(move || loop {
                                 match receiver.recv() {
                                     Ok(MessageToCleanupThread::Act) => {
-                                        //println!("FIXME woken to act");
                                         remove_or_zip_too_old_logfiles_impl(
                                             &cleanup,
                                             &filename_config,
@@ -465,12 +464,11 @@ impl FileLogWriterState {
                                         .ok();
                                     }
                                     Ok(MessageToCleanupThread::Die) | Err(_) => {
-                                        //println!("FIXME woken to die");
                                         return;
                                     }
                                 }
                             })
-                            .map_err(FlexiLoggerError::CleanupThread)?;
+                            .map_err(FlexiLoggerError::OutputCleanupThread)?;
                         o_cleanup_thread_handle = Some(CleanupThreadHandle {
                             sender,
                             join_handle,
@@ -648,7 +646,10 @@ fn list_of_log_and_zip_files(
 }
 
 fn list_of_files(pattern: &str) -> Result<std::vec::IntoIter<PathBuf>, FlexiLoggerError> {
-    let mut log_files: Vec<PathBuf> = glob::glob(pattern)?.filter_map(Result::ok).collect();
+    let mut log_files: Vec<PathBuf> = glob::glob(pattern)
+        .unwrap(/* failure should be impossible */)
+        .filter_map(Result::ok)
+        .collect();
     log_files.reverse();
     Ok(log_files.into_iter())
 }
@@ -776,7 +777,7 @@ fn rotate_output_file_to_date(
                 // current did not exist, so we had nothing to do
                 Ok(())
             } else {
-                Err(FlexiLoggerError::Io(e))
+                Err(FlexiLoggerError::OutputIo(e))
             }
         }
     }
@@ -803,7 +804,7 @@ fn rotate_output_file_to_idx(
                 // current did not exist, so we had nothing to do
                 Ok(idx_state)
             } else {
-                Err(FlexiLoggerError::Io(e))
+                Err(FlexiLoggerError::OutputIo(e))
             }
         }
     }

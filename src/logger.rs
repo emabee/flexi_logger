@@ -1,15 +1,16 @@
-#[cfg(feature = "specfile")]
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
-
 use crate::flexi_logger::FlexiLogger;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::FormatFunction;
 use crate::ReconfigurationHandle;
 use crate::{formats, FlexiLoggerError, LogSpecification};
+#[cfg(feature = "specfile")]
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::collections::HashMap;
+#[cfg(feature = "specfile")]
+use std::io::Read;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 /// The entry-point for using `flexi_logger`.
 ///
@@ -631,12 +632,14 @@ impl Logger {
         // Make logging work, before caring for the specfile
         let mut handle = self.start()?;
         let handle2 = handle.clone();
-        let specfile = specfile.as_ref().to_owned();
 
-        handle.synchronize_with_specfile(&specfile)?;
+        let specfile = specfile.as_ref().to_owned();
+        synchronize_handle_with_specfile(&mut handle, &specfile)?;
 
         // Now that the file exists, we can canonicalize the path
-        let specfile = specfile.canonicalize().map_err(FlexiLoggerError::Io)?;
+        let specfile = specfile
+            .canonicalize()
+            .map_err(FlexiLoggerError::SpecfileIo)?;
 
         // Watch the parent folder of the specfile, using debounced events
         let (tx, rx) = std::sync::mpsc::channel();
@@ -658,12 +661,15 @@ impl Logger {
                                 DebouncedEvent::Create(ref path)
                                 | DebouncedEvent::Write(ref path) => {
                                     if path.canonicalize().unwrap() == specfile {
-                                        match LogSpecification::try_from_file(&specfile) {
+                                        match log_spec_string_from_file(&specfile)
+                                            .map_err(FlexiLoggerError::SpecfileIo)
+                                            .and_then(|s| LogSpecification::from_toml(&s))
+                                        {
                                             Ok(spec) => handle.set_new_spec(spec),
                                             Err(e) => eprintln!(
                                             "[flexi_logger] rereading the log specification file \
-                                         failed with {:?}, \
-                                         continuing with previous log specification",
+                                             failed with {:?}, \
+                                             continuing with previous log specification",
                                             e
                                         ),
                                         }
@@ -681,6 +687,60 @@ impl Logger {
 
         Ok(handle2)
     }
+}
+
+// If the specfile exists, read the file and update the log_spec from it;
+// otherwise try to create the file, with the current spec as content, under the specified name.
+#[cfg(feature = "specfile")]
+pub(crate) fn synchronize_handle_with_specfile(
+    handle: &mut ReconfigurationHandle,
+    specfile: &std::path::PathBuf,
+) -> Result<(), FlexiLoggerError> {
+    if specfile
+        .extension()
+        .unwrap_or_else(|| std::ffi::OsStr::new(""))
+        .to_str()
+        .unwrap_or("")
+        != "toml"
+    {
+        return Err(FlexiLoggerError::SpecfileExtension(
+            "only spec files with extension toml are supported",
+        ));
+    }
+
+    if std::path::Path::is_file(specfile) {
+        let s = log_spec_string_from_file(specfile).map_err(FlexiLoggerError::SpecfileIo)?;
+        handle.set_new_spec(LogSpecification::from_toml(&s)?);
+    } else {
+        if let Some(specfolder) = specfile.parent() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(specfolder)
+                .map_err(FlexiLoggerError::SpecfileIo)?;
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(specfile)
+            .map_err(FlexiLoggerError::SpecfileIo)?;
+
+        handle
+            .current_spec()
+            .read()
+            .map_err(|_e| FlexiLoggerError::Poison)?
+            .to_toml(&mut file)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "specfile")]
+pub(crate) fn log_spec_string_from_file<P: AsRef<std::path::Path>>(
+    specfile: P,
+) -> Result<String, std::io::Error> {
+    let mut buf = String::new();
+    let mut file = std::fs::File::open(specfile)?;
+    file.read_to_string(&mut buf)?;
+    Ok(buf)
 }
 
 /// Criterion when to rotate the log file.

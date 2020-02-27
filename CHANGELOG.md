@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2020-02-27
+
+Refine and rename error variants to allow e.g. differentiating
+between errors related to the output (files)
+and errors related to the specfile.
+
 ## [0.14.8] - 2020-02-06
 
 Make cleanup more robust, and allow controlling the cleanup-thread also with

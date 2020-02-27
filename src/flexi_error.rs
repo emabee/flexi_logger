@@ -1,90 +1,60 @@
 use crate::log_specification::LogSpecification;
 use log;
-use std::error::Error;
-use std::fmt;
+// use std::backtrace::Backtrace;
+use thiserror::Error;
 
 /// Describes errors in the initialization of `flexi_logger`.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum FlexiLoggerError {
     /// Log file cannot be written because the specified path is not a directory.
-    BadDirectory,
+    #[error("Log file cannot be written because the specified path is not a directory")]
+    OutputBadDirectory,
+
     /// Spawning the cleanup thread failed.
     ///
     /// This error can safely be avoided with `Logger::cleanup_in_background_thread(false)`.
-    CleanupThread(std::io::Error),
-    /// Log cannot be written because the configured output directory is not accessible.
-    Io(std::io::Error),
-    /// Error with the filesystem notifications for the specfile.
+    #[error("Spawning the cleanup thread failed.")]
+    OutputCleanupThread(std::io::Error),
+
+    /// Log cannot be written, e.g. because the configured output directory is not accessible.
+    #[error(
+        "Log cannot be written, e.g. because the configured output directory is not accessible"
+    )]
+    OutputIo(#[from] std::io::Error),
+
+    /// Filesystem notifications for the specfile could not be set up.
+    #[error("Filesystem notifications for the specfile could not be set up")]
     #[cfg(feature = "specfile")]
-    Notify(notify::Error),
-    /// The configured logspec file cannot be read.
+    SpecfileNotify(#[from] notify::Error),
+
+    /// Parsing the configured logspec toml-file failed.
+    #[error("Parsing the configured logspec toml-file failed")]
     #[cfg(feature = "specfile")]
-    Toml(toml::de::Error),
+    SpecfileToml(#[from] toml::de::Error),
+
+    /// Specfile cannot be accessed or created.
+    #[error("Specfile cannot be accessed or created")]
+    #[cfg(feature = "specfile")]
+    SpecfileIo(std::io::Error),
+
+    /// Specfile has an unsupported extension.
+    #[error("Specfile has an unsupported extension")]
+    #[cfg(feature = "specfile")]
+    SpecfileExtension(&'static str),
+
     /// Invalid level filter.
+    #[error("Invalid level filter")]
     LevelFilter(String),
-    /// Some error occured during parsing as log specification.
+
+    /// Parsing a log specification failed.
+    #[error("Parsing a log specification failed")]
     Parse(Vec<String>, LogSpecification),
+
     /// Logger initialization failed.
-    Log(log::SetLoggerError),
-    /// Some synchronization object is poisoned
+    #[error("Logger initialization failed")]
+    Log(#[from] log::SetLoggerError),
+
+    /// Some synchronization object is poisoned.
+    #[error("Some synchronization object is poisoned")]
     Poison,
-}
-
-impl fmt::Display for FlexiLoggerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Self::BadDirectory => f.write_str("Bad directory"),
-            Self::CleanupThread(ref err) | Self::Io(ref err) => fmt::Display::fmt(err, f),
-            Self::LevelFilter(ref s) => f.write_str(s),
-            #[cfg(feature = "specfile")]
-            Self::Notify(ref err) => fmt::Display::fmt(err, f),
-            #[cfg(feature = "specfile")]
-            Self::Toml(ref err) => fmt::Display::fmt(err, f),
-            Self::Parse(ref vec, ref logspec) => {
-                for s in vec {
-                    f.write_str(&format!("parse error: \'{}\', ", s))?;
-                }
-                f.write_str(&format!("resulting logspec: {:?}", logspec))?;
-                Ok(())
-            }
-            Self::Log(ref err) => fmt::Display::fmt(err, f),
-            Self::Poison => fmt::Display::fmt("Some synchronization object is poisoned", f),
-        }
-    }
-}
-
-impl Error for FlexiLoggerError {}
-
-impl From<log::SetLoggerError> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: log::SetLoggerError) -> Self {
-        Self::Log(err)
-    }
-}
-impl From<std::io::Error> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: std::io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-impl From<glob::PatternError> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: glob::PatternError) -> Self {
-        Self::Io(std::io::Error::new(std::io::ErrorKind::Other, err))
-    }
-}
-
-#[cfg(feature = "specfile")]
-impl From<toml::de::Error> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: toml::de::Error) -> Self {
-        Self::Toml(err)
-    }
-}
-#[cfg(feature = "specfile")]
-impl From<notify::Error> for FlexiLoggerError {
-    #[must_use]
-    fn from(err: notify::Error) -> Self {
-        Self::Notify(err)
-    }
 }

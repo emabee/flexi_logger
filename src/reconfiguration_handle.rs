@@ -1,5 +1,3 @@
-#[cfg(feature = "specfile")]
-use crate::flexi_error::FlexiLoggerError;
 use crate::log_specification::LogSpecification;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
@@ -76,70 +74,6 @@ impl ReconfigurationHandle {
     #[cfg(feature = "specfile")]
     pub(crate) fn current_spec(&self) -> Arc<RwLock<LogSpecification>> {
         Arc::clone(&self.spec)
-    }
-
-    // If the specfile exists, read the file and update the log_spec from it;
-    // otherwise try to create the file, with the current spec as content, under the specified name.
-    #[cfg(feature = "specfile")]
-    pub(crate) fn synchronize_with_specfile(
-        &mut self,
-        specfile: &std::path::PathBuf,
-    ) -> Result<(), FlexiLoggerError> {
-        if specfile
-            .extension()
-            .unwrap_or_else(|| std::ffi::OsStr::new(""))
-            .to_str()
-            .unwrap_or("")
-            != "toml"
-        {
-            return Err(FlexiLoggerError::Parse(
-                vec!["[flexi_logger] only spec files with suffix toml are supported".to_owned()],
-                LogSpecification::off(),
-            ));
-        }
-
-        if std::path::Path::is_file(specfile) {
-            self.set_new_spec(LogSpecification::try_from_file(&specfile).map_err(|e| {
-                eprintln!(
-                    "[flexi_logger] reading the log specification file failed with {:?}",
-                    e
-                );
-                e
-            })?);
-            Ok(())
-        } else {
-            if let Some(specfolder) = specfile.parent() {
-                std::fs::DirBuilder::new()
-                    .recursive(true)
-                    .create(specfolder)
-                    .map_err(|e| {
-                        eprintln!(
-                            "[flexi_logger] cannot create the folder for the logspec file \
-                             under the specified name {:?}, caused by: {}",
-                            &specfile, e
-                        );
-                        e
-                    })?;
-            }
-
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(specfile)
-                .map_err(|e| {
-                    eprintln!(
-                        "[flexi_logger] cannot create an initial logspec file \
-                         under the specified name {:?}, caused by: {}",
-                        &specfile, e
-                    );
-                    e
-                })?;
-            self.current_spec()
-                .read()
-                .map_err(|_e| FlexiLoggerError::Poison)?
-                .to_toml(&mut file)?;
-            Ok(())
-        }
     }
 
     //
