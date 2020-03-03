@@ -1,6 +1,7 @@
 use crate::flexi_error::FlexiLoggerError;
 use crate::LevelFilter;
 
+#[cfg(feature = "textfilter")]
 use regex::Regex;
 use std::collections::HashMap;
 use std::env;
@@ -52,6 +53,7 @@ use std::env;
 #[derive(Clone, Debug, Default)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
+    #[cfg(feature = "textfilter")]
     textfilter: Option<Regex>,
 }
 
@@ -69,7 +71,11 @@ pub struct ModuleFilter {
 impl LogSpecification {
     pub(crate) fn update_from(&mut self, other: Self) {
         self.module_filters = other.module_filters;
-        self.textfilter = other.textfilter;
+
+        #[cfg(feature = "textfilter")]
+        {
+            self.textfilter = other.textfilter;
+        }
     }
 
     pub(crate) fn max_level(&self) -> log::LevelFilter {
@@ -114,6 +120,7 @@ impl LogSpecification {
 
         let mut parts = spec.split('/');
         let mods = parts.next();
+        #[cfg(feature = "textfilter")]
         let filter = parts.next();
         if parts.next().is_some() {
             push_err(
@@ -180,6 +187,7 @@ impl LogSpecification {
             }
         }
 
+        #[cfg(feature = "textfilter")]
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
@@ -190,6 +198,7 @@ impl LogSpecification {
 
         let logspec = Self {
             module_filters: dirs.level_sort(),
+            #[cfg(feature = "textfilter")]
             textfilter,
         };
 
@@ -260,6 +269,7 @@ impl LogSpecification {
             });
         }
 
+        #[cfg(feature = "textfilter")]
         let textfilter = match logspec_ff.global_pattern {
             None => None,
             Some(s) => match Regex::new(&s) {
@@ -273,6 +283,7 @@ impl LogSpecification {
 
         let logspec = Self {
             module_filters: module_filters.level_sort(),
+            #[cfg(feature = "textfilter")]
             textfilter,
         };
         if parse_errs.is_empty() {
@@ -353,6 +364,7 @@ impl LogSpecification {
     }
 
     /// Provides a reference to the text filter.
+    #[cfg(feature = "textfilter")]
     pub fn text_filter(&self) -> &Option<Regex> {
         &(self.textfilter)
     }
@@ -488,11 +500,13 @@ impl LogSpecBuilder {
     pub fn finalize(self) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.into_vec_module_filter(),
+            #[cfg(feature = "textfilter")]
             textfilter: None,
         }
     }
 
     /// Creates a log specification with text filter.
+    #[cfg(feature = "textfilter")]
     pub fn finalize_with_textfilter(self, tf: Regex) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.into_vec_module_filter(),
@@ -505,11 +519,13 @@ impl LogSpecBuilder {
     pub fn build(&self) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.clone().into_vec_module_filter(),
+            #[cfg(feature = "textfilter")]
             textfilter: None,
         }
     }
 
     /// Creates a log specification without being consumed, optionally with a text filter.
+    #[cfg(feature = "textfilter")]
     pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.clone().into_vec_module_filter(),
@@ -577,6 +593,7 @@ mod tests {
         );
         assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Debug);
 
+        #[cfg(feature = "textfilter")]
         assert!(spec.text_filter().is_none());
     }
 
@@ -610,10 +627,12 @@ mod tests {
         );
         assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Debug);
 
+        #[cfg(feature = "textfilter")]
         assert!(spec.text_filter().is_none());
     }
 
     #[test]
+    #[cfg(feature = "textfilter")]
     fn parse_logging_spec_valid_filter() {
         let spec = LogSpecification::parse(" crate1::mod1 = error , crate1::mod2,crate2=debug/abc")
             .unwrap();
@@ -653,6 +672,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "textfilter")]
     fn parse_logging_spec_empty_with_filter() {
         let spec = LogSpecification::parse("crate1/a*c").unwrap();
         assert_eq!(spec.module_filters().len(), 1);

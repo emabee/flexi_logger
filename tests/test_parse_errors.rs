@@ -14,6 +14,7 @@ fn parse_errors_logspec() {
                     .unwrap()
                     .module_filters()
             );
+            #[cfg(feature = "textfilter")]
             assert!(logspec.text_filter().is_none());
         }
         _ => panic!("Wrong error from parsing (1)"),
@@ -28,6 +29,7 @@ fn parse_errors_logspec() {
                 logspec.module_filters(),
                 LogSpecification::parse("info").unwrap().module_filters()
             );
+            #[cfg(feature = "textfilter")]
             assert!(logspec.text_filter().is_none());
         }
         _ => panic!("Wrong error from parsing (2)"),
@@ -39,6 +41,7 @@ fn parse_errors_logspec() {
                 logspec.module_filters(),
                 LogSpecification::off().module_filters()
             );
+            #[cfg(feature = "textfilter")]
             assert!(logspec.text_filter().is_none());
         }
         _ => panic!("Wrong error from parsing (3)"),
@@ -53,6 +56,7 @@ fn parse_errors_logspec() {
                 logspec.module_filters(),
                 LogSpecification::off().module_filters()
             );
+            #[cfg(feature = "textfilter")]
             assert!(logspec.text_filter().is_none());
         }
         _ => panic!("Wrong error from parsing (4)"),

@@ -177,6 +177,10 @@ or all rotated log files in zipped form rather than as text files.
 
 This is still an experimental feature, likely working, but not well tested. Feedback of all kinds is highly appreciated.
 
+### **`textfilter`**
+
+Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
+
 ## Versions
 
 See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md).
