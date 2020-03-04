@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.15.0"
+version = "0.15.1"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -20,11 +20,12 @@ categories = ["development-tools::debugging"]
 all-features = true
 
 [features]
-default = ["colors"]
+default = ["colors", "textfilter"]
 colors = ["yansi"]
 specfile = ["serde","toml","notify", "serde_derive"]
 syslog_writer = ["libc", "hostname"]
 ziplogs = ["flate2"]
+textfilter = ["regex"]
 
 [dependencies]
 chrono = "0.4"
@@ -32,7 +33,7 @@ glob = "0.3"
 hostname = {version = "0.3", optional = true}
 log = { version = "0.4", features = ["std"] }
 notify = { version = "4.0", optional = true }
-regex = "1.1"
+regex = { version = "1.1", optional = true }
 serde = { version = "1.0", optional = true }
 serde_derive = {version = "1.0", optional = true}
 thiserror = "1.0"

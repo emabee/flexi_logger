@@ -3,6 +3,7 @@ use crate::writers::LogWriter;
 use crate::LogSpecification;
 
 use log;
+#[cfg(feature = "textfilter")]
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -114,19 +115,22 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        // closure that we need below
-        let check_text_filter = |text_filter: &Option<Regex>| {
-            if let Some(filter) = text_filter.as_ref() {
-                filter.is_match(&*record.args().to_string())
-            } else {
-                true
-            }
-        };
+        #[cfg(feature = "textfilter")]
+        {
+            // closure that we need below
+            let check_text_filter = |text_filter: &Option<Regex>| {
+                if let Some(filter) = text_filter.as_ref() {
+                    filter.is_match(&*record.args().to_string())
+                } else {
+                    true
+                }
+            };
 
-        if !check_text_filter(
-            self.log_specification.read().as_ref().unwrap(/* expose this? */).text_filter(),
-        ) {
-            return;
+            if !check_text_filter(
+                self.log_specification.read().as_ref().unwrap(/* expose this? */).text_filter(),
+            ) {
+                return;
+            }
         }
 
         self.primary_writer

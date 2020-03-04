@@ -1,13 +1,14 @@
-use flexi_logger::{default_format, LogSpecification, Logger};
-use log::*;
-
-use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
-
 #[test]
+#[cfg(feature = "textfilter")]
 fn test_textfilter() {
+    use flexi_logger::{default_format, LogSpecification, Logger};
+    use log::*;
+
+    use std::env;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+    use std::path::Path;
+
     let logspec = LogSpecification::parse("info/Hello").unwrap();
     Logger::with(logspec)
         .format(default_format)
