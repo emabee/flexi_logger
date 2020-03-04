@@ -115,9 +115,9 @@ impl log::Log for FlexiLogger {
             return;
         }
 
-        // closure that we need below
         #[cfg(feature = "textfilter")]
         {
+            // closure that we need below
             let check_text_filter = |text_filter: &Option<Regex>| {
                 if let Some(filter) = text_filter.as_ref() {
                     filter.is_match(&*record.args().to_string())

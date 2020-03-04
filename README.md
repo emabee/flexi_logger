@@ -173,13 +173,13 @@ For that reason the feature is not active by default.
 The `ziplogs` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
 or all rotated log files in zipped form rather than as text files.
 
-### **`syslog`**
-
-This is still an experimental feature, likely working, but not well tested. Feedback of all kinds is highly appreciated.
-
 ### **`textfilter`**
 
 Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
+
+### **`syslog`**
+
+This is still an experimental feature, likely working, but not well tested. Feedback of all kinds is highly appreciated.
 
 ## Versions
 

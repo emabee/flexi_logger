@@ -45,6 +45,7 @@ fn main() {
 
     // Build in important variants
     run_command!("cargo", "build");
+    run_command!("cargo", "build", "--no-default-features");
     run_command!("cargo", "build", "--all-features");
     run_command!("cargo", "build", "--release");
     run_command!("cargo", "build", "--release", "--all-features");
@@ -55,7 +56,8 @@ fn main() {
 
     // Run tests in important variants
     run_command!("cargo", "test", "--release", "--all-features");
-    run_command!("cargo", "test");
+    run_command!("cargo", "test", "--no-default-features");
+    run_command!("cargo", "test", "--release");
     run_script("cleanup");
 
     // doc

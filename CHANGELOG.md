@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2020-03-04
+
+Make the textfilter functionality an optional default feature;
+deselecting it removes the regex crate as a required dependency,
+which reduces the size overhead for any binary using `flexi_logger`
+(kudos to [Petre Eftime](petre.eftime@gmail.com)).
+
 ## [0.15.0] - 2020-02-27
 
 Refine and rename error variants to allow e.g. differentiating
