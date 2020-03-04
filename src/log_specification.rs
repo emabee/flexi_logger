@@ -365,7 +365,7 @@ impl LogSpecification {
 
     /// Provides a reference to the text filter.
     ///
-    /// This method is only avaible with feature 'textfilter'.
+    /// This method is only avaible with feature `textfilter`, which is a default feature.
     #[cfg(feature = "textfilter")]
     pub fn text_filter(&self) -> &Option<Regex> {
         &(self.textfilter)
@@ -509,7 +509,7 @@ impl LogSpecBuilder {
 
     /// Creates a log specification with text filter.
     ///
-    /// This method is only avaible with feature 'textfilter'.
+    /// This method is only avaible with feature `textfilter`, which is a default feature.
     #[cfg(feature = "textfilter")]
     pub fn finalize_with_textfilter(self, tf: Regex) -> LogSpecification {
         LogSpecification {
@@ -530,7 +530,7 @@ impl LogSpecBuilder {
 
     /// Creates a log specification without being consumed, optionally with a text filter.
     ///
-    /// This method is only avaible with feature 'textfilter'.
+    /// This method is only avaible with feature `textfilter`, which is a default feature.
     #[cfg(feature = "textfilter")]
     pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
         LogSpecification {
