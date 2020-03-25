@@ -115,7 +115,7 @@ impl LogSpecification {
     ///
     /// `FlexiLoggerError::Parse` if the input is malformed.
     pub fn parse(spec: &str) -> Result<Self, FlexiLoggerError> {
-        let mut parse_errs = Vec::<String>::new();
+        let mut parse_errs = String::new();
         let mut dirs = Vec::<ModuleFilter>::new();
 
         let mut parts = spec.split('/');
@@ -124,7 +124,7 @@ impl LogSpecification {
         let filter = parts.next();
         if parts.next().is_some() {
             push_err(
-                format!("invalid log spec '{}' (too many '/'s), ignoring it", spec),
+                &format!("invalid log spec '{}' (too many '/'s), ignoring it", spec),
                 &mut parse_errs,
             );
             return parse_err(parse_errs, Self::off());
@@ -167,14 +167,14 @@ impl LogSpecification {
                         match parse_level_filter(part_1.trim()) {
                             Ok(num) => (num, Some(part_0.trim())),
                             Err(e) => {
-                                push_err(e.to_string(), &mut parse_errs);
+                                push_err(&e.to_string(), &mut parse_errs);
                                 continue;
                             }
                         }
                     }
                     _ => {
                         push_err(
-                            format!("invalid part in log spec '{}', ignoring it", s),
+                            &format!("invalid part in log spec '{}', ignoring it", s),
                             &mut parse_errs,
                         );
                         continue;
@@ -191,7 +191,7 @@ impl LogSpecification {
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(re),
             Err(e) => {
-                push_err(format!("invalid regex filter - {}", e), &mut parse_errs);
+                push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
                 None
             }
         });
@@ -205,7 +205,7 @@ impl LogSpecification {
         if parse_errs.is_empty() {
             Ok(logspec)
         } else {
-            Err(FlexiLoggerError::Parse(parse_errs, logspec))
+            parse_err(parse_errs, logspec)
         }
     }
 
@@ -252,7 +252,7 @@ impl LogSpecification {
         }
 
         let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
-        let mut parse_errs = Vec::<String>::new();
+        let mut parse_errs = String::new();
         let mut module_filters = Vec::<ModuleFilter>::new();
 
         if let Some(s) = logspec_ff.global_level {
@@ -275,7 +275,7 @@ impl LogSpecification {
             Some(s) => match Regex::new(&s) {
                 Ok(re) => Some(re),
                 Err(e) => {
-                    push_err(format!("invalid regex filter - {}", e), &mut parse_errs);
+                    push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
                     None
                 }
             },
@@ -289,7 +289,7 @@ impl LogSpecification {
         if parse_errs.is_empty() {
             Ok(logspec)
         } else {
-            Err(FlexiLoggerError::Parse(parse_errs, logspec))
+            parse_err(parse_errs, logspec)
         }
     }
 
@@ -372,13 +372,15 @@ impl LogSpecification {
     }
 }
 
-fn push_err(s: String, parse_errs: &mut Vec<String>) {
-    println!("flexi_logger warning: {}", s);
-    parse_errs.push(s);
+fn push_err(s: &str, parse_errs: &mut String) {
+    if !parse_errs.is_empty() {
+        parse_errs.push_str("; ");
+    }
+    parse_errs.push_str(s);
 }
 
 fn parse_err(
-    errors: Vec<String>,
+    errors: String,
     logspec: LogSpecification,
 ) -> Result<LogSpecification, FlexiLoggerError> {
     Err(FlexiLoggerError::Parse(errors, logspec))
@@ -400,11 +402,11 @@ fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerErr
     }
 }
 
-fn contains_dash_or_whitespace(s: &str, parse_errs: &mut Vec<String>) -> bool {
+fn contains_dash_or_whitespace(s: &str, parse_errs: &mut String) -> bool {
     let result = s.find('-').is_some() || s.find(' ').is_some() || s.find('\t').is_some();
     if result {
         push_err(
-            format!(
+            &format!(
                 "ignoring invalid part in log spec '{}' (contains a dash or whitespace)",
                 s
             ),

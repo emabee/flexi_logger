@@ -46,9 +46,9 @@ pub enum FlexiLoggerError {
     #[error("Invalid level filter")]
     LevelFilter(String),
 
-    /// Parsing a log specification failed.
-    #[error("Parsing a log specification failed")]
-    Parse(Vec<String>, LogSpecification),
+    /// Failed to parse log specification.
+    #[error("Failed to parse log specification: {0}")]
+    Parse(String, LogSpecification),
 
     /// Logger initialization failed.
     #[error("Logger initialization failed")]

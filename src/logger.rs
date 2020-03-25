@@ -46,7 +46,7 @@ use std::sync::{Arc, RwLock};
 ///
 pub struct Logger {
     spec: LogSpecification,
-    parse_errs: Option<Vec<String>>,
+    parse_errs: Option<String>,
     log_target: LogTarget,
     duplicate: Duplicate,
     format_for_file: FormatFunction,
@@ -120,20 +120,18 @@ impl Logger {
         Self::from_result(LogSpecification::env_or_parse(s))
     }
 
-    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<Vec<String>>) -> Self {
-        #[cfg(feature = "colors")]
-        let default_format = formats::colored_default_format;
-        #[cfg(not(feature = "colors"))]
-        let default_format = formats::default_format;
-
+    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<String>) -> Self {
         Self {
             spec,
             parse_errs,
             log_target: LogTarget::StdErr,
             duplicate: Duplicate::None,
-            format_for_file: default_format,
-            format_for_stderr: default_format,
-            format_for_writer: default_format,
+            format_for_file: formats::default_format,
+            #[cfg(feature = "colors")]
+            format_for_stderr: formats::colored_default_format,
+            #[cfg(not(feature = "colors"))]
+            format_for_stderr: formats::default_format,
+            format_for_writer: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }

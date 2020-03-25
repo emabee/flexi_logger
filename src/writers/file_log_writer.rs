@@ -214,7 +214,7 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
-        let arg0 = env::args().nth(0).unwrap_or_else(|| "rs".to_owned());
+        let arg0 = env::args().next().unwrap_or_else(|| "rs".to_owned());
         self.config.filename_config.file_basename =
             Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy().to_string();
 
@@ -1304,7 +1304,7 @@ mod test {
     }
 
     fn get_hackyfilepath(infix: &str, discr: &str) -> Box<Path> {
-        let arg0 = std::env::args().nth(0).unwrap();
+        let arg0 = std::env::args().next().unwrap();
         let mut s_filename = Path::new(&arg0)
             .file_stem()
             .unwrap()
