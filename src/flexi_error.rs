@@ -1,5 +1,4 @@
 use crate::log_specification::LogSpecification;
-use log;
 // use std::backtrace::Backtrace;
 use thiserror::Error;
 

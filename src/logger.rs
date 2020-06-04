@@ -517,7 +517,22 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of `FlexiLoggerError` can occur.
-    pub fn start(mut self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+    pub fn start(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+        let (boxed_logger, handle) = self.build()?;
+        log::set_boxed_logger(boxed_logger)?;
+        Ok(handle)
+    }
+
+    /// Consumes the Logger object and builds a boxed logger and a `ReconfigurationHandle` for it.
+    ///
+    /// The returned reconfiguration handle allows updating the log specification programmatically
+    /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
+    /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
+    ///
+    /// # Errors
+    ///
+    /// Several variants of `FlexiLoggerError` can occur.
+    pub fn build(mut self) -> Result<(Box<dyn log::Log>, ReconfigurationHandle), FlexiLoggerError> {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
         let other_writers = Arc::new(self.other_writers);
@@ -555,10 +570,9 @@ impl Logger {
             Arc::clone(&other_writers),
         );
 
-        log::set_boxed_logger(Box::new(flexi_logger))?;
         let handle = ReconfigurationHandle::new(spec, primary_writer, other_writers);
         handle.reconfigure(max_level);
-        Ok(handle)
+        Ok((Box::new(flexi_logger), handle))
     }
 
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
@@ -628,63 +642,88 @@ impl Logger {
         specfile: P,
     ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
         // Make logging work, before caring for the specfile
-        let mut handle = self.start()?;
-        let handle2 = handle.clone();
+        let (boxed_logger, handle) = self.build()?;
+        log::set_boxed_logger(boxed_logger)?;
+        setup_specfile(specfile, handle.clone())?;
+        Ok(handle)
+    }
 
-        let specfile = specfile.as_ref().to_owned();
-        synchronize_handle_with_specfile(&mut handle, &specfile)?;
+    ///
+    /// # Errors
+    ///
+    /// Several variants of `FlexiLoggerError` can occur.
+    ///
+    /// # Returns
+    ///
+    /// A `ReconfigurationHandle` is returned, predominantly to allow using its
+    /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
+    #[cfg(feature = "specfile")]
+    pub fn build_with_specfile<P: AsRef<std::path::Path>>(
+        self,
+        specfile: P,
+    ) -> Result<(Box<dyn log::Log>, ReconfigurationHandle), FlexiLoggerError> {
+        let (boxed_log, handle) = self.build()?;
+        setup_specfile(specfile, handle.clone())?;
+        Ok((boxed_log, handle))
+    }
+}
 
-        // Now that the file exists, we can canonicalize the path
-        let specfile = specfile
-            .canonicalize()
-            .map_err(FlexiLoggerError::SpecfileIo)?;
+#[cfg(feature = "specfile")]
+fn setup_specfile<P: AsRef<std::path::Path>>(
+    specfile: P,
+    mut handle: ReconfigurationHandle,
+) -> Result<(), FlexiLoggerError> {
+    let specfile = specfile.as_ref().to_owned();
+    synchronize_handle_with_specfile(&mut handle, &specfile)?;
 
-        // Watch the parent folder of the specfile, using debounced events
-        let (tx, rx) = std::sync::mpsc::channel();
-        let debouncing_delay = std::time::Duration::from_millis(1000);
-        let mut watcher = watcher(tx, debouncing_delay)?;
-        watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
+    // Now that the file exists, we can canonicalize the path
+    let specfile = specfile
+        .canonicalize()
+        .map_err(FlexiLoggerError::SpecfileIo)?;
 
-        // in a separate thread, reread the specfile when it was updated
-        std::thread::Builder::new()
-            .name("flexi_logger-specfile-watcher".to_string())
-            .stack_size(128 * 1024)
-            .spawn(move || {
-                let _anchor_for_watcher = watcher; // keep it alive!
-                loop {
-                    match rx.recv() {
-                        Ok(debounced_event) => {
-                            // println!("got debounced event {:?}", debounced_event);
-                            match debounced_event {
-                                DebouncedEvent::Create(ref path)
-                                | DebouncedEvent::Write(ref path) => {
-                                    if path.canonicalize().unwrap() == specfile {
-                                        match log_spec_string_from_file(&specfile)
-                                            .map_err(FlexiLoggerError::SpecfileIo)
-                                            .and_then(|s| LogSpecification::from_toml(&s))
-                                        {
-                                            Ok(spec) => handle.set_new_spec(spec),
-                                            Err(e) => eprintln!(
+    // Watch the parent folder of the specfile, using debounced events
+    let (tx, rx) = std::sync::mpsc::channel();
+    let debouncing_delay = std::time::Duration::from_millis(1000);
+    let mut watcher = watcher(tx, debouncing_delay)?;
+    watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
+
+    // in a separate thread, reread the specfile when it was updated
+    std::thread::Builder::new()
+        .name("flexi_logger-specfile-watcher".to_string())
+        .stack_size(128 * 1024)
+        .spawn(move || {
+            let _anchor_for_watcher = watcher; // keep it alive!
+            loop {
+                match rx.recv() {
+                    Ok(debounced_event) => {
+                        // println!("got debounced event {:?}", debounced_event);
+                        match debounced_event {
+                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
+                                if path.canonicalize().unwrap() == specfile {
+                                    match log_spec_string_from_file(&specfile)
+                                        .map_err(FlexiLoggerError::SpecfileIo)
+                                        .and_then(|s| LogSpecification::from_toml(&s))
+                                    {
+                                        Ok(spec) => handle.set_new_spec(spec),
+                                        Err(e) => eprintln!(
                                             "[flexi_logger] rereading the log specification file \
-                                             failed with {:?}, \
-                                             continuing with previous log specification",
+                                         failed with {:?}, \
+                                         continuing with previous log specification",
                                             e
                                         ),
-                                        }
                                     }
                                 }
-                                _event => {}
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
+                            _event => {}
                         }
                     }
+                    Err(e) => {
+                        eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
+                    }
                 }
-            })?;
-
-        Ok(handle2)
-    }
+            }
+        })?;
+    Ok(())
 }
 
 // If the specfile exists, read the file and update the log_spec from it;

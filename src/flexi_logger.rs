@@ -2,7 +2,6 @@ use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
 use crate::LogSpecification;
 
-use log;
 #[cfg(feature = "textfilter")]
 use regex::Regex;
 use std::collections::HashMap;

@@ -4,6 +4,8 @@ Cargo.lock
 *.alerts
 *.log
 *.seclog
+*.gz
+*.zip
 link_to_log
 link_to_mt_log
 log_files

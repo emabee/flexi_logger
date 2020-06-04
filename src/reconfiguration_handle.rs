@@ -1,7 +1,6 @@
 use crate::log_specification::LogSpecification;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -153,6 +152,6 @@ impl ReconfigurationHandle {
     // Allows checking the logs written so far to the writer
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        Borrow::<PrimaryWriter>::borrow(&self.primary_writer).validate_logs(expected)
+        self.primary_writer.validate_logs(expected)
     }
 }
