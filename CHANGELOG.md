@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2020-06-04
+
+Add compatibility with multi_log by adding methods
+`Logger::build` and `Logger::build_with_specfile` (fixes issue-44).
+
+Add `LogSpecBuilder::insert_modules_from()` (fixes issue-43).
+
 ## [0.15.2] - 2020-03-24
 
 Improve handling of parse-errors.

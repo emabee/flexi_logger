@@ -523,9 +523,13 @@ impl Logger {
         Ok(handle)
     }
 
-    /// Consumes the Logger object and builds a boxed logger and a `ReconfigurationHandle` for it.
+    /// Builds a boxed logger and a `ReconfigurationHandle` for it,
+    /// but does not initialize the global logger.
     ///
-    /// The returned reconfiguration handle allows updating the log specification programmatically
+    /// The returned boxed logger implements the Log trait and can be installed manually
+    /// or nested within another logger.
+    ///
+    /// The reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
     /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
     ///
@@ -648,6 +652,15 @@ impl Logger {
         Ok(handle)
     }
 
+    /// Builds a boxed logger and a `ReconfigurationHandle` for it,
+    /// but does not initialize the global logger.
+    ///
+    ///
+    /// The returned boxed logger implements the Log trait and can be installed manually
+    /// or nested within another logger.
+    ///
+    /// For the properties of the returned logger,
+    /// see [`start_with_specfile()`](struct.Logger.html#method.start_with_specfile).
     ///
     /// # Errors
     ///

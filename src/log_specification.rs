@@ -499,6 +499,15 @@ impl LogSpecBuilder {
         self
     }
 
+    /// Adds log level filters from a `LogSpecification`.
+    pub fn insert_modules_from(&mut self, other: LogSpecification) -> &mut Self {
+        for module_filter in other.module_filters {
+            self.module_filters
+                .insert(module_filter.module_name, module_filter.level_filter);
+        }
+        self
+    }
+
     /// Creates a log specification without text filter.
     #[must_use]
     pub fn finalize(self) -> LogSpecification {
@@ -804,6 +813,49 @@ mod tests {
         assert!(!spec.enabled(Level::Error, "rocket::rocket"));
         assert!(!spec.enabled(Level::Warn, "rocket::rocket"));
         assert!(!spec.enabled(Level::Info, "rocket::rocket"));
+    }
+
+    #[test]
+    fn add_filters() {
+        let mut builder = crate::LogSpecBuilder::new();
+
+        builder.default(LevelFilter::Debug);
+        builder.module("carlo", LevelFilter::Debug);
+        builder.module("toni", LevelFilter::Warn);
+
+        builder.insert_modules_from(
+            LogSpecification::parse("info, may=error, toni::heart = trace").unwrap(),
+        );
+        let spec = builder.build();
+
+        assert_eq!(spec.module_filters().len(), 5);
+
+        assert_eq!(
+            spec.module_filters()[0].module_name,
+            Some("toni::heart".to_string())
+        );
+        assert_eq!(spec.module_filters()[0].level_filter, LevelFilter::Trace);
+
+        assert_eq!(
+            spec.module_filters()[1].module_name,
+            Some("carlo".to_string())
+        );
+        assert_eq!(spec.module_filters()[1].level_filter, LevelFilter::Debug);
+
+        assert_eq!(
+            spec.module_filters()[2].module_name,
+            Some("toni".to_string())
+        );
+        assert_eq!(spec.module_filters()[2].level_filter, LevelFilter::Warn);
+
+        assert_eq!(
+            spec.module_filters()[3].module_name,
+            Some("may".to_string())
+        );
+        assert_eq!(spec.module_filters()[3].level_filter, LevelFilter::Error);
+
+        assert_eq!(spec.module_filters()[4].module_name, None);
+        assert_eq!(spec.module_filters()[4].level_filter, LevelFilter::Info);
     }
 
     #[test]
