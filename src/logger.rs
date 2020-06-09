@@ -712,7 +712,7 @@ fn setup_specfile<P: AsRef<std::path::Path>>(
                         // println!("got debounced event {:?}", debounced_event);
                         match debounced_event {
                             DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                                if path.canonicalize().unwrap() == specfile {
+                                if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
                                     match log_spec_string_from_file(&specfile)
                                         .map_err(FlexiLoggerError::SpecfileIo)
                                         .and_then(|s| LogSpecification::from_toml(&s))
