@@ -1,4 +1,4 @@
-use flexi_logger::{detailed_format, Logger};
+use flexi_logger::{detailed_format, Duplicate, Logger};
 use log::*;
 
 #[test]
@@ -6,6 +6,8 @@ fn test_recursion() {
     Logger::with_str("info")
         .format(detailed_format)
         .log_to_file()
+        .duplicate_to_stderr(Duplicate::All)
+        .duplicate_to_stdout(Duplicate::All)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
 

@@ -48,9 +48,10 @@ pub struct Logger {
     spec: LogSpecification,
     parse_errs: Option<String>,
     log_target: LogTarget,
-    duplicate: Duplicate,
+    duplicate_err: Duplicate,
+    duplicate_out: Duplicate,
     format_for_file: FormatFunction,
-    format_for_stderr: FormatFunction,
+    format_for_std_x: FormatFunction,
     format_for_writer: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
@@ -82,11 +83,14 @@ pub enum LogTarget {
     /// Log is written to a file, as with `LogTarget::File`, _and_ to an alternative
     /// `LogWriter` implementation.
     FileAndWriter(Box<dyn LogWriter>),
-    /// Log is processed as if it were written, but is finally not written.
+    /// Log is processed as if it were written, including duplication, but not written to a
+    /// primary target destination.
     ///
-    /// This can be useful for running tests with all log-levels active to ensure that the log calls
-    /// which are normally not active will not cause undesired side-effects when activated
+    /// This can be useful for running tests with all log-levels active, to ensure that the log
+    /// calls which are normally not active will not cause undesired side-effects when activated
     /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
+    ///
+    /// It can also be used if you want to get logs both to stdout and stderr, but not to a file.
     DevNull,
 }
 
@@ -125,12 +129,13 @@ impl Logger {
             spec,
             parse_errs,
             log_target: LogTarget::StdErr,
-            duplicate: Duplicate::None,
+            duplicate_err: Duplicate::None,
+            duplicate_out: Duplicate::None,
             format_for_file: formats::default_format,
             #[cfg(feature = "colors")]
-            format_for_stderr: formats::colored_default_format,
+            format_for_std_x: formats::colored_default_format,
             #[cfg(not(feature = "colors"))]
-            format_for_stderr: formats::default_format,
+            format_for_std_x: formats::default_format,
             format_for_writer: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
@@ -220,8 +225,18 @@ impl Logger {
     }
 
     /// Makes the logger write messages with the specified minimum severity additionally to stderr.
+    ///
+    /// Not effective for log targets `LogTarget::StdErr` and `LogTarget::StdOut`.
     pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Self {
-        self.duplicate = dup;
+        self.duplicate_err = dup;
+        self
+    }
+
+    /// Makes the logger write messages with the specified minimum severity additionally to stdout.
+    ///
+    /// Not effective for log targets `LogTarget::StdErr` and `LogTarget::StdOut`.
+    pub fn duplicate_to_stdout(mut self, dup: Duplicate) -> Self {
+        self.duplicate_out = dup;
         self
     }
 
@@ -240,7 +255,7 @@ impl Logger {
     /// `default_format()` is used for all outputs.
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
-        self.format_for_stderr = format;
+        self.format_for_std_x = format;
         self.format_for_writer = format;
         self
     }
@@ -259,7 +274,7 @@ impl Logger {
     ///
     /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
-        self.format_for_stderr = format;
+        self.format_for_std_x = format;
         self
     }
 
@@ -545,27 +560,38 @@ impl Logger {
             LogTarget::File => {
                 self.flwb = self.flwb.format(self.format_for_file);
                 PrimaryWriter::multi(
-                    self.duplicate,
-                    self.format_for_stderr,
+                    self.duplicate_err,
+                    self.duplicate_out,
+                    self.format_for_std_x,
                     vec![Box::new(self.flwb.try_build()?)],
                 )
             }
             LogTarget::Writer(mut w) => {
                 w.format(self.format_for_writer);
-                PrimaryWriter::multi(self.duplicate, self.format_for_stderr, vec![w])
+                PrimaryWriter::multi(
+                    self.duplicate_err,
+                    self.duplicate_out,
+                    self.format_for_std_x,
+                    vec![w],
+                )
             }
             LogTarget::FileAndWriter(mut w) => {
                 self.flwb = self.flwb.format(self.format_for_file);
                 w.format(self.format_for_writer);
                 PrimaryWriter::multi(
-                    self.duplicate,
-                    self.format_for_stderr,
+                    self.duplicate_err,
+                    self.duplicate_out,
+                    self.format_for_std_x,
                     vec![Box::new(self.flwb.try_build()?), w],
                 )
             }
-            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stderr),
-            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_stderr),
-            LogTarget::DevNull => PrimaryWriter::black_hole(self.duplicate, self.format_for_stderr),
+            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_std_x),
+            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_std_x),
+            LogTarget::DevNull => PrimaryWriter::black_hole(
+                self.duplicate_err,
+                self.duplicate_out,
+                self.format_for_std_x,
+            ),
         });
 
         let flexi_logger = FlexiLogger::new(

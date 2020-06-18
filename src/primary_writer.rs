@@ -7,62 +7,65 @@ use crate::logger::Duplicate;
 use crate::writers::LogWriter;
 use crate::FormatFunction;
 
-// Writes either to stderr,
+// Writes either to stdout, or to stderr,
 // or to a file (with optional duplication to stderr),
 // or to nowhere (with optional "duplication" to stderr).
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum PrimaryWriter {
-    StdOutWriter(StdOutWriter),
-    StdErrWriter(StdErrWriter),
-    MultiWriter(MultiWriter),
-    BlackHole(BlackHoleWriter),
+    StdOut(StdOutWriter),
+    StdErr(StdErrWriter),
+    Multi(MultiWriter),
 }
 impl PrimaryWriter {
     pub fn multi(
-        duplicate: Duplicate,
-        format_for_stderr: FormatFunction,
+        duplicate_stderr: Duplicate,
+        duplicate_stdout: Duplicate,
+        format_for_std_x: FormatFunction,
         writers: Vec<Box<dyn LogWriter>>,
     ) -> Self {
-        Self::MultiWriter(MultiWriter {
-            duplicate,
-            format_for_stderr,
+        Self::Multi(MultiWriter {
+            duplicate_stderr,
+            duplicate_stdout,
+            format_for_std_x,
             writers,
         })
     }
     pub fn stderr(format: FormatFunction) -> Self {
-        Self::StdErrWriter(StdErrWriter::new(format))
+        Self::StdErr(StdErrWriter::new(format))
     }
 
     pub fn stdout(format: FormatFunction) -> Self {
-        Self::StdOutWriter(StdOutWriter::new(format))
+        Self::StdOut(StdOutWriter::new(format))
     }
 
-    pub fn black_hole(duplicate: Duplicate, format: FormatFunction) -> Self {
-        Self::BlackHole(BlackHoleWriter { duplicate, format })
+    pub fn black_hole(
+        duplicate_err: Duplicate,
+        duplicate_out: Duplicate,
+        format: FormatFunction,
+    ) -> Self {
+        Self::multi(duplicate_err, duplicate_out, format, vec![])
     }
 
     // Write out a log line.
     pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {
-            Self::StdErrWriter(ref w) => w.write(now, record),
-            Self::StdOutWriter(ref w) => w.write(now, record),
-            Self::MultiWriter(ref w) => w.write(now, record),
-            Self::BlackHole(ref w) => w.write(now, record),
+            Self::StdErr(ref w) => w.write(now, record),
+            Self::StdOut(ref w) => w.write(now, record),
+            Self::Multi(ref w) => w.write(now, record),
         }
     }
 
     // Flush any buffered records.
     pub fn flush(&self) -> std::io::Result<()> {
         match *self {
-            Self::StdErrWriter(ref w) => w.flush(),
-            Self::StdOutWriter(ref w) => w.flush(),
-            Self::MultiWriter(ref w) => w.flush(),
-            Self::BlackHole(ref w) => w.flush(),
+            Self::StdErr(ref w) => w.flush(),
+            Self::StdOut(ref w) => w.flush(),
+            Self::Multi(ref w) => w.flush(),
         }
     }
 
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        if let Self::MultiWriter(ref w) = *self {
+        if let Self::Multi(ref w) = *self {
             w.validate_logs(expected);
         }
     }
@@ -88,7 +91,7 @@ impl StdErrWriter {
     }
 }
 
-// `StdOutWriter` writes logs to stderr.
+// `StdOutWriter` writes logs to stdout.
 pub(crate) struct StdOutWriter {
     format: FormatFunction,
 }
@@ -108,38 +111,12 @@ impl StdOutWriter {
     }
 }
 
-// The `BlackHoleWriter` does not write any log, but can 'duplicate' messages to stderr.
-pub(crate) struct BlackHoleWriter {
-    duplicate: Duplicate,
-    format: FormatFunction,
-}
-impl BlackHoleWriter {
-    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        let dupl = match self.duplicate {
-            Duplicate::Error => record.level() == log::Level::Error,
-            Duplicate::Warn => record.level() <= log::Level::Warn,
-            Duplicate::Info => record.level() <= log::Level::Info,
-            Duplicate::Debug => record.level() <= log::Level::Debug,
-            Duplicate::Trace | Duplicate::All => true,
-            Duplicate::None => false,
-        };
-        if dupl {
-            (self.format)(&mut std::io::stderr(), now, record)?;
-            std::io::stderr().write_all(b"\n")?;
-        }
-        Ok(())
-    }
-
-    fn flush(&self) -> std::io::Result<()> {
-        std::io::stderr().flush()
-    }
-}
-
 // The `MultiWriter` writes logs to stderr or to a set of `Writer`s, and in the latter case
 // can duplicate messages to stderr.
 pub(crate) struct MultiWriter {
-    duplicate: Duplicate,
-    format_for_stderr: FormatFunction,
+    duplicate_stderr: Duplicate,
+    duplicate_stdout: Duplicate,
+    format_for_std_x: FormatFunction,
     writers: Vec<Box<dyn LogWriter>>,
 }
 impl LogWriter for MultiWriter {
@@ -150,17 +127,28 @@ impl LogWriter for MultiWriter {
     }
 
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        let dupl = match self.duplicate {
+        if match self.duplicate_stderr {
             Duplicate::Error => record.level() == log::Level::Error,
             Duplicate::Warn => record.level() <= log::Level::Warn,
             Duplicate::Info => record.level() <= log::Level::Info,
             Duplicate::Debug => record.level() <= log::Level::Debug,
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
-        };
-        if dupl {
-            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr())?;
+        } {
+            write_buffered(self.format_for_std_x, now, record, &mut std::io::stderr())?;
         }
+
+        if match self.duplicate_stdout {
+            Duplicate::Error => record.level() == log::Level::Error,
+            Duplicate::Warn => record.level() <= log::Level::Warn,
+            Duplicate::Info => record.level() <= log::Level::Info,
+            Duplicate::Debug => record.level() <= log::Level::Debug,
+            Duplicate::Trace | Duplicate::All => true,
+            Duplicate::None => false,
+        } {
+            write_buffered(self.format_for_std_x, now, record, &mut std::io::stdout())?;
+        }
+
         for writer in &self.writers {
             writer.write(now, record)?;
         }
@@ -189,7 +177,7 @@ impl LogWriter for MultiWriter {
     }
 }
 
-// Use a thread-local buffer for writing to stderr
+// Use a thread-local buffer for writing to stderr or stdout
 fn write_buffered(
     format_function: FormatFunction,
     now: &mut DeferredNow,

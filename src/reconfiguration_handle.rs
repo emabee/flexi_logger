@@ -141,7 +141,7 @@ impl ReconfigurationHandle {
     ///
     /// See also [`LogWriter::shutdown`](writers/trait.LogWriter.html#method.shutdown).
     pub fn shutdown(&self) {
-        if let PrimaryWriter::MultiWriter(writer) = &*self.primary_writer {
+        if let PrimaryWriter::Multi(writer) = &*self.primary_writer {
             writer.shutdown();
         }
         for writer in self.other_writers.values() {

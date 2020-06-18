@@ -893,7 +893,7 @@ impl LogWriter for FileLogWriter {
                     .unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
-                let state = state_guard.deref_mut();
+                let state = &mut *state_guard;
 
                 buffer
                     .write_all(state.line_ending)
@@ -921,7 +921,7 @@ impl LogWriter for FileLogWriter {
                     .unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
-                let state = state_guard.deref_mut();
+                let state = &mut *state_guard;
 
                 tmp_buf
                     .write_all(state.line_ending)
