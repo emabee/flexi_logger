@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.5 Proposal] - 2020-06-18
+
+Add `Logger::duplicate_to_stdout()` to fix
+[issue-47](https://github.com/emabee/flexi_logger/issues/47).
+
 ## [0.15.4] - 2020-06-09
 
 Fix issue [45](https://github.com/emabee/flexi_logger/issues/45), which was a panic in
