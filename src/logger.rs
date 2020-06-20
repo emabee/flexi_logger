@@ -83,14 +83,17 @@ pub enum LogTarget {
     /// Log is written to a file, as with `LogTarget::File`, _and_ to an alternative
     /// `LogWriter` implementation.
     FileAndWriter(Box<dyn LogWriter>),
-    /// Log is processed as if it were written, including duplication, but not written to a
-    /// primary target destination.
+    /// Log is processed, including duplication, but not written to a primary target destination.
     ///
     /// This can be useful for running tests with all log-levels active, to ensure that the log
     /// calls which are normally not active will not cause undesired side-effects when activated
     /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
     ///
-    /// It can also be used if you want to get logs both to stdout and stderr, but not to a file.
+    /// Combined with
+    /// [`duplicate_to_stdout()`](struct.Logger.html#method.duplicate_to_stdout)
+    /// and
+    /// [`duplicate_to_stderr()`](struct.Logger.html#method.duplicate_to_stderr)
+    /// it can also be used if you want to get logs both to stdout and stderr, but not to a file.
     DevNull,
 }
 
