@@ -20,13 +20,15 @@ impl PrimaryWriter {
     pub fn multi(
         duplicate_stderr: Duplicate,
         duplicate_stdout: Duplicate,
-        format_for_std_x: FormatFunction,
+        format_for_stderr: FormatFunction,
+        format_for_stdout: FormatFunction,
         writers: Vec<Box<dyn LogWriter>>,
     ) -> Self {
         Self::Multi(MultiWriter {
             duplicate_stderr,
             duplicate_stdout,
-            format_for_std_x,
+            format_for_stderr,
+            format_for_stdout,
             writers,
         })
     }
@@ -41,9 +43,16 @@ impl PrimaryWriter {
     pub fn black_hole(
         duplicate_err: Duplicate,
         duplicate_out: Duplicate,
-        format: FormatFunction,
+        format_for_stderr: FormatFunction,
+        format_for_stdout: FormatFunction,
     ) -> Self {
-        Self::multi(duplicate_err, duplicate_out, format, vec![])
+        Self::multi(
+            duplicate_err,
+            duplicate_out,
+            format_for_stderr,
+            format_for_stdout,
+            vec![],
+        )
     }
 
     // Write out a log line.
@@ -116,9 +125,11 @@ impl StdOutWriter {
 pub(crate) struct MultiWriter {
     duplicate_stderr: Duplicate,
     duplicate_stdout: Duplicate,
-    format_for_std_x: FormatFunction,
+    format_for_stderr: FormatFunction,
+    format_for_stdout: FormatFunction,
     writers: Vec<Box<dyn LogWriter>>,
 }
+
 impl LogWriter for MultiWriter {
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         for writer in &self.writers {
@@ -135,7 +146,7 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(self.format_for_std_x, now, record, &mut std::io::stderr())?;
+            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr())?;
         }
 
         if match self.duplicate_stdout {
@@ -146,7 +157,7 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(self.format_for_std_x, now, record, &mut std::io::stdout())?;
+            write_buffered(self.format_for_stdout, now, record, &mut std::io::stdout())?;
         }
 
         for writer in &self.writers {

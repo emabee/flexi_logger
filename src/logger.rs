@@ -51,7 +51,8 @@ pub struct Logger {
     duplicate_err: Duplicate,
     duplicate_out: Duplicate,
     format_for_file: FormatFunction,
-    format_for_std_x: FormatFunction,
+    format_for_stderr: FormatFunction,
+    format_for_stdout: FormatFunction,
     format_for_writer: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
@@ -136,9 +137,13 @@ impl Logger {
             duplicate_out: Duplicate::None,
             format_for_file: formats::default_format,
             #[cfg(feature = "colors")]
-            format_for_std_x: formats::colored_default_format,
+            format_for_stderr: formats::colored_default_format,
             #[cfg(not(feature = "colors"))]
-            format_for_std_x: formats::default_format,
+            format_for_stderr: formats::default_format,
+            #[cfg(feature = "colors")]
+            format_for_stdout: formats::colored_default_format,
+            #[cfg(not(feature = "colors"))]
+            format_for_stdout: formats::default_format,
             format_for_writer: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
@@ -258,7 +263,8 @@ impl Logger {
     /// `default_format()` is used for all outputs.
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
-        self.format_for_std_x = format;
+        self.format_for_stderr = format;
+        self.format_for_stdout = format;
         self.format_for_writer = format;
         self
     }
@@ -273,11 +279,20 @@ impl Logger {
     }
 
     /// Makes the logger use the provided format function for messages
-    /// that are written to stderr or to stdout.
+    /// that are written to stderr.
     ///
     /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
-        self.format_for_std_x = format;
+        self.format_for_stderr = format;
+        self
+    }
+
+    /// Makes the logger use the provided format function for messages
+    /// that are written to stdout.
+    ///
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    pub fn format_for_stdout(mut self, format: FormatFunction) -> Self {
+        self.format_for_stdout = format;
         self
     }
 
@@ -565,7 +580,8 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![Box::new(self.flwb.try_build()?)],
                 )
             }
@@ -574,7 +590,8 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![w],
                 )
             }
@@ -584,16 +601,18 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![Box::new(self.flwb.try_build()?), w],
                 )
             }
-            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_std_x),
-            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_std_x),
+            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stdout),
+            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_stderr),
             LogTarget::DevNull => PrimaryWriter::black_hole(
                 self.duplicate_err,
                 self.duplicate_out,
-                self.format_for_std_x,
+                self.format_for_stderr,
+                self.format_for_stdout,
             ),
         });
 
