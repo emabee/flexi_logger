@@ -1,9 +1,10 @@
+use flexi_logger::{LogTarget, Logger};
 use log::*;
 
 #[test]
 fn you_must_not_see_anything() {
-    flexi_logger::Logger::with_str("info")
-        .do_not_log()
+    Logger::with_str("info")
+        .log_target(LogTarget::DevNull)
         .start()
         .unwrap();
 

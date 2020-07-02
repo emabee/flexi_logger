@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.6] - 2020-07-02
+
+Introduce separate formatting for stdout (kudos to [pscott](https://github.com/pscott)).
+
+Deprecate `Logger::do_not_log()`.
+
 ## [0.15.5] - 2020-06-18
 
 Add `Logger::duplicate_to_stdout()` to fix
