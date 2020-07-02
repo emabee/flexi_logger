@@ -850,6 +850,7 @@ pub(crate) fn log_spec_string_from_file<P: AsRef<std::path::Path>>(
 /// Criterion when to rotate the log file.
 ///
 /// Used in [`Logger::rotate`](struct.Logger.html#method.rotate).
+#[derive(Copy, Clone, Debug)]
 pub enum Criterion {
     /// Rotate the log file when it exceeds the specified size in bytes.
     Size(u64),
@@ -900,7 +901,7 @@ pub enum Criterion {
 
 /// The age after which a log file rotation will be triggered,
 /// when [`Criterion::Age`](enum.Criterion.html#variant.Age) is chosen.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Age {
     /// Rotate the log file when the local clock has started a new day since the
     /// current file had been created.
@@ -923,7 +924,7 @@ pub enum Age {
 /// another infix of the form `"_r..."`. `Naming` defines which other infix will be used.
 ///
 /// Used in [`Logger::rotate`](struct.Logger.html#method.rotate).
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Naming {
     /// File rotation rotates to files with a timestamp-infix, like `"r2020-01-27_14-41-08"`.
     Timestamps,
@@ -940,7 +941,7 @@ pub enum Naming {
 /// See
 /// [`Logger::cleanup_in_background_thread`](struct.Logger.html#method.cleanup_in_background_thread)
 /// if you want to control whether this extra thread is created and used.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
     Never,
@@ -966,6 +967,7 @@ pub enum Cleanup {
     #[cfg(feature = "ziplogs")]
     KeepLogAndZipFiles(usize, usize),
 }
+
 impl Cleanup {
     // Returns true if some cleanup is to be done.
     #[must_use]
