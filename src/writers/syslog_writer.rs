@@ -13,7 +13,7 @@ use std::sync::Mutex;
 /// Syslog Facility.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SyslogFacility {
     /// kernel messages.
     Kernel = 0 << 3,
@@ -68,6 +68,7 @@ pub enum SyslogFacility {
 /// `SyslogConnector`'s severity.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
+#[derive(Debug)]
 pub enum SyslogSeverity {
     /// System is unusable.
     Emergency = 0,
@@ -209,6 +210,7 @@ impl LogWriter for SyslogWriter {
 ///    let syslog_connector = SyslogConnector::try_tcp("localhost:7777").unwrap();
 /// ```
 ///
+#[derive(Debug)]
 pub enum SyslogConnector {
     /// Sends log lines to the syslog via a
     /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
