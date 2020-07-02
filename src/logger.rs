@@ -51,7 +51,8 @@ pub struct Logger {
     duplicate_err: Duplicate,
     duplicate_out: Duplicate,
     format_for_file: FormatFunction,
-    format_for_std_x: FormatFunction,
+    format_for_stderr: FormatFunction,
+    format_for_stdout: FormatFunction,
     format_for_writer: FormatFunction,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
@@ -135,10 +136,17 @@ impl Logger {
             duplicate_err: Duplicate::None,
             duplicate_out: Duplicate::None,
             format_for_file: formats::default_format,
+
             #[cfg(feature = "colors")]
-            format_for_std_x: formats::colored_default_format,
+            format_for_stderr: formats::colored_default_format,
             #[cfg(not(feature = "colors"))]
-            format_for_std_x: formats::default_format,
+            format_for_stderr: formats::default_format,
+
+            #[cfg(feature = "colors")]
+            format_for_stdout: formats::colored_default_format,
+            #[cfg(not(feature = "colors"))]
+            format_for_stdout: formats::default_format,
+
             format_for_writer: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
@@ -195,14 +203,13 @@ impl Logger {
     /// Is equivalent to
     /// [`log_target`](struct.Logger.html#method.log_target)`(`[`LogTarget::File`](
     /// enum.LogTarget.html#variant.File)`)`.
-    pub fn log_to_file(mut self) -> Self {
-        self.log_target = LogTarget::File;
-        self
+    pub fn log_to_file(self) -> Self {
+        self.log_target(LogTarget::File)
     }
 
     /// Write the main log output to the specified target.
     ///
-    /// By default, i.e. if this method is not called, the standard output goes to `stderr`.
+    /// By default, i.e. if this method is not called, the log target `LogTarget::StdErr` is used.
     pub fn log_target(mut self, log_target: LogTarget) -> Self {
         self.log_target = log_target;
         self
@@ -215,9 +222,12 @@ impl Logger {
     /// within normally unused log calls (like `std::fmt::Display` implementations),
     /// will not cause undesired side-effects when activated (note that the log macros prevent
     /// arguments of inactive log-calls from being evaluated).
-    pub fn do_not_log(mut self) -> Self {
-        self.log_target = LogTarget::DevNull;
-        self
+    #[deprecated(
+        since = "0.15.6",
+        note = "use `log_target()` with `LogTarget::DevNull`"
+    )]
+    pub fn do_not_log(self) -> Self {
+        self.log_target(LogTarget::DevNull)
     }
 
     /// Makes the logger print an info message to stdout with the name of the logfile
@@ -229,7 +239,7 @@ impl Logger {
 
     /// Makes the logger write messages with the specified minimum severity additionally to stderr.
     ///
-    /// Not effective for log targets `LogTarget::StdErr` and `LogTarget::StdOut`.
+    /// Works with all log targets except `StdErr` and `StdOut`.
     pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Self {
         self.duplicate_err = dup;
         self
@@ -237,28 +247,30 @@ impl Logger {
 
     /// Makes the logger write messages with the specified minimum severity additionally to stdout.
     ///
-    /// Not effective for log targets `LogTarget::StdErr` and `LogTarget::StdOut`.
+    /// Works with all log targets except `StdErr` and `StdOut`.
     pub fn duplicate_to_stdout(mut self, dup: Duplicate) -> Self {
         self.duplicate_out = dup;
         self
     }
 
     /// Makes the logger use the provided format function for all messages
-    /// that are written to files or to stderr or to an additional writer.
+    /// that are written to files, stderr, stdout, or to an additional writer.
     ///
     /// You can either choose one of the provided log-line formatters,
     /// or you create and use your own format function with the signature <br>
     /// ```fn(&Record) -> String```.
     ///
     /// By default,
-    /// `default_format()` is used for the output to files and
-    /// `colored_default_format()` is used for the output to stderr.
+    /// [`default_format()`](fn.default_format.html) is used for output to files,
+    /// and [`colored_default_format()`](fn.colored_default_format.html) is used for output
+    /// to stdout or stderr.
     ///
     /// If the feature `colors` is switched off,
     /// `default_format()` is used for all outputs.
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
-        self.format_for_std_x = format;
+        self.format_for_stderr = format;
+        self.format_for_stdout = format;
         self.format_for_writer = format;
         self
     }
@@ -273,11 +285,20 @@ impl Logger {
     }
 
     /// Makes the logger use the provided format function for messages
-    /// that are written to stderr or to stdout.
+    /// that are written to stderr.
     ///
     /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
-        self.format_for_std_x = format;
+        self.format_for_stderr = format;
+        self
+    }
+
+    /// Makes the logger use the provided format function for messages
+    /// that are written to stdout.
+    ///
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    pub fn format_for_stdout(mut self, format: FormatFunction) -> Self {
+        self.format_for_stdout = format;
         self
     }
 
@@ -565,7 +586,8 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![Box::new(self.flwb.try_build()?)],
                 )
             }
@@ -574,7 +596,8 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![w],
                 )
             }
@@ -584,16 +607,18 @@ impl Logger {
                 PrimaryWriter::multi(
                     self.duplicate_err,
                     self.duplicate_out,
-                    self.format_for_std_x,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
                     vec![Box::new(self.flwb.try_build()?), w],
                 )
             }
-            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_std_x),
-            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_std_x),
+            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stdout),
+            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_stderr),
             LogTarget::DevNull => PrimaryWriter::black_hole(
                 self.duplicate_err,
                 self.duplicate_out,
-                self.format_for_std_x,
+                self.format_for_stderr,
+                self.format_for_stdout,
             ),
         });
 
