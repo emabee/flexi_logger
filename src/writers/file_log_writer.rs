@@ -338,6 +338,7 @@ enum NamingState {
 enum RollState {
     Size(u64, u64), // max_size, current_size
     Age(Age),
+    AgeOrSize(Age, u64, u64), // age, max_size, current_size
 }
 
 enum MessageToCleanupThread {
@@ -355,30 +356,73 @@ struct RotationState {
     cleanup: Cleanup,
     o_cleanup_thread_handle: Option<CleanupThreadHandle>,
 }
+
+// Could not implement `std::convert::From` because other parameters are required.
+fn try_roll_state_from_criterion(
+    criterion: Criterion,
+    config: &FileLogWriterConfig,
+    p_path: &Path,
+) -> Result<RollState, FlexiLoggerError> {
+    Ok(match criterion {
+        Criterion::Age(age) => RollState::Age(age),
+        Criterion::Size(size) => {
+            let written_bytes = if config.append {
+                std::fs::metadata(p_path)?.len()
+            } else {
+                0
+            };
+            RollState::Size(size, written_bytes)
+        } // max_size, current_size
+        Criterion::AgeOrSize(age, size) => {
+            let written_bytes = if config.append {
+                std::fs::metadata(&p_path)?.len()
+            } else {
+                0
+            };
+            RollState::AgeOrSize(age, size, written_bytes)
+        } // age, max_size, current_size
+    })
+}
+
 impl RotationState {
+    fn size_rotation_necessary(max_size: u64, current_size: u64) -> bool {
+        current_size > max_size
+    }
+
+    fn age_rotation_necessary(&self, age: Age) -> bool {
+        let now = Local::now();
+        match age {
+            Age::Day => self.created_at.num_days_from_ce() != now.num_days_from_ce(),
+            Age::Hour => {
+                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                    || self.created_at.hour() != now.hour()
+            }
+            Age::Minute => {
+                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                    || self.created_at.hour() != now.hour()
+                    || self.created_at.minute() != now.minute()
+            }
+            Age::Second => {
+                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                    || self.created_at.hour() != now.hour()
+                    || self.created_at.minute() != now.minute()
+                    || self.created_at.second() != now.second()
+            }
+        }
+    }
+
+    fn age_or_size_rotation_necessary(&self, age: Age, max_size: u64, current_size: u64) -> bool {
+        Self::size_rotation_necessary(max_size, current_size) || self.age_rotation_necessary(age)
+    }
+
     fn rotation_necessary(&self) -> bool {
         match &self.roll_state {
-            RollState::Size(max_size, current_size) => current_size > max_size,
-            RollState::Age(age) => {
-                let now = Local::now();
-                match age {
-                    Age::Day => self.created_at.num_days_from_ce() != now.num_days_from_ce(),
-                    Age::Hour => {
-                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
-                            || self.created_at.hour() != now.hour()
-                    }
-                    Age::Minute => {
-                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
-                            || self.created_at.hour() != now.hour()
-                            || self.created_at.minute() != now.minute()
-                    }
-                    Age::Second => {
-                        self.created_at.num_days_from_ce() != now.num_days_from_ce()
-                            || self.created_at.hour() != now.hour()
-                            || self.created_at.minute() != now.minute()
-                            || self.created_at.second() != now.second()
-                    }
-                }
+            RollState::Size(max_size, current_size) => {
+                Self::size_rotation_necessary(*max_size, *current_size)
+            }
+            RollState::Age(age) => self.age_rotation_necessary(*age),
+            RollState::AgeOrSize(age, max_size, current_size) => {
+                self.age_or_size_rotation_necessary(*age, *max_size, *current_size)
             }
         }
     }
@@ -427,17 +471,8 @@ impl FileLogWriterState {
                 };
                 let (log_file, created_at, p_path) = open_log_file(config, true)?;
 
-                let roll_state = match &rotate_config.criterion {
-                    Criterion::Age(age) => RollState::Age(*age),
-                    Criterion::Size(size) => {
-                        let written_bytes = if config.append {
-                            std::fs::metadata(&p_path)?.len()
-                        } else {
-                            0
-                        };
-                        RollState::Size(*size, written_bytes)
-                    } // max_size, current_size
-                };
+                let roll_state =
+                    try_roll_state_from_criterion(rotate_config.criterion, &config, &p_path)?;
 
                 let mut o_cleanup_thread_handle = None;
                 if rotate_config.cleanup.do_cleanup() {
@@ -524,7 +559,8 @@ impl FileLogWriterState {
                 let (line_writer, created_at, _) = open_log_file(config, true)?;
                 self.o_log_file = Some(line_writer);
                 rotation_state.created_at = created_at;
-                if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state
+                if let RollState::Size(_, ref mut current_size)
+                | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state
                 {
                     *current_size = 0;
                 }
@@ -547,7 +583,9 @@ impl FileLogWriterState {
             .write_all(buf)?;
 
         if let Some(ref mut rotation_state) = self.o_rotation_state {
-            if let RollState::Size(_max_size, ref mut current_size) = rotation_state.roll_state {
+            if let RollState::Size(_, ref mut current_size)
+            | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state
+            {
                 *current_size += buf.len() as u64;
             }
         };
