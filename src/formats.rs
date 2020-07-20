@@ -1,6 +1,8 @@
 use crate::DeferredNow;
 use log::Record;
 use std::thread;
+#[cfg(feature = "colors")]
+use yansi::{Color, Paint, Style};
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
@@ -27,6 +29,8 @@ pub fn default_format(
 /// that produces log lines like <br>
 /// <code><span style="color:red">ERROR</span> &#91;my_prog::some_submodule&#93; <span
 /// style="color:red">File not found</span></code>
+///
+/// See method [style](fn.style.html) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -74,6 +78,8 @@ pub fn opt_format(
 }
 
 /// A colored version of the logline-formatter `opt_format`.
+///
+/// See method [style](fn.style.html) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -125,6 +131,8 @@ pub fn detailed_format(
 }
 
 /// A colored version of the logline-formatter `detailed_format`.
+///
+/// See method [style](fn.style.html) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -178,6 +186,8 @@ pub fn with_thread(
 
 /// A colored version of the logline-formatter `with_thread`.
 ///
+/// See method [style](fn.style.html) if you want to influence coloring.
+///
 /// Only available with feature `colors`.
 ///
 /// # Errors
@@ -204,14 +214,80 @@ pub fn colored_with_thread(
 
 /// Helper function that is used in the provided colored format functions.
 ///
+/// The palette that is used by `style` can be overridden by setting the environment variable
+/// `FLEXI_LOGGER_PALETTE` to a semicolon-separated list of numbers (0..=255) and/or dashes (´-´).
+/// The first five values denote the fixed color that is used for coloring error, warning, info,
+/// debug, and trace messages.
+///
+/// `FLEXI_LOGGER_PALETTE = "196;208;-;7;8"`
+/// reflects the default palette; color 196 is used for error messages, and so on.
+///
+/// The '-' means that no coloring is done, i.e., with "-;-;-;-;-" all coloring is switched off.
+///
+/// For your convenience, if you want to specify your own palette,
+/// you can produce a colored list of all 255 colors with `cargo run --example colors`
+/// to see the available colors.
+///
 /// Only available with feature `colors`.
 #[cfg(feature = "colors")]
-pub fn style<T>(level: log::Level, item: T) -> yansi::Paint<T> {
+pub fn style<T>(level: log::Level, item: T) -> Paint<T> {
     match level {
-        log::Level::Error => yansi::Paint::fixed(196, item).bold(),
-        log::Level::Warn => yansi::Paint::fixed(208, item).bold(),
-        log::Level::Info => yansi::Paint::new(item),
-        log::Level::Debug => yansi::Paint::fixed(7, item),
-        log::Level::Trace => yansi::Paint::fixed(8, item),
+        log::Level::Error => Paint::new(item).with_style(PALETTE.error),
+        log::Level::Warn => Paint::new(item).with_style(PALETTE.warn),
+        log::Level::Info => Paint::new(item).with_style(PALETTE.info),
+        log::Level::Debug => Paint::new(item).with_style(PALETTE.debug),
+        log::Level::Trace => Paint::new(item).with_style(PALETTE.trace),
     }
+}
+
+#[cfg(feature = "colors")]
+lazy_static::lazy_static! {
+    static ref PALETTE: Palette = {
+        match std::env::var("FLEXI_LOGGER_PALETTE") {
+            Ok(palette) => Palette::parse(&palette).unwrap_or_else(|_| Palette::default()),
+            Err(..) => Palette::default(),
+        }
+
+    };
+}
+
+#[cfg(feature = "colors")]
+struct Palette {
+    pub error: Style,
+    pub warn: Style,
+    pub info: Style,
+    pub debug: Style,
+    pub trace: Style,
+}
+#[cfg(feature = "colors")]
+impl Palette {
+    fn default() -> Palette {
+        Palette {
+            error: Style::new(Color::Fixed(196)).bold(),
+            warn: Style::new(Color::Fixed(208)).bold(),
+            info: Style::new(Color::Unset),
+            debug: Style::new(Color::Fixed(7)),
+            trace: Style::new(Color::Fixed(8)),
+        }
+    }
+
+    fn parse(palette: &str) -> Result<Palette, std::num::ParseIntError> {
+        let mut items = palette.split(';');
+        Ok(Palette {
+            error: parse_style(items.next().unwrap_or("196").trim())?,
+            warn: parse_style(items.next().unwrap_or("208").trim())?,
+            info: parse_style(items.next().unwrap_or("-").trim())?,
+            debug: parse_style(items.next().unwrap_or("7").trim())?,
+            trace: parse_style(items.next().unwrap_or("8").trim())?,
+        })
+    }
+}
+
+#[cfg(feature = "colors")]
+fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
+    Ok(if input == "-" {
+        Style::new(Color::Unset)
+    } else {
+        Style::new(Color::Fixed(input.parse()?))
+    })
 }

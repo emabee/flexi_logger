@@ -128,7 +128,22 @@ impl Logger {
         Self::from_result(LogSpecification::env_or_parse(s))
     }
 
+    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Self {
+        match result {
+            Ok(logspec) => Self::from_spec_and_errs(logspec, None),
+            Err(e) => match e {
+                FlexiLoggerError::Parse(parse_errs, logspec) => {
+                    Self::from_spec_and_errs(logspec, Some(parse_errs))
+                }
+                _ => Self::from_spec_and_errs(LogSpecification::off(), None),
+            },
+        }
+    }
+
     fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<String>) -> Self {
+        #[cfg(feature = "colors")]
+        yansi::Paint::enable_windows_ascii();
+
         Self {
             spec,
             parse_errs,
@@ -151,18 +166,6 @@ impl Logger {
             return formats::colored_default_format;
         }
         formats::default_format
-    }
-
-    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Self {
-        match result {
-            Ok(logspec) => Self::from_spec_and_errs(logspec, None),
-            Err(e) => match e {
-                FlexiLoggerError::Parse(parse_errs, logspec) => {
-                    Self::from_spec_and_errs(logspec, Some(parse_errs))
-                }
-                _ => Self::from_spec_and_errs(LogSpecification::off(), None),
-            },
-        }
     }
 }
 
