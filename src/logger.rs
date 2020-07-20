@@ -897,7 +897,8 @@ pub enum Criterion {
     /// created-at-timestamp.
     ///
     Age(Age),
-    /// Rotate the file when it has either become older than the specified age, or when it has exceeded the specified size in bytes.
+    /// Rotate the file when it has either become older than the specified age, or when it has
+    /// exceeded the specified size in bytes.
     ///
     /// See documentation for Age and Size.
     AgeOrSize(Age, u64),

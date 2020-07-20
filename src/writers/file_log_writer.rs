@@ -411,10 +411,6 @@ impl RotationState {
         }
     }
 
-    fn age_or_size_rotation_necessary(&self, age: Age, max_size: u64, current_size: u64) -> bool {
-        Self::size_rotation_necessary(max_size, current_size) || self.age_rotation_necessary(age)
-    }
-
     fn rotation_necessary(&self) -> bool {
         match &self.roll_state {
             RollState::Size(max_size, current_size) => {
@@ -422,7 +418,8 @@ impl RotationState {
             }
             RollState::Age(age) => self.age_rotation_necessary(*age),
             RollState::AgeOrSize(age, max_size, current_size) => {
-                self.age_or_size_rotation_necessary(*age, *max_size, *current_size)
+                Self::size_rotation_necessary(*max_size, *current_size)
+                    || self.age_rotation_necessary(*age)
             }
         }
     }
