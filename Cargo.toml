@@ -21,13 +21,14 @@ all-features = true
 
 [features]
 default = ["colors", "textfilter"]
-colors = ["yansi"]
+colors = ["atty","yansi"]
 specfile = ["serde","toml","notify", "serde_derive"]
 syslog_writer = ["libc", "hostname"]
 ziplogs = ["flate2"]
 textfilter = ["regex"]
 
 [dependencies]
+atty = {version = "0.2", optional = true}
 chrono = "0.4"
 glob = "0.3"
 hostname = {version = "0.3", optional = true}

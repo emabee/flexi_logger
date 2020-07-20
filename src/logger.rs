@@ -136,21 +136,21 @@ impl Logger {
             duplicate_err: Duplicate::None,
             duplicate_out: Duplicate::None,
             format_for_file: formats::default_format,
-
-            #[cfg(feature = "colors")]
-            format_for_stderr: formats::colored_default_format,
-            #[cfg(not(feature = "colors"))]
-            format_for_stderr: formats::default_format,
-
-            #[cfg(feature = "colors")]
-            format_for_stdout: formats::colored_default_format,
-            #[cfg(not(feature = "colors"))]
-            format_for_stdout: formats::default_format,
-
+            format_for_stdout: Self::tty_format(true),
+            format_for_stderr: Self::tty_format(false),
             format_for_writer: formats::default_format,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
+    }
+
+    fn tty_format(_out: bool) -> FormatFunction {
+        #[cfg(feature = "colors")]
+        #[allow(clippy::used_underscore_binding)]
+        if (_out && atty::is(atty::Stream::Stdout)) || (!_out && atty::is(atty::Stream::Stderr)) {
+            return formats::colored_default_format;
+        }
+        formats::default_format
     }
 
     fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Self {
