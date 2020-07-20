@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unpublished] - 2020-07-20
+## [0.15.8] - 2020-07-20
+
+Allow modifying the coloring palette through the environment variable `FLEXI_LOGGER_PALETTE`.
+See function [style](https://docs.rs/flexi_logger/latest/flexi_logger/fn.style.html) for details.
+Closes [issue-55](https://github.com/emabee/flexi_logger/issues/55).
 
 By default, don't use colors if stdout or stderr are not a terminal
 ([issue-57](https://github.com/emabee/flexi_logger/issues/57)).
