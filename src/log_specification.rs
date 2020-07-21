@@ -411,7 +411,7 @@ fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
     if result {
         push_err(
             &format!(
-                "ignoring invalid part in log spec '{}' (contains a dash or whitespace)",
+                "ignoring invalid part in log spec '{}' (contains a whitespace)",
                 s
             ),
             parse_errs,
