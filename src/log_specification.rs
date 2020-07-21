@@ -407,7 +407,7 @@ fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerErr
 }
 
 fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
-    let result = s.find(' ').is_some() || s.find('\t').is_some();
+    let result = s.chars().any(|c| c.is_whitespace());
     if result {
         push_err(
             &format!(
