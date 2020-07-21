@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.9] - 2020-07-21
+
+Allow using the log target with fantasy names, like with `env_logger`.
+Closes [issue-56](https://github.com/emabee/flexi_logger/issues/56).
+
 ## [0.15.8] - 2020-07-20
 
 Allow modifying the coloring palette through the environment variable `FLEXI_LOGGER_PALETTE`.

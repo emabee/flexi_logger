@@ -51,16 +51,11 @@ impl log::Log for FlexiLogger {
     // Caveat:
     // Rocket e.g. sets target explicitly to several fantasy names;
     // these hopefully do not collide with any of the modules in the log specification;
-    // since they do not conform with the {}  syntax expected by flexi_logger, they're treated as
+    // since they do not conform with the {} syntax expected by flexi_logger, they're treated as
     // module names.
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         let target = metadata.target();
         let level = metadata.level();
-
-        // This is bad - we should have the module_path here :-(
-        if self.primary_enabled(level, target) {
-            return true;
-        };
 
         if !self.other_writers.is_empty() && target.starts_with('{') {
             // at least one other writer is configured _and_ addressed
@@ -78,7 +73,8 @@ impl log::Log for FlexiLogger {
                 }
             }
         }
-        false
+
+        self.primary_enabled(level, target)
     }
 
     fn log(&self, record: &log::Record) {
@@ -110,7 +106,12 @@ impl log::Log for FlexiLogger {
             }
         }
 
-        if !self.primary_enabled(record.level(), record.module_path().unwrap_or_default()) {
+        let effective_target = if target.starts_with('{') {
+            record.module_path().unwrap_or_default()
+        } else {
+            target
+        };
+        if !self.primary_enabled(record.level(), effective_target) {
             return;
         }
 

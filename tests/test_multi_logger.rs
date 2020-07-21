@@ -17,7 +17,7 @@ mod macros {
 fn test() {
     // more complex just to support validation:
     let (sec_writer, sec_handle) = SecWriter::new();
-    let mut log_handle = Logger::with_str("info")
+    let mut log_handle = Logger::with_str("info, fantasy = trace")
         .format(detailed_format)
         .print_message()
         .log_to_file()
@@ -39,6 +39,9 @@ fn test() {
     debug!("This is a debug message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
 
+    trace!(target: "phantasia", "this is a trace you should not see");
+    trace!(target: "fantasy", "this is a trace you should see");
+
     // Switching off logging has no effect on non-default targets
     log_handle.parse_new_spec("Off");
     sec_alert_error!("This is a further security-relevant alert and log message");
@@ -50,6 +53,7 @@ fn test() {
         ("ERROR", "multi_logger", "another security-relevant alert and log message"),
         ("WARN", "multi_logger", "warning"),
         ("INFO", "multi_logger", "info"),
+        ("TRACE", "multi_logger", "this is a trace you should see"),
     ]);
     #[rustfmt::skip]
     sec_handle.validate_logs(&[

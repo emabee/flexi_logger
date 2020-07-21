@@ -235,7 +235,7 @@ fn write_buffered(
 
 pub(crate) fn buffer_with<F>(f: F)
 where
-    F: FnOnce(&RefCell<Vec<u8>>) -> (),
+    F: FnOnce(&RefCell<Vec<u8>>),
 {
     thread_local! {
         static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));

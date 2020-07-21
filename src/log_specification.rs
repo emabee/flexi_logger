@@ -50,6 +50,10 @@ use std::env;
 /// Note that external module names are to be specified like in ```"extern crate ..."```, i.e.,
 /// for crates with a dash in their name this means: the dash is to be replaced with
 /// the underscore (e.g. ```karl_heinz```, not ```karl-heinz```).
+/// See
+/// [https://github.com/rust-lang/rfcs/pull/940/files](https://github.com/rust-lang/rfcs/pull/940/files)
+/// for an explanation of the different naming conventions in Cargo (packages allow hyphen) and
+/// rustc (“extern crate” does not allow hyphens).
 #[derive(Clone, Debug, Default)]
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
@@ -142,7 +146,7 @@ impl LogSpecification {
                     parts.next(),
                 ) {
                     (Some(part_0), None, None) => {
-                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
+                        if contains_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
                         // if the single argument is a log-level string or number,
@@ -154,14 +158,14 @@ impl LogSpecification {
                     }
 
                     (Some(part_0), Some(""), None) => {
-                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
+                        if contains_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
                         (LevelFilter::max(), Some(part_0))
                     }
 
                     (Some(part_0), Some(part_1), None) => {
-                        if contains_dash_or_whitespace(part_0, &mut parse_errs) {
+                        if contains_whitespace(part_0, &mut parse_errs) {
                             continue;
                         }
                         match parse_level_filter(part_1.trim()) {
@@ -402,8 +406,8 @@ fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerErr
     }
 }
 
-fn contains_dash_or_whitespace(s: &str, parse_errs: &mut String) -> bool {
-    let result = s.find('-').is_some() || s.find(' ').is_some() || s.find('\t').is_some();
+fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
+    let result = s.find(' ').is_some() || s.find('\t').is_some();
     if result {
         push_err(
             &format!(
@@ -681,11 +685,6 @@ mod tests {
     #[test]
     fn parse_logging_spec_invalid_crate_filter() {
         assert!(LogSpecification::parse("crate1::mod1=error=warn,crate2=debug/a.c").is_err());
-    }
-
-    #[test]
-    fn parse_logging_spec_invalid_crate_with_dash() {
-        assert!(LogSpecification::parse("karl-heinz::mod1=warn,crate2=debug/a.c").is_err());
     }
 
     #[test]
