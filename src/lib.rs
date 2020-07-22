@@ -31,6 +31,12 @@
 //! `flexi_logger` uses a similar syntax as [`env_logger`](http://crates.io/crates/env_logger/)
 //! for specifying which logs should really be written (but is more graceful with the syntax,
 //! and can provide error information).
+//!
+//! By default, i.e. if feature `colors` is not switched off, the log lines that appear on your
+//! terminal are coloured. In case the chosen colors don't fit to your terminal's color theme,
+//! you can adapt the colors to improve readability.
+//! See the documentation of method [style](fn.style.html)
+//! for a description how this can be done.
 
 mod deferred_now;
 mod flexi_error;
