@@ -28,17 +28,17 @@ pub enum FlexiLoggerError {
 
     /// Parsing the configured logspec toml-file failed.
     #[error("Parsing the configured logspec toml-file failed")]
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     SpecfileToml(#[from] toml::de::Error),
 
     /// Specfile cannot be accessed or created.
     #[error("Specfile cannot be accessed or created")]
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     SpecfileIo(std::io::Error),
 
     /// Specfile has an unsupported extension.
     #[error("Specfile has an unsupported extension")]
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     SpecfileExtension(&'static str),
 
     /// Invalid level filter.

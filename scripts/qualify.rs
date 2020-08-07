@@ -58,6 +58,13 @@ fn main() {
     run_command!("cargo", "test", "--release", "--all-features");
     run_command!("cargo", "test", "--no-default-features");
     run_command!("cargo", "test", "--release");
+    run_command!(
+        "cargo",
+        "test",
+        "--release",
+        "--features",
+        "specfile_without_notification"
+    );
     run_script("cleanup");
 
     // doc

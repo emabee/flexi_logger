@@ -70,7 +70,7 @@ impl ReconfigurationHandle {
         }
     }
 
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     pub(crate) fn current_spec(&self) -> Arc<RwLock<LogSpecification>> {
         Arc::clone(&self.spec)
     }

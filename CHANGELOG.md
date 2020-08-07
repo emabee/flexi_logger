@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.11] - 2020-08-07
+
+Introduce feature `specfile_without_notification` to allow coping with OS issues
+(see [issue-59](https://github.com/emabee/flexi_logger/issues/59)).
+
 ## [0.15.10] - 2020-07-22
 
 Minor code maintenance.

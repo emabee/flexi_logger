@@ -7,7 +7,7 @@ use crate::{formats, FlexiLoggerError, LogSpecification};
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -697,7 +697,7 @@ impl Logger {
     ///
     /// A `ReconfigurationHandle` is returned, predominantly to allow using its
     /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,
         specfile: P,
@@ -727,7 +727,7 @@ impl Logger {
     ///
     /// A `ReconfigurationHandle` is returned, predominantly to allow using its
     /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<std::path::Path>>(
         self,
         specfile: P,
@@ -738,7 +738,7 @@ impl Logger {
     }
 }
 
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 fn setup_specfile<P: AsRef<std::path::Path>>(
     specfile: P,
     mut handle: ReconfigurationHandle,
@@ -746,59 +746,63 @@ fn setup_specfile<P: AsRef<std::path::Path>>(
     let specfile = specfile.as_ref().to_owned();
     synchronize_handle_with_specfile(&mut handle, &specfile)?;
 
-    // Now that the file exists, we can canonicalize the path
-    let specfile = specfile
-        .canonicalize()
-        .map_err(FlexiLoggerError::SpecfileIo)?;
+    #[cfg(feature = "specfile")]
+    {
+        // Now that the file exists, we can canonicalize the path
+        let specfile = specfile
+            .canonicalize()
+            .map_err(FlexiLoggerError::SpecfileIo)?;
 
-    // Watch the parent folder of the specfile, using debounced events
-    let (tx, rx) = std::sync::mpsc::channel();
-    let debouncing_delay = std::time::Duration::from_millis(1000);
-    let mut watcher = watcher(tx, debouncing_delay)?;
-    watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
+        // Watch the parent folder of the specfile, using debounced events
+        let (tx, rx) = std::sync::mpsc::channel();
+        let debouncing_delay = std::time::Duration::from_millis(1000);
+        let mut watcher = watcher(tx, debouncing_delay)?;
+        watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
 
-    // in a separate thread, reread the specfile when it was updated
-    std::thread::Builder::new()
-        .name("flexi_logger-specfile-watcher".to_string())
-        .stack_size(128 * 1024)
-        .spawn(move || {
-            let _anchor_for_watcher = watcher; // keep it alive!
-            loop {
-                match rx.recv() {
-                    Ok(debounced_event) => {
-                        // println!("got debounced event {:?}", debounced_event);
-                        match debounced_event {
-                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                                if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                                    match log_spec_string_from_file(&specfile)
-                                        .map_err(FlexiLoggerError::SpecfileIo)
-                                        .and_then(|s| LogSpecification::from_toml(&s))
-                                    {
-                                        Ok(spec) => handle.set_new_spec(spec),
-                                        Err(e) => eprintln!(
+        // in a separate thread, reread the specfile when it was updated
+        std::thread::Builder::new()
+            .name("flexi_logger-specfile-watcher".to_string())
+            .stack_size(128 * 1024)
+            .spawn(move || {
+                let _anchor_for_watcher = watcher; // keep it alive!
+                loop {
+                    match rx.recv() {
+                        Ok(debounced_event) => {
+                            // println!("got debounced event {:?}", debounced_event);
+                            match debounced_event {
+                                DebouncedEvent::Create(ref path)
+                                | DebouncedEvent::Write(ref path) => {
+                                    if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
+                                        match log_spec_string_from_file(&specfile)
+                                            .map_err(FlexiLoggerError::SpecfileIo)
+                                            .and_then(|s| LogSpecification::from_toml(&s))
+                                        {
+                                            Ok(spec) => handle.set_new_spec(spec),
+                                            Err(e) => eprintln!(
                                             "[flexi_logger] rereading the log specification file \
                                          failed with {:?}, \
                                          continuing with previous log specification",
                                             e
                                         ),
+                                        }
                                     }
                                 }
+                                _event => {}
                             }
-                            _event => {}
+                        }
+                        Err(e) => {
+                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
                         }
                     }
-                    Err(e) => {
-                        eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
-                    }
                 }
-            }
-        })?;
+            })?;
+    }
     Ok(())
 }
 
 // If the specfile exists, read the file and update the log_spec from it;
 // otherwise try to create the file, with the current spec as content, under the specified name.
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 pub(crate) fn synchronize_handle_with_specfile(
     handle: &mut ReconfigurationHandle,
     specfile: &std::path::PathBuf,
@@ -840,7 +844,7 @@ pub(crate) fn synchronize_handle_with_specfile(
     Ok(())
 }
 
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 pub(crate) fn log_spec_string_from_file<P: AsRef<std::path::Path>>(
     specfile: P,
 ) -> Result<String, std::io::Error> {

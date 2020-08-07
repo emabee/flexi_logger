@@ -246,7 +246,7 @@ impl LogSpecification {
     /// # Errors
     ///
     /// `FlexiLoggerError::Parse` if the input is malformed.
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     pub fn from_toml(s: &str) -> Result<Self, FlexiLoggerError> {
         #[derive(Clone, Debug, serde_derive::Deserialize)]
         struct LogSpecFileFormat {
@@ -304,7 +304,7 @@ impl LogSpecification {
     /// # Errors
     ///
     /// `FlexiLoggerError::Io` if writing fails.
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     pub fn to_toml(&self, w: &mut dyn std::io::Write) -> Result<(), FlexiLoggerError> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();
@@ -390,7 +390,6 @@ fn parse_err(
     Err(FlexiLoggerError::Parse(errors, logspec))
 }
 
-// #[cfg(feature = "specfile")]
 fn parse_level_filter<S: AsRef<str>>(s: S) -> Result<LevelFilter, FlexiLoggerError> {
     match s.as_ref().to_lowercase().as_ref() {
         "off" => Ok(LevelFilter::Off),
@@ -866,9 +865,9 @@ mod tests {
 }
 
 #[cfg(test)]
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 mod test_with_specfile {
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     use crate::LogSpecification;
 
     #[test]
@@ -909,7 +908,7 @@ mod test_with_specfile {
         );
     }
 
-    #[cfg(feature = "specfile")]
+    #[cfg(feature = "specfile_without_notification")]
     fn compare_specs(s1: &str, s2: &str) {
         let ls1 = LogSpecification::from_toml(s1).unwrap();
         let ls2 = LogSpecification::parse(s2).unwrap();

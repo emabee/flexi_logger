@@ -1,17 +1,13 @@
-#[cfg(feature = "specfile")]
+#[cfg(feature = "specfile_without_notification")]
 mod a {
     use flexi_logger::{detailed_format, Logger};
     use log::*;
     use std::io::{BufRead, Write};
     use std::ops::Add;
 
-    const WAIT: u64 = 2000;
+    const WAIT_MILLIS: u64 = 2000;
 
-    /// Rudimentary test of the specfile feature, using the file ./tests/logspec.toml.
-    /// For real test, run this manually, change the duration before to a much higher value (see below),
-    /// and edit the file while the test is running. You should see the impact immediately -
-    /// by default, ERR, WARN, and INFO messages are printed. If you change the level in the file,
-    /// less or more lines should be printed.
+    /// Test of the specfile feature, using the file ./tests/logspec.toml.
     #[test]
     fn test_specfile() {
         let specfile = "test_spec/test_specfile_logspec.toml";
@@ -52,7 +48,7 @@ mod a {
             .unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(WAIT));
+        std::thread::sleep(std::time::Duration::from_millis(WAIT_MILLIS));
 
         error!("This is an error-1");
         warn!("This is a warning-1");
@@ -79,7 +75,7 @@ mod a {
             .unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(WAIT));
+        std::thread::sleep(std::time::Duration::from_millis(WAIT_MILLIS));
 
         error!("This is an error-2");
         warn!("This is a warning-2");
@@ -94,17 +90,36 @@ mod a {
             .to_string()
             .add(".log");
 
-        validate_logs(
-            &logfile,
-            &[
-                ("ERROR", "test_specfile::a", "error-0"),
-                ("WARN", "test_specfile::a", "warning-0"),
-                ("INFO", "test_specfile::a", "info-0"),
-                ("ERROR", "test_specfile::a", "error-1"),
-                ("WARN", "test_specfile::a", "warning-1"),
-                ("ERROR", "test_specfile::a", "error-2"),
-            ],
-        );
+        if cfg!(feature = "specfile") {
+            eprintln!("feature is: specfile!");
+            validate_logs(
+                &logfile,
+                &[
+                    ("ERROR", "test_specfile::a", "error-0"),
+                    ("WARN", "test_specfile::a", "warning-0"),
+                    ("INFO", "test_specfile::a", "info-0"),
+                    ("ERROR", "test_specfile::a", "error-1"),
+                    ("WARN", "test_specfile::a", "warning-1"),
+                    ("ERROR", "test_specfile::a", "error-2"),
+                ],
+            );
+        } else {
+            eprintln!("feature is: specfile_without_notification!");
+            validate_logs(
+                &logfile,
+                &[
+                    ("ERROR", "test_specfile::a", "error-0"),
+                    ("WARN", "test_specfile::a", "warning-0"),
+                    ("INFO", "test_specfile::a", "info-0"),
+                    ("ERROR", "test_specfile::a", "error-1"),
+                    ("WARN", "test_specfile::a", "warning-1"),
+                    ("INFO", "test_specfile::a", "info-1"),
+                    ("ERROR", "test_specfile::a", "error-2"),
+                    ("WARN", "test_specfile::a", "warning-2"),
+                    ("INFO", "test_specfile::a", "info-2"),
+                ],
+            );
+        }
     }
 
     fn validate_logs(logfile: &str, expected: &[(&'static str, &'static str, &'static str)]) {

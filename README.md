@@ -168,6 +168,11 @@ The implementation of this feature uses some additional crates that you might
 not want to depend on with your program if you don't use this functionality.
 For that reason the feature is not active by default.
 
+### **`specfile_without_notification`**
+
+Pretty much like `specfile`, except that updates to the file are being ignored.
+See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more details.
+
 ### **`ziplogs`**
 
 The `ziplogs` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
@@ -179,7 +184,8 @@ Removes the ability to filter logs by text, but also removes the dependency on t
 
 ### **`syslog`**
 
-This is still an experimental feature, likely working, but not well tested. Feedback of all kinds is highly appreciated.
+This is still an experimental feature, likely working, but not well tested.
+Feedback of all kinds is highly appreciated.
 
 ## Versions
 
