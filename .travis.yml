@@ -1,26 +1,32 @@
 language: rust
+
 rust:
   - stable
   - beta
   - nightly
-matrix:
-  allow_failures:
-    - rust: nightly
-    - os: windows
-  fast_finish: true
+  - 1.37.0
 
 os:
   - linux
   - windows
   - osx
 
-cache: cargo
+jobs:
+  fast_finish: true
+  allow_failures:
+    - rust: nightly
+    - os: windows
+  include:
+    - if: rust = stable OR rust = beta OR rust = nightly
+      script:
+        - cargo build
+        - cargo doc --all-features --no-deps
+        - cargo test --release
+        - cargo test --release --no-default-features
+        - cargo test --release --all-features
 
-script:
-  - cargo build
-  - cargo build --all-features
-  - cargo build --release
-  - cargo build --release --all-features
-  - cargo test --release --all-features
-  - cargo test
-  - cargo doc --all-features --no-deps
+    - if: rust = "1.37.0"
+      script:
+        - cargo build --release
+        - cargo build --release --no-default-features
+        - cargo build --release --all-feature

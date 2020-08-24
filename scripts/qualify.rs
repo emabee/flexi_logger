@@ -47,6 +47,8 @@ fn main() {
     run_command!("cargo", "build");
     run_command!("cargo", "build", "--no-default-features");
     run_command!("cargo", "build", "--all-features");
+    run_command!("cargo", "+1.37.0", "build", "--no-default-features");
+    run_command!("cargo", "+1.37.0", "build", "--all-features");
     run_command!("cargo", "build", "--release");
     run_command!("cargo", "build", "--release", "--all-features");
 
