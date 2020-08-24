@@ -162,8 +162,11 @@ impl Logger {
     fn tty_format(_out: bool) -> FormatFunction {
         #[cfg(feature = "colors")]
         #[allow(clippy::used_underscore_binding)]
-        if (_out && atty::is(atty::Stream::Stdout)) || (!_out && atty::is(atty::Stream::Stderr)) {
-            return formats::colored_default_format;
+        {
+            if (_out && atty::is(atty::Stream::Stdout)) || (!_out && atty::is(atty::Stream::Stderr))
+            {
+                return formats::colored_default_format;
+            }
         }
         formats::default_format
     }
