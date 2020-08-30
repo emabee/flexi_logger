@@ -17,6 +17,11 @@ jobs:
     - rust: nightly
     - os: windows
   include:
+    - if: rust = stable
+      script:
+        - rustup component add rustfmt
+        - cargo fmt --all -- --check
+
     - if: rust = stable OR rust = beta OR rust = nightly
       script:
         - cargo test --release --all-features
@@ -28,4 +33,4 @@ jobs:
       script:
         - cargo build --release
         - cargo build --release --no-default-features
-        - cargo build --release --all-feature
+        - cargo build --release --all-features
