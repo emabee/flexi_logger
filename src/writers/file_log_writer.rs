@@ -8,12 +8,11 @@ use crate::FormatFunction;
 use chrono::{DateTime, Datelike, Local, Timelike};
 use log::Record;
 
-use std::borrow::BorrowMut;
 use std::cmp::max;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::{Add, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -41,7 +40,6 @@ struct FilenameConfig {
 
 // The immutable configuration of a FileLogWriter.
 struct FileLogWriterConfig {
-    format: FormatFunction,
     print_message: bool,
     append: bool,
     filename_config: FilenameConfig,
@@ -52,7 +50,6 @@ impl FileLogWriterConfig {
     // Factory method; uses the same defaults as Logger.
     pub fn default() -> Self {
         Self {
-            format: default_format,
             print_message: false,
             filename_config: FilenameConfig {
                 directory: PathBuf::from("."),
@@ -72,6 +69,7 @@ impl FileLogWriterConfig {
 pub struct FileLogWriterBuilder {
     discriminant: Option<String>,
     config: FileLogWriterConfig,
+    format: FormatFunction,
     o_rotation_config: Option<RotationConfig>,
     max_log_level: log::LevelFilter,
     cleanup_in_background_thread: bool,
@@ -90,7 +88,7 @@ impl FileLogWriterBuilder {
     /// Makes the `FileLogWriter` use the provided format function for the log entries,
     /// rather than the default ([`formats::default_format`](fn.default_format.html)).
     pub fn format(mut self, format: FormatFunction) -> Self {
-        self.config.format = format;
+        self.format = format;
         self
     }
 
@@ -226,15 +224,18 @@ impl FileLogWriterBuilder {
                 &Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string();
         };
 
-        let state = FileLogWriterState::try_new(
-            &self.config,
-            &self.o_rotation_config,
-            self.cleanup_in_background_thread,
-        )?;
-
         Ok(FileLogWriter {
-            state: Mutex::new(state),
-            config: self.config,
+            format: self.format,
+            line_ending: if self.config.use_windows_line_ending {
+                b"\r\n"
+            } else {
+                b"\n"
+            },
+            state: Mutex::new(FileLogWriterState::try_new(
+                self.config,
+                self.o_rotation_config,
+                self.cleanup_in_background_thread,
+            )?),
             max_log_level: self.max_log_level,
         })
     }
@@ -429,18 +430,18 @@ impl RotationState {
 struct FileLogWriterState {
     o_log_file: Option<File>,
     o_rotation_state: Option<RotationState>,
-    line_ending: &'static [u8],
+    config: FileLogWriterConfig,
 }
 impl FileLogWriterState {
     // If rotate, the logger writes into a file with infix `_rCURRENT`.
     fn try_new(
-        config: &FileLogWriterConfig,
-        o_rotation_config: &Option<RotationConfig>,
+        config: FileLogWriterConfig,
+        o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
     ) -> Result<Self, FlexiLoggerError> {
         let (log_file, o_rotation_state) = match o_rotation_config {
             None => {
-                let (log_file, _created_at, _p_path) = open_log_file(config, false)?;
+                let (log_file, _created_at, _p_path) = open_log_file(&config, false)?;
                 (log_file, None)
             }
             Some(rotate_config) => {
@@ -453,7 +454,7 @@ impl FileLogWriterState {
                                     Some(CURRENT_INFIX),
                                     &config.filename_config,
                                 ))?,
-                                config,
+                                &config,
                             )?;
                         }
                         NamingState::CreatedAt
@@ -461,12 +462,12 @@ impl FileLogWriterState {
                     Naming::Numbers => {
                         let mut rotation_state = get_highest_rotate_idx(&config.filename_config);
                         if !config.append {
-                            rotation_state = rotate_output_file_to_idx(rotation_state, config)?;
+                            rotation_state = rotate_output_file_to_idx(rotation_state, &config)?;
                         }
                         NamingState::IdxState(rotation_state)
                     }
                 };
-                let (log_file, created_at, p_path) = open_log_file(config, true)?;
+                let (log_file, created_at, p_path) = open_log_file(&config, true)?;
 
                 let roll_state =
                     try_roll_state_from_criterion(rotate_config.criterion, &config, &p_path)?;
@@ -524,11 +525,7 @@ impl FileLogWriterState {
         Ok(Self {
             o_log_file: Some(log_file),
             o_rotation_state,
-            line_ending: if config.use_windows_line_ending {
-                b"\r\n"
-            } else {
-                b"\n"
-            },
+            config,
         })
     }
 
@@ -536,24 +533,21 @@ impl FileLogWriterState {
     // On overflow, an existing `_rCURRENT` file is renamed to the next numbered file,
     // before writing into `_rCURRENT` goes on.
     #[inline]
-    fn mount_next_linewriter_if_necessary(
-        &mut self,
-        config: &FileLogWriterConfig,
-    ) -> Result<(), FlexiLoggerError> {
+    fn mount_next_linewriter_if_necessary(&mut self) -> Result<(), FlexiLoggerError> {
         if let Some(ref mut rotation_state) = self.o_rotation_state {
             if rotation_state.rotation_necessary() {
                 self.o_log_file = None; // close the output file
 
                 match rotation_state.naming_state {
                     NamingState::CreatedAt => {
-                        rotate_output_file_to_date(&rotation_state.created_at, config)?;
+                        rotate_output_file_to_date(&rotation_state.created_at, &self.config)?;
                     }
                     NamingState::IdxState(ref mut idx_state) => {
-                        *idx_state = rotate_output_file_to_idx(*idx_state, config)?;
+                        *idx_state = rotate_output_file_to_idx(*idx_state, &self.config)?;
                     }
                 }
 
-                let (line_writer, created_at, _) = open_log_file(config, true)?;
+                let (line_writer, created_at, _) = open_log_file(&self.config, true)?;
                 self.o_log_file = Some(line_writer);
                 rotation_state.created_at = created_at;
                 if let RollState::Size(_, ref mut current_size)
@@ -565,7 +559,7 @@ impl FileLogWriterState {
                 remove_or_zip_too_old_logfiles(
                     &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
-                    &config.filename_config,
+                    &self.config.filename_config,
                 )?;
             }
         }
@@ -587,6 +581,15 @@ impl FileLogWriterState {
             }
         };
         Ok(())
+    }
+
+    pub fn current_filename(&self) -> PathBuf {
+        let o_infix = if self.o_rotation_state.is_some() {
+            Some(CURRENT_INFIX)
+        } else {
+            None
+        };
+        get_filepath(o_infix, &self.config.filename_config)
     }
 }
 
@@ -875,7 +878,8 @@ fn try_get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerE
 ///
 /// See the [module description](index.html) for usage guidance.
 pub struct FileLogWriter {
-    config: FileLogWriterConfig,
+    format: FormatFunction,
+    line_ending: &'static [u8],
     // the state needs to be mutable; since `Log.log()` requires an unmutable self,
     // which translates into a non-mutating `LogWriter::write()`,
     // we need internal mutability and thread-safety.
@@ -890,6 +894,7 @@ impl FileLogWriter {
             discriminant: None,
             o_rotation_config: None,
             config: FileLogWriterConfig::default(),
+            format: default_format,
             max_log_level: log::LevelFilter::Trace,
             cleanup_in_background_thread: true,
         }
@@ -898,24 +903,12 @@ impl FileLogWriter {
     /// Returns a reference to its configured output format function.
     #[inline]
     pub fn format(&self) -> FormatFunction {
-        self.config.format
+        self.format
     }
 
     #[doc(hidden)]
     pub fn current_filename(&self) -> PathBuf {
-        let o_infix = if self
-            .state
-            .lock()
-            .unwrap()
-            .deref()
-            .o_rotation_state
-            .is_some()
-        {
-            Some(CURRENT_INFIX)
-        } else {
-            None
-        };
-        get_filepath(o_infix, &self.config.filename_config)
+        self.state.lock().unwrap().current_filename()
     }
 }
 
@@ -924,19 +917,18 @@ impl LogWriter for FileLogWriter {
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
             Ok(mut buffer) => {
-                (self.config.format)(&mut *buffer, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, &e));
+                (self.format)(&mut *buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
                 let state = &mut *state_guard;
 
                 buffer
-                    .write_all(state.line_ending)
+                    .write_all(self.line_ending)
                     .unwrap_or_else(|e| write_err(ERR_2, &e));
 
                 // rotate if necessary
                 state
-                    .mount_next_linewriter_if_necessary(&self.config)
+                    .mount_next_linewriter_if_necessary()
                     .unwrap_or_else(|e| {
                         eprintln!("[flexi_logger] opening file failed with {}", e);
                     });
@@ -952,14 +944,13 @@ impl LogWriter for FileLogWriter {
                 // we print the inner calls, in chronological order, before finally the
                 // outer most message is printed
                 let mut tmp_buf = Vec::<u8>::with_capacity(200);
-                (self.config.format)(&mut tmp_buf, now, record)
-                    .unwrap_or_else(|e| write_err(ERR_1, &e));
+                (self.format)(&mut tmp_buf, now, record).unwrap_or_else(|e| write_err(ERR_1, &e));
 
                 let mut state_guard = self.state.lock().unwrap();
                 let state = &mut *state_guard;
 
                 tmp_buf
-                    .write_all(state.line_ending)
+                    .write_all(self.line_ending)
                     .unwrap_or_else(|e| write_err(ERR_2, &e));
 
                 state
@@ -988,15 +979,11 @@ impl LogWriter for FileLogWriter {
 
     #[doc(hidden)]
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        let mut state_guard = self.state.lock().unwrap(); // : MutexGuard<FileLogWriterState>
-
+        let state_guard = self.state.lock().unwrap(); // : MutexGuard<FileLogWriterState>
+        let state = &*state_guard;
         let path = get_filepath(
-            state_guard
-                .borrow_mut()
-                .o_rotation_state
-                .as_ref()
-                .map(|_| CURRENT_INFIX),
-            &self.config.filename_config,
+            state.o_rotation_state.as_ref().map(|_| CURRENT_INFIX),
+            &state.config.filename_config,
         );
         let f = File::open(path).unwrap();
         let mut reader = BufReader::new(f);
