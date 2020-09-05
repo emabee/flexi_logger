@@ -252,7 +252,7 @@ impl LogSpecification {
         struct LogSpecFileFormat {
             pub global_level: Option<String>,
             pub global_pattern: Option<String>,
-            pub modules: std::collections::BTreeMap<String, String>,
+            pub modules: Option<std::collections::BTreeMap<String, String>>,
         }
 
         let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
@@ -266,7 +266,7 @@ impl LogSpecification {
             });
         }
 
-        for (k, v) in logspec_ff.modules {
+        for (k, v) in logspec_ff.modules.unwrap_or_default() {
             module_filters.push(ModuleFilter {
                 module_name: Some(k),
                 level_filter: parse_level_filter(v)?,
@@ -872,6 +872,11 @@ mod test_with_specfile {
 
     #[test]
     fn specfile() {
+        compare_specs(
+            "",
+            "",
+        );
+
         compare_specs(
             "[modules]\n\
              ",
