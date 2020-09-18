@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.13] - 2020-08-07
+
+If file logging is used, do not create the output file if no log is written
+Solves issue [issue-62](https://github.com/emabee/flexi_logger/issues/62).
+
 ## [0.15.12] - 2020-08-07
 
 Make `1.37.0` the minimal rust version for `flexi_logger`.
@@ -12,7 +17,7 @@ Make `1.37.0` the minimal rust version for `flexi_logger`.
 ## [0.15.11] - 2020-08-07
 
 Introduce feature `specfile_without_notification` to allow coping with OS issues
-(see [issue-59](https://github.com/emabee/flexi_logger/issues/59)).
+(solves [issue-59](https://github.com/emabee/flexi_logger/issues/59)).
 
 ## [0.15.10] - 2020-07-22
 
@@ -21,16 +26,16 @@ Minor code maintenance.
 ## [0.15.9] - 2020-07-21
 
 Allow using the log target with fantasy names, like with `env_logger`.
-Closes [issue-56](https://github.com/emabee/flexi_logger/issues/56).
+Solves [issue-56](https://github.com/emabee/flexi_logger/issues/56).
 
 ## [0.15.8] - 2020-07-20
 
 Allow modifying the coloring palette through the environment variable `FLEXI_LOGGER_PALETTE`.
 See function [style](https://docs.rs/flexi_logger/latest/flexi_logger/fn.style.html) for details.
-Closes [issue-55](https://github.com/emabee/flexi_logger/issues/55).
+Solves [issue-55](https://github.com/emabee/flexi_logger/issues/55).
 
 By default, don't use colors if stdout or stderr are not a terminal
-([issue-57](https://github.com/emabee/flexi_logger/issues/57)).
+Solves [issue-57](https://github.com/emabee/flexi_logger/issues/57).
 
 Add variant Criterion::AgeOrSize
 (kudos to

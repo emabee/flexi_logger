@@ -44,6 +44,7 @@ mod flexi_logger;
 mod formats;
 mod log_specification;
 mod logger;
+mod parameters;
 mod primary_writer;
 mod reconfiguration_handle;
 
@@ -56,7 +57,8 @@ pub use crate::deferred_now::DeferredNow;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
-pub use crate::logger::{Age, Cleanup, Criterion, Duplicate, LogTarget, Logger, Naming};
+pub use crate::logger::{Duplicate, LogTarget, Logger};
+pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 pub use crate::reconfiguration_handle::ReconfigurationHandle;
 
 /// Function type for Format functions.
