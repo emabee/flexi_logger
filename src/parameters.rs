@@ -96,6 +96,7 @@ pub enum Naming {
 /// See
 /// [`Logger::cleanup_in_background_thread`](struct.Logger.html#method.cleanup_in_background_thread)
 /// if you want to control whether this extra thread is created and used.
+#[allow(deprecated)]
 #[derive(Copy, Clone, Debug)]
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
@@ -103,23 +104,30 @@ pub enum Cleanup {
     /// The specified number of rotated log files are kept.
     /// Older files are deleted, if necessary.
     KeepLogFiles(usize),
-    /// The specified number of rotated log files are zipped and kept.
+    /// The specified number of rotated log files are compressed and kept.
     /// Older files are deleted, if necessary.
     ///
-    /// This option is only available with feature `ziplogs`.
-    #[cfg(feature = "ziplogs")]
+    /// This option is only available with feature `compress`.
+    #[cfg(feature = "compress")]
+    KeepCompressedFiles(usize),
+    /// Outdated
+    #[cfg(feature = "compress")]
+    #[deprecated(since = "0.16.0", note = "use KeepCompressedFiles instead")]
     KeepZipFiles(usize),
-    /// Allows keeping some files as text files and some as zip files.
-    ///
-    /// Is used in
+    /// Allows keeping some files as text files and some as compressed files.
     ///
     /// ## Example
     ///
-    /// `KeepLogAndZipFiles(5,30)` ensures that the youngest five log files are kept as text files,
-    /// the next 30 are kept as zip files, and older files are removed.
+    /// `KeepLogAndCompressedFiles(5,30)` ensures that the youngest five log files are
+    /// kept as text files, the next 30 are kept as compressed files with additional suffix `.gz`,
+    /// and older files are removed.
     ///
-    /// This option is only available with feature `ziplogs`.
-    #[cfg(feature = "ziplogs")]
+    /// This option is only available with feature `compress`.
+    #[cfg(feature = "compress")]
+    KeepLogAndCompressedFiles(usize, usize),
+    /// Outdated
+    #[deprecated(since = "0.16.0", note = "use KeepLogAndCompressedFiles instead")]
+    #[cfg(feature = "compress")]
     KeepLogAndZipFiles(usize, usize),
 }
 

@@ -1,4 +1,4 @@
-#[cfg(feature = "ziplogs")]
+#[cfg(feature = "compress")]
 mod d {
     use chrono::Local;
     use flexi_logger::{
@@ -13,7 +13,7 @@ mod d {
     const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
     const ROTATE_OVER_SIZE: u64 = 3_000_000;
     const NO_OF_LOG_FILES: usize = 2;
-    const NO_OF_ZIP_FILES: usize = 5;
+    const NO_OF_GZ_FILES: usize = 5;
 
     #[test]
     fn multi_threaded() {
@@ -30,7 +30,7 @@ mod d {
             .rotate(
                 Criterion::Size(ROTATE_OVER_SIZE),
                 Naming::Timestamps,
-                Cleanup::KeepLogAndZipFiles(NO_OF_LOG_FILES, NO_OF_ZIP_FILES),
+                Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
             )
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -120,7 +120,7 @@ mod d {
 
     fn verify_logs(directory: &str) {
         // Since the cleanup deleted log files, we just can confirm that the correct number of
-        // log files and zip files exist
+        // log files and compressed files exist
 
         let basename = String::from(directory).add("/").add(
             &std::path::Path::new(&std::env::args().next().unwrap())
@@ -140,16 +140,16 @@ mod d {
             .inspect(|p| println!("found: {:?}", p))
             .count();
 
-        let zip_pattern = fn_pattern.add("zip");
-        let no_of_zip_files = glob(&zip_pattern)
+        let gz_pattern = fn_pattern.add("gz");
+        let no_of_gz_files = glob(&gz_pattern)
             .unwrap()
             .map(Result::unwrap)
             .inspect(|p| println!("found: {:?}", p))
             .count();
 
         assert_eq!(no_of_log_files, NO_OF_LOG_FILES);
-        assert_eq!(no_of_zip_files, NO_OF_ZIP_FILES);
+        assert_eq!(no_of_gz_files, NO_OF_GZ_FILES);
 
-        info!("Found correct number of log and zip files");
+        info!("Found correct number of log and compressed files");
     }
 }

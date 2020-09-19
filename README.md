@@ -14,7 +14,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "0.15"
+flexi_logger = "0.16"
 log = "0.4"
 ```
 
@@ -22,7 +22,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.15", features = ["specfile", "ziplogs"] }
+flexi_logger = { version = "0.16", features = ["specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -30,7 +30,7 @@ or, to get the smallest footprint (and no colors), with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.15", default_features = false }
+flexi_logger = { version = "0.16", default_features = false }
 log = "0.4"
 ```
 
@@ -146,13 +146,21 @@ The default feature `colors` simplifies this by doing three things:
 * provides additional colored pendants to the existing uncolored format functions
 * it uses `colored_default_format()` for the output to stderr,
   and the non-colored `default_format()` for the output to files
-* it activates the optional dependency to `atty` to being able to switch off 
+* it activates the optional dependency to `atty` to being able to switch off
   coloring if the output is not sent to a terminal but e.g. piped to another program.
 
 **<span style="color:red">C</span><span style="color:blue">o</span><span style="color:green">l</span><span style="color:orange">o</span><span style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
 or styles in general, are a matter of taste, and no choice will fit every need. So you can override the default formatting and coloring in various ways.
 
 With `--no-default-features --features="atty"` you can remove the yansi-based coloring but keep the capability to switch off your own coloring.
+
+### **`compress`**
+
+The `compress` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
+or all rotated log files in compressed form (`.gz`) rather than as plain text files.
+
+The feature was previously called `ziplogs`. The old name still works, but is deprecated and
+should be replaced.
 
 ### **`specfile`**
 
@@ -175,11 +183,6 @@ For that reason the feature is not active by default.
 
 Pretty much like `specfile`, except that updates to the file are being ignored.
 See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more details.
-
-### **`ziplogs`**
-
-The `ziplogs` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
-or all rotated log files in zipped form rather than as text files.
 
 ### **`textfilter`**
 

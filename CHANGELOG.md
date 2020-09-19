@@ -5,12 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.13] - 2020-08-07
+## [0.16.0] - 2020-09-19
+
+If file logging is used, do not create the output file if no log is written.
+Solves [issue-62](https://github.com/emabee/flexi_logger/issues/62).
+
+Improve color handling
+
+- introduce AdaptiveFormat for a clearer API
+- Support using feature `atty` without provided coloring
+- Extend example `colors` to provide insight in how AdaptiveFormat works
+- Remove the deprecated method `Logger::do_not_log()`; use `log_target()` with `LogTarget::DevNull` instead.
+- Remove deprecated method `Logger::o_log_to_file()`; use  `log_target()` instead. The clearer convenience method `Logger::log_to_file()` is still available.
+
+Improve the compression feature. Solves [issue-65](https://github.com/emabee/flexi_logger/issues/65).
+
+- breaking change: change the file suffix for the compressed log files from `.zip` to `.gz`
+- Fix wrong wording in code and documentation
+- deprecate the feature name `ziplog` and call the feature now `compress`
+- rename `Cleanup::KeepZipFiles` into `Cleanup::KeepCompressedFiles`
+   and `Cleanup::KeepLogAndZipFiles` into `Cleanup::KeepLogAndCompressedFiles`
+  - the old names still work but are deprecated
 
 If file logging is used, do not create the output file if no log is written
 Solves issue [issue-62](https://github.com/emabee/flexi_logger/issues/62).
 
-## [0.15.12] - 2020-08-07
+## [0.15.12] - 2020-28-08
 
 Make `1.37.0` the minimal rust version for `flexi_logger`.
 
@@ -264,8 +284,8 @@ When file rotation is used, the name of the file to which the logs are written i
 
 Details:
 
-* the logs are always written to a file with infix _rCURRENT
-* if this file exceeds the specified rotate-over-size, it is closed and renamed
+- the logs are always written to a file with infix _rCURRENT
+- if this file exceeds the specified rotate-over-size, it is closed and renamed
   to a file with a sequential number infix, and then the logging continues again
   to the (fresh) file with infix _rCURRENT
 
@@ -356,10 +376,10 @@ in the auto-generated docu (because it does not use --allfeatures)
 
 Add specfile feature
 
-* Add a feature that allows to specify the LogSpecification via a file
+- Add a feature that allows to specify the LogSpecification via a file
   that can be edited while the program is running
-* Remove/hide deprecated APIs
-* As a consequence, cleanup code, get rid of duplicate stuff.
+_ Remove/hide deprecated APIs
+- As a consequence, cleanup code, get rid of duplicate stuff.
 
 ## [0.7.1] - 2018-03-07
 
@@ -370,11 +390,11 @@ Update docu and the description in cargo.toml
 
 Add support for multiple log output streams
 
-* replace FlexiWriter with DefaultLogWriter, which wraps a FileLogWriter
-* add test where a SecurityWriter and an AlertWriter are added
-* add docu
-* move deprecated structs to separate package
-* move benches to folder benches
+- replace FlexiWriter with DefaultLogWriter, which wraps a FileLogWriter
+- add test where a SecurityWriter and an AlertWriter are added
+- add docu
+- move deprecated structs to separate package
+- move benches to folder benches
 
 ## [0.6.13] 2018-02-09
 
@@ -398,6 +418,6 @@ Publish version based on log 0.4
 
 Use builder pattern for LogSpecification and Logger
 
-* deprecate outdated API
-* "objectify" LogSpecification
-* improve documentation, e.g. document the dash/underscore issue
+- deprecate outdated API
+- "objectify" LogSpecification
+- improve documentation, e.g. document the dash/underscore issue

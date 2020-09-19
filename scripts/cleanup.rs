@@ -14,6 +14,7 @@ fn main() {
         "./*logspec.toml",
         "./log_files/**/*.log",
         "./log_files/**/*.zip",
+        "./log_files/**/*.gz",
         "./test_spec/*.toml",
     ] {
         for globresult in glob::glob(pattern).unwrap() {

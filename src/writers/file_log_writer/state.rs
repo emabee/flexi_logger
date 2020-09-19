@@ -200,7 +200,7 @@ impl State {
                     )?;
                     let mut o_cleanup_thread_handle = None;
                     if rotate_config.cleanup.do_cleanup() {
-                        remove_or_zip_too_old_logfiles(
+                        remove_or_compress_too_old_logfiles(
                             &None,
                             &rotate_config.cleanup,
                             &self.config.filename_config,
@@ -215,7 +215,7 @@ impl State {
                                 .spawn(move || loop {
                                     match receiver.recv() {
                                         Ok(MessageToCleanupThread::Act) => {
-                                            remove_or_zip_too_old_logfiles_impl(
+                                            remove_or_compress_too_old_logfiles_impl(
                                                 &cleanup,
                                                 &filename_config,
                                             )
@@ -282,7 +282,7 @@ impl State {
                     *current_size = 0;
                 }
 
-                remove_or_zip_too_old_logfiles(
+                remove_or_compress_too_old_logfiles(
                     &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
                     &self.config.filename_config,
@@ -418,7 +418,7 @@ fn open_log_file(
 }
 
 fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
-    match list_of_log_and_zip_files(filename_config) {
+    match list_of_log_and_compressed_files(filename_config) {
         Err(e) => {
             eprintln!("[flexi_logger] listing rotated log files failed with {}", e);
             IdxState::Start // hope and pray ...??
@@ -444,10 +444,17 @@ fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
     }
 }
 
-fn list_of_log_and_zip_files(
+#[allow(clippy::type_complexity)]
+fn list_of_log_and_compressed_files(
     filename_config: &FilenameConfig,
-) -> Result<
-    std::iter::Chain<std::vec::IntoIter<PathBuf>, std::vec::IntoIter<PathBuf>>,
+) -> std::result::Result<
+    std::iter::Chain<
+        std::iter::Chain<
+            std::vec::IntoIter<std::path::PathBuf>,
+            std::vec::IntoIter<std::path::PathBuf>,
+        >,
+        std::vec::IntoIter<std::path::PathBuf>,
+    >,
     std::io::Error,
 > {
     let fn_pattern = String::with_capacity(180)
@@ -460,10 +467,16 @@ fn list_of_log_and_zip_files(
     let log_pattern = log_pattern.as_os_str().to_string_lossy();
 
     let mut zip_pattern = filename_config.directory.clone();
-    zip_pattern.push(fn_pattern.add("zip"));
+    zip_pattern.push(fn_pattern.clone().add("zip"));
     let zip_pattern = zip_pattern.as_os_str().to_string_lossy();
 
-    Ok(list_of_files(&log_pattern).chain(list_of_files(&zip_pattern)))
+    let mut gz_pattern = filename_config.directory.clone();
+    gz_pattern.push(fn_pattern.add("gz"));
+    let gz_pattern = gz_pattern.as_os_str().to_string_lossy();
+
+    Ok(list_of_files(&log_pattern)
+        .chain(list_of_files(&gz_pattern))
+        .chain(list_of_files(&zip_pattern)))
 }
 
 fn list_of_files(pattern: &str) -> std::vec::IntoIter<PathBuf> {
@@ -475,7 +488,7 @@ fn list_of_files(pattern: &str) -> std::vec::IntoIter<PathBuf> {
     log_files.into_iter()
 }
 
-fn remove_or_zip_too_old_logfiles(
+fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
@@ -487,44 +500,51 @@ fn remove_or_zip_too_old_logfiles(
             .ok();
         Ok(())
     } else {
-        remove_or_zip_too_old_logfiles_impl(cleanup_config, filename_config)
+        remove_or_compress_too_old_logfiles_impl(cleanup_config, filename_config)
     }
 }
 
-fn remove_or_zip_too_old_logfiles_impl(
+fn remove_or_compress_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
 ) -> Result<(), std::io::Error> {
-    let (log_limit, zip_limit) = match *cleanup_config {
+    let (log_limit, compress_limit) = match *cleanup_config {
         Cleanup::Never => {
             return Ok(());
         }
         Cleanup::KeepLogFiles(log_limit) => (log_limit, 0),
-        #[cfg(feature = "ziplogs")]
-        Cleanup::KeepZipFiles(zip_limit) => (0, zip_limit),
-        #[cfg(feature = "ziplogs")]
-        Cleanup::KeepLogAndZipFiles(log_limit, zip_limit) => (log_limit, zip_limit),
+
+        #[cfg(feature = "compress")]
+        #[allow(deprecated)]
+        Cleanup::KeepCompressedFiles(compress_limit) | Cleanup::KeepZipFiles(compress_limit) => {
+            (0, compress_limit)
+        }
+
+        #[cfg(feature = "compress")]
+        #[allow(deprecated)]
+        Cleanup::KeepLogAndCompressedFiles(log_limit, compress_limit)
+        | Cleanup::KeepLogAndZipFiles(log_limit, compress_limit) => (log_limit, compress_limit),
     };
 
-    for (index, file) in list_of_log_and_zip_files(&filename_config)?.enumerate() {
-        if index >= log_limit + zip_limit {
-            // delete (zip or log)
+    for (index, file) in list_of_log_and_compressed_files(&filename_config)?.enumerate() {
+        if index >= log_limit + compress_limit {
+            // delete (log or log.gz)
             std::fs::remove_file(&file)?;
         } else if index >= log_limit {
-            #[cfg(feature = "ziplogs")]
+            #[cfg(feature = "compress")]
             {
-                // zip, if not yet zipped
+                // compress, if not yet compressed
                 if let Some(extension) = file.extension() {
-                    if extension != "zip" {
+                    if extension != "gz" {
                         let mut old_file = File::open(file.clone())?;
-                        let mut zip_file = file.clone();
-                        zip_file.set_extension("log.zip");
-                        let mut zip = flate2::write::GzEncoder::new(
-                            File::create(zip_file)?,
+                        let mut compressed_file = file.clone();
+                        compressed_file.set_extension("log.gz");
+                        let mut gz_encoder = flate2::write::GzEncoder::new(
+                            File::create(compressed_file)?,
                             flate2::Compression::fast(),
                         );
-                        std::io::copy(&mut old_file, &mut zip)?;
-                        zip.finish()?;
+                        std::io::copy(&mut old_file, &mut gz_encoder)?;
+                        gz_encoder.finish()?;
                         std::fs::remove_file(&file)?;
                     }
                 }

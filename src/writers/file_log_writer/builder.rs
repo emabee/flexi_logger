@@ -71,8 +71,8 @@ impl FileLogWriterBuilder {
     }
 
     /// When rotation is used with some `Cleanup` variant, then this option defines
-    /// if the cleanup activities (finding files, deleting files, evtl zipping files) is done in
-    /// the current thread (in the current log-call), or whether cleanup is delegated to a
+    /// if the cleanup activities (finding files, deleting files, evtl compressing files) is done
+    /// in the current thread (in the current log-call), or whether cleanup is delegated to a
     /// background thread.
     ///
     /// As of `flexi_logger` version `0.14.7`,
