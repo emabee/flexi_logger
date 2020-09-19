@@ -56,4 +56,8 @@ pub enum FlexiLoggerError {
     /// Some synchronization object is poisoned.
     #[error("Some synchronization object is poisoned")]
     Poison,
+
+    /// Palette parsing failed
+    #[error("Palette parsing failed")]
+    Palette(#[from] std::num::ParseIntError),
 }

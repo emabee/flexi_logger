@@ -46,6 +46,7 @@ fn main() {
     // Build in important variants
     run_command!("cargo", "build");
     run_command!("cargo", "build", "--no-default-features");
+    run_command!("cargo", "build", "--no-default-features", "--features=atty");
     run_command!("cargo", "build", "--all-features");
     run_command!("cargo", "+1.37.0", "build", "--no-default-features");
     run_command!("cargo", "+1.37.0", "build", "--all-features");

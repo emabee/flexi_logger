@@ -1,8 +1,11 @@
 use crate::flexi_logger::FlexiLogger;
+use crate::formats::default_format;
+#[cfg(feature = "atty")]
+use crate::formats::{AdaptiveFormat, Stream};
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::{
-    formats, Cleanup, Criterion, FlexiLoggerError, FormatFunction, LogSpecification, Naming,
+    Cleanup, Criterion, FlexiLoggerError, FormatFunction, LogSpecification, Naming,
     ReconfigurationHandle,
 };
 
@@ -45,7 +48,6 @@ use std::sync::{Arc, RwLock};
 ///
 ///   * [`start()`](struct.Logger.html#method.start),
 ///   * or [`start_with_specfile()`](struct.Logger.html#method.start_with_specfile).
-///
 pub struct Logger {
     spec: LogSpecification,
     parse_errs: Option<String>,
@@ -56,6 +58,8 @@ pub struct Logger {
     format_for_stderr: FormatFunction,
     format_for_stdout: FormatFunction,
     format_for_writer: FormatFunction,
+    #[cfg(feature = "colors")]
+    o_palette: Option<String>,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
@@ -144,7 +148,13 @@ impl Logger {
 
     fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<String>) -> Self {
         #[cfg(feature = "colors")]
-        yansi::Paint::enable_windows_ascii();
+        {
+            // Enable ASCII escape sequence support on Windows consoles,
+            // but disable coloring on unsupported Windows consoles
+            if cfg!(windows) && !yansi::Paint::enable_windows_ascii() {
+                yansi::Paint::disable();
+            }
+        }
 
         Self {
             spec,
@@ -152,25 +162,24 @@ impl Logger {
             log_target: LogTarget::StdErr,
             duplicate_err: Duplicate::None,
             duplicate_out: Duplicate::None,
-            format_for_file: formats::default_format,
-            format_for_stdout: Self::tty_format(true),
-            format_for_stderr: Self::tty_format(false),
-            format_for_writer: formats::default_format,
+            format_for_file: default_format,
+
+            #[cfg(feature = "colors")]
+            format_for_stdout: AdaptiveFormat::Default.format_function(Stream::StdOut),
+            #[cfg(feature = "colors")]
+            format_for_stderr: AdaptiveFormat::Default.format_function(Stream::StdErr),
+
+            #[cfg(not(feature = "colors"))]
+            format_for_stdout: default_format,
+            #[cfg(not(feature = "colors"))]
+            format_for_stderr: default_format,
+
+            format_for_writer: default_format,
+            #[cfg(feature = "colors")]
+            o_palette: None,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
-    }
-
-    fn tty_format(_out: bool) -> FormatFunction {
-        #[cfg(feature = "colors")]
-        #[allow(clippy::used_underscore_binding)]
-        {
-            if (_out && atty::is(atty::Stream::Stdout)) || (!_out && atty::is(atty::Stream::Stderr))
-            {
-                return formats::colored_default_format;
-            }
-        }
-        formats::default_format
     }
 }
 
@@ -223,21 +232,6 @@ impl Logger {
         self
     }
 
-    /// Makes the logger write no logs at all.
-    ///
-    /// This can be useful when you want to run tests of your programs with all log-levels active.
-    /// Such tests can ensure that those parts of your code, which are only executed
-    /// within normally unused log calls (like `std::fmt::Display` implementations),
-    /// will not cause undesired side-effects when activated (note that the log macros prevent
-    /// arguments of inactive log-calls from being evaluated).
-    #[deprecated(
-        since = "0.15.6",
-        note = "use `log_target()` with `LogTarget::DevNull`"
-    )]
-    pub fn do_not_log(self) -> Self {
-        self.log_target(LogTarget::DevNull)
-    }
-
     /// Makes the logger print an info message to stdout with the name of the logfile
     /// when a logfile is opened for writing.
     pub fn print_message(mut self) -> Self {
@@ -269,9 +263,9 @@ impl Logger {
     /// ```fn(&Record) -> String```.
     ///
     /// By default,
-    /// [`default_format()`](fn.default_format.html) is used for output to files,
-    /// and [`colored_default_format()`](fn.colored_default_format.html) is used for output
-    /// to stdout or stderr.
+    /// [`default_format()`](fn.default_format.html) is used for output to files
+    /// and to custom writers, and [`AdaptiveFormat::Default`](enum.AdaptiveFormat.html#variant.Default)
+    /// is used for output to `stderr` and `stdout`.
     ///
     /// If the feature `colors` is switched off,
     /// `default_format()` is used for all outputs.
@@ -292,6 +286,30 @@ impl Logger {
         self
     }
 
+    /// Makes the logger use the specified format for messages that are written to `stderr`.
+    /// Coloring is used if `stderr` is a tty.
+    ///
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    ///
+    /// Only available with feature `colors`.
+    #[cfg(feature = "atty")]
+    pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
+        self.format_for_stderr = adaptive_format.format_function(Stream::StdErr);
+        self
+    }
+
+    /// Makes the logger use the specified format for messages that are written to `stdout`.
+    /// Coloring is used if `stdout` is a tty.
+    ///
+    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    ///
+    /// Only available with feature `colors`.
+    #[cfg(feature = "atty")]
+    pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
+        self.format_for_stdout = adaptive_format.format_function(Stream::StdOut);
+        self
+    }
+
     /// Makes the logger use the provided format function for messages
     /// that are written to stderr.
     ///
@@ -301,7 +319,7 @@ impl Logger {
         self
     }
 
-    /// Makes the logger use the provided format function for messages
+    /// Makes the logger use the provided format function to format messages
     /// that are written to stdout.
     ///
     /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
@@ -317,6 +335,34 @@ impl Logger {
     /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
     pub fn format_for_writer(mut self, format: FormatFunction) -> Self {
         self.format_for_writer = format;
+        self
+    }
+
+    /// Sets the color palette for function [`style`](fn.style.html), which is used in the
+    /// provided coloring format functions.
+    ///
+    /// The palette given here overrides the default palette.
+    ///
+    /// The palette is specified in form of a String that contains a semicolon-separated list
+    /// of numbers (0..=255) and/or dashes (´-´).
+    /// The first five values denote the fixed color that is
+    /// used for coloring `error`, `warn`, `info`, `debug`, and `trace` messages.
+    ///
+    /// The String `"196;208;-;7;8"` describes the default palette, where color 196 is
+    /// used for error messages, and so on. The `-` means that no coloring is done,
+    /// i.e., with `"-;-;-;-;-"` all coloring is switched off.
+    ///
+    /// The palette can further be overridden at runtime by setting the environment variable
+    /// `FLEXI_LOGGER_PALETTE` to a palette String. This allows adapting the used text colors to
+    /// differently colored terminal backgrounds.
+    ///
+    /// For your convenience, if you want to specify your own palette,
+    /// you can produce a colored list with all 255 colors with `cargo run --example colors`.
+    ///
+    /// Only available with feature `colors`.
+    #[cfg(feature = "colors")]
+    pub fn set_palette(mut self, palette: String) -> Self {
+        self.o_palette = Some(palette);
         self
     }
 
@@ -470,17 +516,6 @@ impl Logger {
 /// Use these methods when you want to control the settings flexibly,
 /// e.g. with commandline arguments via `docopts` or `clap`.
 impl Logger {
-    /// With true, makes the logger write all logs to a file, otherwise to stderr.
-    #[deprecated(since = "0.13.3", note = "please use `log_target` instead")]
-    pub fn o_log_to_file(mut self, log_to_file: bool) -> Self {
-        if log_to_file {
-            self.log_target = LogTarget::File;
-        } else {
-            self.log_target = LogTarget::StdErr;
-        }
-        self
-    }
-
     /// With true, makes the logger print an info message to stdout, each time
     /// when a new file is used for log-output.
     pub fn o_print_message(mut self, print_message: bool) -> Self {
@@ -587,6 +622,9 @@ impl Logger {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
         let other_writers = Arc::new(self.other_writers);
+
+        #[cfg(feature = "colors")]
+        crate::formats::set_palette(&self.o_palette)?;
 
         let primary_writer = Arc::new(match self.log_target {
             LogTarget::File => {

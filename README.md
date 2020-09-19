@@ -137,19 +137,22 @@ Make use of any of these features by specifying them in your `Cargo.toml`
 
 ### **`colors`**
 
-Getting colored output was also possible without this feature, by adding
-colors to the logged message,
-and/or implementing and using your own coloring format function.
+Getting colored output is also possible without this feature,
+by implementing and using your own coloring format function.
 
-The new default feature `colors` simplifies this by doing three things:
+The default feature `colors` simplifies this by doing three things:
 
 * it activates the optional dependency to `yansi` and
 * provides additional colored pendants to the existing uncolored format functions
 * it uses `colored_default_format()` for the output to stderr,
   and the non-colored `default_format()` for the output to files
+* it activates the optional dependency to `atty` to being able to switch off 
+  coloring if the output is not sent to a terminal but e.g. piped to another program.
 
 **<span style="color:red">C</span><span style="color:blue">o</span><span style="color:green">l</span><span style="color:orange">o</span><span style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
-or styles in general, are a matter of taste, and no choice will fit every need. So you can override the default formatting for stderr, using `Logger::format_for_stderr()`, and for the files using `Logger::format_for_files()`, or for both in one shot using `Logger::format()`.
+or styles in general, are a matter of taste, and no choice will fit every need. So you can override the default formatting and coloring in various ways.
+
+With `--no-default-features --features="atty"` you can remove the yansi-based coloring but keep the capability to switch off your own coloring.
 
 ### **`specfile`**
 

@@ -60,28 +60,3 @@ pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilte
 pub use crate::logger::{Duplicate, LogTarget, Logger};
 pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 pub use crate::reconfiguration_handle::ReconfigurationHandle;
-
-/// Function type for Format functions.
-///
-/// If you want to write the log lines in your own format,
-/// implement a function with this signature and provide it to one of the methods
-/// [`Logger::format()`](struct.Logger.html#method.format),
-/// [`Logger::format_for_files()`](struct.Logger.html#method.format_for_files),
-/// or [`Logger::format_for_stderr()`](struct.Logger.html#method.format_for_stderr).
-///
-/// Checkout the code of the provided [format functions](index.html#functions)
-/// if you want to start with a template.
-///
-/// ## Parameters
-///
-/// - `write`: the output stream
-///
-/// - `now`: the timestamp that you should use if you want a timestamp to appear in the log line
-///
-/// - `record`: the log line's content and metadata, as provided by the log crate's macros.
-///
-pub type FormatFunction = fn(
-    write: &mut dyn std::io::Write,
-    now: &mut DeferredNow,
-    record: &Record,
-) -> Result<(), std::io::Error>;
