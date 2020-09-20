@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2020-09-20
+
+Support empty toml spec files (kudos to ijackson for
+[pull request 66](https://github.com/emabee/flexi_logger/pull/66))
+(was supposed to be part of 0.16.0, but I had forgotten to merge it).
+
 ## [0.16.0] - 2020-09-19
 
 If file logging is used, do not create the output file if no log is written.

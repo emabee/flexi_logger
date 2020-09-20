@@ -872,10 +872,7 @@ mod test_with_specfile {
 
     #[test]
     fn specfile() {
-        compare_specs(
-            "",
-            "",
-        );
+        compare_specs("", "");
 
         compare_specs(
             "[modules]\n\
@@ -914,16 +911,16 @@ mod test_with_specfile {
     }
 
     #[cfg(feature = "specfile_without_notification")]
-    fn compare_specs(s1: &str, s2: &str) {
-        let ls1 = LogSpecification::from_toml(s1).unwrap();
-        let ls2 = LogSpecification::parse(s2).unwrap();
+    fn compare_specs(toml: &str, spec_string: &str) {
+        let ls_toml = LogSpecification::from_toml(toml).unwrap();
+        let ls_spec = LogSpecification::parse(spec_string).unwrap();
 
-        assert_eq!(ls1.module_filters, ls2.module_filters);
-        assert_eq!(ls1.textfilter.is_none(), ls2.textfilter.is_none());
-        if ls1.textfilter.is_some() && ls2.textfilter.is_some() {
+        assert_eq!(ls_toml.module_filters, ls_spec.module_filters);
+        assert_eq!(ls_toml.textfilter.is_none(), ls_spec.textfilter.is_none());
+        if ls_toml.textfilter.is_some() && ls_spec.textfilter.is_some() {
             assert_eq!(
-                ls1.textfilter.unwrap().to_string(),
-                ls2.textfilter.unwrap().to_string()
+                ls_toml.textfilter.unwrap().to_string(),
+                ls_spec.textfilter.unwrap().to_string()
             );
         }
     }
