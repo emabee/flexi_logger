@@ -48,6 +48,7 @@ mod parameters;
 mod primary_writer;
 mod reconfiguration_handle;
 
+pub mod code_examples;
 pub mod writers;
 
 /// Re-exports from log crate

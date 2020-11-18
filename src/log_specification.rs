@@ -227,16 +227,16 @@ impl LogSpecification {
     }
 
     /// Returns a log specification based on the value of the environment variable `RUST_LOG`,
-    /// or on the given String.
+    /// if it exists and can be parsed, or on the given String.
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the input is malformed.
+    /// `FlexiLoggerError::Parse` if the given spec is malformed.
     pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> Result<Self, FlexiLoggerError> {
-        match env::var("RUST_LOG") {
-            Ok(spec) => Self::parse(&spec),
-            Err(..) => Self::parse(given_spec.as_ref()),
-        }
+        env::var("RUST_LOG")
+            .map_err(|_e| FlexiLoggerError::Poison /*wrong, but only dummy*/)
+            .and_then(|value| Self::parse(&value))
+            .or_else(|_| Self::parse(given_spec.as_ref()))
     }
 
     /// Reads a log specification from an appropriate toml document.

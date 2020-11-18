@@ -38,84 +38,10 @@ Note: `log` is needed because `flexi_logger` plugs into the standard Rust loggin
 by the [log crate](https://crates.io/crates/log),
 and you use the ```log``` macros to write log lines from your code.
 
-## Example 1: log to stderr
+## Code examples
 
-To read the log specification from the environment variable  `RUST_LOG` and write the logs
-to stderr (i.e., behave like `env_logger`),
-do this early in your program:
-
-```rust
-flexi_logger::Logger::with_env()
-            .start()
-            .unwrap();
-```
-
-After that, you just use the log-macros from the log crate.
-
-To log differently, you may
-
-* choose an alternative `with...` method,
-* and/or add some configuration options,
-* and/or choose an alternative `start...` method.
-
-## Example 2: log to files in a folder
-
-In the folllowing example we
-
-* provide the loglevel-specification programmatically, as String, while still allowing it
-   to be overridden by the environment variable `RUST_LOG`,
-* and we configure `flexi_logger` to write into a log file in folder `log_files`,
-* and write the log entries with time and location info (`opt_format`)
-
-```rust
-use flexi_logger::{Logger, opt_format};
-// ...
-Logger::with_env_or_str("myprog=debug, mylib=warn")
-            .log_to_file()
-            .directory("log_files")
-            .format(opt_format)
-            .start()
-            .unwrap();
-```
-
-## Example 3: reconfigure the log-spec programmatically
-
-Obtain the `ReconfigurationHandle` (using `.start()`):
-
-```rust
-let mut log_handle = flexi_logger::Logger::with_str("info")
-    // ... logger configuration ...
-    .start()
-    .unwrap();
-```
-
-and modify the effective log specification from within your code:
-
-```rust
-// ...
-log_handle.parse_and_push_temp_spec("info, critical_mod = trace");
-// ... critical calls ...
-log_handle.pop_temp_spec();
-// ... continue with the log spec you had before.
-```
-
-## Example 4: reconfigure the log-spec dynamically by editing a spec-file
-
-If you start  `flexi_logger` with a specfile, e.g.
-
-```rust
-flexi_logger::Logger::with_str("info")
-    // ... logger configuration ...
-   .start_with_specfile("/server/config/logspec.toml")
-   .unwrap();
-```
-
-then you can change the logspec dynamically, *while your program is running*,
-by editing the specfile.
-
-See the API documentation of
-[`Logger::start_with_specfile()`](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.start_with_specfile)
-for more details.
+See the documentation of module
+[code_examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html).
 
 ## Options
 

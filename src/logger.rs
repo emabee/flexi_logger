@@ -92,8 +92,10 @@ pub enum LogTarget {
     FileAndWriter(Box<dyn LogWriter>),
     /// Log is processed, including duplication, but not written to a primary target destination.
     ///
-    /// This can be useful for running tests with all log-levels active, to ensure that the log
-    /// calls which are normally not active will not cause undesired side-effects when activated
+    /// This can be useful e.g. for running application tests with all log-levels active and still
+    /// avoiding tons of log files etc.
+    /// Such tests ensure that the log calls which are normally not active
+    /// will not cause undesired side-effects when activated
     /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
     ///
     /// Combined with
@@ -260,7 +262,13 @@ impl Logger {
     ///
     /// You can either choose one of the provided log-line formatters,
     /// or you create and use your own format function with the signature <br>
-    /// ```fn(&Record) -> String```.
+    /// ```rust,ignore
+    /// fn(
+    ///    write: &mut dyn std::io::Write,
+    ///    now: &mut DeferredNow,
+    ///    record: &Record,
+    /// ) -> Result<(), std::io::Error>
+    /// ```
     ///
     /// By default,
     /// [`default_format()`](fn.default_format.html) is used for output to files
@@ -369,7 +377,7 @@ impl Logger {
     /// Specifies a folder for the log files.
     ///
     /// This parameter only has an effect if `log_to_file()` is used, too.
-    /// If the specified folder does not exist, the initialization will fail.
+    /// The specified folder will be created if it does not exist.
     /// By default, the log files are created in the folder where the program was started.
     pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Self {
         self.flwb = self.flwb.directory(directory);
@@ -386,7 +394,8 @@ impl Logger {
 
     /// Makes the logger not include a timestamp into the names of the log files.
     ///
-    /// This option only has an effect if `log_to_file()` is used, too.
+    /// This option only has an effect if `log_to_file()` is used, too,
+    /// and is ignored if rotation is used.
     pub fn suppress_timestamp(mut self) -> Self {
         self.flwb = self.flwb.suppress_timestamp();
         self

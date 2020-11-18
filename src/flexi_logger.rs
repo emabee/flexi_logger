@@ -119,11 +119,9 @@ impl log::Log for FlexiLogger {
         {
             // closure that we need below
             let check_text_filter = |text_filter: &Option<Regex>| {
-                if let Some(filter) = text_filter.as_ref() {
-                    filter.is_match(&*record.args().to_string())
-                } else {
-                    true
-                }
+                text_filter
+                    .as_ref()
+                    .map_or(true, |filter| filter.is_match(&*record.args().to_string()))
             };
 
             if !check_text_filter(

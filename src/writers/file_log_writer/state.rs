@@ -493,15 +493,16 @@ fn remove_or_compress_too_old_logfiles(
     cleanup_config: &Cleanup,
     filename_config: &FilenameConfig,
 ) -> Result<(), std::io::Error> {
-    if let Some(ref cleanup_thread_handle) = o_cleanup_thread_handle {
-        cleanup_thread_handle
-            .sender
-            .send(MessageToCleanupThread::Act)
-            .ok();
-        Ok(())
-    } else {
-        remove_or_compress_too_old_logfiles_impl(cleanup_config, filename_config)
-    }
+    o_cleanup_thread_handle.as_ref().map_or(
+        remove_or_compress_too_old_logfiles_impl(cleanup_config, filename_config),
+        |cleanup_thread_handle| {
+            cleanup_thread_handle
+                .sender
+                .send(MessageToCleanupThread::Act)
+                .ok();
+            Ok(())
+        },
+    )
 }
 
 fn remove_or_compress_too_old_logfiles_impl(

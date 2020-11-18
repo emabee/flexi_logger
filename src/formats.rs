@@ -282,6 +282,7 @@ pub(crate) fn set_palette(input: &Option<String>) -> Result<(), std::num::ParseI
 }
 
 #[cfg(feature = "colors")]
+#[derive(Debug)]
 struct Palette {
     pub error: Style,
     pub warn: Style,

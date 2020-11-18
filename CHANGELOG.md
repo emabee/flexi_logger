@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2020-11-18
+
+Add module
+[code-examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html)
+with additional usage documentation.
+This is a follow-up of a PR, kudos goes to [devzbysiu](https://github.com/devzbysiu)!
+
 ## [0.16.1] - 2020-09-20
 
 Support empty toml spec files (kudos to ijackson for

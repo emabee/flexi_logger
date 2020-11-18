@@ -134,7 +134,9 @@ pub enum Cleanup {
 impl Cleanup {
     // Returns true if some cleanup is to be done.
     #[must_use]
+    #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn do_cleanup(&self) -> bool {
+        // !matches!(self, Self::Never) would be nicer, but is not possible with 1.37
         match self {
             Self::Never => false,
             _ => true,
