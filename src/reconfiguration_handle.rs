@@ -134,12 +134,12 @@ impl ReconfigurationHandle {
     ///
     /// This method is supposed to be called at the very end of your program, in case you use
     /// your own writers, or if you want to securely shutdown the cleanup-thread of the
-    /// `FileLogWriter`. If you use a [`Cleanup`](enum.Cleanup.html) strategy with compressing,
+    /// `FileLogWriter`. If you use a [`Cleanup`](crate::Cleanup) strategy with compressing,
     /// and your process terminates
     /// without correctly shutting down the cleanup-thread, then you might stop the cleanup-thread
     /// while it is compressing a log file, which can leave unexpected files in the filesystem.
     ///
-    /// See also [`LogWriter::shutdown`](writers/trait.LogWriter.html#method.shutdown).
+    /// See also [`LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
     pub fn shutdown(&self) {
         if let PrimaryWriter::Multi(writer) = &*self.primary_writer {
             writer.shutdown();

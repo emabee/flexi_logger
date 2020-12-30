@@ -5,7 +5,7 @@ use log::Record;
 /// Writes to a single log output stream.
 ///
 /// Boxed instances of `LogWriter` can be used as additional log targets
-/// (see [module description](index.html) for more details).
+/// (see [writers](crate::writers) for more details).
 pub trait LogWriter: Sync + Send {
     /// Writes out a log line.
     ///
@@ -25,9 +25,9 @@ pub trait LogWriter: Sync + Send {
     fn max_log_level(&self) -> log::LevelFilter;
 
     /// Sets the format function.
-    /// Defaults to ([`formats::default_format`](fn.default_format.html)),
+    /// Defaults to ([`formats::default_format`](crate::default_format)),
     /// but can be changed with a call to
-    /// [`Logger::format_for_writer`](struct.Logger.html#method.format_for_writer).
+    /// [`Logger::format_for_writer`](crate::Logger::format_for_writer).
     ///
     /// The default implementation is a no-op.
     fn format(&mut self, format: FormatFunction) {

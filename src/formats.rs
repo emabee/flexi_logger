@@ -8,9 +8,9 @@ use yansi::{Color, Paint, Style};
 ///
 /// If you want to write the log lines in your own format,
 /// implement a function with this signature and provide it to one of the methods
-/// [`Logger::format()`](struct.Logger.html#method.format),
-/// [`Logger::format_for_files()`](struct.Logger.html#method.format_for_files),
-/// or [`Logger::format_for_stderr()`](struct.Logger.html#method.format_for_stderr).
+/// [`Logger::format()`](crate::Logger::format),
+/// [`Logger::format_for_files()`](crate::Logger::format_for_files),
+/// or [`Logger::format_for_stderr()`](crate::Logger::format_for_stderr).
 ///
 /// Checkout the code of the provided [format functions](index.html#functions)
 /// if you want to start with a template.
@@ -55,7 +55,7 @@ pub fn default_format(
 /// <code><span style="color:red">ERROR</span> &#91;my_prog::some_submodule&#93; <span
 /// style="color:red">File not found</span></code>
 ///
-/// See method [style](fn.style.html) if you want to influence coloring.
+/// See method [style](crate::style) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -104,7 +104,7 @@ pub fn opt_format(
 
 /// A colored version of the logline-formatter `opt_format`.
 ///
-/// See method [style](fn.style.html) if you want to influence coloring.
+/// See method [style](crate::style) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -157,7 +157,7 @@ pub fn detailed_format(
 
 /// A colored version of the logline-formatter `detailed_format`.
 ///
-/// See method [style](fn.style.html) if you want to influence coloring.
+/// See method [style](crate::style) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -211,7 +211,7 @@ pub fn with_thread(
 
 /// A colored version of the logline-formatter `with_thread`.
 ///
-/// See method [style](fn.style.html) if you want to influence coloring.
+/// See method [style](crate::style) if you want to influence coloring.
 ///
 /// Only available with feature `colors`.
 ///
@@ -240,7 +240,7 @@ pub fn colored_with_thread(
 /// Helper function that is used in the provided coloring format functions to apply
 /// colors based on the log level and the effective color palette.
 ///
-/// See [`Logger::set_palette`](struct.Logger.html#method.set_palette) if you want to
+/// See [`Logger::set_palette`](crate::Logger::set_palette) if you want to
 /// modify the color palette.
 ///
 /// Only available with feature `colors`.
@@ -326,34 +326,34 @@ fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
 /// Specifies the `FormatFunction` and decides if coloring should be used.
 ///
 /// Is used in
-/// [`Logger::adaptive_format_for_stderr`](struct.Logger.html#method.adaptive_format_for_stderr) and
-/// [`Logger::adaptive_format_for_stdout`](struct.Logger.html#method.adaptive_format_for_stdout).
+/// [`Logger::adaptive_format_for_stderr`](crate::Logger::adaptive_format_for_stderr) and
+/// [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout).
 /// The coloring format functions are used if the output channel is a tty.
 ///
 /// Only available with feature `atty`.
 #[cfg(feature = "atty")]
 #[derive(Clone, Copy)]
 pub enum AdaptiveFormat {
-    /// Chooses between [`default_format`](fn.default_format.html)
-    /// and [`colored_default_format`](fn.colored_default_format.html).
+    /// Chooses between [`default_format`](crate::default_format)
+    /// and [`colored_default_format`](crate::colored_default_format).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "colors")]
     Default,
-    /// Chooses between [`detailed_format`](fn.detailed_format.html)
-    /// and [`colored_detailed_format`](fn.colored_detailed_format.html).
+    /// Chooses between [`detailed_format`](crate::detailed_format)
+    /// and [`colored_detailed_format`](crate::colored_detailed_format).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "colors")]
     Detailed,
-    /// Chooses between [`opt_format`](fn.opt_format.html)
-    /// and [`colored_opt_format`](fn.colored_opt_format.html).
+    /// Chooses between [`opt_format`](crate::opt_format)
+    /// and [`colored_opt_format`](crate::colored_opt_format).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "colors")]
     Opt,
-    /// Chooses between [`with_thread`](fn.with_thread.html)
-    /// and [`colored_with_thread`](fn.colored_with_thread.html).
+    /// Chooses between [`with_thread`](crate::with_thread)
+    /// and [`colored_with_thread`](crate::colored_with_thread).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "colors")]

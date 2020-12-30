@@ -12,6 +12,7 @@ use super::{Config, FileLogWriter, RotationConfig, State};
 /// Builder for `FileLogWriter`.
 #[allow(clippy::module_name_repetitions)]
 pub struct FileLogWriterBuilder {
+    basename: Option<String>,
     discriminant: Option<String>,
     config: Config,
     format: FormatFunction,
@@ -24,6 +25,7 @@ pub struct FileLogWriterBuilder {
 impl FileLogWriterBuilder {
     pub(crate) fn new() -> FileLogWriterBuilder {
         FileLogWriterBuilder {
+            basename: None,
             discriminant: None,
             o_rotation_config: None,
             config: Config::default(),
@@ -42,7 +44,7 @@ impl FileLogWriterBuilder {
     }
 
     /// Makes the `FileLogWriter` use the provided format function for the log entries,
-    /// rather than the default ([`formats::default_format`](fn.default_format.html)).
+    /// rather than the default ([`formats::default_format`](crate::default_format)).
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format = format;
         self
@@ -115,7 +117,7 @@ impl FileLogWriterBuilder {
     /// ```
     ///
     /// The cleanup parameter allows defining the strategy for dealing with older files.
-    /// See [Cleanup](enum.Cleanup.html) for details.
+    /// See [Cleanup](crate::Cleanup) for details.
     #[must_use]
     pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.o_rotation_config = Some(RotationConfig {
@@ -138,6 +140,13 @@ impl FileLogWriterBuilder {
     /// The specified String is added to the log file name.
     pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Self {
         self.discriminant = Some(discriminant.into());
+        self
+    }
+
+    /// The specified String is used as the basename of the log file name,
+    /// instead of the program name.
+    pub fn basename<S: Into<String>>(mut self, basename: S) -> Self {
+        self.basename = Some(basename.into());
         self
     }
 
@@ -168,9 +177,13 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
-        let arg0 = env::args().next().unwrap_or_else(|| "rs".to_owned());
-        self.config.filename_config.file_basename =
-            Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy().to_string();
+        if let Some(basename) = self.basename {
+            self.config.filename_config.file_basename = basename;
+        } else {
+            let arg0 = env::args().next().unwrap_or_else(|| "rs".to_owned());
+            self.config.filename_config.file_basename =
+                Path::new(&arg0).file_stem().unwrap(/*cannot fail*/).to_string_lossy().to_string();
+        }
 
         if let Some(discriminant) = self.discriminant {
             self.config.filename_config.file_basename += &format!("_{}", discriminant);
@@ -264,6 +277,13 @@ impl FileLogWriterBuilder {
     /// The specified String is added to the log file name.
     pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Self {
         self.discriminant = discriminant.map(Into::into);
+        self
+    }
+
+    /// The specified String is used as the basename of the log file,
+    /// instead of the program name, which is used when `None` is given.
+    pub fn o_basename<S: Into<String>>(mut self, basename: Option<S>) -> Self {
+        self.basename = basename.map(Into::into);
         self
     }
 

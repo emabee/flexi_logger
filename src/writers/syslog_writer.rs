@@ -110,7 +110,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 /// how you can access it and with which protocol you can write to it,
 /// so that you can choose a variant of the `SyslogConnector` that fits to your environment.
 ///
-/// See the [module description](index.html) for guidance how to use additional log writers.
+/// See the [writers](crate::writers) for guidance how to use additional log writers.
 pub struct SyslogWriter {
     hostname: OsString,
     process: String,
@@ -137,7 +137,7 @@ impl SyslogWriter {
     /// is a string without further semantics. It is intended for filtering
     /// messages on a relay or collector.
     ///
-    /// `syslog`: A [`SyslogConnector`](enum.SyslogConnector.html).
+    /// `syslog`: A [`SyslogConnector`](crate::writers::SyslogConnector).
     ///
     /// # Errors
     ///
@@ -158,7 +158,12 @@ impl SyslogWriter {
             facility,
             max_log_level,
             message_id,
-            determine_severity: determine_severity.unwrap_or_else(|| default_mapping),
+            // shorter variants with unwrap_or() or unwrap_or_else() don't work
+            // with either current clippy or old rustc:
+            determine_severity: match determine_severity {
+                Some(f) => f,
+                None => default_mapping,
+            },
             syslog: Mutex::new(RefCell::new(syslog)),
         }))
     }
@@ -201,7 +206,7 @@ impl LogWriter for SyslogWriter {
 
 /// Helper struct that connects to the syslog and implements Write.
 ///
-/// Is used in [`SyslogWriter::try_new`](struct.SyslogWriter.html#method.try_new).
+/// Is used in [`SyslogWriter::try_new`](crate::writers::SyslogWriter::try_new).
 ///
 /// ## Example
 ///

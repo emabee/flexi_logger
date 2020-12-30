@@ -15,8 +15,8 @@
 //!
 //! See
 //!
-//! * [Logger](struct.Logger.html) for a full description of all configuration options,
-//! * and the [writers](writers/index.html) module for the usage of additional log writers,
+//! * [Logger](crate::Logger) for a full description of all configuration options,
+//! * and the [writers](crate::writers) module for the usage of additional log writers,
 //! * and [the homepage](https://crates.io/crates/flexi_logger) for how to get started.
 //!
 //! There are configuration options to e.g.
@@ -35,7 +35,7 @@
 //! By default, i.e. if feature `colors` is not switched off, the log lines that appear on your
 //! terminal are coloured. In case the chosen colors don't fit to your terminal's color theme,
 //! you can adapt the colors to improve readability.
-//! See the documentation of method [style](fn.style.html)
+//! See the documentation of method [style](crate::style)
 //! for a description how this can be done.
 
 mod deferred_now;

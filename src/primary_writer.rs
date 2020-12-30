@@ -179,8 +179,22 @@ impl LogWriter for MultiWriter {
         for writer in &self.writers {
             writer.flush()?;
         }
-        std::io::stderr().flush()
+        if let Duplicate::None = self.duplicate_stderr {
+            std::io::stderr().flush()?;
+        }
+        if let Duplicate::None = self.duplicate_stdout {
+            std::io::stdout().flush()?;
+        }
+        // maybe nicer, but doesn't work with rustc 1.37:
+        // if !matches!(self.duplicate_stderr, Duplicate::None) {
+        //     std::io::stderr().flush()?;
+        // }
+        // if !matches!(self.duplicate_stdout, Duplicate::None) {
+        //     std::io::stdout().flush()?;
+        // }
+        Ok(())
     }
+
     fn shutdown(&self) {
         for writer in &self.writers {
             writer.shutdown();

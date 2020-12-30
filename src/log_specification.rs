@@ -11,8 +11,8 @@ use std::env;
 /// based on the module, the log level, and the text.
 ///
 /// The loglevel specification via string (relevant for methods
-/// [parse()](struct.LogSpecification.html#method.parse) and
-/// [env()](struct.LogSpecification.html#method.env))
+/// [parse()](crate::LogSpecification::parse) and
+/// [env()](crate::LogSpecification::env))
 /// works essentially like with `env_logger`,
 /// but we are a bit more tolerant with spaces. Its functionality can be
 /// described with some Backus-Naur-form:

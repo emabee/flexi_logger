@@ -16,7 +16,7 @@ use std::sync::Mutex;
 
 /// A configurable `LogWriter` implementation that writes to a file or a sequence of files.
 ///
-/// See the [module description](index.html) for usage guidance.
+/// See [writers](crate::writers) for usage guidance.
 #[allow(clippy::module_name_repetitions)]
 pub struct FileLogWriter {
     format: FormatFunction,

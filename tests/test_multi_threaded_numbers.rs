@@ -23,6 +23,7 @@ fn multi_threaded() {
     let directory = define_directory();
     let mut reconf_handle = Logger::with_str("debug")
         .log_to_file()
+        .basename("test_mtn")
         .format(test_format)
         .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())

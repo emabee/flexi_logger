@@ -40,15 +40,17 @@ fn run_script(s: &str) {
 }
 
 fn main() {
+    println!("Qualify flexi_logger");
+
     // format
     run_command!("cargo", "fmt");
 
     // Build in important variants
-    std::fs::remove_file("Cargo.lock");
+    std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo", "+1.37.0", "build", "--no-default-features");
     run_command!("cargo", "+1.37.0", "build", "--all-features");
 
-    std::fs::remove_file("Cargo.lock");
+    std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo", "build");
     run_command!("cargo", "build", "--no-default-features");
     run_command!("cargo", "build", "--no-default-features", "--features=atty");

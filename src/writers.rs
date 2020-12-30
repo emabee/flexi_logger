@@ -1,24 +1,24 @@
-//! Contains a trait ([`LogWriter`](trait.LogWriter.html)) for extending `flexi_logger`
+//! Contains the trait [`LogWriter`](crate::writers::LogWriter) for extending `flexi_logger`
 //! with additional log writers,
 //! and two concrete implementations
 //! for writing to files
-//! ([`FileLogWriter`](struct.FileLogWriter.html))
+//! ([`FileLogWriter`](crate::writers::FileLogWriter))
 //! or to the syslog
-//! ([`SyslogWriter`](struct.SyslogWriter.html)).
-//! You can also use your own implementations of [`LogWriter`](trait.LogWriter.html).
+//! ([`SyslogWriter`](crate::writers::SyslogWriter)).
+//! You can also use your own implementations of `LogWriter`.
 //!
 //! Such log writers can be used in two ways:
 //!
-//! * With [`Logger::log_target(...)`](../struct.Logger.html#method.log_target)
+//! * With [`Logger::log_target()`](crate::Logger::log_target)
 //!   you can influence to which output stream normal log messages will be written,
 //!   i.e. from log macro calls without explicit target specification.
 //!
-//!   See [`LogTarget`](../enum.LogTarget.html) for the available options.
+//!   See [`LogTarget`](crate::LogTarget) for the available options.
 //!
 //!   These log calls will only be written if they match the current
-//!   [`log specification`](../struct.LogSpecification.html).
+//!   [log specification](crate::LogSpecification).
 //!
-//! * [`Logger::add_writer()`](../struct.Logger.html#method.add_writer)
+//! * [`Logger::add_writer()`](crate::Logger::add_writer)
 //!   can be used to register an additional log writer under a target name.
 //!   The target name can then be used in calls to the
 //!   [log macro](https://docs.rs/log/latest/log/macro.log.html)

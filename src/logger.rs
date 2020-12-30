@@ -36,18 +36,18 @@ use std::sync::{Arc, RwLock};
 /// `Logger` is a builder class that allows you to
 /// * specify your desired (initial) loglevel-specification
 ///   * either programmatically as a String
-///    ([`Logger::with_str()`](struct.Logger.html#method.with_str))
+///    ([`Logger::with_str()`](crate::Logger::with_str))
 ///   * or by providing a String in the environment
-///    ([`Logger::with_env()`](struct.Logger.html#method.with_env)),
+///    ([`Logger::with_env()`](crate::Logger::with_env)),
 ///   * or by combining both options
-///    ([`Logger::with_env_or_str()`](struct.Logger.html#method.with_env_or_str)),
+///    ([`Logger::with_env_or_str()`](crate::Logger::with_env_or_str)),
 ///   * or by building a `LogSpecification` programmatically
-///    ([`Logger::with()`](struct.Logger.html#method.with)),
+///    ([`Logger::with()`](crate::Logger::with)),
 /// * use the desired configuration methods,
 /// * and finally start the logger with
 ///
-///   * [`start()`](struct.Logger.html#method.start),
-///   * or [`start_with_specfile()`](struct.Logger.html#method.start_with_specfile).
+///   * [`start()`](crate::Logger::start),
+///   * or [`start_with_specfile()`](crate::Logger::start_with_specfile).
 pub struct Logger {
     spec: LogSpecification,
     parse_errs: Option<String>,
@@ -69,7 +69,7 @@ pub struct Logger {
 /// All log messages, in which no target is explicitly defined, will be written to
 /// the default log target.
 ///
-/// See the [writers](writers/index.html) module for
+/// See module [writers](crate::writers) for
 /// how to specify non-default log targets in log macro calls,
 /// and the usage of non-default log writers.
 pub enum LogTarget {
@@ -99,9 +99,9 @@ pub enum LogTarget {
     /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
     ///
     /// Combined with
-    /// [`duplicate_to_stdout()`](struct.Logger.html#method.duplicate_to_stdout)
+    /// [`duplicate_to_stdout()`](crate::Logger::duplicate_to_stdout)
     /// and
-    /// [`duplicate_to_stderr()`](struct.Logger.html#method.duplicate_to_stderr)
+    /// [`duplicate_to_stderr()`](crate::Logger::duplicate_to_stderr)
     /// it can also be used if you want to get logs both to stdout and stderr, but not to a file.
     DevNull,
 }
@@ -117,7 +117,7 @@ impl Logger {
     }
 
     /// Creates a Logger that reads the `LogSpecification` from a String or &str.
-    /// [See `LogSpecification`](struct.LogSpecification.html) for the syntax.
+    /// [See `LogSpecification`](crate::LogSpecification) for the syntax.
     #[must_use]
     pub fn with_str<S: AsRef<str>>(s: S) -> Self {
         Self::from_result(LogSpecification::parse(s.as_ref()))
@@ -220,15 +220,15 @@ impl Logger {
     }
 
     /// Is equivalent to
-    /// [`log_target`](struct.Logger.html#method.log_target)`(`[`LogTarget::File`](
-    /// enum.LogTarget.html#variant.File)`)`.
+    /// [`log_target`](crate::Logger::log_target)`(`[`LogTarget::File`](crate::LogTarget::File)`)`.
     pub fn log_to_file(self) -> Self {
         self.log_target(LogTarget::File)
     }
 
     /// Write the main log output to the specified target.
     ///
-    /// By default, i.e. if this method is not called, the log target `LogTarget::StdErr` is used.
+    /// By default, i.e. if this method is not called,
+    /// the log target [`LogTarget::StdErr`](crate::LogTarget::StdErr) is used.
     pub fn log_target(mut self, log_target: LogTarget) -> Self {
         self.log_target = log_target;
         self
@@ -271,8 +271,8 @@ impl Logger {
     /// ```
     ///
     /// By default,
-    /// [`default_format()`](fn.default_format.html) is used for output to files
-    /// and to custom writers, and [`AdaptiveFormat::Default`](enum.AdaptiveFormat.html#variant.Default)
+    /// [`default_format()`](crate::default_format) is used for output to files
+    /// and to custom writers, and [`AdaptiveFormat::Default`](crate::AdaptiveFormat::Default)
     /// is used for output to `stderr` and `stdout`.
     ///
     /// If the feature `colors` is switched off,
@@ -288,7 +288,7 @@ impl Logger {
     /// Makes the logger use the provided format function for messages
     /// that are written to files.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     pub fn format_for_files(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self
@@ -297,7 +297,7 @@ impl Logger {
     /// Makes the logger use the specified format for messages that are written to `stderr`.
     /// Coloring is used if `stderr` is a tty.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "atty")]
@@ -309,7 +309,7 @@ impl Logger {
     /// Makes the logger use the specified format for messages that are written to `stdout`.
     /// Coloring is used if `stdout` is a tty.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "atty")]
@@ -321,7 +321,7 @@ impl Logger {
     /// Makes the logger use the provided format function for messages
     /// that are written to stderr.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
         self.format_for_stderr = format;
         self
@@ -330,7 +330,7 @@ impl Logger {
     /// Makes the logger use the provided format function to format messages
     /// that are written to stdout.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     pub fn format_for_stdout(mut self, format: FormatFunction) -> Self {
         self.format_for_stdout = format;
         self
@@ -340,13 +340,13 @@ impl Logger {
     /// Note that it is up to the implementation of the additional writer
     /// whether it evaluates this setting or not.
     ///
-    /// Regarding the default, see [`Logger::format`](struct.Logger.html#method.format).
+    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
     pub fn format_for_writer(mut self, format: FormatFunction) -> Self {
         self.format_for_writer = format;
         self
     }
 
-    /// Sets the color palette for function [`style`](fn.style.html), which is used in the
+    /// Sets the color palette for function [`style`](crate::style), which is used in the
     /// provided coloring format functions.
     ///
     /// The palette given here overrides the default palette.
@@ -454,7 +454,7 @@ impl Logger {
     /// files once they reach a size of 10 MiB.
     ///     
     /// `cleanup` defines the strategy for dealing with older files.
-    /// See [Cleanup](enum.Cleanup.html) for details.
+    /// See [Cleanup](crate::Cleanup) for details.
     pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.flwb = self.flwb.rotate(criterion, naming, cleanup);
         self
@@ -475,6 +475,15 @@ impl Logger {
     /// This option only has an effect if `log_to_file()` is used, too.
     pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Self {
         self.flwb = self.flwb.discriminant(discriminant);
+        self
+    }
+
+    /// The specified String is used as the basename of the log file name,
+    /// instead of the program name.
+    ///
+    /// This option only has an effect if `log_to_file()` is used, too.
+    pub fn basename<S: Into<String>>(mut self, basename: S) -> Self {
+        self.flwb = self.flwb.basename(basename);
         self
     }
 
@@ -504,7 +513,7 @@ impl Logger {
     ///
     /// The target name must not start with an underscore.
     ///
-    /// See [the module documentation of `writers`](writers/index.html).
+    /// See module [`writers`](crate::writers).
     pub fn add_writer<S: Into<String>>(
         mut self,
         target_name: S,
@@ -589,6 +598,15 @@ impl Logger {
 
     /// This option only has an effect if `log_to_file` is set to true.
     ///
+    /// The specified String is used as the basename of the log file,
+    /// instead of the program name, which is used when `None` is given.
+    pub fn o_basename<S: Into<String>>(mut self, basename: Option<S>) -> Self {
+        self.flwb = self.flwb.o_basename(basename);
+        self
+    }
+
+    /// This option only has an effect if `log_to_file` is set to true.
+    ///
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
     pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Self {
@@ -603,7 +621,7 @@ impl Logger {
     ///
     /// The returned reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
+    /// See [`ReconfigurationHandle`](crate::ReconfigurationHandle) for an example.
     ///
     /// # Errors
     ///
@@ -622,7 +640,7 @@ impl Logger {
     ///
     /// The reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`ReconfigurationHandle`](struct.ReconfigurationHandle.html) for an example.
+    /// See [`ReconfigurationHandle`](crate::ReconfigurationHandle) for an example.
     ///
     /// # Errors
     ///
@@ -702,7 +720,8 @@ impl Logger {
     /// The implementation of this configuration method uses some additional crates
     /// that you might not want to depend on with your program if you don't use this functionality.
     /// For that reason the method is only available if you activate the
-    /// `specfile` feature. See `flexi_logger`'s [usage](index.html#usage) section for details.
+    /// `specfile` feature. See the usage section on
+    /// [crates.io](https://crates.io/crates/flexi_logger) for details.
     ///
     /// ## Usage
     ///
@@ -748,7 +767,7 @@ impl Logger {
     /// # Returns
     ///
     /// A `ReconfigurationHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
+    /// [`shutdown`](crate::ReconfigurationHandle::shutdown) method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,
@@ -769,7 +788,7 @@ impl Logger {
     /// or nested within another logger.
     ///
     /// For the properties of the returned logger,
-    /// see [`start_with_specfile()`](struct.Logger.html#method.start_with_specfile).
+    /// see [`start_with_specfile()`](crate::Logger::start_with_specfile).
     ///
     /// # Errors
     ///
@@ -778,7 +797,7 @@ impl Logger {
     /// # Returns
     ///
     /// A `ReconfigurationHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](struct.ReconfigurationHandle.html#method.shutdown) method.
+    /// [`shutdown`](crate::ReconfigurationHandle::shutdown) method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<std::path::Path>>(
         self,
