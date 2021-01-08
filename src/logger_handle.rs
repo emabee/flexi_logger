@@ -8,10 +8,10 @@ use std::sync::{Arc, RwLock};
 ///
 /// # Example
 ///
-/// Obtain the `ReconfigurationHandle` (using `.start()`):
+/// Obtain the `LoggerHandle` (using `.start()`):
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
-/// let mut log_handle = Logger::with_str("info")
+/// let mut logger = Logger::with_str("info")
 ///     // ... your logger configuration goes here, as usual
 ///     .start()
 ///     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -23,11 +23,11 @@ use std::sync::{Arc, RwLock};
 ///
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
-/// # let mut log_handle = Logger::with_str("info")
+/// # let mut logger = Logger::with_str("info")
 /// #     .start()
 /// #     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 /// // ...
-/// log_handle.parse_new_spec("warn");
+/// logger.parse_new_spec("warn");
 /// // ...
 /// ```
 ///
@@ -37,26 +37,26 @@ use std::sync::{Arc, RwLock};
 ///
 /// ```rust
 /// # use flexi_logger::{Logger, LogSpecBuilder};
-/// #    let mut log_handle = Logger::with_str("info")
+/// #    let mut logger = Logger::with_str("info")
 /// #        .start()
 /// #        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-/// log_handle.parse_and_push_temp_spec("trace");
+/// logger.parse_and_push_temp_spec("trace");
 /// // ...
 /// // critical calls
 /// // ...
 ///
-/// log_handle.pop_temp_spec();
+/// logger.pop_temp_spec();
 /// // Continue with the log spec you had before.
 /// // ...
 /// ```
 #[derive(Clone)]
-pub struct ReconfigurationHandle {
+pub struct LoggerHandle {
     spec: Arc<RwLock<LogSpecification>>,
     spec_stack: Vec<LogSpecification>,
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
 }
-impl ReconfigurationHandle {
+impl LoggerHandle {
     pub(crate) fn new(
         spec: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
@@ -94,7 +94,7 @@ impl ReconfigurationHandle {
     pub fn parse_new_spec(&mut self, spec: &str) {
         self.set_new_spec(LogSpecification::parse(spec).unwrap_or_else(|e| {
             eprintln!(
-                "[flexi_logger] ReconfigurationHandle::parse_new_spec(): failed with {}",
+                "[flexi_logger] LoggerHandle::parse_new_spec(): failed with {}",
                 e
             );
             LogSpecification::off()
@@ -115,7 +115,7 @@ impl ReconfigurationHandle {
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
         self.set_new_spec(LogSpecification::parse(new_spec).unwrap_or_else(|e| {
             eprintln!(
-                "[flexi_logger] ReconfigurationHandle::parse_new_spec(): failed with {}, \
+                "[flexi_logger] LoggerHandle::parse_new_spec(): failed with {}, \
                  falling back to empty log spec",
                 e
             );
@@ -130,17 +130,30 @@ impl ReconfigurationHandle {
         }
     }
 
+    /// Flush all writers.
+    pub fn flush(&self) {
+        self.primary_writer.flush().ok();
+        for writer in self.other_writers.values() {
+            writer.flush().ok();
+        }
+    }
+
     /// Shutdown all participating writers.
     ///
-    /// This method is supposed to be called at the very end of your program, in case you use
-    /// your own writers, or if you want to securely shutdown the cleanup-thread of the
-    /// `FileLogWriter`. If you use a [`Cleanup`](crate::Cleanup) strategy with compressing,
-    /// and your process terminates
-    /// without correctly shutting down the cleanup-thread, then you might stop the cleanup-thread
-    /// while it is compressing a log file, which can leave unexpected files in the filesystem.
+    /// This method is supposed to be called at the very end of your program, if
+    ///
+    /// - you use buffering
+    ///   (to ensure that all buffered log lines are flushed before the program terminates)
+    /// - you use your own writer(s) (in case they need to cleanup resources)
+    /// - or if you want to securely shutdown the cleanup-thread of the `FileLogWriter`
+    ///   (if you use a [`Cleanup`](crate::Cleanup) strategy with compressing,
+    ///   and your process terminates
+    ///   without correctly shutting down the cleanup-thread, then you might stop the cleanup-thread
+    ///   while it is compressing a log file, which can leave unexpected files in the filesystem)
     ///
     /// See also [`LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
     pub fn shutdown(&self) {
+        self.primary_writer.flush().ok();
         if let PrimaryWriter::Multi(writer) = &*self.primary_writer {
             writer.shutdown();
         }

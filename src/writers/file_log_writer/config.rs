@@ -22,9 +22,10 @@ pub(crate) struct FilenameConfig {
 pub(crate) struct Config {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
+    pub(crate) buffered: bool,
     pub(crate) filename_config: FilenameConfig,
     pub(crate) o_create_symlink: Option<PathBuf>,
-    pub(crate) use_windows_line_ending: bool,
+    pub(crate) line_ending: &'static [u8],
 }
 impl Config {
     // Factory method; uses the same defaults as Logger.
@@ -38,8 +39,9 @@ impl Config {
                 use_timestamp: true,
             },
             append: false,
+            buffered: false,
             o_create_symlink: None,
-            use_windows_line_ending: false,
+            line_ending: super::UNIX_LINE_ENDING,
         }
     }
 }

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unpublished] - 2021-01-08
+
+Introduce optional buffering of log output. This increases performance
+(which can be relevant for programs with really high log production),
+but delays log line appearance in the output, which can be confusing,
+and requires to flush or shutdown the logger at the end of the program
+to ensure that all logs are written to the output before
+the program terminates.
+
+Add `must_use` annotations to all methods that were proposed by clippy.
+
+Reduce the size of `LogConfiguration` considerably by moving the rarely used textfilter
+into the heap. This unfortunately leads to an incompatible change in a rarely used public method
+(`LogConfiguration::text_filter()` was returning a `&Option<Regex>`,
+and is now returning `Option<&Regex>`), which enforces a version bump.
+
 ## [0.16.2] - 2020-11-18
 
 Add module

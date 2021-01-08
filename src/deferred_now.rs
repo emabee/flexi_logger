@@ -6,8 +6,16 @@ use chrono::{DateTime, Local};
 /// (in maybe different formats) always uses the same timestamp.
 #[derive(Debug)]
 pub struct DeferredNow(Option<DateTime<Local>>);
+impl Default for DeferredNow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> DeferredNow {
-    pub(crate) fn new() -> Self {
+    /// Constructs a new instance, but does not generate the timestamp.
+    #[must_use]
+    pub fn new() -> Self {
         Self(None)
     }
 

@@ -44,9 +44,9 @@ mod flexi_logger;
 mod formats;
 mod log_specification;
 mod logger;
+mod logger_handle;
 mod parameters;
 mod primary_writer;
-mod reconfiguration_handle;
 
 pub mod code_examples;
 pub mod writers;
@@ -59,5 +59,9 @@ pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
 pub use crate::logger::{Duplicate, LogTarget, Logger};
+pub use crate::logger_handle::LoggerHandle;
 pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
-pub use crate::reconfiguration_handle::ReconfigurationHandle;
+
+/// For backwards compatibility.
+#[deprecated]
+pub type ReconfigurationHandle = LoggerHandle;

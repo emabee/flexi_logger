@@ -58,7 +58,7 @@ use std::env;
 pub struct LogSpecification {
     module_filters: Vec<ModuleFilter>,
     #[cfg(feature = "textfilter")]
-    textfilter: Option<Regex>,
+    textfilter: Option<Box<Regex>>,
 }
 
 /// Defines which loglevel filter to use for the specified module.
@@ -91,6 +91,7 @@ impl LogSpecification {
     }
 
     /// Returns true if messages on the specified level from the writing module should be written
+    #[must_use]
     pub fn enabled(&self, level: log::Level, writing_module: &str) -> bool {
         // Search for the longest match, the vector is assumed to be pre-sorted.
         for module_filter in &self.module_filters {
@@ -193,7 +194,7 @@ impl LogSpecification {
 
         #[cfg(feature = "textfilter")]
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
-            Ok(re) => Some(re),
+            Ok(re) => Some(Box::new(re)),
             Err(e) => {
                 push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
                 None
@@ -277,7 +278,7 @@ impl LogSpecification {
         let textfilter = match logspec_ff.global_pattern {
             None => None,
             Some(s) => match Regex::new(&s) {
-                Ok(re) => Some(re),
+                Ok(re) => Some(Box::new(re)),
                 Err(e) => {
                     push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
                     None
@@ -363,6 +364,7 @@ impl LogSpecification {
     }
 
     /// Provides a reference to the module filters.
+    #[must_use]
     pub fn module_filters(&self) -> &Vec<ModuleFilter> {
         &self.module_filters
     }
@@ -371,8 +373,11 @@ impl LogSpecification {
     ///
     /// This method is only avaible with feature `textfilter`, which is a default feature.
     #[cfg(feature = "textfilter")]
-    pub fn text_filter(&self) -> &Option<Regex> {
-        &(self.textfilter)
+    #[must_use]
+    pub fn text_filter(&self) -> Option<&Regex> {
+        self.textfilter
+            .as_ref()
+            .map(|boxed_re| std::ops::Deref::deref(boxed_re))
     }
 }
 
@@ -528,7 +533,7 @@ impl LogSpecBuilder {
     pub fn finalize_with_textfilter(self, tf: Regex) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.into_vec_module_filter(),
-            textfilter: Some(tf),
+            textfilter: Some(Box::new(tf)),
         }
     }
 
@@ -549,7 +554,7 @@ impl LogSpecBuilder {
     pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.clone().into_vec_module_filter(),
-            textfilter: tf,
+            textfilter: tf.map(Box::new),
         }
     }
 }

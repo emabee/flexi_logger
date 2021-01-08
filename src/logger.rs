@@ -5,8 +5,7 @@ use crate::formats::{AdaptiveFormat, Stream};
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::{
-    Cleanup, Criterion, FlexiLoggerError, FormatFunction, LogSpecification, Naming,
-    ReconfigurationHandle,
+    Cleanup, Criterion, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle, Naming,
 };
 
 #[cfg(feature = "specfile")]
@@ -221,6 +220,7 @@ impl Logger {
 
     /// Is equivalent to
     /// [`log_target`](crate::Logger::log_target)`(`[`LogTarget::File`](crate::LogTarget::File)`)`.
+    #[must_use]
     pub fn log_to_file(self) -> Self {
         self.log_target(LogTarget::File)
     }
@@ -229,6 +229,7 @@ impl Logger {
     ///
     /// By default, i.e. if this method is not called,
     /// the log target [`LogTarget::StdErr`](crate::LogTarget::StdErr) is used.
+    #[must_use]
     pub fn log_target(mut self, log_target: LogTarget) -> Self {
         self.log_target = log_target;
         self
@@ -236,6 +237,7 @@ impl Logger {
 
     /// Makes the logger print an info message to stdout with the name of the logfile
     /// when a logfile is opened for writing.
+    #[must_use]
     pub fn print_message(mut self) -> Self {
         self.flwb = self.flwb.print_message();
         self
@@ -244,6 +246,7 @@ impl Logger {
     /// Makes the logger write messages with the specified minimum severity additionally to stderr.
     ///
     /// Works with all log targets except `StdErr` and `StdOut`.
+    #[must_use]
     pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Self {
         self.duplicate_err = dup;
         self
@@ -252,6 +255,7 @@ impl Logger {
     /// Makes the logger write messages with the specified minimum severity additionally to stdout.
     ///
     /// Works with all log targets except `StdErr` and `StdOut`.
+    #[must_use]
     pub fn duplicate_to_stdout(mut self, dup: Duplicate) -> Self {
         self.duplicate_out = dup;
         self
@@ -301,6 +305,7 @@ impl Logger {
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "atty")]
+    #[must_use]
     pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stderr = adaptive_format.format_function(Stream::StdErr);
         self
@@ -313,6 +318,7 @@ impl Logger {
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "atty")]
+    #[must_use]
     pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stdout = adaptive_format.format_function(Stream::StdOut);
         self
@@ -369,6 +375,7 @@ impl Logger {
     ///
     /// Only available with feature `colors`.
     #[cfg(feature = "colors")]
+    #[must_use]
     pub fn set_palette(mut self, palette: String) -> Self {
         self.o_palette = Some(palette);
         self
@@ -396,6 +403,7 @@ impl Logger {
     ///
     /// This option only has an effect if `log_to_file()` is used, too,
     /// and is ignored if rotation is used.
+    #[must_use]
     pub fn suppress_timestamp(mut self) -> Self {
         self.flwb = self.flwb.suppress_timestamp();
         self
@@ -455,6 +463,7 @@ impl Logger {
     ///     
     /// `cleanup` defines the strategy for dealing with older files.
     /// See [Cleanup](crate::Cleanup) for details.
+    #[must_use]
     pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.flwb = self.flwb.rotate(criterion, naming, cleanup);
         self
@@ -465,6 +474,7 @@ impl Logger {
     ///
     /// This option only has an effect if `log_to_file()` is used, too.
     /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+    #[must_use]
     pub fn append(mut self) -> Self {
         self.flwb = self.flwb.append();
         self
@@ -523,7 +533,27 @@ impl Logger {
         self
     }
 
+    /// Define if buffering should be used.
+    ///
+    /// By default, every log line is directly written to the output, without buffering.
+    /// This allows seeing new log lines in real time.
+    ///
+    /// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
+    /// which can be important if logging is used heavily.
+    /// On the other hand, if logging is used with low frequency,
+    /// the log lines can become visible in the output file with significant deferral.
+    ///
+    /// **Note** that with buffering you should use [`crate::LoggerHandle::shutdown`]
+    /// at the very end of your program
+    /// to ensure that all buffered log lines are flushed before the program terminates.
+    #[must_use]
+    pub fn use_buffering(mut self, buffer: bool) -> Self {
+        self.flwb = self.flwb.use_buffering(buffer);
+        self
+    }
+
     /// Use Windows line endings, rather than just `\n`.
+    #[must_use]
     pub fn use_windows_line_ending(mut self) -> Self {
         self.flwb = self.flwb.use_windows_line_ending();
         self
@@ -536,6 +566,7 @@ impl Logger {
 impl Logger {
     /// With true, makes the logger print an info message to stdout, each time
     /// when a new file is used for log-output.
+    #[must_use]
     pub fn o_print_message(mut self, print_message: bool) -> Self {
         self.flwb = self.flwb.o_print_message(print_message);
         self
@@ -561,6 +592,7 @@ impl Logger {
     /// files once they reach a size of 1 kB.
     ///
     /// The cleanup strategy allows delimiting the used space on disk.
+    #[must_use]
     pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Self {
         self.flwb = self.flwb.o_rotate(rotate_config);
         self
@@ -571,6 +603,7 @@ impl Logger {
     /// With this method you can set it to `true` again.
     ///
     /// This parameter only has an effect if `log_to_file` is set to true.
+    #[must_use]
     pub fn o_timestamp(mut self, timestamp: bool) -> Self {
         self.flwb = self.flwb.o_timestamp(timestamp);
         self
@@ -582,7 +615,7 @@ impl Logger {
     /// By default, or with false, the file would be truncated.
     ///
     /// This option will hardly make an effect if `suppress_timestamp()` is not used.
-
+    #[must_use]
     pub fn o_append(mut self, append: bool) -> Self {
         self.flwb = self.flwb.o_append(append);
         self
@@ -621,18 +654,18 @@ impl Logger {
     ///
     /// The returned reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`ReconfigurationHandle`](crate::ReconfigurationHandle) for an example.
+    /// See [`LoggerHandle`](crate::LoggerHandle) for an example.
     ///
     /// # Errors
     ///
     /// Several variants of `FlexiLoggerError` can occur.
-    pub fn start(self) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+    pub fn start(self) -> Result<LoggerHandle, FlexiLoggerError> {
         let (boxed_logger, handle) = self.build()?;
         log::set_boxed_logger(boxed_logger)?;
         Ok(handle)
     }
 
-    /// Builds a boxed logger and a `ReconfigurationHandle` for it,
+    /// Builds a boxed logger and a `LoggerHandle` for it,
     /// but does not initialize the global logger.
     ///
     /// The returned boxed logger implements the Log trait and can be installed manually
@@ -640,12 +673,12 @@ impl Logger {
     ///
     /// The reconfiguration handle allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`ReconfigurationHandle`](crate::ReconfigurationHandle) for an example.
+    /// See [`LoggerHandle`](crate::LoggerHandle) for an example.
     ///
     /// # Errors
     ///
     /// Several variants of `FlexiLoggerError` can occur.
-    pub fn build(mut self) -> Result<(Box<dyn log::Log>, ReconfigurationHandle), FlexiLoggerError> {
+    pub fn build(mut self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
         let other_writers = Arc::new(self.other_writers);
@@ -685,8 +718,12 @@ impl Logger {
                     vec![Box::new(self.flwb.try_build()?), w],
                 )
             }
-            LogTarget::StdOut => PrimaryWriter::stdout(self.format_for_stdout),
-            LogTarget::StdErr => PrimaryWriter::stderr(self.format_for_stderr),
+            LogTarget::StdOut => {
+                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.is_buffered())
+            }
+            LogTarget::StdErr => {
+                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.is_buffered())
+            }
             LogTarget::DevNull => PrimaryWriter::black_hole(
                 self.duplicate_err,
                 self.duplicate_out,
@@ -701,7 +738,7 @@ impl Logger {
             Arc::clone(&other_writers),
         );
 
-        let handle = ReconfigurationHandle::new(spec, primary_writer, other_writers);
+        let handle = LoggerHandle::new(spec, primary_writer, other_writers);
         handle.reconfigure(max_level);
         Ok((Box::new(flexi_logger), handle))
     }
@@ -766,13 +803,13 @@ impl Logger {
     ///
     /// # Returns
     ///
-    /// A `ReconfigurationHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](crate::ReconfigurationHandle::shutdown) method.
+    /// A `LoggerHandle` is returned, predominantly to allow using its
+    /// [`shutdown`](crate::LoggerHandle::shutdown) method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,
         specfile: P,
-    ) -> Result<ReconfigurationHandle, FlexiLoggerError> {
+    ) -> Result<LoggerHandle, FlexiLoggerError> {
         // Make logging work, before caring for the specfile
         let (boxed_logger, handle) = self.build()?;
         log::set_boxed_logger(boxed_logger)?;
@@ -780,7 +817,7 @@ impl Logger {
         Ok(handle)
     }
 
-    /// Builds a boxed logger and a `ReconfigurationHandle` for it,
+    /// Builds a boxed logger and a `LoggerHandle` for it,
     /// but does not initialize the global logger.
     ///
     ///
@@ -796,13 +833,13 @@ impl Logger {
     ///
     /// # Returns
     ///
-    /// A `ReconfigurationHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](crate::ReconfigurationHandle::shutdown) method.
+    /// A `LoggerHandle` is returned, predominantly to allow using its
+    /// [`shutdown`](crate::LoggerHandle::shutdown) method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<std::path::Path>>(
         self,
         specfile: P,
-    ) -> Result<(Box<dyn log::Log>, ReconfigurationHandle), FlexiLoggerError> {
+    ) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         let (boxed_log, handle) = self.build()?;
         setup_specfile(specfile, handle.clone())?;
         Ok((boxed_log, handle))
@@ -812,7 +849,7 @@ impl Logger {
 #[cfg(feature = "specfile_without_notification")]
 fn setup_specfile<P: AsRef<std::path::Path>>(
     specfile: P,
-    mut handle: ReconfigurationHandle,
+    mut handle: LoggerHandle,
 ) -> Result<(), FlexiLoggerError> {
     let specfile = specfile.as_ref().to_owned();
     synchronize_handle_with_specfile(&mut handle, &specfile)?;
@@ -875,7 +912,7 @@ fn setup_specfile<P: AsRef<std::path::Path>>(
 // otherwise try to create the file, with the current spec as content, under the specified name.
 #[cfg(feature = "specfile_without_notification")]
 pub(crate) fn synchronize_handle_with_specfile(
-    handle: &mut ReconfigurationHandle,
+    handle: &mut LoggerHandle,
     specfile: &std::path::PathBuf,
 ) -> Result<(), FlexiLoggerError> {
     if specfile

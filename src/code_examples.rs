@@ -246,11 +246,11 @@
 //! This can be especially handy in debugging situations where you want to see
 //! traces only for a short instant.
 //!
-//! Obtain the `ReconfigurationHandle`
+//! Obtain the `LoggerHandle`
 //!
 //! ```rust
 //! # use flexi_logger::Logger;
-//! let mut log_handle = Logger::with_str("info")
+//! let mut logger = Logger::with_str("info")
 //!     // ... logger configuration ...
 //!     .start()
 //!     .unwrap();
@@ -260,9 +260,9 @@
 //!
 //! ```rust, ignore
 //! // ...
-//! log_handle.parse_and_push_temp_spec("info, critical_mod = trace");
+//! logger.parse_and_push_temp_spec("info, critical_mod = trace");
 //! // ... critical calls ...
-//! log_handle.pop_temp_spec();
+//! logger.pop_temp_spec();
 //! // ... continue with the log spec you had before.
 //! ```
 //!

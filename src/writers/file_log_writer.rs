@@ -14,6 +14,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+const WINDOWS_LINE_ENDING: &[u8] = b"\r\n";
+const UNIX_LINE_ENDING: &[u8] = b"\n";
+
 /// A configurable `LogWriter` implementation that writes to a file or a sequence of files.
 ///
 /// See [writers](crate::writers) for usage guidance.

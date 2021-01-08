@@ -2,7 +2,7 @@ use crate::{Age, Cleanup, Criterion, FlexiLoggerError, Naming};
 use chrono::{DateTime, Datelike, Local, Timelike};
 use std::cmp::max;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
@@ -134,7 +134,7 @@ fn try_roll_state_from_criterion(
 
 enum Inner {
     Initial(Option<RotationConfig>, bool),
-    Active(Option<RotationState>, File),
+    Active(Option<RotationState>, Box<dyn Write + Send>),
 }
 
 // The mutable state of a FileLogWriter.
@@ -148,15 +148,10 @@ impl State {
         o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
     ) -> Result<Self, FlexiLoggerError> {
-        let mut state = Self {
+        Ok(Self {
             inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
             config,
-        };
-        if false {
-            // early initialize
-            state.initialize()?;
-        }
-        Ok(state)
+        })
     }
 
     fn initialize(&mut self) -> Result<(), std::io::Error> {
@@ -368,10 +363,11 @@ impl State {
     }
 
     pub fn shutdown(&mut self) {
-        if let Inner::Active(ref mut o_rotation_state, _) = self.inner {
+        if let Inner::Active(ref mut o_rotation_state, ref mut writer) = self.inner {
             if let Some(ref mut rotation_state) = o_rotation_state {
                 rotation_state.shutdown();
             }
+            writer.flush().ok();
         }
     }
 }
@@ -390,10 +386,11 @@ fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
     p_path
 }
 
+#[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &Config,
     with_rotation: bool,
-) -> Result<(File, DateTime<Local>, PathBuf), std::io::Error> {
+) -> Result<(Box<dyn Write + Send>, DateTime<Local>, PathBuf), std::io::Error> {
     let o_infix = if with_rotation {
         Some(CURRENT_INFIX)
     } else {
@@ -413,8 +410,12 @@ fn open_log_file(
         .append(config.append)
         .truncate(!config.append)
         .open(&p_path)?;
-
-    Ok((log_file, get_creation_date(&p_path), p_path))
+    let w: Box<dyn Write + Send> = if config.buffered {
+        Box::new(BufWriter::new(log_file))
+    } else {
+        Box::new(log_file)
+    };
+    Ok((w, get_creation_date(&p_path), p_path))
 }
 
 fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {

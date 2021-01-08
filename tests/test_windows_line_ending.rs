@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
 use log::*;
 

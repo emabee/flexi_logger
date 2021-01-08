@@ -1,9 +1,9 @@
-use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
+use flexi_logger::{detailed_format, Logger, LoggerHandle};
 use log::*;
 
 #[test]
 fn test_mods_off() {
-    let handle: ReconfigurationHandle = Logger::with_env_or_str("info, test_mods_off::mymod1=off")
+    let handle: LoggerHandle = Logger::with_env_or_str("info, test_mods_off::mymod1=off")
         .format(detailed_format)
         .log_to_file()
         .start()

@@ -160,8 +160,31 @@ impl FileLogWriterBuilder {
     /// Use Windows line endings, rather than just `\n`.
     #[must_use]
     pub fn use_windows_line_ending(mut self) -> Self {
-        self.config.use_windows_line_ending = true;
+        self.config.line_ending = super::WINDOWS_LINE_ENDING;
         self
+    }
+
+    /// Define if buffering should be used.
+    ///
+    /// By default, every log line is directly written to the output file, without buffering.
+    /// This allows seeing new log lines in real time.
+    ///
+    /// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
+    /// which can be important if logging is used heavily.
+    /// On the other hand, if logging is used with low frequency,
+    /// the log lines can become visible in the output file with significant deferral.
+    ///
+    /// **Note** that with buffering you should use [`super::LogWriter::shutdown`]
+    /// at the very end of your program
+    /// to ensure that all buffered log lines are flushed before the program terminates.
+    #[must_use]
+    pub fn use_buffering(mut self, buffer: bool) -> Self {
+        self.config.buffered = buffer;
+        self
+    }
+
+    pub(crate) fn is_buffered(&self) -> bool {
+        self.config.buffered
     }
 
     /// Produces the `FileLogWriter`.
@@ -195,11 +218,7 @@ impl FileLogWriterBuilder {
 
         Ok(FileLogWriter::new(
             self.format,
-            if self.config.use_windows_line_ending {
-                b"\r\n"
-            } else {
-                b"\n"
-            },
+            self.config.line_ending,
             Mutex::new(State::try_new(
                 self.config,
                 self.o_rotation_config,

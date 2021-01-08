@@ -21,9 +21,10 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    let mut reconf_handle = Logger::with_str("debug")
+    let reconf_handle = Logger::with_str("debug")
         .log_to_file()
         .basename("test_mtn")
+        .use_buffering(true)
         .format(test_format)
         .duplicate_to_stderr(Duplicate::Info)
         .directory(directory.clone())
@@ -38,12 +39,13 @@ fn multi_threaded() {
         "create a huge number of log lines with a considerable number of threads, verify the log"
     );
 
+    let mut reconf_handle2 = reconf_handle.clone();
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
             std::thread::sleep(time::Duration::from_millis(1000));
-            reconf_handle.set_new_spec(new_spec);
+            reconf_handle2.set_new_spec(new_spec);
             0 as u8
         })
         .unwrap();
@@ -55,6 +57,7 @@ fn multi_threaded() {
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
     );
+    reconf_handle.shutdown();
     verify_logs(&directory);
 }
 

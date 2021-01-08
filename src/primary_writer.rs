@@ -1,11 +1,11 @@
-use log::Record;
-use std::cell::RefCell;
-use std::io::Write;
-
 use crate::deferred_now::DeferredNow;
 use crate::logger::Duplicate;
 use crate::writers::LogWriter;
 use crate::FormatFunction;
+use log::Record;
+use std::cell::RefCell;
+use std::io::{BufWriter, Write};
+use std::sync::Mutex;
 
 // Writes either to stdout, or to stderr,
 // or to a file (with optional duplication to stderr),
@@ -32,12 +32,12 @@ impl PrimaryWriter {
             writers,
         })
     }
-    pub fn stderr(format: FormatFunction) -> Self {
-        Self::StdErr(StdErrWriter::new(format))
+    pub fn stderr(format: FormatFunction, buffered: bool) -> Self {
+        Self::StdErr(StdErrWriter::new(format, buffered))
     }
 
-    pub fn stdout(format: FormatFunction) -> Self {
-        Self::StdOut(StdOutWriter::new(format))
+    pub fn stdout(format: FormatFunction, buffered: bool) -> Self {
+        Self::StdOut(StdOutWriter::new(format, buffered))
     }
 
     pub fn black_hole(
@@ -83,40 +83,104 @@ impl PrimaryWriter {
 // `StdErrWriter` writes logs to stderr.
 pub(crate) struct StdErrWriter {
     format: FormatFunction,
+    writer: ErrWriter,
 }
-
+enum ErrWriter {
+    Unbuffered(std::io::Stderr),
+    Buffered(Mutex<BufWriter<std::io::Stderr>>),
+}
 impl StdErrWriter {
-    fn new(format: FormatFunction) -> Self {
-        Self { format }
+    fn new(format: FormatFunction, buffered: bool) -> Self {
+        if buffered {
+            Self {
+                format,
+                writer: ErrWriter::Buffered(Mutex::new(BufWriter::new(std::io::stderr()))),
+            }
+        } else {
+            Self {
+                format,
+                writer: ErrWriter::Unbuffered(std::io::stderr()),
+            }
+        }
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        write_buffered(self.format, now, record, &mut std::io::stderr())
+        match &self.writer {
+            ErrWriter::Unbuffered(stderr) => {
+                let mut w = stderr.lock();
+                write_buffered(self.format, now, record, &mut w)
+            }
+            ErrWriter::Buffered(mbuf_w) => {
+                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                write_buffered(self.format, now, record, &mut *w)
+            }
+        }
     }
 
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
-        std::io::stderr().flush()
+        match &self.writer {
+            ErrWriter::Unbuffered(stderr) => {
+                let mut w = stderr.lock();
+                w.flush()
+            }
+            ErrWriter::Buffered(mbuf_w) => {
+                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                w.flush()
+            }
+        }
     }
 }
 
 // `StdOutWriter` writes logs to stdout.
 pub(crate) struct StdOutWriter {
     format: FormatFunction,
+    writer: OutWriter,
 }
-
+enum OutWriter {
+    Unbuffered(std::io::Stdout),
+    Buffered(Mutex<BufWriter<std::io::Stdout>>),
+}
 impl StdOutWriter {
-    fn new(format: FormatFunction) -> Self {
-        Self { format }
+    fn new(format: FormatFunction, buffered: bool) -> Self {
+        if buffered {
+            Self {
+                format,
+                writer: OutWriter::Buffered(Mutex::new(BufWriter::new(std::io::stdout()))),
+            }
+        } else {
+            Self {
+                format,
+                writer: OutWriter::Unbuffered(std::io::stdout()),
+            }
+        }
     }
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        write_buffered(self.format, now, record, &mut std::io::stdout())
+        match &self.writer {
+            OutWriter::Unbuffered(stdout) => {
+                let mut w = stdout.lock();
+                write_buffered(self.format, now, record, &mut w)
+            }
+            OutWriter::Buffered(mbuf_w) => {
+                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                write_buffered(self.format, now, record, &mut *w)
+            }
+        }
     }
 
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
-        std::io::stdout().flush()
+        match &self.writer {
+            OutWriter::Unbuffered(stdout) => {
+                let mut w = stdout.lock();
+                w.flush()
+            }
+            OutWriter::Buffered(mbuf_w) => {
+                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                w.flush()
+            }
+        }
     }
 }
 

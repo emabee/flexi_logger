@@ -27,7 +27,7 @@ mod test {
             syslog_connector,
         )
         .unwrap();
-        let log_handle = Logger::with_str("info")
+        let logger = Logger::with_str("info")
             .format(detailed_format)
             .print_message()
             .log_to_file()
@@ -51,7 +51,7 @@ mod test {
         trace!("This is a trace message - you must not see it!");
 
         // Verification:
-        log_handle.validate_logs(&[
+        logger.validate_logs(&[
             (
                 "ERROR",
                 "syslog",
