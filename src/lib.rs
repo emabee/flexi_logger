@@ -65,3 +65,6 @@ pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 /// For backwards compatibility.
 #[deprecated]
 pub type ReconfigurationHandle = LoggerHandle;
+
+pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = 8 * 1024;
+pub(crate) const DEFAULT_FLUSH_WAIT_TIME: std::time::Duration = std::time::Duration::from_secs(1);

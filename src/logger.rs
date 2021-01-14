@@ -14,6 +14,7 @@ use std::collections::HashMap;
 #[cfg(feature = "specfile_without_notification")]
 use std::io::Read;
 use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 
 /// The entry-point for using `flexi_logger`.
@@ -59,6 +60,7 @@ pub struct Logger {
     format_for_writer: FormatFunction,
     #[cfg(feature = "colors")]
     o_palette: Option<String>,
+    o_flush_wait: Option<std::time::Duration>,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
@@ -178,6 +180,7 @@ impl Logger {
             format_for_writer: default_format,
             #[cfg(feature = "colors")]
             o_palette: None,
+            o_flush_wait: None,
             flwb: FileLogWriter::builder(),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
@@ -543,12 +546,36 @@ impl Logger {
     /// On the other hand, if logging is used with low frequency,
     /// the log lines can become visible in the output file with significant deferral.
     ///
-    /// **Note** that with buffering you should use [`crate::LoggerHandle::shutdown`]
-    /// at the very end of your program
+    /// **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle)
+    /// and call [`shutdown`](crate::LoggerHandle::shutdown) at the very end of your program
     /// to ensure that all buffered log lines are flushed before the program terminates.
     #[must_use]
     pub fn use_buffering(mut self, buffer: bool) -> Self {
         self.flwb = self.flwb.use_buffering(buffer);
+        self
+    }
+
+    /// Activates buffering (like with [`Logger::use_buffering`])
+    /// and flushes all buffers automatically every second.
+    ///
+    /// Note that flushing uses an extra thread (with minimal stack).
+    #[must_use]
+    pub fn buffer_and_flush(mut self) -> Self {
+        self.flwb = self
+            .flwb
+            .buffer_with_capacity(crate::DEFAULT_BUFFER_CAPACITY);
+        self.o_flush_wait = Some(crate::DEFAULT_FLUSH_WAIT_TIME);
+        self
+    }
+
+    /// Activates buffering and flushing (like with [`Logger::buffer_and_flush`],
+    /// but with user-defined buffer capacity and flush frequency.
+    ///
+    /// Note that flushing uses an extra thread (with minimal stack).
+    #[must_use]
+    pub fn buffer_and_flush_with(mut self, capacity: usize, wait: std::time::Duration) -> Self {
+        self.flwb = self.flwb.buffer_with_capacity(capacity);
+        self.o_flush_wait = Some(wait);
         self
     }
 
@@ -719,10 +746,10 @@ impl Logger {
                 )
             }
             LogTarget::StdOut => {
-                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.is_buffered())
+                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.buffersize())
             }
             LogTarget::StdErr => {
-                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.is_buffered())
+                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.buffersize())
             }
             LogTarget::DevNull => PrimaryWriter::black_hole(
                 self.duplicate_err,
@@ -737,6 +764,24 @@ impl Logger {
             Arc::clone(&primary_writer),
             Arc::clone(&other_writers),
         );
+
+        if let Some(wait_time) = self.o_flush_wait {
+            let pw = Arc::clone(&primary_writer);
+            let ows = Arc::clone(&other_writers);
+            std::thread::Builder::new()
+                .name("flexi_logger-flusher".to_string())
+                .stack_size(128)
+                .spawn(move || {
+                    let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
+                    loop {
+                        receiver.recv_timeout(wait_time).ok();
+                        pw.flush().ok();
+                        for w in ows.values() {
+                            w.flush().ok();
+                        }
+                    }
+                })?;
+        }
 
         let handle = LoggerHandle::new(spec, primary_writer, other_writers);
         handle.reconfigure(max_level);

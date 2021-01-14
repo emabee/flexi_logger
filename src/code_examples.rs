@@ -1,5 +1,17 @@
 //! Here are some examples for the `flexi_logger` initialization.
 //!
+//! ## Contents
+//!
+//! - [Write logs to stderr](#write-logs-to-stderr)
+//! - [Choose the log output channel](#choose-the-log-output-channel)
+//! - [Use buffering to reduce I/O overhead](#use-buffering-to-reduce-io-overhead)
+//! - [Influence the location and name of the log file](#influence-the-location-and-name-of-the-log-file)
+//! - [Specify the format for the log lines explicitly](#specify-the-format-for-the-log-lines-explicitly)
+//! - [Use a fixed log file, and truncate or append the file on each program start](#use-a-fixed-log-file-and-truncate-or-append-the-file-on-each-program-start)
+//! - [Rotate the log file](#rotate-the-log-file)
+//! - [Reconfigure the log specification programmatically](#reconfigure-the-log-specification-programmatically)
+//! - [Reconfigure the log specification dynamically by editing a spec-file](#reconfigure-the-log-specification-dynamically-by-editing-a-spec-file)
+//!
 //!
 //! ## Write logs to stderr
 //!
@@ -41,6 +53,48 @@
 //!    .start()?;
 //! # Ok(())
 //! # }
+//! ```
+//!
+//! ## Use buffering to reduce I/O overhead
+//!
+//! By default, every log line is directly written to the output, without buffering.
+//! This allows seeing new log lines in real time.
+//!
+//! Using buffering reduces the program's I/O overhead, and thus increases overall performance,
+//! which can be important if logging is used heavily.
+//!
+//! **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle) and call
+//! [`shutdown`](crate::LoggerHandle::shutdown) at the very end of your program
+//! to ensure that all buffered log lines are flushed before the program terminates.
+//!
+//! ```rust
+//! # use flexi_logger::{LogTarget,Logger,Duplicate};
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let logger = Logger::with_str("info")
+//!        .log_target(LogTarget::File)
+//!        .use_buffering(true)
+//!        .start()?;
+//!     // ... do all your work ...
+//!     logger.shutdown();
+//!     Ok(())
+//! }
+//! ```
+//!
+//! If logging is used with low frequency, buffering can delay the appearance of log lines
+//! significantly. To avoid that, you can get the buffers flushed automatically in regular
+//! intervals.
+//!
+//! ```rust
+//! # use flexi_logger::{LogTarget,Logger,Duplicate};
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let logger = Logger::with_str("info")
+//!        .log_target(LogTarget::File)
+//!        .buffer_and_flush()
+//!        .start()?;
+//!     // ... do all your work ...
+//!     logger.shutdown();
+//!     Ok(())
+//! }
 //! ```
 //!
 //! ## Influence the location and name of the log file

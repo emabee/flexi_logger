@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unpublished] - 2021-01-08
+## [0.17.1] - 2021-01-14
+
+Add options `Logger::buffer_and_flush()` and `buffer_and_flush_with()`
+as means to avoid long output delays.
+
+## [0.17.0] - 2021-01-08
 
 Introduce optional buffering of log output. This increases performance
 (which can be relevant for programs with really high log production),
@@ -14,12 +19,18 @@ and requires to flush or shutdown the logger at the end of the program
 to ensure that all logs are written to the output before
 the program terminates.
 
-Add `must_use` annotations to all methods that were proposed by clippy.
-
-Reduce the size of `LogConfiguration` considerably by moving the rarely used textfilter
+Reduce the size of `LogConfiguration` considerably by moving the optional and rarely used textfilter
 into the heap. This unfortunately leads to an incompatible change in a rarely used public method
 (`LogConfiguration::text_filter()` was returning a `&Option<Regex>`,
 and is now returning `Option<&Regex>`), which enforces a version bump.
+
+Rename ReconfigurationHandle to LoggerHandle (and add an type alias with the old name).
+
+Add the public method `LoggerHandle::flush()`.
+
+Expose `DeferredNow::new()`.
+
+Add some `must_use` annotations where appropriate.
 
 ## [0.16.2] - 2020-11-18
 

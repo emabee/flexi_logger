@@ -23,6 +23,7 @@ fn multi_threaded() {
     let directory = define_directory();
     let reconf_handle = Logger::with_str("debug")
         .log_to_file()
+        .buffer_and_flush()
         .basename("test_mtn")
         .use_buffering(true)
         .format(test_format)

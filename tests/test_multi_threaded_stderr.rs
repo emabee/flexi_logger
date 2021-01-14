@@ -9,18 +9,14 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
 #[test]
 fn multi_threaded() {
     let logger = Logger::with_str("debug")
-        .use_buffering(false)
-        // .use_buffering(true)
+        .buffer_and_flush_with(1024, std::time::Duration::from_millis(600))
         .log_target(LogTarget::StdErr)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     info!("create a huge number of log lines with a considerable number of threads");
-    for i in 0..20 {
+    for i in 0..50 {
         std::thread::sleep(std::time::Duration::from_millis(100));
         info!("********** check delay of this log line ({}) **********", i);
-        if i == 10 {
-            logger.flush();
-        }
     }
     let start = Local::now();
 

@@ -22,7 +22,7 @@ pub(crate) struct FilenameConfig {
 pub(crate) struct Config {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
-    pub(crate) buffered: bool,
+    pub(crate) o_buffersize: Option<usize>,
     pub(crate) filename_config: FilenameConfig,
     pub(crate) o_create_symlink: Option<PathBuf>,
     pub(crate) line_ending: &'static [u8],
@@ -39,7 +39,7 @@ impl Config {
                 use_timestamp: true,
             },
             append: false,
-            buffered: false,
+            o_buffersize: None,
             o_create_symlink: None,
             line_ending: super::UNIX_LINE_ENDING,
         }

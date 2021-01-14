@@ -32,12 +32,12 @@ impl PrimaryWriter {
             writers,
         })
     }
-    pub fn stderr(format: FormatFunction, buffered: bool) -> Self {
-        Self::StdErr(StdErrWriter::new(format, buffered))
+    pub fn stderr(format: FormatFunction, o_buffer_capacity: &Option<usize>) -> Self {
+        Self::StdErr(StdErrWriter::new(format, o_buffer_capacity))
     }
 
-    pub fn stdout(format: FormatFunction, buffered: bool) -> Self {
-        Self::StdOut(StdOutWriter::new(format, buffered))
+    pub fn stdout(format: FormatFunction, o_buffer_capacity: &Option<usize>) -> Self {
+        Self::StdOut(StdOutWriter::new(format, o_buffer_capacity))
     }
 
     pub fn black_hole(
@@ -90,17 +90,19 @@ enum ErrWriter {
     Buffered(Mutex<BufWriter<std::io::Stderr>>),
 }
 impl StdErrWriter {
-    fn new(format: FormatFunction, buffered: bool) -> Self {
-        if buffered {
-            Self {
+    fn new(format: FormatFunction, o_buffer_capacity: &Option<usize>) -> Self {
+        match o_buffer_capacity {
+            Some(capacity) => Self {
                 format,
-                writer: ErrWriter::Buffered(Mutex::new(BufWriter::new(std::io::stderr()))),
-            }
-        } else {
-            Self {
+                writer: ErrWriter::Buffered(Mutex::new(BufWriter::with_capacity(
+                    *capacity,
+                    std::io::stderr(),
+                ))),
+            },
+            None => Self {
                 format,
                 writer: ErrWriter::Unbuffered(std::io::stderr()),
-            }
+            },
         }
     }
     #[inline]
@@ -111,7 +113,7 @@ impl StdErrWriter {
                 write_buffered(self.format, now, record, &mut w)
             }
             ErrWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                let mut w = mbuf_w.lock().map_err(|e| poison_err("stderr", &e))?;
                 write_buffered(self.format, now, record, &mut *w)
             }
         }
@@ -125,11 +127,15 @@ impl StdErrWriter {
                 w.flush()
             }
             ErrWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                let mut w = mbuf_w.lock().map_err(|e| poison_err("stderr", &e))?;
                 w.flush()
             }
         }
     }
+}
+
+fn poison_err(s: &'static str, _e: &dyn std::error::Error) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, s)
 }
 
 // `StdOutWriter` writes logs to stdout.
@@ -142,17 +148,19 @@ enum OutWriter {
     Buffered(Mutex<BufWriter<std::io::Stdout>>),
 }
 impl StdOutWriter {
-    fn new(format: FormatFunction, buffered: bool) -> Self {
-        if buffered {
-            Self {
+    fn new(format: FormatFunction, o_buffer_capacity: &Option<usize>) -> Self {
+        match o_buffer_capacity {
+            Some(capacity) => Self {
                 format,
-                writer: OutWriter::Buffered(Mutex::new(BufWriter::new(std::io::stdout()))),
-            }
-        } else {
-            Self {
+                writer: OutWriter::Buffered(Mutex::new(BufWriter::with_capacity(
+                    *capacity,
+                    std::io::stdout(),
+                ))),
+            },
+            None => Self {
                 format,
                 writer: OutWriter::Unbuffered(std::io::stdout()),
-            }
+            },
         }
     }
     #[inline]
@@ -163,7 +171,7 @@ impl StdOutWriter {
                 write_buffered(self.format, now, record, &mut w)
             }
             OutWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                let mut w = mbuf_w.lock().map_err(|e| poison_err("stdout", &e))?;
                 write_buffered(self.format, now, record, &mut *w)
             }
         }
@@ -177,7 +185,7 @@ impl StdOutWriter {
                 w.flush()
             }
             OutWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().unwrap(/*FIXME*/);
+                let mut w = mbuf_w.lock().map_err(|e| poison_err("stdout", &e))?;
                 w.flush()
             }
         }

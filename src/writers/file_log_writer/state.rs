@@ -410,8 +410,10 @@ fn open_log_file(
         .append(config.append)
         .truncate(!config.append)
         .open(&p_path)?;
-    let w: Box<dyn Write + Send> = if config.buffered {
-        Box::new(BufWriter::new(log_file))
+
+    #[allow(clippy::option_if_let_else)]
+    let w: Box<dyn Write + Send> = if let Some(capacity) = config.o_buffersize {
+        Box::new(BufWriter::with_capacity(capacity, log_file))
     } else {
         Box::new(log_file)
     };

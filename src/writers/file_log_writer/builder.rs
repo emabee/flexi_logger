@@ -173,18 +173,34 @@ impl FileLogWriterBuilder {
     /// which can be important if logging is used heavily.
     /// On the other hand, if logging is used with low frequency,
     /// the log lines can become visible in the output file with significant deferral.
+    /// See [`Logger::buffer_and_flush`](crate::Logger::buffer_and_flush)
+    /// for how to limit the maximum buffering time.
     ///
-    /// **Note** that with buffering you should use [`super::LogWriter::shutdown`]
-    /// at the very end of your program
+    /// **Note** that with buffering you should use
+    /// [`LogWriter::shutdown`](super::LogWriter::shutdown) at the very end of your program
     /// to ensure that all buffered log lines are flushed before the program terminates.
     #[must_use]
     pub fn use_buffering(mut self, buffer: bool) -> Self {
-        self.config.buffered = buffer;
+        if buffer {
+            self.config.o_buffersize = Some(8 * 1024);
+        } else {
+            self.config.o_buffersize = None;
+        }
         self
     }
 
-    pub(crate) fn is_buffered(&self) -> bool {
-        self.config.buffered
+    /// Activates buffering, and uses a buffer with the specified capacity.
+    ///
+    /// See [`Logger::use_buffering`](crate::Logger::use_buffering)
+    #[must_use]
+    pub fn buffer_with_capacity(mut self, capacity: usize) -> Self {
+        self.config.o_buffersize = Some(capacity);
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn buffersize(&self) -> &Option<usize> {
+        &self.config.o_buffersize
     }
 
     /// Produces the `FileLogWriter`.
