@@ -15,9 +15,10 @@
 //!
 //! See
 //!
-//! * [Logger](crate::Logger) for a full description of all configuration options,
-//! * and the [writers](crate::writers) module for the usage of additional log writers,
-//! * and [the homepage](https://crates.io/crates/flexi_logger) for how to get started.
+//! * The builder [`Logger`] for a full description of all configuration options,
+//! * module [`code_examples`] for various concrete examples of `flexi_logger` initialization
+//! * the module [`writers`] for the usage of additional log writers,
+//! * and [the README](https://crates.io/crates/flexi_logger) for how to get started.
 //!
 //! There are configuration options to e.g.
 //!
@@ -35,10 +36,11 @@
 //! By default, i.e. if feature `colors` is not switched off, the log lines that appear on your
 //! terminal are coloured. In case the chosen colors don't fit to your terminal's color theme,
 //! you can adapt the colors to improve readability.
-//! See the documentation of method [style](crate::style)
+//! See the documentation of method [`Logger::set_palette`]
 //! for a description how this can be done.
 
 mod deferred_now;
+mod file_spec;
 mod flexi_error;
 mod flexi_logger;
 mod formats;
@@ -51,20 +53,19 @@ mod primary_writer;
 pub mod code_examples;
 pub mod writers;
 
-/// Re-exports from log crate
-pub use log::{Level, LevelFilter, Record};
-
 pub use crate::deferred_now::DeferredNow;
+pub use crate::file_spec::FileSpec;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
-pub use crate::logger::{Duplicate, LogTarget, Logger};
+pub use crate::logger::{Duplicate, Logger, WriteMode};
 pub use crate::logger_handle::LoggerHandle;
 pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 
-/// For backwards compatibility.
-#[deprecated]
-pub type ReconfigurationHandle = LoggerHandle;
+/// Default buffer capacity (8k), when buffering is used.
+pub const DEFAULT_BUFFER_CAPACITY: usize = 8 * 1024;
+/// Default flush interval (1s), when flushing is used.
+pub const DEFAULT_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
-pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = 8 * 1024;
-pub(crate) const DEFAULT_FLUSH_WAIT_TIME: std::time::Duration = std::time::Duration::from_secs(1);
+/// Re-exports from log crate
+pub use log::{Level, LevelFilter, Record};

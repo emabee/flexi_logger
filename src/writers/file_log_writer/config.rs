@@ -1,4 +1,4 @@
-use crate::{Cleanup, Criterion, Naming};
+use crate::{Cleanup, Criterion, FileSpec, Naming};
 use std::path::PathBuf;
 
 // Describes how rotation should work
@@ -10,38 +10,12 @@ pub(crate) struct RotationConfig {
     // Defines the cleanup strategy
     pub(crate) cleanup: Cleanup,
 }
-#[derive(Clone)]
-pub(crate) struct FilenameConfig {
-    pub(crate) directory: PathBuf,
-    pub(crate) file_basename: String,
-    pub(crate) suffix: String,
-    pub(crate) use_timestamp: bool,
-}
 
 // The immutable configuration of a FileLogWriter.
 pub(crate) struct Config {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
     pub(crate) o_buffersize: Option<usize>,
-    pub(crate) filename_config: FilenameConfig,
+    pub(crate) file_spec: FileSpec,
     pub(crate) o_create_symlink: Option<PathBuf>,
-    pub(crate) line_ending: &'static [u8],
-}
-impl Config {
-    // Factory method; uses the same defaults as Logger.
-    pub fn default() -> Self {
-        Self {
-            print_message: false,
-            filename_config: FilenameConfig {
-                directory: PathBuf::from("."),
-                file_basename: String::new(),
-                suffix: "log".to_string(),
-                use_timestamp: true,
-            },
-            append: false,
-            o_buffersize: None,
-            o_create_symlink: None,
-            line_ending: super::UNIX_LINE_ENDING,
-        }
-    }
 }

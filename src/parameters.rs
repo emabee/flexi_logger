@@ -56,7 +56,7 @@ pub enum Criterion {
 }
 
 /// The age after which a log file rotation will be triggered,
-/// when [`Criterion::Age`](crate::Criterion::Age) is chosen.
+/// when [`Criterion::Age`] is chosen.
 #[derive(Copy, Clone, Debug)]
 pub enum Age {
     /// Rotate the log file when the local clock has started a new day since the
@@ -93,27 +93,29 @@ pub enum Naming {
 ///
 /// Note that if you use a strategy other than `Cleanup::Never`, then the cleanup work is
 /// by default done in an extra thread, to minimize the impact on the program.
+///
+/// See [`LoggerHandle::shutdown`](crate::LoggerHandle::shutdown)
+/// to avoid interrupting a currently active cleanup when your program terminates.
+///
 /// See
 /// [`Logger::cleanup_in_background_thread`](crate::Logger::cleanup_in_background_thread)
 /// if you want to control whether this extra thread is created and used.
-#[allow(deprecated)]
 #[derive(Copy, Clone, Debug)]
 pub enum Cleanup {
     /// Older log files are not touched - they remain for ever.
     Never,
+
     /// The specified number of rotated log files are kept.
     /// Older files are deleted, if necessary.
     KeepLogFiles(usize),
+
     /// The specified number of rotated log files are compressed and kept.
     /// Older files are deleted, if necessary.
     ///
     /// This option is only available with feature `compress`.
     #[cfg(feature = "compress")]
     KeepCompressedFiles(usize),
-    /// Outdated
-    #[cfg(feature = "compress")]
-    #[deprecated(since = "0.16.0", note = "use KeepCompressedFiles instead")]
-    KeepZipFiles(usize),
+
     /// Allows keeping some files as text files and some as compressed files.
     ///
     /// ## Example
@@ -125,10 +127,6 @@ pub enum Cleanup {
     /// This option is only available with feature `compress`.
     #[cfg(feature = "compress")]
     KeepLogAndCompressedFiles(usize, usize),
-    /// Outdated
-    #[deprecated(since = "0.16.0", note = "use KeepLogAndCompressedFiles instead")]
-    #[cfg(feature = "compress")]
-    KeepLogAndZipFiles(usize, usize),
 }
 
 impl Cleanup {

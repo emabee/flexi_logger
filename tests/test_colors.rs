@@ -1,10 +1,10 @@
-use flexi_logger::{LogTarget, Logger};
+use flexi_logger::Logger;
 use log::*;
 
 #[test]
 fn test_mods() {
     Logger::with_str("trace")
-        .log_target(LogTarget::StdOut)
+        .log_to_stdout()
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

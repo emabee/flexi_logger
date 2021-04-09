@@ -1,11 +1,10 @@
-#![allow(deprecated)]
-use flexi_logger::{Logger, ReconfigurationHandle};
+use flexi_logger::{FileSpec, Logger, LoggerHandle};
 use log::*;
 
 #[test]
 fn test_reconfigure_methods() {
     let mut logger = Logger::with_str("info")
-        .log_to_file()
+        .log_to_file(FileSpec::default())
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
@@ -14,7 +13,7 @@ fn test_reconfigure_methods() {
     validate_logs(&mut logger);
 }
 
-fn test_parse_new_spec(logger: &mut ReconfigurationHandle) {
+fn test_parse_new_spec(logger: &mut LoggerHandle) {
     error!("1-error message");
     warn!("1-warning");
     info!("1-info message");
@@ -39,7 +38,7 @@ fn test_parse_new_spec(logger: &mut ReconfigurationHandle) {
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn test_push_new_spec(logger: &mut ReconfigurationHandle) {
+fn test_push_new_spec(logger: &mut LoggerHandle) {
     error!("2-error message");
     warn!("2-warning");
     info!("2-info message");
@@ -79,7 +78,7 @@ fn test_push_new_spec(logger: &mut ReconfigurationHandle) {
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn validate_logs(logger: &mut ReconfigurationHandle) {
+fn validate_logs(logger: &mut LoggerHandle) {
     logger.validate_logs(&[
         ("ERROR", "test_reconfigure_methods", "1-error"),
         ("WARN", "test_reconfigure_methods", "1-warning"),

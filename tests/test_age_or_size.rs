@@ -1,5 +1,5 @@
 use chrono::Local;
-use flexi_logger::{Age, Cleanup, Criterion, Duplicate, Logger, Naming};
+use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
 use glob::glob;
 use log::*;
 use std::fs::File;
@@ -10,9 +10,8 @@ use std::ops::Add;
 fn test_age_or_size() {
     let directory = define_directory();
     Logger::with_str("trace")
-        .log_to_file()
+        .log_to_file(FileSpec::default().directory(directory.clone()))
         .duplicate_to_stderr(Duplicate::Info)
-        .directory(directory.clone())
         .rotate(
             Criterion::AgeOrSize(Age::Second, 80),
             Naming::Numbers,

@@ -1,28 +1,31 @@
-//! Contains the trait [`LogWriter`](crate::writers::LogWriter) for extending `flexi_logger`
+//! Contains the trait [`LogWriter`] for extending `flexi_logger`
 //! with additional log writers,
 //! and two concrete implementations
-//! for writing to files
-//! ([`FileLogWriter`](crate::writers::FileLogWriter))
-//! or to the syslog
-//! ([`SyslogWriter`](crate::writers::SyslogWriter)).
-//! You can also use your own implementations of `LogWriter`.
+//! for writing to files ([`FileLogWriter`])
+//! or to the syslog ([`SyslogWriter`]).
+//! You can also use your own implementations of [`LogWriter`].
 //!
 //! Such log writers can be used in two ways:
 //!
-//! * With [`Logger::log_target()`](crate::Logger::log_target)
-//!   you can influence to which output stream normal log messages will be written,
-//!   i.e. from log macro calls without explicit target specification.
+//! * You can influence to which output stream normal log messages will be written,
+//!   i.e. those from normal log macro calls without explicit target specification.
+//!   By default, the logs are sent to stderr. With one of the methods
 //!
-//!   See [`LogTarget`](crate::LogTarget) for the available options.
+//!   * [`Logger::log_to_stdout`](crate::Logger::log_to_stdout)
+//!   * [`Logger::log_to_file`](crate::Logger::log_to_file)
+//!   * [`Logger::log_to_writer`](crate::Logger::log_to_writer)
+//!   * [`Logger::log_to_file_and_writer`](crate::Logger::log_to_file_and_writer)
+//!   * [`Logger::do_not_log`](crate::Logger::do_not_log)
 //!
-//!   These log calls will only be written if they match the current
+//!   you can specify a different log target. See there for more details.
+//!
+//!   Normal log calls will only be written to the chosen output channel if they match the current
 //!   [log specification](crate::LogSpecification).
 //!
-//! * [`Logger::add_writer()`](crate::Logger::add_writer)
-//!   can be used to register an additional log writer under a target name.
-//!   The target name can then be used in calls to the
-//!   [log macro](https://docs.rs/log/latest/log/macro.log.html)
-//!   for directing log messages to the desired writers.
+//! * You can register additional log writers under a target name with
+//!   [`Logger::add_writer()`](crate::Logger::add_writer), and address these log writers by
+//!   specifying the target name in calls to the
+//!   [log macros](https://docs.rs/log/latest/log/macro.log.html).
 //!
 //!   A log call with a target value that has the form `{Name1,Name2,...}`, i.e.,
 //!   a comma-separated list of target names, within braces, is not sent to the default logger,
@@ -39,14 +42,16 @@
 //!   ```rust
 //!   use log::*;
 //!
-//!   use flexi_logger::Logger;
+//!   use flexi_logger::{FileSpec,Logger};
 //!   use flexi_logger::writers::FileLogWriter;
 //!
 //!   // Configure a FileLogWriter for alert messages
 //!   pub fn alert_logger() -> Box<FileLogWriter> {
-//!       Box::new(FileLogWriter::builder()
-//!           .discriminant("Alert")
-//!           .suffix("alerts")
+//!       Box::new(FileLogWriter::builder(
+//!           FileSpec::default()
+//!               .discriminant("Alert")
+//!               .suffix("alerts")
+//!           )
 //!           .print_message()
 //!           .try_build()
 //!           .unwrap())
@@ -66,7 +71,7 @@
 //!   fn main() {
 //!       Logger::with_env_or_str("info")
 //!           .print_message()
-//!           .log_to_file()
+//!           .log_to_file(FileSpec::default())
 //!           .add_writer("Alert", alert_logger())
 //!           .start()
 //!           .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

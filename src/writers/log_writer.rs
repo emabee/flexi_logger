@@ -11,21 +11,22 @@ pub trait LogWriter: Sync + Send {
     ///
     /// # Errors
     ///
-    /// `std::io::Error`
+    /// [`std::io::Error`]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()>;
 
     /// Flushes any buffered records.
     ///
     /// # Errors
     ///
-    /// `std::io::Error`
+    /// [`std::io::Error`]
     fn flush(&self) -> std::io::Result<()>;
 
     /// Provides the maximum log level that is to be written.
     fn max_log_level(&self) -> log::LevelFilter;
 
     /// Sets the format function.
-    /// Defaults to ([`formats::default_format`](crate::default_format)),
+    ///
+    /// Defaults to [`default_format`](crate::default_format),
     /// but can be changed with a call to
     /// [`Logger::format_for_writer`](crate::Logger::format_for_writer).
     ///

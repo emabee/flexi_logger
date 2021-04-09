@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.17.1"
+version = "0.18.0-alpha"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -25,7 +25,6 @@ colors = ["atty", "lazy_static","yansi"]
 specfile = ["specfile_without_notification","notify"]
 specfile_without_notification = ["serde","toml","serde_derive"]
 syslog_writer = ["libc", "hostname"]
-ziplog = ["compress"]  # for backwards compatibility
 compress = ["flate2"]
 textfilter = ["regex"]
 

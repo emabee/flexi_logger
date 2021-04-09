@@ -1,7 +1,7 @@
 #[cfg(feature = "syslog_writer")]
 mod test {
     use flexi_logger::writers::{SyslogConnector, SyslogFacility, SyslogWriter};
-    use flexi_logger::{detailed_format, Logger};
+    use flexi_logger::{detailed_format, FileSpec, Logger};
     use log::*;
 
     #[macro_use]
@@ -29,8 +29,8 @@ mod test {
         .unwrap();
         let logger = Logger::with_str("info")
             .format(detailed_format)
+            .log_to_file(FileSpec::default())
             .print_message()
-            .log_to_file()
             .add_writer("Syslog", boxed_syslog_writer)
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

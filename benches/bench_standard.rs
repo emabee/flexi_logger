@@ -6,6 +6,7 @@ extern crate test;
 #[macro_use]
 extern crate log;
 
+use flexi_logger::FileSpec;
 use flexi_logger::Logger;
 use test::Bencher;
 
@@ -17,8 +18,7 @@ fn b10_no_logger_active(b: &mut Bencher) {
 #[bench]
 fn b20_initialize_logger(_: &mut Bencher) {
     Logger::with_str("info")
-        .log_to_file()
-        .directory("log_files")
+        .log_to_file(FileSpec::default().directory("log_files"))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 }

@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use flexi_logger::writers::LogWriter;
-use flexi_logger::{default_format, DeferredNow, FormatFunction, LogTarget, Logger};
+use flexi_logger::{default_format, DeferredNow, FormatFunction, Logger};
 use log::*;
 
 pub struct CustomWriter {
@@ -52,10 +52,10 @@ fn custom_format(
 #[test]
 fn test_custom_log_writer_custom_format() {
     let handle = Logger::with_str("info")
-        .log_target(LogTarget::Writer(Box::new(CustomWriter {
+        .log_to_writer(Box::new(CustomWriter {
             data: Mutex::new(Vec::new()),
             format: default_format,
-        })))
+        }))
         .format(custom_format)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

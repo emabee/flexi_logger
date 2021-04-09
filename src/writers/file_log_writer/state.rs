@@ -1,3 +1,4 @@
+use crate::FileSpec;
 use crate::{Age, Cleanup, Criterion, FlexiLoggerError, Naming};
 use chrono::{DateTime, Datelike, Local, Timelike};
 use std::cmp::max;
@@ -6,7 +7,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
-use super::{Config, FilenameConfig, RotationConfig};
+use super::{Config, RotationConfig};
 
 const CURRENT_INFIX: &str = "_rCURRENT";
 fn number_infix(idx: u32) -> String {
@@ -167,18 +168,16 @@ impl State {
                         Naming::Timestamps => {
                             if !self.config.append {
                                 rotate_output_file_to_date(
-                                    &get_creation_date(&get_filepath(
-                                        Some(CURRENT_INFIX),
-                                        &self.config.filename_config,
-                                    )),
+                                    &get_creation_date(
+                                        &self.config.file_spec.as_pathbuf(Some(CURRENT_INFIX)),
+                                    ),
                                     &self.config,
                                 )?;
                             }
                             NamingState::CreatedAt
                         }
                         Naming::Numbers => {
-                            let mut rotation_state =
-                                get_highest_rotate_idx(&self.config.filename_config);
+                            let mut rotation_state = get_highest_rotate_idx(&self.config.file_spec);
                             if !self.config.append {
                                 rotation_state =
                                     rotate_output_file_to_idx(rotation_state, &self.config)?;
@@ -198,11 +197,11 @@ impl State {
                         remove_or_compress_too_old_logfiles(
                             &None,
                             &rotate_config.cleanup,
-                            &self.config.filename_config,
+                            &self.config.file_spec,
                         )?;
                         if *cleanup_in_background_thread {
                             let cleanup = rotate_config.cleanup;
-                            let filename_config = self.config.filename_config.clone();
+                            let filename_config = self.config.file_spec.clone();
                             let (sender, receiver) = std::sync::mpsc::channel();
                             let join_handle = std::thread::Builder::new()
                                 .name("flexi_logger-cleanup".to_string())
@@ -280,7 +279,7 @@ impl State {
                 remove_or_compress_too_old_logfiles(
                     &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
-                    &self.config.filename_config,
+                    &self.config.file_spec,
                 )?;
             }
         }
@@ -328,7 +327,7 @@ impl State {
                 }
             }
         };
-        get_filepath(o_infix, &self.config.filename_config)
+        self.config.file_spec.as_pathbuf(o_infix)
     }
 
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
@@ -336,11 +335,10 @@ impl State {
             self.initialize().unwrap();
         }
         if let Inner::Active(ref mut o_rotation_state, _) = self.inner {
-            let path = get_filepath(
+            let path = self.config.file_spec.as_pathbuf(
                 o_rotation_state
                     .as_ref()
                     .map(|_| super::state::CURRENT_INFIX),
-                &self.config.filename_config,
             );
             let f = File::open(path).unwrap();
             let mut reader = BufReader::new(f);
@@ -372,20 +370,6 @@ impl State {
     }
 }
 
-fn get_filepath(o_infix: Option<&str>, config: &FilenameConfig) -> PathBuf {
-    let mut s_filename = String::with_capacity(
-        config.file_basename.len() + o_infix.map_or(0, str::len) + 1 + config.suffix.len(),
-    ) + &config.file_basename;
-    if let Some(infix) = o_infix {
-        s_filename += infix;
-    };
-    s_filename += ".";
-    s_filename += &config.suffix;
-    let mut p_path = config.directory.to_path_buf();
-    p_path.push(s_filename);
-    p_path
-}
-
 #[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &Config,
@@ -396,7 +380,7 @@ fn open_log_file(
     } else {
         None
     };
-    let p_path = get_filepath(o_infix, &config.filename_config);
+    let p_path = config.file_spec.as_pathbuf(o_infix);
     if config.print_message {
         println!("Log is written to {}", &p_path.display());
     }
@@ -420,66 +404,44 @@ fn open_log_file(
     Ok((w, get_creation_date(&p_path), p_path))
 }
 
-fn get_highest_rotate_idx(filename_config: &FilenameConfig) -> IdxState {
-    match list_of_log_and_compressed_files(filename_config) {
-        Err(e) => {
-            eprintln!("[flexi_logger] listing rotated log files failed with {}", e);
-            IdxState::Start // hope and pray ...??
-        }
-        Ok(files) => {
-            let mut highest_idx = IdxState::Start;
-            for file in files {
-                let filename = file.file_stem().unwrap(/*ok*/).to_string_lossy();
-                let mut it = filename.rsplit("_r");
-                match it.next() {
-                    Some(next) => {
-                        let idx: u32 = next.parse().unwrap_or(0);
-                        highest_idx = match highest_idx {
-                            IdxState::Start => IdxState::Idx(idx),
-                            IdxState::Idx(prev) => IdxState::Idx(max(prev, idx)),
-                        };
-                    }
-                    None => continue, // ignore unexpected files
-                }
+fn get_highest_rotate_idx(file_spec: &FileSpec) -> IdxState {
+    let mut highest_idx = IdxState::Start;
+    for file in list_of_log_and_compressed_files(file_spec) {
+        let filename = file.file_stem().unwrap(/*ok*/).to_string_lossy();
+        let mut it = filename.rsplit("_r");
+        match it.next() {
+            Some(next) => {
+                let idx: u32 = next.parse().unwrap_or(0);
+                highest_idx = match highest_idx {
+                    IdxState::Start => IdxState::Idx(idx),
+                    IdxState::Idx(prev) => IdxState::Idx(max(prev, idx)),
+                };
             }
-            highest_idx
+            None => continue, // ignore unexpected files
         }
     }
+    highest_idx
 }
 
 #[allow(clippy::type_complexity)]
 fn list_of_log_and_compressed_files(
-    filename_config: &FilenameConfig,
-) -> std::result::Result<
+    file_spec: &FileSpec,
+) -> std::iter::Chain<
     std::iter::Chain<
-        std::iter::Chain<
-            std::vec::IntoIter<std::path::PathBuf>,
-            std::vec::IntoIter<std::path::PathBuf>,
-        >,
+        std::vec::IntoIter<std::path::PathBuf>,
         std::vec::IntoIter<std::path::PathBuf>,
     >,
-    std::io::Error,
+    std::vec::IntoIter<std::path::PathBuf>,
 > {
-    let fn_pattern = String::with_capacity(180)
-        .add(&filename_config.file_basename)
-        .add("_r[0-9]*")
-        .add(".");
+    let o_infix = Some("_r[0-9]*");
 
-    let mut log_pattern = filename_config.directory.clone();
-    log_pattern.push(fn_pattern.clone().add(&filename_config.suffix));
-    let log_pattern = log_pattern.as_os_str().to_string_lossy();
+    let log_pattern = file_spec.as_glob_pattern(o_infix, None);
+    let zip_pattern = file_spec.as_glob_pattern(o_infix, Some("zip"));
+    let gz_pattern = file_spec.as_glob_pattern(o_infix, Some("gz"));
 
-    let mut zip_pattern = filename_config.directory.clone();
-    zip_pattern.push(fn_pattern.clone().add("zip"));
-    let zip_pattern = zip_pattern.as_os_str().to_string_lossy();
-
-    let mut gz_pattern = filename_config.directory.clone();
-    gz_pattern.push(fn_pattern.add("gz"));
-    let gz_pattern = gz_pattern.as_os_str().to_string_lossy();
-
-    Ok(list_of_files(&log_pattern)
+    list_of_files(&log_pattern)
         .chain(list_of_files(&gz_pattern))
-        .chain(list_of_files(&zip_pattern)))
+        .chain(list_of_files(&zip_pattern))
 }
 
 fn list_of_files(pattern: &str) -> std::vec::IntoIter<PathBuf> {
@@ -494,10 +456,10 @@ fn list_of_files(pattern: &str) -> std::vec::IntoIter<PathBuf> {
 fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
     cleanup_config: &Cleanup,
-    filename_config: &FilenameConfig,
+    file_spec: &FileSpec,
 ) -> Result<(), std::io::Error> {
     o_cleanup_thread_handle.as_ref().map_or(
-        remove_or_compress_too_old_logfiles_impl(cleanup_config, filename_config),
+        remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec),
         |cleanup_thread_handle| {
             cleanup_thread_handle
                 .sender
@@ -510,7 +472,7 @@ fn remove_or_compress_too_old_logfiles(
 
 fn remove_or_compress_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
-    filename_config: &FilenameConfig,
+    file_spec: &FileSpec,
 ) -> Result<(), std::io::Error> {
     let (log_limit, compress_limit) = match *cleanup_config {
         Cleanup::Never => {
@@ -519,18 +481,15 @@ fn remove_or_compress_too_old_logfiles_impl(
         Cleanup::KeepLogFiles(log_limit) => (log_limit, 0),
 
         #[cfg(feature = "compress")]
-        #[allow(deprecated)]
-        Cleanup::KeepCompressedFiles(compress_limit) | Cleanup::KeepZipFiles(compress_limit) => {
-            (0, compress_limit)
-        }
+        Cleanup::KeepCompressedFiles(compress_limit) => (0, compress_limit),
 
         #[cfg(feature = "compress")]
-        #[allow(deprecated)]
-        Cleanup::KeepLogAndCompressedFiles(log_limit, compress_limit)
-        | Cleanup::KeepLogAndZipFiles(log_limit, compress_limit) => (log_limit, compress_limit),
+        Cleanup::KeepLogAndCompressedFiles(log_limit, compress_limit) => {
+            (log_limit, compress_limit)
+        }
     };
 
-    for (index, file) in list_of_log_and_compressed_files(&filename_config)?.enumerate() {
+    for (index, file) in list_of_log_and_compressed_files(&file_spec).enumerate() {
         if index >= log_limit + compress_limit {
             // delete (log or log.gz)
             std::fs::remove_file(&file)?;
@@ -569,12 +528,10 @@ fn rotate_output_file_to_date(
     creation_date: &DateTime<Local>,
     config: &Config,
 ) -> Result<(), std::io::Error> {
-    let current_path = get_filepath(Some(CURRENT_INFIX), &config.filename_config);
-
-    let mut rotated_path = get_filepath(
-        Some(&creation_date.format("_r%Y-%m-%d_%H-%M-%S").to_string()),
-        &config.filename_config,
-    );
+    let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
+    let mut rotated_path = config.file_spec.as_pathbuf(Some(
+        &creation_date.format("_r%Y-%m-%d_%H-%M-%S").to_string(),
+    ));
 
     // Search for rotated_path as is and for restart-siblings;
     // if any exists, find highest restart and add 1, else continue without restart
@@ -602,15 +559,12 @@ fn rotate_output_file_to_date(
         };
 
         while (*rotated_path).exists() {
-            rotated_path = get_filepath(
-                Some(
-                    &creation_date
-                        .format("_r%Y-%m-%d_%H-%M-%S")
-                        .to_string()
-                        .add(&format!(".restart-{:04}", number)),
-                ),
-                &config.filename_config,
-            );
+            rotated_path = config.file_spec.as_pathbuf(Some(
+                &creation_date
+                    .format("_r%Y-%m-%d_%H-%M-%S")
+                    .to_string()
+                    .add(&format!(".restart-{:04}", number)),
+            ));
             number += 1;
         }
     }
@@ -640,8 +594,8 @@ fn rotate_output_file_to_idx(
     };
 
     match std::fs::rename(
-        get_filepath(Some(CURRENT_INFIX), &config.filename_config),
-        get_filepath(Some(&number_infix(new_idx)), &config.filename_config),
+        config.file_spec.as_pathbuf(Some(CURRENT_INFIX)),
+        config.file_spec.as_pathbuf(Some(&number_infix(new_idx))),
     ) {
         Ok(()) => Ok(IdxState::Idx(new_idx)),
         Err(e) => {

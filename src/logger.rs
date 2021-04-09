@@ -1,12 +1,14 @@
 use crate::flexi_logger::FlexiLogger;
 use crate::formats::default_format;
-#[cfg(feature = "atty")]
-use crate::formats::{AdaptiveFormat, Stream};
+#[cfg(feature = "colors")]
+use crate::formats::AdaptiveFormat;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::{
-    Cleanup, Criterion, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle, Naming,
+    Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
+    Naming, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL,
 };
+use std::time::Duration;
 
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
@@ -22,10 +24,10 @@ use std::sync::{Arc, RwLock};
 /// A simple example with file logging might look like this:
 ///
 /// ```rust
-/// use flexi_logger::{Duplicate,Logger};
+/// use flexi_logger::{Duplicate, FileSpec, Logger};
 ///
 /// Logger::with_str("info, mycrate = debug")
-///         .log_to_file()
+///         .log_to_file(FileSpec::default())
 ///         .duplicate_to_stderr(Duplicate::Warn)
 ///         .start()
 ///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -35,19 +37,15 @@ use std::sync::{Arc, RwLock};
 ///
 /// `Logger` is a builder class that allows you to
 /// * specify your desired (initial) loglevel-specification
-///   * either programmatically as a String
-///    ([`Logger::with_str()`](crate::Logger::with_str))
-///   * or by providing a String in the environment
-///    ([`Logger::with_env()`](crate::Logger::with_env)),
-///   * or by combining both options
-///    ([`Logger::with_env_or_str()`](crate::Logger::with_env_or_str)),
-///   * or by building a `LogSpecification` programmatically
-///    ([`Logger::with()`](crate::Logger::with)),
+///   * either programmatically as a String ([`Logger::with_str`])
+///   * or by providing a String in the environment ([`Logger::with_env`]),
+///   * or by combining both options ([`Logger::with_env_or_str`]),
+///   * or by building a [`LogSpecification`] programmatically ([`Logger::with`]),
 /// * use the desired configuration methods,
 /// * and finally start the logger with
 ///
-///   * [`start()`](crate::Logger::start),
-///   * or [`start_with_specfile()`](crate::Logger::start_with_specfile).
+///   * [`Logger::start`], or
+///   * [`Logger::start_with_specfile`].
 pub struct Logger {
     spec: LogSpecification,
     parse_errs: Option<String>,
@@ -65,73 +63,37 @@ pub struct Logger {
     other_writers: HashMap<String, Box<dyn LogWriter>>,
 }
 
-/// Describes the default log target.
-///
-/// All log messages, in which no target is explicitly defined, will be written to
-/// the default log target.
-///
-/// See module [writers](crate::writers) for
-/// how to specify non-default log targets in log macro calls,
-/// and the usage of non-default log writers.
-pub enum LogTarget {
-    /// Log is written to stderr.
-    ///
-    /// This is the default behavior of `flexi_logger`.
+enum LogTarget {
     StdErr,
-    /// Log is written to stdout.
     StdOut,
-    /// Log is written to a file.
-    ///
-    /// The default pattern for the filename is '\<program_name\>\_\<date\>\_\<time\>.\<suffix\>',
-    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
-    File,
-    /// Log is written to an alternative `LogWriter` implementation.
-    ///
-    Writer(Box<dyn LogWriter>),
-    /// Log is written to a file, as with `LogTarget::File`, _and_ to an alternative
-    /// `LogWriter` implementation.
-    FileAndWriter(Box<dyn LogWriter>),
-    /// Log is processed, including duplication, but not written to a primary target destination.
-    ///
-    /// This can be useful e.g. for running application tests with all log-levels active and still
-    /// avoiding tons of log files etc.
-    /// Such tests ensure that the log calls which are normally not active
-    /// will not cause undesired side-effects when activated
-    /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
-    ///
-    /// Combined with
-    /// [`duplicate_to_stdout()`](crate::Logger::duplicate_to_stdout)
-    /// and
-    /// [`duplicate_to_stderr()`](crate::Logger::duplicate_to_stderr)
-    /// it can also be used if you want to get logs both to stdout and stderr, but not to a file.
-    DevNull,
+    Multi(bool, Option<Box<dyn LogWriter>>),
 }
 
 /// Create a Logger instance and define how to access the (initial)
 /// loglevel-specification.
 impl Logger {
-    /// Creates a Logger that you provide with an explicit `LogSpecification`.
-    /// By default, logs are written with `default_format` to `stderr`.
+    /// Creates a Logger that you provide with an explicit [`LogSpecification`].
     #[must_use]
     pub fn with(logspec: LogSpecification) -> Self {
         Self::from_spec_and_errs(logspec, None)
     }
 
-    /// Creates a Logger that reads the `LogSpecification` from a String or &str.
-    /// [See `LogSpecification`](crate::LogSpecification) for the syntax.
+    /// Creates a Logger that reads the [`LogSpecification`] from a `String` or `&str`.
+    /// See [`LogSpecification`] for the syntax.
     #[must_use]
     pub fn with_str<S: AsRef<str>>(s: S) -> Self {
         Self::from_result(LogSpecification::parse(s.as_ref()))
     }
 
-    /// Creates a Logger that reads the `LogSpecification` from the environment variable `RUST_LOG`.
+    /// Creates a Logger that reads the [`LogSpecification`] from the environment variable
+    /// `RUST_LOG`.
     #[must_use]
     pub fn with_env() -> Self {
         Self::from_result(LogSpecification::env())
     }
 
-    /// Creates a Logger that reads the `LogSpecification` from the environment variable `RUST_LOG`,
-    /// or derives it from the given String, if `RUST_LOG` is not set.
+    /// Creates a Logger that reads the [`LogSpecification`] from the environment variable
+    /// `RUST_LOG`, or derives it from the given `String`, if `RUST_LOG` is not set.
     #[must_use]
     pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Self {
         Self::from_result(LogSpecification::env_or_parse(s))
@@ -168,9 +130,17 @@ impl Logger {
             format_for_file: default_format,
 
             #[cfg(feature = "colors")]
-            format_for_stdout: AdaptiveFormat::Default.format_function(Stream::StdOut),
+            format_for_stdout: AdaptiveFormat::Default.format_function(if cfg!(feature = "atty") {
+                atty::is(atty::Stream::Stdout)
+            } else {
+                false
+            }),
             #[cfg(feature = "colors")]
-            format_for_stderr: AdaptiveFormat::Default.format_function(Stream::StdErr),
+            format_for_stderr: AdaptiveFormat::Default.format_function(if cfg!(feature = "atty") {
+                atty::is(atty::Stream::Stderr)
+            } else {
+                false
+            }),
 
             #[cfg(not(feature = "colors"))]
             format_for_stdout: default_format,
@@ -181,7 +151,7 @@ impl Logger {
             #[cfg(feature = "colors")]
             o_palette: None,
             o_flush_wait: None,
-            flwb: FileLogWriter::builder(),
+            flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
         }
     }
@@ -193,7 +163,7 @@ impl Logger {
     /// and examining the parse error.
     ///
     /// Most of the factory methods for Logger (`Logger::with_...()`)
-    /// parse a log specification String, and deduce from it a `LogSpecification` object.
+    /// parse a log specification String, and deduce from it a [`LogSpecification`] object.
     /// If parsing fails, errors are reported to stdout, but effectively ignored.
     /// In worst case, nothing is logged!
     ///
@@ -203,17 +173,17 @@ impl Logger {
     /// In the following example we just panic if the spec was not free of errors:
     ///
     /// ```should_panic
-    /// # use flexi_logger::{Logger,LogTarget};
+    /// # use flexi_logger::{Logger,FileSpec};
     /// Logger::with_str("hello world")
     /// .check_parser_error()
     /// .unwrap()       // <-- here we could do better than panic
-    /// .log_target(LogTarget::File)
+    /// .log_to_file(FileSpec::default())
     /// .start();
     /// ```
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the input for the log specification is malformed.
+    /// [`FlexiLoggerError::Parse`] if the input for the log specification is malformed.
     pub fn check_parser_error(self) -> Result<Self, FlexiLoggerError> {
         match self.parse_errs {
             Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
@@ -221,20 +191,68 @@ impl Logger {
         }
     }
 
-    /// Is equivalent to
-    /// [`log_target`](crate::Logger::log_target)`(`[`LogTarget::File`](crate::LogTarget::File)`)`.
+    /// Log is written to stderr (which is the default).
     #[must_use]
-    pub fn log_to_file(self) -> Self {
-        self.log_target(LogTarget::File)
+    pub fn log_to_stderr(mut self) -> Self {
+        self.log_target = LogTarget::StdErr;
+        self
     }
 
-    /// Write the main log output to the specified target.
-    ///
-    /// By default, i.e. if this method is not called,
-    /// the log target [`LogTarget::StdErr`](crate::LogTarget::StdErr) is used.
+    /// Log is written to stdout.
     #[must_use]
-    pub fn log_target(mut self, log_target: LogTarget) -> Self {
-        self.log_target = log_target;
+    pub fn log_to_stdout(mut self) -> Self {
+        self.log_target = LogTarget::StdOut;
+        self
+    }
+
+    /// Log is written to a file.
+    ///
+    ///
+    /// The default filename pattern is `<program_name>_<date>_<time>.<suffix>`,
+    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
+    ///
+    /// You can duplicate to stdout and stderr, and you can add additional writers.
+    #[must_use]
+    pub fn log_to_file(mut self, file_spec: FileSpec) -> Self {
+        self.log_target = LogTarget::Multi(true, None);
+        self.flwb = self.flwb.file_spec(file_spec);
+        self
+    }
+
+    /// Log is written to the provided writer.
+    ///
+    /// You can duplicate to stdout and stderr, and you can add additional writers.
+    #[must_use]
+    pub fn log_to_writer(mut self, w: Box<dyn LogWriter>) -> Self {
+        self.log_target = LogTarget::Multi(false, Some(w));
+        self
+    }
+
+    /// Log is written to a file, as with [`Logger::log_to_file`], _and_ to an alternative
+    /// [`LogWriter`] implementation.
+    ///
+    /// And you can duplicate to stdout and stderr, and you can add additional writers.
+    #[must_use]
+    pub fn log_to_file_and_writer(mut self, file_spec: FileSpec, w: Box<dyn LogWriter>) -> Self {
+        self.log_target = LogTarget::Multi(true, Some(w));
+        self.flwb = self.flwb.file_spec(file_spec);
+        self
+    }
+
+    /// Log is processed, including duplication, but not written to any destination.
+    ///
+    /// This can be useful e.g. for running application tests with all log-levels active and still
+    /// avoiding tons of log files etc.
+    /// Such tests ensure that the log calls which are normally not active
+    /// will not cause undesired side-effects when activated
+    /// (note that the log macros may prevent arguments of inactive log-calls from being evaluated).
+    ///
+    /// Or, if you want to get logs both to stdout and stderr, but nowhere else,
+    /// then use this option and combine it with
+    /// [`Logger::duplicate_to_stdout`] and [`Logger::duplicate_to_stderr`].
+    #[must_use]
+    pub fn do_not_log(mut self) -> Self {
+        self.log_target = LogTarget::Multi(false, None);
         self
     }
 
@@ -248,7 +266,7 @@ impl Logger {
 
     /// Makes the logger write messages with the specified minimum severity additionally to stderr.
     ///
-    /// Works with all log targets except `StdErr` and `StdOut`.
+    /// Does not work with [`Logger::log_to_stdout`] or [`Logger::log_to_stderr`].
     #[must_use]
     pub fn duplicate_to_stderr(mut self, dup: Duplicate) -> Self {
         self.duplicate_err = dup;
@@ -257,7 +275,7 @@ impl Logger {
 
     /// Makes the logger write messages with the specified minimum severity additionally to stdout.
     ///
-    /// Works with all log targets except `StdErr` and `StdOut`.
+    /// Does not work with [`Logger::log_to_stdout`] or [`Logger::log_to_stderr`].
     #[must_use]
     pub fn duplicate_to_stdout(mut self, dup: Duplicate) -> Self {
         self.duplicate_out = dup;
@@ -269,21 +287,18 @@ impl Logger {
     ///
     /// You can either choose one of the provided log-line formatters,
     /// or you create and use your own format function with the signature <br>
-    /// ```rust,ignore
+    /// ```rust
     /// fn(
     ///    write: &mut dyn std::io::Write,
     ///    now: &mut DeferredNow,
     ///    record: &Record,
     /// ) -> Result<(), std::io::Error>
+    /// #;
     /// ```
     ///
-    /// By default,
-    /// [`default_format()`](crate::default_format) is used for output to files
-    /// and to custom writers, and [`AdaptiveFormat::Default`](crate::AdaptiveFormat::Default)
-    /// is used for output to `stderr` and `stdout`.
-    ///
-    /// If the feature `colors` is switched off,
-    /// `default_format()` is used for all outputs.
+    /// By default, [`default_format`] is used for output to files and to custom writers,
+    /// and [`AdaptiveFormat::Default`] is used for output to `stderr` and `stdout`.
+    /// If the feature `colors` is switched off, [`default_format`] is used for all outputs.
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self.format_for_stderr = format;
@@ -295,53 +310,63 @@ impl Logger {
     /// Makes the logger use the provided format function for messages
     /// that are written to files.
     ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
+    /// Regarding the default, see [`Logger::format`].
     pub fn format_for_files(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
-        self
-    }
-
-    /// Makes the logger use the specified format for messages that are written to `stderr`.
-    /// Coloring is used if `stderr` is a tty.
-    ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
-    ///
-    /// Only available with feature `colors`.
-    #[cfg(feature = "atty")]
-    #[must_use]
-    pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        self.format_for_stderr = adaptive_format.format_function(Stream::StdErr);
-        self
-    }
-
-    /// Makes the logger use the specified format for messages that are written to `stdout`.
-    /// Coloring is used if `stdout` is a tty.
-    ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
-    ///
-    /// Only available with feature `colors`.
-    #[cfg(feature = "atty")]
-    #[must_use]
-    pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        self.format_for_stdout = adaptive_format.format_function(Stream::StdOut);
         self
     }
 
     /// Makes the logger use the provided format function for messages
     /// that are written to stderr.
     ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
-    pub fn format_for_stderr(mut self, format: FormatFunction) -> Self {
-        self.format_for_stderr = format;
+    /// Regarding the default, see [`Logger::format`].
+    pub fn format_for_stderr(mut self, format_function: FormatFunction) -> Self {
+        self.format_for_stderr = format_function;
+        self
+    }
+
+    /// Makes the logger use the specified format for messages that are written to `stderr`.
+    /// Coloring is used if `stderr` is a tty.
+    ///
+    /// Regarding the default, see [`Logger::format`].
+    ///
+    /// Only available with feature `colors`.
+    #[cfg(feature = "atty")]
+    #[must_use]
+    pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
+        #[cfg(feature = "atty")]
+        let is_tty = atty::is(atty::Stream::Stderr);
+        #[cfg(not(feature = "atty"))]
+        let is_tty = false;
+
+        self.format_for_stderr = adaptive_format.format_function(is_tty);
         self
     }
 
     /// Makes the logger use the provided format function to format messages
     /// that are written to stdout.
     ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
-    pub fn format_for_stdout(mut self, format: FormatFunction) -> Self {
-        self.format_for_stdout = format;
+    /// Regarding the default, see [`Logger::format`].
+    pub fn format_for_stdout(mut self, format_function: FormatFunction) -> Self {
+        self.format_for_stdout = format_function;
+        self
+    }
+
+    /// Makes the logger use the specified format for messages that are written to `stdout`.
+    /// Coloring is used if `stdout` is a tty.
+    ///
+    /// Regarding the default, see [`Logger::format`].
+    ///
+    /// Only available with feature `colors`.
+    #[cfg(feature = "atty")]
+    #[must_use]
+    pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
+        #[cfg(feature = "atty")]
+        let is_tty = atty::is(atty::Stream::Stdout);
+        #[cfg(not(feature = "atty"))]
+        let is_tty = false;
+
+        self.format_for_stdout = adaptive_format.format_function(is_tty);
         self
     }
 
@@ -349,7 +374,7 @@ impl Logger {
     /// Note that it is up to the implementation of the additional writer
     /// whether it evaluates this setting or not.
     ///
-    /// Regarding the default, see [`Logger::format`](crate::Logger::format).
+    /// Regarding the default, see [`Logger::format`].
     pub fn format_for_writer(mut self, format: FormatFunction) -> Self {
         self.format_for_writer = format;
         self
@@ -384,54 +409,6 @@ impl Logger {
         self
     }
 
-    /// Specifies a folder for the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file()` is used, too.
-    /// The specified folder will be created if it does not exist.
-    /// By default, the log files are created in the folder where the program was started.
-    pub fn directory<S: Into<PathBuf>>(mut self, directory: S) -> Self {
-        self.flwb = self.flwb.directory(directory);
-        self
-    }
-
-    /// Specifies a suffix for the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file()` is used, too.
-    pub fn suffix<S: Into<String>>(mut self, suffix: S) -> Self {
-        self.flwb = self.flwb.suffix(suffix);
-        self
-    }
-
-    /// Makes the logger not include a timestamp into the names of the log files.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too,
-    /// and is ignored if rotation is used.
-    #[must_use]
-    pub fn suppress_timestamp(mut self) -> Self {
-        self.flwb = self.flwb.suppress_timestamp();
-        self
-    }
-
-    /// When rotation is used with some `Cleanup` variant, then this option defines
-    /// if the cleanup activities (finding files, deleting files, evtl compressing files) is done
-    /// in the current thread (in the current log-call), or whether cleanup is delegated to a
-    /// background thread.
-    ///
-    /// As of `flexi_logger` version `0.14.7`,
-    /// the cleanup activities are done by default in a background thread.
-    /// This minimizes the blocking impact to your application caused by IO operations.
-    ///
-    /// In earlier versions of `flexi_logger`, or if you call this method with
-    /// `use_background_thread = false`,
-    /// the cleanup is done in the thread that is currently causing a file rotation.
-    #[must_use]
-    pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
-        self.flwb = self
-            .flwb
-            .cleanup_in_background_thread(use_background_thread);
-        self
-    }
-
     /// Prevent indefinite growth of the log file by applying file rotation
     /// and a clean-up strategy for older log files.
     ///
@@ -441,7 +418,7 @@ impl Logger {
     ///
     /// Note that also the filename pattern changes:
     ///
-    /// - by default, no timestamp is added to the filename
+    /// - by default, no timestamp is added to the filename if rotation is used
     /// - the logs are always written to a file with infix `_rCURRENT`
     /// - when the rotation criterion is fulfilled, it is closed and renamed to a file
     ///   with another infix (see `Naming`),
@@ -461,42 +438,45 @@ impl Logger {
     ///
     /// ## Parameters
     ///
-    /// `rotate_over_size` is given in bytes, e.g. `10_000_000` will rotate
-    /// files once they reach a size of 10 MiB.
-    ///     
+    /// `criterion` defines *when* the log file should be rotated, based on its size or age.
+    /// See [`Criterion`] for details.
+    ///
+    /// `naming` defines the naming convention for the rotated log files.
+    /// See [`Naming`] for details.
+    ///
     /// `cleanup` defines the strategy for dealing with older files.
-    /// See [Cleanup](crate::Cleanup) for details.
+    /// See [`Cleanup`] for details.
     #[must_use]
     pub fn rotate(mut self, criterion: Criterion, naming: Naming, cleanup: Cleanup) -> Self {
         self.flwb = self.flwb.rotate(criterion, naming, cleanup);
         self
     }
 
+    /// When [`Logger::rotate`] is used with some [`Cleanup`] variant other than [`Cleanup::Never`],
+    /// then this method can be used to define
+    /// if the cleanup activities (finding files, deleting files, evtl compressing files) are
+    /// delegated to a background thread (which is the default,
+    /// to minimize the blocking impact to your application caused by IO operations),
+    /// or whether they are done synchronously in the current log-call.
+    ///
+    /// If you call this method with `use_background_thread = false`,
+    /// the cleanup is done synchronously.
+    #[must_use]
+    pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
+        self.flwb = self
+            .flwb
+            .cleanup_in_background_thread(use_background_thread);
+        self
+    }
+
     /// Makes the logger append to the specified output file, if it exists already;
     /// by default, the file would be truncated.
     ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+    /// This option only has an effect if logs are written to files, but
+    /// it will hardly make an effect if [`FileSpec::suppress_timestamp`] is not used.
     #[must_use]
     pub fn append(mut self) -> Self {
         self.flwb = self.flwb.append();
-        self
-    }
-
-    /// The specified String is added to the log file name after the program name.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn discriminant<S: Into<String>>(mut self, discriminant: S) -> Self {
-        self.flwb = self.flwb.discriminant(discriminant);
-        self
-    }
-
-    /// The specified String is used as the basename of the log file name,
-    /// instead of the program name.
-    ///
-    /// This option only has an effect if `log_to_file()` is used, too.
-    pub fn basename<S: Into<String>>(mut self, basename: S) -> Self {
-        self.flwb = self.flwb.basename(basename);
         self
     }
 
@@ -504,14 +484,14 @@ impl Logger {
     /// to the current log file.
     ///
     /// This option has no effect on filesystems where symlinks are not supported,
-    /// and it only has an effect if `log_to_file()` is used, too.
+    /// and it only has an effect if logs are written to files.
     ///
     /// ### Example
     ///
     /// You can use the symbolic link to follow the log output with `tail`,
     /// even if the log files are rotated.
     ///
-    /// Assuming the link has the name `link_to_log_file`, then use:
+    /// Assuming you use `create_symlink("link_to_log_file")`, then use:
     ///
     /// ```text
     /// tail --follow=name --max-unchanged-stats=1 --retry link_to_log_file
@@ -522,11 +502,10 @@ impl Logger {
         self
     }
 
-    /// Registers a `LogWriter` implementation under the given target name.
+    /// Registers a [`LogWriter`] implementation under the given target name.
     ///
     /// The target name must not start with an underscore.
-    ///
-    /// See module [`writers`](crate::writers).
+    /// See module [`writers`](crate::writers) for more details.
     pub fn add_writer<S: Into<String>>(
         mut self,
         target_name: S,
@@ -536,46 +515,27 @@ impl Logger {
         self
     }
 
-    /// Define if buffering should be used.
+    /// Defines if buffering and optionally flushing should be used.
     ///
     /// By default, every log line is directly written to the output, without buffering.
     /// This allows seeing new log lines in real time.
     ///
     /// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
-    /// which can be important if logging is used heavily.
+    /// which can become relevant if logging is used heavily.
     /// On the other hand, if logging is used with low frequency,
-    /// the log lines can become visible in the output file with significant deferral.
+    /// buffering can defer the appearance of log lines significantly.
     ///
-    /// **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle)
-    /// and call [`shutdown`](crate::LoggerHandle::shutdown) at the very end of your program
-    /// to ensure that all buffered log lines are flushed before the program terminates.
-    #[must_use]
-    pub fn use_buffering(mut self, buffer: bool) -> Self {
-        self.flwb = self.flwb.use_buffering(buffer);
-        self
-    }
-
-    /// Activates buffering (like with [`Logger::use_buffering`])
-    /// and flushes all buffers automatically every second.
+    /// **Note** that with buffering you should keep the [`LoggerHandle`] alive
+    /// up to the very end of your program to ensure that all buffered log lines are flushed out
+    /// (which happens automatically when the [`LoggerHandle`] is dropped)
+    /// before the program terminates.
+    /// [See here for an example](code_examples/index.html#use-buffering-to-reduce-io-overhead).
     ///
-    /// Note that flushing uses an extra thread (with minimal stack).
+    /// **Note** further that flushing uses an extra thread (with minimal stack).
     #[must_use]
-    pub fn buffer_and_flush(mut self) -> Self {
-        self.flwb = self
-            .flwb
-            .buffer_with_capacity(crate::DEFAULT_BUFFER_CAPACITY);
-        self.o_flush_wait = Some(crate::DEFAULT_FLUSH_WAIT_TIME);
-        self
-    }
-
-    /// Activates buffering and flushing (like with [`Logger::buffer_and_flush`],
-    /// but with user-defined buffer capacity and flush frequency.
-    ///
-    /// Note that flushing uses an extra thread (with minimal stack).
-    #[must_use]
-    pub fn buffer_and_flush_with(mut self, capacity: usize, wait: std::time::Duration) -> Self {
-        self.flwb = self.flwb.buffer_with_capacity(capacity);
-        self.o_flush_wait = Some(wait);
+    pub fn write_mode(mut self, cfg: WriteMode) -> Self {
+        self.flwb = self.flwb.write_mode(cfg.get_capacity());
+        self.o_flush_wait = cfg.get_duration();
         self
     }
 
@@ -599,16 +559,6 @@ impl Logger {
         self
     }
 
-    /// Specifies a folder for the log files.
-    ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
-    /// If the specified folder does not exist, the initialization will fail.
-    /// With None, the log files are created in the folder where the program was started.
-    pub fn o_directory<P: Into<PathBuf>>(mut self, directory: Option<P>) -> Self {
-        self.flwb = self.flwb.o_directory(directory);
-        self
-    }
-
     /// By default, and with None, the log file will grow indefinitely.
     /// If a `rotate_config` is set, when the log file reaches or exceeds the specified size,
     /// the file will be closed and a new file will be opened.
@@ -622,17 +572,6 @@ impl Logger {
     #[must_use]
     pub fn o_rotate(mut self, rotate_config: Option<(Criterion, Naming, Cleanup)>) -> Self {
         self.flwb = self.flwb.o_rotate(rotate_config);
-        self
-    }
-
-    /// With true, makes the logger include a timestamp into the names of the log files.
-    /// `true` is the default, but `rotate_over_size` sets it to `false`.
-    /// With this method you can set it to `true` again.
-    ///
-    /// This parameter only has an effect if `log_to_file` is set to true.
-    #[must_use]
-    pub fn o_timestamp(mut self, timestamp: bool) -> Self {
-        self.flwb = self.flwb.o_timestamp(timestamp);
         self
     }
 
@@ -650,23 +589,6 @@ impl Logger {
 
     /// This option only has an effect if `log_to_file` is set to true.
     ///
-    /// The specified String is added to the log file name.
-    pub fn o_discriminant<S: Into<String>>(mut self, discriminant: Option<S>) -> Self {
-        self.flwb = self.flwb.o_discriminant(discriminant);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
-    /// The specified String is used as the basename of the log file,
-    /// instead of the program name, which is used when `None` is given.
-    pub fn o_basename<S: Into<String>>(mut self, basename: Option<S>) -> Self {
-        self.flwb = self.flwb.o_basename(basename);
-        self
-    }
-
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
     /// If a String is specified, it will be used on linux systems to create in the current folder
     /// a symbolic link with this name to the current log file.
     pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Self {
@@ -679,13 +601,12 @@ impl Logger {
 impl Logger {
     /// Consumes the Logger object and initializes `flexi_logger`.
     ///
-    /// The returned reconfiguration handle allows updating the log specification programmatically
+    /// The returned [`LoggerHandle`] allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`LoggerHandle`](crate::LoggerHandle) for an example.
     ///
     /// # Errors
     ///
-    /// Several variants of `FlexiLoggerError` can occur.
+    /// Several variants of [`FlexiLoggerError`] can occur.
     pub fn start(self) -> Result<LoggerHandle, FlexiLoggerError> {
         let (boxed_logger, handle) = self.build()?;
         log::set_boxed_logger(boxed_logger)?;
@@ -698,14 +619,13 @@ impl Logger {
     /// The returned boxed logger implements the Log trait and can be installed manually
     /// or nested within another logger.
     ///
-    /// The reconfiguration handle allows updating the log specification programmatically
+    /// The [`LoggerHandle`] allows updating the log specification programmatically
     /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
-    /// See [`LoggerHandle`](crate::LoggerHandle) for an example.
     ///
     /// # Errors
     ///
-    /// Several variants of `FlexiLoggerError` can occur.
-    pub fn build(mut self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
+    /// Several variants of [`FlexiLoggerError`] can occur.
+    pub fn build(self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         let max_level = self.spec.max_level();
         let spec = Arc::new(RwLock::new(self.spec));
         let other_writers = Arc::new(self.other_writers);
@@ -714,49 +634,31 @@ impl Logger {
         crate::formats::set_palette(&self.o_palette)?;
 
         let primary_writer = Arc::new(match self.log_target {
-            LogTarget::File => {
-                self.flwb = self.flwb.format(self.format_for_file);
-                PrimaryWriter::multi(
-                    self.duplicate_err,
-                    self.duplicate_out,
-                    self.format_for_stderr,
-                    self.format_for_stdout,
-                    vec![Box::new(self.flwb.try_build()?)],
-                )
-            }
-            LogTarget::Writer(mut w) => {
-                w.format(self.format_for_writer);
-                PrimaryWriter::multi(
-                    self.duplicate_err,
-                    self.duplicate_out,
-                    self.format_for_stderr,
-                    self.format_for_stdout,
-                    vec![w],
-                )
-            }
-            LogTarget::FileAndWriter(mut w) => {
-                self.flwb = self.flwb.format(self.format_for_file);
-                w.format(self.format_for_writer);
-                PrimaryWriter::multi(
-                    self.duplicate_err,
-                    self.duplicate_out,
-                    self.format_for_stderr,
-                    self.format_for_stdout,
-                    vec![Box::new(self.flwb.try_build()?), w],
-                )
-            }
             LogTarget::StdOut => {
                 PrimaryWriter::stdout(self.format_for_stdout, self.flwb.buffersize())
             }
             LogTarget::StdErr => {
                 PrimaryWriter::stderr(self.format_for_stderr, self.flwb.buffersize())
             }
-            LogTarget::DevNull => PrimaryWriter::black_hole(
-                self.duplicate_err,
-                self.duplicate_out,
-                self.format_for_stderr,
-                self.format_for_stdout,
-            ),
+            LogTarget::Multi(use_file, o_writer) => {
+                let mut writers: Vec<Box<dyn LogWriter>> = vec![];
+                if use_file {
+                    writers.push(Box::new(
+                        self.flwb.format(self.format_for_file).try_build()?,
+                    ));
+                }
+                if let Some(mut writer) = o_writer {
+                    writer.format(self.format_for_writer);
+                    writers.push(writer);
+                }
+                PrimaryWriter::multi(
+                    self.duplicate_err,
+                    self.duplicate_out,
+                    self.format_for_stderr,
+                    self.format_for_stdout,
+                    writers,
+                )
+            }
         });
 
         let flexi_logger = FlexiLogger::new(
@@ -791,7 +693,7 @@ impl Logger {
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
     /// subsequently the log specification can be updated manually.
     ///
-    /// Uses the spec that was given to the factory method (`Logger::with()` etc)
+    /// Uses the spec that was given to the factory method ([`Logger::with`] etc)
     /// as initial spec and then tries to read the logspec from a file.
     ///
     /// If the file does not exist, `flexi_logger` creates the file and fills it
@@ -844,12 +746,11 @@ impl Logger {
     ///
     /// # Errors
     ///
-    /// Several variants of `FlexiLoggerError` can occur.
+    /// Several variants of [`FlexiLoggerError`] can occur.
     ///
     /// # Returns
     ///
-    /// A `LoggerHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](crate::LoggerHandle::shutdown) method.
+    /// A [`LoggerHandle`].
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<std::path::Path>>(
         self,
@@ -869,17 +770,16 @@ impl Logger {
     /// The returned boxed logger implements the Log trait and can be installed manually
     /// or nested within another logger.
     ///
-    /// For the properties of the returned logger,
-    /// see [`start_with_specfile()`](crate::Logger::start_with_specfile).
+    /// For the properties of the returned logger, see [`Logger::start_with_specfile()`].
     ///
     /// # Errors
     ///
-    /// Several variants of `FlexiLoggerError` can occur.
+    /// Several variants of [`FlexiLoggerError`] can occur.
     ///
     /// # Returns
     ///
     /// A `LoggerHandle` is returned, predominantly to allow using its
-    /// [`shutdown`](crate::LoggerHandle::shutdown) method.
+    /// [`LoggerHandle::shutdown`] method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<std::path::Path>>(
         self,
@@ -1024,4 +924,39 @@ pub enum Duplicate {
     Trace,
     /// All messages are duplicated.
     All,
+}
+
+/// Describes if and how the log output should be buffered and flushed.
+///
+/// Is used in [`Logger::write_mode`], see there for detailed information.
+#[derive(Copy, Clone)]
+pub enum WriteMode {
+    /// Do not buffer (default).
+    Direct,
+    /// Buffer with default capacity ([`DEFAULT_BUFFER_CAPACITY`]), but don't flush.
+    Buffered,
+    /// Buffer with default capacity ([`DEFAULT_BUFFER_CAPACITY`])
+    /// and flush with default interval ([`DEFAULT_FLUSH_INTERVAL`]).
+    BufferAndFlush,
+    /// Buffer and  flush with given capacity and interval.
+    BufferAndFlushWith(usize, Duration),
+    // /// Send logs through a channel to the output thread which writes to output
+    // /// and flushes regularly
+    // Async,
+}
+impl WriteMode {
+    pub(crate) fn get_capacity(&self) -> Option<usize> {
+        match self {
+            Self::Direct => None,
+            Self::Buffered | Self::BufferAndFlush => Some(DEFAULT_BUFFER_CAPACITY),
+            Self::BufferAndFlushWith(capacity, _) => Some(*capacity),
+        }
+    }
+    pub(crate) fn get_duration(&self) -> Option<Duration> {
+        match self {
+            Self::Direct | Self::Buffered => None,
+            Self::BufferAndFlush => Some(DEFAULT_FLUSH_INTERVAL),
+            Self::BufferAndFlushWith(_, interval) => Some(*interval),
+        }
+    }
 }

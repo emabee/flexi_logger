@@ -1,5 +1,5 @@
 use flexi_logger::writers::{FileLogWriter, LogWriter};
-use flexi_logger::{detailed_format, DeferredNow, Logger, Record};
+use flexi_logger::{detailed_format, DeferredNow, FileSpec, Logger, Record};
 use log::*;
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ fn test() {
     let mut logger = Logger::with_str("info, fantasy = trace")
         .format(detailed_format)
         .print_message()
-        .log_to_file()
+        .log_to_file(FileSpec::default())
         .add_writer("Sec", sec_writer)
         .add_writer("Alert", alert_logger())
         .start()
@@ -70,12 +70,14 @@ struct SecWriter(Arc<FileLogWriter>);
 impl SecWriter {
     pub fn new() -> (Box<SecWriter>, Arc<FileLogWriter>) {
         let a_flw = Arc::new(
-            FileLogWriter::builder()
-                .discriminant("Security")
-                .suffix("seclog")
-                .print_message()
-                .try_build()
-                .unwrap(),
+            FileLogWriter::builder(
+                FileSpec::default()
+                    .discriminant("Security")
+                    .suffix("seclog"),
+            )
+            .print_message()
+            .try_build()
+            .unwrap(),
         );
         (Box::new(SecWriter(Arc::clone(&a_flw))), a_flw)
     }
@@ -94,9 +96,7 @@ impl LogWriter for SecWriter {
 
 pub fn alert_logger() -> Box<FileLogWriter> {
     Box::new(
-        FileLogWriter::builder()
-            .discriminant("Alert")
-            .suffix("alerts")
+        FileLogWriter::builder(FileSpec::default().discriminant("Alert").suffix("alerts"))
             .print_message()
             .try_build()
             .unwrap(),

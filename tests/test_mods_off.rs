@@ -1,11 +1,11 @@
-use flexi_logger::{detailed_format, Logger, LoggerHandle};
+use flexi_logger::{detailed_format, FileSpec, Logger, LoggerHandle};
 use log::*;
 
 #[test]
 fn test_mods_off() {
     let handle: LoggerHandle = Logger::with_env_or_str("info, test_mods_off::mymod1=off")
         .format(detailed_format)
-        .log_to_file()
+        .log_to_file(FileSpec::default())
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

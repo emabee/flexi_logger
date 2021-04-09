@@ -4,10 +4,10 @@ mod state;
 
 pub use self::builder::FileLogWriterBuilder;
 
-use self::config::{Config, FilenameConfig, RotationConfig};
+use self::config::{Config, RotationConfig};
 use crate::primary_writer::buffer_with;
 use crate::writers::LogWriter;
-use crate::{DeferredNow, FormatFunction};
+use crate::{DeferredNow, FileSpec, FormatFunction};
 use log::Record;
 use state::State;
 use std::io::Write;
@@ -17,7 +17,7 @@ use std::sync::Mutex;
 const WINDOWS_LINE_ENDING: &[u8] = b"\r\n";
 const UNIX_LINE_ENDING: &[u8] = b"\n";
 
-/// A configurable `LogWriter` implementation that writes to a file or a sequence of files.
+/// A configurable [`LogWriter`] implementation that writes to a file or a sequence of files.
 ///
 /// See [writers](crate::writers) for usage guidance.
 #[allow(clippy::module_name_repetitions)]
@@ -47,8 +47,8 @@ impl FileLogWriter {
 
     /// Instantiates a builder for `FileLogWriter`.
     #[must_use]
-    pub fn builder() -> FileLogWriterBuilder {
-        FileLogWriterBuilder::new()
+    pub fn builder(file_spec: FileSpec) -> FileLogWriterBuilder {
+        FileLogWriterBuilder::new(file_spec)
     }
 
     /// Returns a reference to its configured output format function.
@@ -144,6 +144,7 @@ fn write_err(msg: &str, err: &std::io::Error) {
 
 #[cfg(test)]
 mod test {
+    use crate::writers::file_log_writer::FileSpec;
     use crate::writers::LogWriter;
     use crate::{Cleanup, Criterion, DeferredNow, Naming};
     use chrono::Local;
@@ -313,16 +314,16 @@ mod test {
         assert_eq!(list_rotated_files(&basename, &ts).len(), 1);
         assert!(contains("CURRENT", &ts, THREE));
 
-        // // ensure this produces 12/34/56
+        // ensure this produces 12/34/56
         write_loglines(true, naming, &ts, &[FOUR, FIVE, SIX]);
         assert!(contains("CURRENT", &ts, FIVE));
         assert!(contains("CURRENT", &ts, SIX));
         assert_eq!(list_rotated_files(&basename, &ts).len(), 2);
 
-        // // ensure this produces 12/34/56/78/9
-        // write_loglines(true, naming, &ts, &[SEVEN, EIGHT, NINE]);
-        // assert_eq!(list_rotated_files(&basename, &ts).len(), 4);
-        // assert!(contains("CURRENT", &ts, NINE));
+        // ensure this produces 12/34/56/78/9
+        write_loglines(true, naming, &ts, &[SEVEN, EIGHT, NINE]);
+        assert_eq!(list_rotated_files(&basename, &ts).len(), 4);
+        assert!(contains("CURRENT", &ts, NINE));
     }
 
     #[test]
@@ -333,17 +334,19 @@ mod test {
         const LOG_FOLDER: &str = "log_files/issue_38";
 
         for _ in 0..NUMBER_OF_PSEUDO_PROCESSES {
-            let flw = super::FileLogWriter::builder()
-                .directory(LOG_FOLDER)
-                .discriminant(ISSUE_38)
-                .rotate(
-                    Criterion::Size(500),
-                    Naming::Timestamps,
-                    Cleanup::KeepLogFiles(NUMBER_OF_FILES),
-                )
-                .o_append(false)
-                .try_build()
-                .unwrap();
+            let flw = super::FileLogWriter::builder(
+                FileSpec::default()
+                    .directory(LOG_FOLDER)
+                    .discriminant(ISSUE_38),
+            )
+            .rotate(
+                Criterion::Size(500),
+                Naming::Timestamps,
+                Cleanup::KeepLogFiles(NUMBER_OF_FILES),
+            )
+            .o_append(false)
+            .try_build()
+            .unwrap();
 
             // write some lines, but not enough to rotate
             for i in 0..4 {
@@ -442,9 +445,7 @@ mod test {
         naming: Naming,
         discr: &str,
     ) -> crate::writers::FileLogWriter {
-        super::FileLogWriter::builder()
-            .directory(DIRECTORY)
-            .discriminant(discr)
+        super::FileLogWriter::builder(FileSpec::default().directory(DIRECTORY).discriminant(discr))
             .rotate(
                 Criterion::Size(if append { 28 } else { 10 }),
                 naming,

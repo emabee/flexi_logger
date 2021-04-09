@@ -1,14 +1,13 @@
-#![allow(deprecated)]
-use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
+use flexi_logger::{detailed_format, FileSpec, Logger, LoggerHandle};
 use log::*;
 
 #[test]
 fn test_mods() {
-    let handle: ReconfigurationHandle = Logger::with_env_or_str(
+    let handle: LoggerHandle = Logger::with_env_or_str(
         "info, test_windows_line_ending::mymod1=debug, test_windows_line_ending::mymod2=error",
     )
     .format(detailed_format)
-    .log_to_file()
+    .log_to_file(FileSpec::default())
     .use_windows_line_ending()
     .start()
     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

@@ -10,9 +10,8 @@ use std::env;
 /// Immutable struct that defines which loglines are to be written,
 /// based on the module, the log level, and the text.
 ///
-/// The loglevel specification via string (relevant for methods
-/// [parse()](crate::LogSpecification::parse) and
-/// [env()](crate::LogSpecification::env))
+/// Providing the loglevel specification via `String`
+/// ([`LogSpecification::parse`] and [`LogSpecification::env`])
 /// works essentially like with `env_logger`,
 /// but we are a bit more tolerant with spaces. Its functionality can be
 /// described with some Backus-Naur-form:
@@ -38,7 +37,7 @@ use std::env;
 ///   it is necessary to specify their loglevel explicitly).
 /// * The module names are compared as Strings, with the side effect that a specified module filter
 ///   affects all modules whose name starts with this String.<br>
-///   Example: ```"foo"``` affects e.g.
+///   Example: `"foo"` affects e.g.
 ///
 ///   * `foo`
 ///   * `foo::bar`
@@ -90,23 +89,6 @@ impl LogSpecification {
             .unwrap_or(log::LevelFilter::Off)
     }
 
-    /// Returns true if messages on the specified level from the writing module should be written
-    #[must_use]
-    pub fn enabled(&self, level: log::Level, writing_module: &str) -> bool {
-        // Search for the longest match, the vector is assumed to be pre-sorted.
-        for module_filter in &self.module_filters {
-            match module_filter.module_name {
-                Some(ref module_name) => {
-                    if writing_module.starts_with(module_name) {
-                        return level <= module_filter.level_filter;
-                    }
-                }
-                None => return level <= module_filter.level_filter,
-            }
-        }
-        false
-    }
-
     /// Returns a `LogSpecification` where all traces are switched off.
     #[must_use]
     pub fn off() -> Self {
@@ -118,11 +100,11 @@ impl LogSpecification {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the input is malformed.
-    pub fn parse(spec: &str) -> Result<Self, FlexiLoggerError> {
+    /// [`FlexiLoggerError::Parse`] if the input is malformed.
+    pub fn parse<S: AsRef<str>>(spec: S) -> Result<Self, FlexiLoggerError> {
         let mut parse_errs = String::new();
         let mut dirs = Vec::<ModuleFilter>::new();
-
+        let spec = spec.as_ref();
         let mut parts = spec.split('/');
         let mods = parts.next();
         #[cfg(feature = "textfilter")]
@@ -219,7 +201,7 @@ impl LogSpecification {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the input is malformed.
+    /// [`FlexiLoggerError::Parse`] if the input is malformed.
     pub fn env() -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
             Ok(spec) => Self::parse(&spec),
@@ -232,12 +214,18 @@ impl LogSpecification {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the given spec is malformed.
+    /// [`FlexiLoggerError::Parse`] if the given spec is malformed.
     pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> Result<Self, FlexiLoggerError> {
         env::var("RUST_LOG")
             .map_err(|_e| FlexiLoggerError::Poison /*wrong, but only dummy*/)
             .and_then(|value| Self::parse(&value))
             .or_else(|_| Self::parse(given_spec.as_ref()))
+    }
+
+    /// Creates a [`LogSpecBuilder`], which allows building a log spec programmatically.
+    #[must_use]
+    pub fn builder() -> LogSpecBuilder {
+        LogSpecBuilder::new()
     }
 
     /// Reads a log specification from an appropriate toml document.
@@ -246,16 +234,16 @@ impl LogSpecification {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the input is malformed.
+    /// [`FlexiLoggerError::Parse`] if the input is malformed.
     #[cfg(feature = "specfile_without_notification")]
-    pub fn from_toml(s: &str) -> Result<Self, FlexiLoggerError> {
+    pub fn from_toml<S: AsRef<str>>(s: S) -> Result<Self, FlexiLoggerError> {
         #[derive(Clone, Debug, serde_derive::Deserialize)]
         struct LogSpecFileFormat {
             pub global_level: Option<String>,
             pub global_pattern: Option<String>,
             pub modules: Option<std::collections::BTreeMap<String, String>>,
         }
-
+        let s = s.as_ref();
         let logspec_ff: LogSpecFileFormat = toml::from_str(s)?;
         let mut parse_errs = String::new();
         let mut module_filters = Vec::<ModuleFilter>::new();
@@ -304,9 +292,15 @@ impl LogSpecification {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Io` if writing fails.
+    /// [`FlexiLoggerError::SpecfileIo`] if writing fails.
     #[cfg(feature = "specfile_without_notification")]
     pub fn to_toml(&self, w: &mut dyn std::io::Write) -> Result<(), FlexiLoggerError> {
+        self.to_toml_impl(w)
+            .map_err(|e| FlexiLoggerError::SpecfileIo(e))
+    }
+
+    #[cfg(feature = "specfile_without_notification")]
+    fn to_toml_impl(&self, w: &mut dyn std::io::Write) -> Result<(), std::io::Error> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();
         if last.is_some() && last.as_ref().unwrap().module_name.is_none() {
@@ -354,13 +348,21 @@ impl LogSpecification {
         Ok(())
     }
 
-    /// Creates a `LogSpecBuilder`, setting the default log level.
+    /// Returns true if messages on the specified level from the writing module should be written.
     #[must_use]
-    pub fn default(level_filter: LevelFilter) -> LogSpecBuilder {
-        LogSpecBuilder::from_module_filters(&[ModuleFilter {
-            module_name: None,
-            level_filter,
-        }])
+    pub fn enabled(&self, level: log::Level, writing_module: &str) -> bool {
+        // Search for the longest match, the vector is assumed to be pre-sorted.
+        for module_filter in &self.module_filters {
+            match module_filter.module_name {
+                Some(ref module_name) => {
+                    if writing_module.starts_with(module_name) {
+                        return level <= module_filter.level_filter;
+                    }
+                }
+                None => return level <= module_filter.level_filter,
+            }
+        }
+        false
     }
 
     /// Provides a reference to the module filters.
@@ -371,7 +373,7 @@ impl LogSpecification {
 
     /// Provides a reference to the text filter.
     ///
-    /// This method is only avaible with feature `textfilter`, which is a default feature.
+    /// This method is only avaible if the default feature `textfilter` is not switched off.
     #[cfg(feature = "textfilter")]
     #[must_use]
     pub fn text_filter(&self) -> Option<&Regex> {
@@ -425,24 +427,27 @@ fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
 }
 
 #[allow(clippy::needless_doctest_main)]
-/// Builder for `LogSpecification`.
+/// Builder for [`LogSpecification`].
 ///
 /// # Example
 ///
-/// Use the reconfigurability feature and build the log spec programmatically.
+/// Start with a programmatically built log specification, and use the
+/// [`LoggerHandle`](crate::LoggerHandle) to apply a modified version of the log specification
+/// at a later point in time:
 ///
 /// ```rust
-/// use flexi_logger::{Logger, LogSpecBuilder};
+/// use flexi_logger::{Logger, LogSpecification};
 /// use log::LevelFilter;
 ///
 /// fn main() {
 ///     // Build the initial log specification
-///     let mut builder = LogSpecBuilder::new();  // default is LevelFilter::Off
-///     builder.default(LevelFilter::Info);
-///     builder.module("karl", LevelFilter::Debug);
+///     let mut builder = LogSpecification::builder();
+///     builder
+///         .default(LevelFilter::Info)
+///         .module("karl", LevelFilter::Debug);
 ///
 ///     // Initialize Logger, keep builder alive
-///     let mut logger_reconf_handle = Logger::with(builder.build())
+///     let mut logger = Logger::with(builder.build())
 ///         // your logger configuration goes here, as usual
 ///         .start()
 ///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -450,11 +455,12 @@ fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
 ///     // ...
 ///
 ///     // Modify builder and update the logger
-///     builder.default(LevelFilter::Error);
-///     builder.remove("karl");
-///     builder.module("emma", LevelFilter::Trace);
+///     builder
+///         .default(LevelFilter::Error)
+///         .remove("karl")
+///         .module("emma", LevelFilter::Trace);
 ///
-///     logger_reconf_handle.set_new_spec(builder.build());
+///     logger.set_new_spec(builder.build());
 ///
 ///     // ...
 /// }
@@ -528,8 +534,9 @@ impl LogSpecBuilder {
 
     /// Creates a log specification with text filter.
     ///
-    /// This method is only avaible with feature `textfilter`, which is a default feature.
+    /// This method is only avaible if the dafault feature `textfilter` is not switched off.
     #[cfg(feature = "textfilter")]
+    #[must_use]
     pub fn finalize_with_textfilter(self, tf: Regex) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.into_vec_module_filter(),
@@ -549,8 +556,9 @@ impl LogSpecBuilder {
 
     /// Creates a log specification without being consumed, optionally with a text filter.
     ///
-    /// This method is only avaible with feature `textfilter`, which is a default feature.
+    /// This method is only avaible if the dafault feature `textfilter` is not switched off.
     #[cfg(feature = "textfilter")]
+    #[must_use]
     pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
         LogSpecification {
             module_filters: self.module_filters.clone().into_vec_module_filter(),

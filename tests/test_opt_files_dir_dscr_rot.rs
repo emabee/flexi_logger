@@ -1,4 +1,4 @@
-use flexi_logger::{opt_format, Cleanup, Criterion, Logger, Naming};
+use flexi_logger::{opt_format, Cleanup, Criterion, FileSpec, Logger, Naming};
 use log::*;
 
 #[test]
@@ -6,9 +6,11 @@ fn test_opt_files_dir_dscr_rot() {
     let link_name = "link_to_log".to_string();
     let handle = Logger::with_str("info")
         .format(opt_format)
-        .log_to_file()
-        .directory("log_files")
-        .discriminant("foo".to_string())
+        .log_to_file(
+            FileSpec::default()
+                .directory("log_files")
+                .discriminant("foo".to_string()),
+        )
         .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
         .create_symlink(link_name.clone())
         .start()

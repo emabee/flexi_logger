@@ -4,31 +4,6 @@ use std::thread;
 #[cfg(feature = "colors")]
 use yansi::{Color, Paint, Style};
 
-/// Function type for Format functions.
-///
-/// If you want to write the log lines in your own format,
-/// implement a function with this signature and provide it to one of the methods
-/// [`Logger::format()`](crate::Logger::format),
-/// [`Logger::format_for_files()`](crate::Logger::format_for_files),
-/// or [`Logger::format_for_stderr()`](crate::Logger::format_for_stderr).
-///
-/// Checkout the code of the provided [format functions](index.html#functions)
-/// if you want to start with a template.
-///
-/// ## Parameters
-///
-/// - `write`: the output stream
-///
-/// - `now`: the timestamp that you should use if you want a timestamp to appear in the log line
-///
-/// - `record`: the log line's content and metadata, as provided by the log crate's macros.
-///
-pub type FormatFunction = fn(
-    write: &mut dyn std::io::Write,
-    now: &mut DeferredNow,
-    record: &Record,
-) -> Result<(), std::io::Error>;
-
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
 ///
@@ -323,12 +298,13 @@ fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
     })
 }
 
-/// Specifies the `FormatFunction` and decides if coloring should be used.
-///
-/// Is used in
+/// Can be used in
 /// [`Logger::adaptive_format_for_stderr`](crate::Logger::adaptive_format_for_stderr) and
-/// [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout).
-/// The coloring format functions are used if the output channel is a tty.
+/// [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout)
+/// to use coloring only if the output goes to a tty.
+///
+/// This is helpful if the output is sometimes piped into other programs, which usually
+/// do not expect color control byte sequences.
 ///
 /// Only available with feature `atty`.
 #[cfg(feature = "atty")]
@@ -369,8 +345,8 @@ pub enum AdaptiveFormat {
 #[cfg(feature = "atty")]
 impl AdaptiveFormat {
     #[must_use]
-    pub(crate) fn format_function(self, stream: Stream) -> FormatFunction {
-        if stream.is_tty() {
+    pub(crate) fn format_function(self, is_tty: bool) -> FormatFunction {
+        if is_tty {
             match self {
                 #[cfg(feature = "colors")]
                 Self::Default => colored_default_format,
@@ -398,19 +374,28 @@ impl AdaptiveFormat {
     }
 }
 
-#[cfg(feature = "atty")]
-#[derive(Clone, Copy)]
-pub(crate) enum Stream {
-    StdOut,
-    StdErr,
-}
-#[cfg(feature = "atty")]
-impl Stream {
-    #[must_use]
-    pub fn is_tty(self) -> bool {
-        match self {
-            Self::StdOut => atty::is(atty::Stream::Stdout),
-            Self::StdErr => atty::is(atty::Stream::Stderr),
-        }
-    }
-}
+/// Function type for format functions.
+///
+/// If you want to write the log lines in your own format,
+/// implement a function with this signature and provide it to one of the methods
+/// [`Logger::format()`](crate::Logger::format),
+/// [`Logger::format_for_files()`](crate::Logger::format_for_files),
+/// [`Logger::format_for_stdout()`](crate::Logger::format_for_stdout),
+/// or [`Logger::format_for_stderr()`](crate::Logger::format_for_stderr).
+///
+/// Check out the code of the provided [format functions](index.html#functions)
+/// if you want to start with a template.
+///
+/// ## Parameters
+///
+/// - `write`: the output stream
+///
+/// - `now`: the timestamp that you should use if you want a timestamp to appear in the log line
+///
+/// - `record`: the log line's content and metadata, as provided by the log crate's macros.
+///
+pub type FormatFunction = fn(
+    write: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error>;

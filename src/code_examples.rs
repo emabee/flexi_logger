@@ -15,13 +15,13 @@
 //!
 //! ## Write logs to stderr
 //!
-//! Expect the log specification in the environment variable `RUST_LOG`:
+//! Provide the log specification in the environment variable `RUST_LOG`:
 //!
 //! ` Logger::`[`with_env()`](crate::Logger::with_env)`.start()?;`
 //!
 //! (if `RUST_LOG` is not set, or if its value cannot be interpreted, nothing is logged)
 //!
-//! or provide the log spec programmatically:
+//! or provide the log specification programmatically:
 //!
 //! ` Logger::`[`with_str("info")`](crate::Logger::with_str)`.start()?;`
 //!
@@ -34,21 +34,26 @@
 //! ## Choose the log output channel
 //!
 //! By default, logs are written to `stderr`.
-//! With [`Logger::log_target`](crate::Logger::log_target)
-//! you can send the logs to `stdout`, a file, an implementation of `LogWriter`,
+//! With
+//! [`Logger::log_to_stdout`](crate::Logger::log_to_stdout),
+//! [`Logger::log_to_file`](crate::Logger::log_to_file),
+//! [`Logger::log_to_writer`](crate::Logger::log_to_writer),
+//! [`Logger::do_not_log`](crate::Logger::do_not_log)
+//! you can send the logs alternatively to `stdout`, to a file, to an implementation of `LogWriter`,
 //! or write them not at all.
 //!
-//! When writing to files, you sometimes want to have parts of the log still on the terminal;
+//! When writing to files or to a writer,
+//! you sometimes want to see some parts of the log additionally on the terminal;
 //! this can be achieved with
 //! [`Logger::duplicate_to_stderr`](crate::Logger::duplicate_to_stderr) or
 //! [`Logger::duplicate_to_stdout`](crate::Logger::duplicate_to_stdout),
 //! which duplicate log messages to the terminal.
 //!
 //! ```rust
-//! # use flexi_logger::{LogTarget,Logger,Duplicate};
+//! # use flexi_logger::{Logger,Duplicate, FileSpec};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! Logger::with_str("info")
-//!    .log_target(LogTarget::File)              // write logs to file
+//!    .log_to_file(FileSpec::default())         // write logs to file
 //!    .duplicate_to_stderr(Duplicate::Warn)     // print warnings and errors also to the console
 //!    .start()?;
 //! # Ok(())
@@ -63,36 +68,37 @@
 //! Using buffering reduces the program's I/O overhead, and thus increases overall performance,
 //! which can be important if logging is used heavily.
 //!
-//! **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle) and call
-//! [`shutdown`](crate::LoggerHandle::shutdown) at the very end of your program
+//! You control buffering with [`Logger::write_mode`](crate::Logger::write_mode).
+//!
+//! **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle)
+//! alive to the very end of your program, because it will, in its Drop implementation,
+//! flush all writers
 //! to ensure that all buffered log lines are flushed before the program terminates.
 //!
 //! ```rust
-//! # use flexi_logger::{LogTarget,Logger,Duplicate};
+//! # use flexi_logger::{WriteMode,FileSpec,Logger,Duplicate};
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let logger = Logger::with_str("info")
-//!        .log_target(LogTarget::File)
-//!        .use_buffering(true)
+//!     let _logger = Logger::with_str("info")
+//!        .log_to_file(FileSpec::default())
+//!        .write_mode(WriteMode::BufferDontFlush)
 //!        .start()?;
 //!     // ... do all your work ...
-//!     logger.shutdown();
 //!     Ok(())
 //! }
 //! ```
 //!
 //! If logging is used with low frequency, buffering can delay the appearance of log lines
 //! significantly. To avoid that, you can get the buffers flushed automatically in regular
-//! intervals.
+//! intervals. `Flexi_logger` will use a little thread to do that.
 //!
 //! ```rust
-//! # use flexi_logger::{LogTarget,Logger,Duplicate};
+//! # use flexi_logger::{WriteMode, Duplicate, FileSpec, Logger};
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let logger = Logger::with_str("info")
-//!        .log_target(LogTarget::File)
-//!        .buffer_and_flush()
+//!     let _logger = Logger::with_str("info")
+//!        .log_to_file(FileSpec::default())
+//!        .write_mode(WriteMode::BufferAndFlush)
 //!        .start()?;
 //!     // ... do all your work ...
-//!     logger.shutdown();
 //!     Ok(())
 //! }
 //! ```
@@ -100,13 +106,13 @@
 //! ## Influence the location and name of the log file
 //!
 //! By default, the log files are created in the current directory (where the program was started).
-//! With [`Logger:directory`](crate::Logger::directory)
+//! With [`FileSpec:directory`](crate::FileSpec::directory)
 //! you can specify a concrete folder in which the files should be created.
 //!
-//! Using [`Logger::discriminant`](crate::Logger::discriminant)
+//! Using [`FileSpec::discriminant`](crate::FileSpec::discriminant)
 //! you can add a discriminating infix to the log file name.
 //!
-//! With [`Logger::suffix`](crate::Logger::suffix)
+//! With [`FileSpec::suffix`](crate::FileSpec::suffix)
 //! you can change the suffix that is used for the log files.
 //!
 //! When writing to files, especially when they are in a distant folder, you may want to let the
@@ -115,25 +121,28 @@
 //! [`Logger::print_message`](crate::Logger::print_message)
 //! prints an info to `stdout` to which file the log is written.
 //!
-//! `create_symlink(path)` creates (on unix-systems only) a symbolic link at the
-//! specified path that points to the log file.
+//! [`Logger::create_symlink`](crate::Logger::create_symlink)
+//! creates (on unix-systems only) a symbolic link at the specified path that points to the log file.
 //!
 //! ```rust
-//! # use flexi_logger::Logger;
+//! # use flexi_logger::{FileSpec,Logger};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! Logger::with_str("info")
-//!    .log_to_file()                            // write logs to file
-//!    .directory("traces")                      // create files in folder ./traces
-//!    .discriminant("Sample4711A")              // use infix in log file name
-//!    .suffix("trc")                            // use suffix .trc instead of .log
-//!    .print_message()                          //
-//!    .create_symlink("current_run")            // create a symbolic link to the current log file
-//!    .start()?;
+//!     .log_to_file(
+//!         FileSpec::default()
+//!             .directory("traces")              // create files in folder ./traces
+//!             .basename("foo")
+//!             .discriminant("Sample4711A")      // use infix in log file name
+//!             .suffix("trc")                    // use suffix .trc instead of .log
+//!     )
+//!     .print_message()                          //
+//!     .create_symlink("current_run")            // create a symbolic link to the current log file
+//!     .start()?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! This example will print a message
+//! This example will print a message like
 //! "Log is written to `./traces/foo_Sample4711A_2020-11-17_19-24-35.trc`"
 //! and, on unix, create a symbolic link called `current_run`.
 //!
@@ -164,33 +173,49 @@
 //!
 //!  - [`colored_default_format`](crate::colored_default_format)
 //!  - [`colored_detailed_format`](crate::colored_detailed_format)
-//!  - [`colored_opt_format`](crate::colored_opt_format).
-//!  - [`colored_with_thread`](crate::colored_with_thread).
+//!  - [`colored_opt_format`](crate::colored_opt_format)
+//!  - [`colored_with_thread`](crate::colored_with_thread),
+//!
+//! or your own method.
 //!
 //! ### Adaptive Coloring
 //!
 //! You can use coloring for `stdout` and/or `stderr`
-//! conditionally, such that colors are used when the output goes to a tty,
-//! and suppressed if you e.g. pipe the output to some other program.
-//! With
-//! [`Logger::adaptive_format_for_stderr`](crate::Logger::adaptive_format_for_stderr) or
-//! [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout)
-//! you can specify one of the provided format pairs
-//! (which are based on the format functions listed above),
-//! or you can provide your own colored and non-colored format functions.
+//! _conditionally_, such that colors
+//!
+//! * are used when the output goes to a tty,
+//! * are suppressed when you e.g. pipe the output to some other program.
+//!
+//! You achieve that
+//! by providing one of the variants of [`AdaptiveFormat`](crate::AdaptiveFormat) to the respective
+//! format method, e.g.
+//! ```rust
+//! # #[cfg(feature = "atty")]
+//! # use flexi_logger::AdaptiveFormat;
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # #[cfg(feature = "atty")]
+//! # {
+//!       flexi_logger::Logger::with_str("info")
+//!           .adaptive_format_for_stderr(AdaptiveFormat::Detailed);
+//! # }
+//! #     Ok(())
+//! # }
+//! ```
 //!
 //! ### Defaults
 //!
 //! `flexi_logger` initializes by default equivalently to this:
 //!
-//! ```rust,ignore
-//! # use flexi_logger::{Logger,AdaptiveFormat,default_format};
+//! ```rust
+//! # #[cfg(feature = "atty")]
+//! # mod example {
+//! # use flexi_logger::{Logger,AdaptiveFormat,default_format, FileSpec};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # Logger::with_str("info")      // Write all error, warn, and info messages
-//! #   .directory(std::env::temp_dir())
-//!     .adaptive_format_for_stderr(AdaptiveFormat::Default)
-//!     .adaptive_format_for_stdout(AdaptiveFormat::Default)
+//! #   .log_to_file(FileSpec::default().directory(std::env::temp_dir()))
+//!     .format_for_stderr(AdaptiveFormat::Default)
+//!     .format_for_stdout(AdaptiveFormat::Default)
 //!     .format_for_files(default_format)
 //!     .format_for_writer(default_format)
 //! #    .start()?;
@@ -202,6 +227,7 @@
 //! #  run()
 //! # }
 //! # fn run() -> Result<(), Box<dyn std::error::Error>> {Ok(())}
+//! # }
 //! ```
 //!
 //! ## Use a fixed log file, and truncate or append the file on each program start
@@ -211,7 +237,7 @@
 //! `foo_2020-11-16_08-37-44.log` (for a program called `foo`), which are quite unique for each
 //! program start.
 //!
-//! With [`Logger::suppress_timestamp`](crate::Logger::suppress_timestamp)
+//! With [`FileSpec::suppress_timestamp`](crate::FileSpec::suppress_timestamp)
 //! you get a simple fixed filename, like `foo.log`.
 //!
 //! In that case, a restart of the program will truncate an existing log file.
@@ -220,14 +246,15 @@
 //! to append the logs of each new run to the existing file.
 //!
 //! ```rust
-//! # use flexi_logger::Logger;
+//! # use flexi_logger::{FileSpec, Logger};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! Logger::with_str("info")      // Write all error, warn, and info messages
-//! #   .directory(std::env::temp_dir())
-//!     .log_to_file()            // Write the log to a file
-//!     .suppress_timestamp()     // use a simple filename without a timestamp
-//!     .append()                 // do not truncate the log file when the program is restarted
+//! Logger::with_str("info") // Write all error, warn, and info messages
+//!     .log_to_file(
+//!         FileSpec::default().suppress_timestamp(), // use a simple filename without a timestamp
+//! #           .directory(std::env::temp_dir())
+//!     )
+//!     .append() // do not truncate the log file when the program is restarted
 //!     .start()?;
 //!
 //! # error!("This is an error message");
@@ -246,38 +273,45 @@
 //! with the infix `rCURRENT`, like e.g. `foo_rCURRENT.log`.
 //!
 //! [`Logger::rotate`](crate::Logger::rotate)
-//! takes three enum arguments to define its behavior:
+//! takes three enum arguments that define its behavior:
 //!
 //! - [`Criterion`](crate::Criterion)
-//!    - with `Criterion::Age` the rotation happens
+//!    - with [`Criterion::Age`](crate::Criterion::Age) the rotation happens
 //!      when the clock switches to a new day, hour, minute, or second
-//!    - with `Criterion::Size` the rotation happens when the current log file exceeds
-//!      the specified limit
-//!    - with `Criterion::AgeOrSize` the rotation happens when either of the two limits is reached
+//!    - with [`Criterion::Size`](crate::Criterion::Size) the rotation happens
+//!      when the current log file exceeds the specified limit
+//!    - with [`Criterion::AgeOrSize`](crate::Criterion::AgeOrSize) the rotation happens
+//!      when either of the two limits is reached
 //!
 //! - [`Naming`](crate::Naming)<br>The current file is then renamed
-//!   - with `Naming::Timestamps` to something like `foo_r2020-11-16_08-56-52.log`
-//!   - with `Naming::Numbers` to something like `foo_r00000.log`
+//!   - with [`Naming::Timestamps`](crate::Naming::Timestamps) to something
+//!     like `foo_r2020-11-16_08-56-52.log`
+//!   - with [`Naming::Numbers`](crate::Naming::Numbers) to something like `foo_r00000.log`
 //!
 //!   and a fresh `rCURRENT` file is created.
 //!
 //! - [`Cleanup`](crate::Cleanup) defines if and how you
 //!   avoid accumulating log files indefinitely:
-//!   - with `Cleanup::KeepLogFiles` you specify the number of log files that should be retained;
+//!   - with [`Cleanup::KeepLogFiles`](crate::Cleanup::KeepLogFiles) you specify
+//!     the number of log files that should be retained;
 //!     if there are more, the older ones are getting deleted
-//!   - with `Cleanup::KeepCompressedFiles` you specify the number of log files that should be
+//!   - with [`Cleanup::KeepCompressedFiles`](crate::Cleanup::KeepCompressedFiles) you specify
+//!     the number of log files that should be
 //!     retained, and these are being compressed additionally
-//!   - with `Cleanup::KeepLogAndCompressedFiles` you specify the number of log files that should be
+//!   - with [`Cleanup::KeepLogAndCompressedFiles`](crate::Cleanup::KeepLogAndCompressedFiles)
+//!     you specify the number of log files that should be
 //!     retained as is, and an additional number that are being compressed
-//!   - with `Cleanup::Never` no cleanup is done, all files are retained.
+//!   - with [`Cleanup::Never`](crate::Cleanup::Never) no cleanup is done, all files are retained.
 //!
 //! ```rust
-//! # use flexi_logger::{Age, Cleanup, Criterion, Logger, Naming};
+//! # use flexi_logger::{Age, Cleanup, Criterion, FileSpec, Logger, Naming};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! Logger::with_str("info")          // Write all error, warn, and info messages
-//! #   .directory(std::env::temp_dir())
-//!     .log_to_file()                // Write the log to a file
+//!     .log_to_file(
+//!         FileSpec::default()
+//! #           .directory(std::env::temp_dir())
+//!     )
 //!     .rotate(                      // If the program runs long enough,
 //!         Criterion::Age(Age::Day), // - create a new file every day
 //!         Naming::Timestamps,       // - let the rotated files have a timestamp in their name
@@ -300,7 +334,7 @@
 //! This can be especially handy in debugging situations where you want to see
 //! traces only for a short instant.
 //!
-//! Obtain the `LoggerHandle`
+//! Obtain the [`LoggerHandle`](crate::LoggerHandle)
 //!
 //! ```rust
 //! # use flexi_logger::Logger;

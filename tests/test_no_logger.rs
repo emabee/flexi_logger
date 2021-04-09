@@ -1,12 +1,9 @@
-use flexi_logger::{LogTarget, Logger};
+use flexi_logger::Logger;
 use log::*;
 
 #[test]
 fn you_must_not_see_anything() {
-    Logger::with_str("info")
-        .log_target(LogTarget::DevNull)
-        .start()
-        .unwrap();
+    Logger::with_str("trace").do_not_log().start().unwrap();
 
     error!("This is an error message - you must not see it!");
     warn!("This is a warning - you must not see it!");

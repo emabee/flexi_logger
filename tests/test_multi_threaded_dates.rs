@@ -1,6 +1,7 @@
 use chrono::Local;
 use flexi_logger::{
-    Age, Cleanup, Criterion, DeferredNow, Duplicate, LogSpecification, Logger, Naming, Record,
+    Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
+    Record,
 };
 use glob::glob;
 use log::*;
@@ -21,11 +22,10 @@ fn multi_threaded() {
     let start = Local::now();
     let directory = define_directory();
     let mut reconf_handle = Logger::with_str("debug")
-        .log_to_file()
+        .log_to_file(FileSpec::default().directory(directory.clone()))
         .format(test_format)
         .create_symlink("link_to_mt_log")
         .duplicate_to_stderr(Duplicate::Info)
-        .directory(directory.clone())
         .rotate(
             Criterion::Age(Age::Minute),
             Naming::Timestamps,

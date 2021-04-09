@@ -40,21 +40,6 @@ impl PrimaryWriter {
         Self::StdOut(StdOutWriter::new(format, o_buffer_capacity))
     }
 
-    pub fn black_hole(
-        duplicate_err: Duplicate,
-        duplicate_out: Duplicate,
-        format_for_stderr: FormatFunction,
-        format_for_stdout: FormatFunction,
-    ) -> Self {
-        Self::multi(
-            duplicate_err,
-            duplicate_out,
-            format_for_stderr,
-            format_for_stdout,
-            vec![],
-        )
-    }
-
     // Write out a log line.
     pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {

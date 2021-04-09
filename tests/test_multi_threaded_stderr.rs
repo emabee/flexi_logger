@@ -1,16 +1,20 @@
 use chrono::Local;
-use flexi_logger::{LogTarget, Logger};
+use flexi_logger::{Logger, WriteMode};
 use log::*;
 use std::thread::{self, JoinHandle};
 
 const NO_OF_THREADS: usize = 5;
-const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
+// const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
+const NO_OF_LOGLINES_PER_THREAD: usize = 50;
 
 #[test]
 fn multi_threaded() {
     let logger = Logger::with_str("debug")
-        .buffer_and_flush_with(1024, std::time::Duration::from_millis(600))
-        .log_target(LogTarget::StdErr)
+        .log_to_stderr()
+        .write_mode(WriteMode::BufferAndFlushWith(
+            1024,
+            std::time::Duration::from_millis(600),
+        ))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
     info!("create a huge number of log lines with a considerable number of threads");

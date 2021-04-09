@@ -1,7 +1,7 @@
 #[test]
 #[cfg(feature = "textfilter")]
 fn test_textfilter() {
-    use flexi_logger::{default_format, LogSpecification, Logger};
+    use flexi_logger::{default_format, FileSpec, LogSpecification, Logger};
     use log::*;
 
     use std::env;
@@ -13,8 +13,7 @@ fn test_textfilter() {
     Logger::with(logspec)
         .format(default_format)
         .print_message()
-        .log_to_file()
-        .suppress_timestamp()
+        .log_to_file(FileSpec::default().suppress_timestamp())
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

@@ -1,6 +1,6 @@
 #[cfg(feature = "specfile_without_notification")]
 mod a {
-    use flexi_logger::{detailed_format, Logger};
+    use flexi_logger::{detailed_format, FileSpec, Logger};
     use log::*;
     use std::io::{BufRead, Write};
     use std::ops::Add;
@@ -16,9 +16,8 @@ mod a {
         assert!(!std::path::Path::new(specfile).exists());
 
         Logger::with_str("info")
+            .log_to_file(FileSpec::default().suppress_timestamp())
             .format(detailed_format)
-            .log_to_file()
-            .suppress_timestamp()
             .start_with_specfile(specfile)
             .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
 

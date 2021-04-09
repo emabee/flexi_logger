@@ -56,6 +56,8 @@ pub struct LoggerHandle {
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
 }
+
+// FIXME implement methods to reconfigure the complete FlexiLogger
 impl LoggerHandle {
     pub(crate) fn new(
         spec: Arc<RwLock<LogSpecification>>,
@@ -110,7 +112,7 @@ impl LoggerHandle {
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String
     ///  and pushes the previous one to a Stack.
-    pub fn parse_and_push_temp_spec(&mut self, new_spec: &str) {
+    pub fn parse_and_push_temp_spec<S: AsRef<str>>(&mut self, new_spec: S) {
         self.spec_stack
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
         self.set_new_spec(LogSpecification::parse(new_spec).unwrap_or_else(|e| {
@@ -142,20 +144,17 @@ impl LoggerHandle {
     ///
     /// This method is supposed to be called at the very end of your program, if
     ///
-    /// - you use buffering
-    ///   (to ensure that all buffered log lines are flushed before the program terminates)
-    /// - you use your own writer(s) (in case they need to cleanup resources)
-    /// - or if you want to securely shutdown the cleanup-thread of the `FileLogWriter`
-    ///   (if you use a [`Cleanup`](crate::Cleanup) strategy with compressing,
-    ///   and your process terminates
-    ///   without correctly shutting down the cleanup-thread, then you might stop the cleanup-thread
-    ///   while it is compressing a log file, which can leave unexpected files in the filesystem)
+    /// - you use some [`Cleanup`](crate::Cleanup) strategy with compression:
+    ///   then you want to ensure that a termination of your program
+    ///   does not interrput the cleanup-thread when it is compressing a log file,
+    ///   which could leave unexpected files in the filesystem
+    /// - you use your own writer(s), and they need to clean up resources
     ///
-    /// See also [`LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
+    /// See also [`writers::LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
     pub fn shutdown(&self) {
         self.primary_writer.flush().ok();
         if let PrimaryWriter::Multi(writer) = &*self.primary_writer {
-            writer.shutdown();
+            writer.shutdown(); //FIXME should be a method on primary_writer, which should also flush
         }
         for writer in self.other_writers.values() {
             writer.shutdown();
@@ -166,5 +165,15 @@ impl LoggerHandle {
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         self.primary_writer.validate_logs(expected)
+    }
+}
+
+// FIXME adapt the code_examples (use _logger = with buffering, use logger = .. and logger:shutdown with cleanup in backroundthread)
+impl Drop for LoggerHandle {
+    fn drop(&mut self) {
+        self.primary_writer.flush().ok();
+        for writer in self.other_writers.values() {
+            writer.flush().ok();
+        }
     }
 }

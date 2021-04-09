@@ -2,7 +2,8 @@
 mod d {
     use chrono::Local;
     use flexi_logger::{
-        Cleanup, Criterion, DeferredNow, Duplicate, LogSpecification, Logger, Naming, Record,
+        Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
+        Record, WriteMode,
     };
     use glob::glob;
     use log::*;
@@ -23,11 +24,13 @@ mod d {
         let start = Local::now();
         let directory = define_directory();
         let mut reconf_handle = Logger::with_str("debug")
-            .log_to_file()
-            .buffer_and_flush_with(10 * 1024, std::time::Duration::from_millis(600))
+            .log_to_file(FileSpec::default().directory(directory.clone()))
+            .write_mode(WriteMode::BufferAndFlushWith(
+                10 * 1024,
+                std::time::Duration::from_millis(600),
+            ))
             .format(test_format)
             .duplicate_to_stderr(Duplicate::Info)
-            .directory(directory.clone())
             .rotate(
                 Criterion::Size(ROTATE_OVER_SIZE),
                 Naming::Timestamps,

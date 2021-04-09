@@ -85,9 +85,6 @@ With `--no-default-features --features="atty"` you can remove the yansi-based co
 The `compress` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
 or all rotated log files in compressed form (`.gz`) rather than as plain text files.
 
-The feature was previously called `ziplogs`. The old name still works, but is deprecated and
-should be replaced.
-
 ### **`specfile`**
 
 The `specfile` feature adds a method `Logger::start_with_specfile(specfile)`.

@@ -1,13 +1,15 @@
-use flexi_logger::{opt_format, Logger};
+use flexi_logger::{opt_format, FileSpec, Logger};
 use log::*;
 
 #[test]
 fn test_opt_files_dir_dscr() {
     let handle = Logger::with_str("info")
         .format(opt_format)
-        .log_to_file()
-        .directory("log_files")
-        .discriminant("foo")
+        .log_to_file(
+            FileSpec::default()
+                .directory("log_files")
+                .discriminant("foo"),
+        )
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

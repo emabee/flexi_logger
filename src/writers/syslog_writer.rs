@@ -65,7 +65,7 @@ pub enum SyslogFacility {
     LocalUse7 = 23 << 3,
 }
 
-/// `SyslogConnector`'s severity.
+/// [`SyslogConnector`]'s severity.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
 #[derive(Debug)]
@@ -101,7 +101,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
     }
 }
 
-/// An experimental configurable `LogWriter` implementation that writes log messages to the syslog
+/// An experimental configurable [`LogWriter`] implementation that writes log messages to the syslog
 /// (see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424)).
 ///
 /// Only available with optional crate feature `syslog_writer`.
@@ -240,7 +240,7 @@ pub enum SyslogConnector {
     Tcp(BufWriter<TcpStream>),
 }
 impl SyslogConnector {
-    /// Returns a `SyslogConnector::Datagram` to the specified path.
+    /// Returns a [`SyslogConnector::Datagram`] to the specified path.
     ///
     /// Is only available on linux.
     #[cfg(target_os = "linux")]
@@ -250,7 +250,7 @@ impl SyslogConnector {
         Ok(SyslogConnector::Datagram(ud))
     }
 
-    /// Returns a `SyslogConnector::Stream` to the specified path.
+    /// Returns a [`SyslogConnector::Stream`] to the specified path.
     ///
     /// Is only available on linux.
     #[cfg(target_os = "linux")]
@@ -260,7 +260,7 @@ impl SyslogConnector {
         )))
     }
 
-    /// Returns a `SyslogConnector` which sends the log lines via TCP to the specified address.
+    /// Returns a [`SyslogConnector`] which sends the log lines via TCP to the specified address.
     ///
     /// # Errors
     ///

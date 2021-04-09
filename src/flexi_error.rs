@@ -9,6 +9,10 @@ pub enum FlexiLoggerError {
     #[error("Log file cannot be written because the specified path is not a directory")]
     OutputBadDirectory,
 
+    /// Log file cannot be written because the specified path is a directory.
+    #[error("Log file cannot be written because the specified path is a directory")]
+    OutputBadFile,
+
     /// Spawning the cleanup thread failed.
     ///
     /// This error can safely be avoided with `Logger::cleanup_in_background_thread(false)`.
@@ -46,6 +50,9 @@ pub enum FlexiLoggerError {
     LevelFilter(String),
 
     /// Failed to parse log specification.
+    ///
+    /// The String contains a description of the error, the second parameter
+    /// contains the resulting [`LogSpecification`] object
     #[error("Failed to parse log specification: {0}")]
     Parse(String, LogSpecification),
 

@@ -1,6 +1,7 @@
 use chrono::Local;
 use flexi_logger::{
-    Cleanup, Criterion, DeferredNow, Duplicate, LogSpecification, Logger, Naming, Record,
+    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming, Record,
+    WriteMode,
 };
 use glob::glob;
 use log::*;
@@ -21,14 +22,15 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    let reconf_handle = Logger::with_str("debug")
-        .log_to_file()
-        .buffer_and_flush()
-        .basename("test_mtn")
-        .use_buffering(true)
+    let logger = Logger::with_str("debug")
+        .log_to_file(
+            FileSpec::default()
+                .basename("test_mtn")
+                .directory(directory.clone()),
+        )
+        .write_mode(WriteMode::BufferAndFlush)
         .format(test_format)
         .duplicate_to_stderr(Duplicate::Info)
-        .directory(directory.clone())
         .rotate(
             Criterion::Size(ROTATE_OVER_SIZE),
             Naming::Numbers,
@@ -40,13 +42,13 @@ fn multi_threaded() {
         "create a huge number of log lines with a considerable number of threads, verify the log"
     );
 
-    let mut reconf_handle2 = reconf_handle.clone();
+    let mut logger2 = logger.clone();
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
             std::thread::sleep(time::Duration::from_millis(1000));
-            reconf_handle2.set_new_spec(new_spec);
+            logger2.set_new_spec(new_spec);
             0 as u8
         })
         .unwrap();
@@ -58,7 +60,7 @@ fn multi_threaded() {
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
     );
-    reconf_handle.shutdown();
+    logger.shutdown();
     verify_logs(&directory);
 }
 

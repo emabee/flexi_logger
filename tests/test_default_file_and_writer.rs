@@ -1,19 +1,17 @@
 use flexi_logger::writers::{FileLogWriter, LogWriter};
-use flexi_logger::{detailed_format, LogTarget, Logger};
+use flexi_logger::{detailed_format, FileSpec, Logger};
 use log::*;
 
 #[test]
 fn test_default_file_and_writer() {
-    let w = FileLogWriter::builder()
+    let w = FileLogWriter::builder(FileSpec::default().discriminant("bar"))
         .format(detailed_format)
-        .discriminant("bar")
         .try_build()
         .unwrap();
 
     let handle = Logger::with_str("info")
-        .log_target(LogTarget::FileAndWriter(Box::new(w)))
+        .log_to_file_and_writer(FileSpec::default().discriminant("foo"), Box::new(w))
         .format(detailed_format)
-        .discriminant("foo")
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
@@ -29,9 +27,8 @@ fn test_default_file_and_writer() {
         ("INFO", "test_default_file_and_writer", "info"),
     ]);
 
-    let w = FileLogWriter::builder()
+    let w = FileLogWriter::builder(FileSpec::default().discriminant("bar"))
         .format(detailed_format)
-        .discriminant("bar")
         .append()
         .try_build()
         .unwrap();

@@ -1,14 +1,13 @@
-#![allow(deprecated)]
-use flexi_logger::{detailed_format, Logger, ReconfigurationHandle};
+use flexi_logger::{detailed_format, FileSpec, Logger};
 use log::*;
 
 #[test]
 fn test_mods() {
-    let handle: ReconfigurationHandle = Logger::with_env_or_str(
+    let handle = Logger::with_env_or_str(
         "info, test_mods::mymod1=debug, test_mods::mymod2=error, test_mods::mymod1::mysubmod = off",
     )
     .format(detailed_format)
-    .log_to_file()
+    .log_to_file(FileSpec::default())
     .start()
     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
