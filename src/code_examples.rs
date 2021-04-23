@@ -80,7 +80,7 @@
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let _logger = Logger::with_str("info")
 //!        .log_to_file(FileSpec::default())
-//!        .write_mode(WriteMode::BufferDontFlush)
+//!        .write_mode(WriteMode::Buffered)
 //!        .start()?;
 //!     // ... do all your work ...
 //!     Ok(())
@@ -130,13 +130,13 @@
 //! Logger::with_str("info")
 //!     .log_to_file(
 //!         FileSpec::default()
-//!             .directory("traces")              // create files in folder ./traces
+//!             .directory("traces")             // create files in folder ./traces
 //!             .basename("foo")
-//!             .discriminant("Sample4711A")      // use infix in log file name
-//!             .suffix("trc")                    // use suffix .trc instead of .log
+//!             .discriminant("Sample4711A")     // use infix in log file name
+//!             .suffix("trc")                   // use suffix .trc instead of .log
 //!     )
-//!     .print_message()                          //
-//!     .create_symlink("current_run")            // create a symbolic link to the current log file
+//!     .print_message()                         //
+//!     .create_symlink("current_run")           // create a symbolic link to the current log file
 //!     .start()?;
 //! # Ok(())
 //! # }
@@ -214,8 +214,8 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # Logger::with_str("info")      // Write all error, warn, and info messages
 //! #   .log_to_file(FileSpec::default().directory(std::env::temp_dir()))
-//!     .format_for_stderr(AdaptiveFormat::Default)
-//!     .format_for_stdout(AdaptiveFormat::Default)
+//!     .adaptive_format_for_stderr(AdaptiveFormat::Default)
+//!     .adaptive_format_for_stdout(AdaptiveFormat::Default)
 //!     .format_for_files(default_format)
 //!     .format_for_writer(default_format)
 //! #    .start()?;
@@ -250,11 +250,13 @@
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! Logger::with_str("info") // Write all error, warn, and info messages
+//!     // use a simple filename without a timestamp
 //!     .log_to_file(
-//!         FileSpec::default().suppress_timestamp(), // use a simple filename without a timestamp
+//!         FileSpec::default().suppress_timestamp()
 //! #           .directory(std::env::temp_dir())
 //!     )
-//!     .append() // do not truncate the log file when the program is restarted
+//!     // do not truncate the log file when the program is restarted
+//!     .append()
 //!     .start()?;
 //!
 //! # error!("This is an error message");
@@ -358,10 +360,14 @@
 //!
 //! If you start `flexi_logger` with a specfile,
 //!
-//! ```rust,ignore
+//! ```rust
 //! # use flexi_logger::Logger;
+//! # let logger =
 //! Logger::with_str("info")
 //!     // ... logger configuration ...
+//! # ;
+//! # #[cfg(feature = "specfile")]
+//! # logger
 //!    .start_with_specfile("/server/config/logspec.toml")
 //!    .unwrap();
 //! ```

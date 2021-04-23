@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2021-04
+
+API simplification, to better cope with new features and for better readability/applicability.
+
+Most important changes:
+
+- introduction of `FileSpec`, move of filename-related methods from `Logger` to `FileSpec`
+  (and similarly on the `FileLogWriter`)
+- `Logger::log_target(LogTarget)` is replaced with a set of methods
+  (`Logger::log_to_file(FileSpec)`, `Logger::log_to_stdout()`, `Logger::log_to_stderr()`,
+  `Logger::log_to_writer(FileSpec)`, `Logger::log_to_file_and_writer(FileSpec,Box<dyn LogWriter>)`,
+  `Logger::do_not_log()`).
+- `Logger::write_mode(WriteMode)` replaces several methods to control buffer handling.
+- Several methods are now more generic with their input parameters
+
+Fixed error handling in logspec parsing (wrong error was thrown).
+
+Several docu improvements.
+
 ## [0.17.1] - 2021-01-14
 
 Add options `Logger::buffer_and_flush()` and `buffer_and_flush_with()`

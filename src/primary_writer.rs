@@ -63,6 +63,13 @@ impl PrimaryWriter {
             w.validate_logs(expected);
         }
     }
+
+    pub fn shutdown(&self) {
+        self.flush().ok();
+        if let PrimaryWriter::Multi(writer) = self {
+            writer.shutdown();
+        }
+    }
 }
 
 // `StdErrWriter` writes logs to stderr.

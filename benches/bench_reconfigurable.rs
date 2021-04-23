@@ -2,10 +2,8 @@
 #![feature(test)]
 
 extern crate test;
-use flexi_logger::FileSpec;
+use flexi_logger::{FileSpec, Logger};
 use log::{error, trace};
-
-use flexi_logger::Logger;
 use test::Bencher;
 
 #[bench]

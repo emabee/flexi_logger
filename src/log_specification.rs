@@ -295,8 +295,7 @@ impl LogSpecification {
     /// [`FlexiLoggerError::SpecfileIo`] if writing fails.
     #[cfg(feature = "specfile_without_notification")]
     pub fn to_toml(&self, w: &mut dyn std::io::Write) -> Result<(), FlexiLoggerError> {
-        self.to_toml_impl(w)
-            .map_err(|e| FlexiLoggerError::SpecfileIo(e))
+        self.to_toml_impl(w).map_err(FlexiLoggerError::SpecfileIo)
     }
 
     #[cfg(feature = "specfile_without_notification")]

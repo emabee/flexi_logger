@@ -6,8 +6,7 @@ extern crate test;
 #[macro_use]
 extern crate log;
 
-use flexi_logger::FileSpec;
-use flexi_logger::Logger;
+use flexi_logger::{FileSpec, Logger};
 use test::Bencher;
 
 #[bench]

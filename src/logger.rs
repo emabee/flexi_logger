@@ -1,6 +1,6 @@
 use crate::flexi_logger::FlexiLogger;
 use crate::formats::default_format;
-#[cfg(feature = "colors")]
+#[cfg(feature = "atty")]
 use crate::formats::AdaptiveFormat;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
@@ -288,12 +288,12 @@ impl Logger {
     /// You can either choose one of the provided log-line formatters,
     /// or you create and use your own format function with the signature <br>
     /// ```rust
-    /// fn(
+    /// fn my_format(
     ///    write: &mut dyn std::io::Write,
-    ///    now: &mut DeferredNow,
-    ///    record: &Record,
-    /// ) -> Result<(), std::io::Error>
-    /// #;
+    ///    now: &mut flexi_logger::DeferredNow,
+    ///    record: &log::Record,
+    /// ) -> std::io::Result<()>
+    /// # {unimplemented!("")}
     /// ```
     ///
     /// By default, [`default_format`] is used for output to files and to custom writers,
@@ -626,14 +626,10 @@ impl Logger {
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
     pub fn build(self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
-        let max_level = self.spec.max_level();
-        let spec = Arc::new(RwLock::new(self.spec));
-        let other_writers = Arc::new(self.other_writers);
-
         #[cfg(feature = "colors")]
         crate::formats::set_palette(&self.o_palette)?;
 
-        let primary_writer = Arc::new(match self.log_target {
+        let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
                 PrimaryWriter::stdout(self.format_for_stdout, self.flwb.buffersize())
             }
@@ -661,15 +657,11 @@ impl Logger {
             }
         });
 
-        let flexi_logger = FlexiLogger::new(
-            Arc::clone(&spec),
-            Arc::clone(&primary_writer),
-            Arc::clone(&other_writers),
-        );
+        let a_other_writers = Arc::new(self.other_writers);
 
         if let Some(wait_time) = self.o_flush_wait {
-            let pw = Arc::clone(&primary_writer);
-            let ows = Arc::clone(&other_writers);
+            let pw = Arc::clone(&a_primary_writer);
+            let ows = Arc::clone(&a_other_writers);
             std::thread::Builder::new()
                 .name("flexi_logger-flusher".to_string())
                 .stack_size(128)
@@ -685,7 +677,16 @@ impl Logger {
                 })?;
         }
 
-        let handle = LoggerHandle::new(spec, primary_writer, other_writers);
+        let max_level = self.spec.max_level();
+        let a_l_spec = Arc::new(RwLock::new(self.spec));
+
+        let flexi_logger = FlexiLogger::new(
+            Arc::clone(&a_l_spec),
+            Arc::clone(&a_primary_writer),
+            Arc::clone(&a_other_writers),
+        );
+
+        let handle = LoggerHandle::new(a_l_spec, a_primary_writer, a_other_writers);
         handle.reconfigure(max_level);
         Ok((Box::new(flexi_logger), handle))
     }
@@ -711,7 +712,7 @@ impl Logger {
     ///
     /// A logger initialization like
     ///
-    /// ```ignore
+    /// ```rust,no_run
     /// use flexi_logger::Logger;
     ///     Logger::with_str("info")/*...*/.start_with_specfile("logspecification.toml");
     /// ```

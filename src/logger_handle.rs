@@ -1,6 +1,6 @@
-use crate::log_specification::LogSpecification;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
+use crate::LogSpecification;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -57,7 +57,6 @@ pub struct LoggerHandle {
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
 }
 
-// FIXME implement methods to reconfigure the complete FlexiLogger
 impl LoggerHandle {
     pub(crate) fn new(
         spec: Arc<RwLock<LogSpecification>>,
@@ -152,10 +151,7 @@ impl LoggerHandle {
     ///
     /// See also [`writers::LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
     pub fn shutdown(&self) {
-        self.primary_writer.flush().ok();
-        if let PrimaryWriter::Multi(writer) = &*self.primary_writer {
-            writer.shutdown(); //FIXME should be a method on primary_writer, which should also flush
-        }
+        self.primary_writer.shutdown();
         for writer in self.other_writers.values() {
             writer.shutdown();
         }
@@ -168,7 +164,6 @@ impl LoggerHandle {
     }
 }
 
-// FIXME adapt the code_examples (use _logger = with buffering, use logger = .. and logger:shutdown with cleanup in backroundthread)
 impl Drop for LoggerHandle {
     fn drop(&mut self) {
         self.primary_writer.flush().ok();
