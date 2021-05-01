@@ -1,7 +1,7 @@
 use crate::deferred_now::DeferredNow;
 use crate::logger::Duplicate;
-use crate::writers::LogWriter;
-use crate::FormatFunction;
+use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
+use crate::{FlexiLoggerError, FormatFunction};
 use log::Record;
 use std::cell::RefCell;
 use std::io::{BufWriter, Write};
@@ -22,14 +22,16 @@ impl PrimaryWriter {
         duplicate_stdout: Duplicate,
         format_for_stderr: FormatFunction,
         format_for_stdout: FormatFunction,
-        writers: Vec<Box<dyn LogWriter>>,
+        o_file_writer: Option<Box<FileLogWriter>>,
+        o_other_writer: Option<Box<dyn LogWriter>>,
     ) -> Self {
         Self::Multi(MultiWriter {
             duplicate_stderr,
             duplicate_stdout,
             format_for_stderr,
             format_for_stdout,
-            writers,
+            o_file_writer,
+            o_other_writer,
         })
     }
     pub fn stderr(format: FormatFunction, o_buffer_capacity: &Option<usize>) -> Self {
@@ -191,12 +193,27 @@ pub(crate) struct MultiWriter {
     duplicate_stdout: Duplicate,
     format_for_stderr: FormatFunction,
     format_for_stdout: FormatFunction,
-    writers: Vec<Box<dyn LogWriter>>,
+    o_file_writer: Option<Box<FileLogWriter>>,
+    o_other_writer: Option<Box<dyn LogWriter>>,
+}
+
+impl MultiWriter {
+    pub(crate) fn reset_file_log_writer(
+        &self,
+        flwb: &FileLogWriterBuilder,
+    ) -> Result<(), FlexiLoggerError> {
+        self.o_file_writer
+            .as_ref()
+            .map_or(Err(FlexiLoggerError::Reset), |flw| flw.reset(flwb))
+    }
 }
 
 impl LogWriter for MultiWriter {
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        for writer in &self.writers {
+        if let Some(ref writer) = self.o_file_writer {
+            (*writer).validate_logs(expected);
+        }
+        if let Some(ref writer) = self.o_other_writer {
             (*writer).validate_logs(expected);
         }
     }
@@ -224,7 +241,10 @@ impl LogWriter for MultiWriter {
             write_buffered(self.format_for_stdout, now, record, &mut std::io::stdout())?;
         }
 
-        for writer in &self.writers {
+        if let Some(ref writer) = self.o_file_writer {
+            writer.write(now, record)?;
+        }
+        if let Some(ref writer) = self.o_other_writer {
             writer.write(now, record)?;
         }
         Ok(())
@@ -232,24 +252,36 @@ impl LogWriter for MultiWriter {
 
     /// Provides the maximum log level that is to be written.
     fn max_log_level(&self) -> log::LevelFilter {
-        self.writers
-            .iter()
+        *self
+            .o_file_writer
+            .as_ref()
             .map(|w| w.max_log_level())
+            .iter()
+            .chain(
+                self.o_other_writer
+                    .as_ref()
+                    .map(|w| w.max_log_level())
+                    .iter(),
+            )
             .max()
             .unwrap()
     }
 
     fn flush(&self) -> std::io::Result<()> {
-        for writer in &self.writers {
+        if let Some(ref writer) = self.o_file_writer {
             writer.flush()?;
         }
+        if let Some(ref writer) = self.o_other_writer {
+            writer.flush()?;
+        }
+
         if let Duplicate::None = self.duplicate_stderr {
             std::io::stderr().flush()?;
         }
         if let Duplicate::None = self.duplicate_stdout {
             std::io::stdout().flush()?;
         }
-        // maybe nicer, but doesn't work with rustc 1.37:
+        // maybe nicer, but doesn't work with rustc 1.41.1:
         // if !matches!(self.duplicate_stderr, Duplicate::None) {
         //     std::io::stderr().flush()?;
         // }
@@ -260,7 +292,10 @@ impl LogWriter for MultiWriter {
     }
 
     fn shutdown(&self) {
-        for writer in &self.writers {
+        if let Some(ref writer) = self.o_file_writer {
+            writer.shutdown();
+        }
+        if let Some(ref writer) = self.o_other_writer {
             writer.shutdown();
         }
     }

@@ -611,7 +611,7 @@ fn rotate_output_file_to_idx(
 
 // See documentation of Criterion::Age.
 #[allow(unused_variables)]
-fn get_creation_date(path: &PathBuf) -> DateTime<Local> {
+fn get_creation_date(path: &Path) -> DateTime<Local> {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     // On linux, we know that try_get_creation_date() returns an error.
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -636,9 +636,9 @@ fn try_get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerE
 }
 
 mod platform {
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
-    pub fn create_symlink_if_possible(link: &PathBuf, path: &Path) {
+    pub fn create_symlink_if_possible(link: &Path, path: &Path) {
         linux_create_symlink(link, path);
     }
 
@@ -666,5 +666,5 @@ mod platform {
     }
 
     #[cfg(not(target_os = "linux"))]
-    fn linux_create_symlink(_: &PathBuf, _: &Path) {}
+    fn linux_create_symlink(_: &Path, _: &Path) {}
 }

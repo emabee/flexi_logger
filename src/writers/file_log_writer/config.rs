@@ -2,6 +2,7 @@ use crate::{Cleanup, Criterion, FileSpec, Naming};
 use std::path::PathBuf;
 
 // Describes how rotation should work
+#[derive(Clone)]
 pub(crate) struct RotationConfig {
     // Defines if rotation should be based on size or date
     pub(crate) criterion: Criterion,

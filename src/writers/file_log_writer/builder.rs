@@ -172,6 +172,15 @@ impl FileLogWriterBuilder {
     ///
     /// `FlexiLoggerError::Io`.
     pub fn try_build(self) -> Result<FileLogWriter, FlexiLoggerError> {
+        Ok(FileLogWriter::new(
+            self.format,
+            self.cfg_line_ending,
+            Mutex::new(self.try_build_state()?),
+            self.max_log_level,
+        ))
+    }
+
+    pub(crate) fn try_build_state(&self) -> Result<State, FlexiLoggerError> {
         // make sure the folder exists or create it
         let dir = self.file_spec.get_directory();
         let p_directory = Path::new(&dir);
@@ -180,22 +189,20 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
-        Ok(FileLogWriter::new(
-            self.format,
-            self.cfg_line_ending,
-            Mutex::new(State::try_new(
-                Config {
-                    print_message: self.cfg_print_message,
-                    append: self.cfg_append,
-                    o_buffersize: self.cfg_o_buffersize,
-                    file_spec: self.file_spec,
-                    o_create_symlink: self.cfg_o_create_symlink,
-                },
-                self.o_rotation_config,
-                self.cleanup_in_background_thread,
-            )?),
-            self.max_log_level,
-        ))
+        State::try_new(
+            Config {
+                print_message: self.cfg_print_message,
+                append: self.cfg_append,
+                o_buffersize: self.cfg_o_buffersize,
+                file_spec: self.file_spec.clone(),
+                o_create_symlink: self
+                    .cfg_o_create_symlink
+                    .as_ref()
+                    .map(|pb| pb.to_path_buf()),
+            },
+            self.o_rotation_config.as_ref().map(Clone::clone),
+            self.cleanup_in_background_thread,
+        )
     }
 }
 

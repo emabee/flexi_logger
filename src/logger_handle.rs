@@ -1,6 +1,6 @@
 use crate::primary_writer::PrimaryWriter;
-use crate::writers::LogWriter;
-use crate::LogSpecification;
+use crate::writers::{FileLogWriterBuilder, LogWriter};
+use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -85,6 +85,7 @@ impl LoggerHandle {
     }
 
     /// Replaces the active `LogSpecification`.
+    #[allow(clippy::missing_panics_doc)]
     pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
         let max_level = new_spec.max_level();
         self.spec.write().unwrap(/* catch and expose error? */).update_from(new_spec);
@@ -103,6 +104,7 @@ impl LoggerHandle {
     }
 
     /// Replaces the active `LogSpecification` and pushes the previous one to a Stack.
+    #[allow(clippy::missing_panics_doc)]
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
         self.spec_stack
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
@@ -111,6 +113,7 @@ impl LoggerHandle {
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String
     ///  and pushes the previous one to a Stack.
+    #[allow(clippy::missing_panics_doc)]
     pub fn parse_and_push_temp_spec<S: AsRef<str>>(&mut self, new_spec: S) {
         self.spec_stack
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
@@ -136,6 +139,22 @@ impl LoggerHandle {
         self.primary_writer.flush().ok();
         for writer in self.other_writers.values() {
             writer.flush().ok();
+        }
+    }
+
+    /// Replace the configuration of the file log writer.
+    ///
+    /// Note that there are two exceptions:
+    /// neither the format function nor the line ending can be reset.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Reset` if no file log writer is configured.
+    pub fn reset(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+            mw.reset_file_log_writer(flwb)
+        } else {
+            Err(FlexiLoggerError::Reset)
         }
     }
 

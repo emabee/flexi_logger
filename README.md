@@ -14,7 +14,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "0.17"
+flexi_logger = "0.18"
 log = "0.4"
 ```
 
@@ -22,7 +22,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.17", features = ["specfile", "compress"] }
+flexi_logger = { version = "0.18", features = ["specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -30,7 +30,7 @@ or, to get the smallest footprint (and no colors), with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.17", default_features = false }
+flexi_logger = { version = "0.18", default_features = false }
 log = "0.4"
 ```
 

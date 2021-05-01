@@ -22,6 +22,7 @@ impl<'a> DeferredNow {
     /// Retrieve the timestamp.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
+    #[allow(clippy::missing_panics_doc)]
     pub fn now(&'a mut self) -> &'a DateTime<Local> {
         if self.0.is_none() {
             self.0 = Some(Local::now());

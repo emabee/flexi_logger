@@ -15,6 +15,8 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
 #[cfg(feature = "specfile_without_notification")]
 use std::io::Read;
+#[cfg(feature = "specfile_without_notification")]
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
@@ -636,25 +638,25 @@ impl Logger {
             LogTarget::StdErr => {
                 PrimaryWriter::stderr(self.format_for_stderr, self.flwb.buffersize())
             }
-            LogTarget::Multi(use_file, o_writer) => {
-                let mut writers: Vec<Box<dyn LogWriter>> = vec![];
+            LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
+                self.duplicate_err,
+                self.duplicate_out,
+                self.format_for_stderr,
+                self.format_for_stdout,
                 if use_file {
-                    writers.push(Box::new(
+                    Some(Box::new(
                         self.flwb.format(self.format_for_file).try_build()?,
-                    ));
-                }
-                if let Some(mut writer) = o_writer {
-                    writer.format(self.format_for_writer);
-                    writers.push(writer);
-                }
-                PrimaryWriter::multi(
-                    self.duplicate_err,
-                    self.duplicate_out,
-                    self.format_for_stderr,
-                    self.format_for_stdout,
-                    writers,
-                )
-            }
+                    ))
+                } else {
+                    None
+                },
+                {
+                    if let Some(ref mut writer) = o_writer {
+                        writer.format(self.format_for_writer);
+                    }
+                    o_writer
+                },
+            ),
         });
 
         let a_other_writers = Arc::new(self.other_writers);
@@ -753,7 +755,7 @@ impl Logger {
     ///
     /// A [`LoggerHandle`].
     #[cfg(feature = "specfile_without_notification")]
-    pub fn start_with_specfile<P: AsRef<std::path::Path>>(
+    pub fn start_with_specfile<P: AsRef<Path>>(
         self,
         specfile: P,
     ) -> Result<LoggerHandle, FlexiLoggerError> {
@@ -782,7 +784,7 @@ impl Logger {
     /// A `LoggerHandle` is returned, predominantly to allow using its
     /// [`LoggerHandle::shutdown`] method.
     #[cfg(feature = "specfile_without_notification")]
-    pub fn build_with_specfile<P: AsRef<std::path::Path>>(
+    pub fn build_with_specfile<P: AsRef<Path>>(
         self,
         specfile: P,
     ) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
@@ -793,7 +795,7 @@ impl Logger {
 }
 
 #[cfg(feature = "specfile_without_notification")]
-fn setup_specfile<P: AsRef<std::path::Path>>(
+fn setup_specfile<P: AsRef<Path>>(
     specfile: P,
     mut handle: LoggerHandle,
 ) -> Result<(), FlexiLoggerError> {
@@ -859,7 +861,7 @@ fn setup_specfile<P: AsRef<std::path::Path>>(
 #[cfg(feature = "specfile_without_notification")]
 pub(crate) fn synchronize_handle_with_specfile(
     handle: &mut LoggerHandle,
-    specfile: &std::path::PathBuf,
+    specfile: &Path,
 ) -> Result<(), FlexiLoggerError> {
     if specfile
         .extension()
@@ -873,7 +875,7 @@ pub(crate) fn synchronize_handle_with_specfile(
         ));
     }
 
-    if std::path::Path::is_file(specfile) {
+    if Path::is_file(specfile) {
         let s = log_spec_string_from_file(specfile).map_err(FlexiLoggerError::SpecfileIo)?;
         handle.set_new_spec(LogSpecification::from_toml(&s)?);
     } else {
@@ -899,7 +901,7 @@ pub(crate) fn synchronize_handle_with_specfile(
 }
 
 #[cfg(feature = "specfile_without_notification")]
-pub(crate) fn log_spec_string_from_file<P: AsRef<std::path::Path>>(
+pub(crate) fn log_spec_string_from_file<P: AsRef<Path>>(
     specfile: P,
 ) -> Result<String, std::io::Error> {
     let mut buf = String::new();
@@ -941,6 +943,7 @@ pub enum WriteMode {
     BufferAndFlush,
     /// Buffer and  flush with given capacity and interval.
     BufferAndFlushWith(usize, Duration),
+    // FIXME try implementing this (using crossbeam?):
     // /// Send logs through a channel to the output thread which writes to output
     // /// and flushes regularly
     // Async,

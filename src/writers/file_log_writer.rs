@@ -7,7 +7,7 @@ pub use self::builder::FileLogWriterBuilder;
 use self::config::{Config, RotationConfig};
 use crate::primary_writer::buffer_with;
 use crate::writers::LogWriter;
-use crate::{DeferredNow, FileSpec, FormatFunction};
+use crate::{DeferredNow, FileSpec, FlexiLoggerError, FormatFunction};
 use log::Record;
 use state::State;
 use std::io::Write;
@@ -20,7 +20,6 @@ const UNIX_LINE_ENDING: &[u8] = b"\n";
 /// A configurable [`LogWriter`] implementation that writes to a file or a sequence of files.
 ///
 /// See [writers](crate::writers) for usage guidance.
-#[allow(clippy::module_name_repetitions)]
 pub struct FileLogWriter {
     format: FormatFunction,
     line_ending: &'static [u8],
@@ -60,6 +59,12 @@ impl FileLogWriter {
     #[doc(hidden)]
     pub fn current_filename(&self) -> PathBuf {
         self.state.lock().unwrap().current_filename()
+    }
+
+    // Replace the state, but ignore other parts of the builder: format and cfg_line_ending
+    pub(crate) fn reset(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
+        *(self.state.lock().unwrap()) = flwb.try_build_state()?;
+        Ok(())
     }
 }
 

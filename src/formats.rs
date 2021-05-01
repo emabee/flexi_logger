@@ -219,6 +219,7 @@ pub fn colored_with_thread(
 /// modify the color palette.
 ///
 /// Only available with feature `colors`.
+#[allow(clippy::missing_panics_doc)]
 #[cfg(feature = "colors")]
 pub fn style<T>(level: log::Level, item: T) -> Paint<T> {
     let palette = &*(PALETTE.read().unwrap());

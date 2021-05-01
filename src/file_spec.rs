@@ -52,6 +52,10 @@ impl FileSpec {
     /// # Errors
     ///
     /// [`FlexiLoggerError::OutputBadFile`] if the given path exists and is a folder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the basename of the given path has no filename
     pub fn try_from<P: Into<PathBuf>>(p: P) -> Result<Self, FlexiLoggerError> {
         let p: PathBuf = p.into();
         if p.is_dir() {
@@ -246,7 +250,7 @@ impl TimestampCfg {
 #[cfg(test)]
 mod test {
     use super::FileSpec;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_default() {
@@ -254,7 +258,7 @@ mod test {
         assert_file_spec(&path, &PathBuf::from("."), true, "log");
     }
 
-    fn assert_file_spec(path: &PathBuf, folder: &PathBuf, with_timestamp: bool, suffix: &str) {
+    fn assert_file_spec(path: &Path, folder: &Path, with_timestamp: bool, suffix: &str) {
         // check folder
         assert_eq!(
             path.parent().unwrap(), // .canonicalize().unwrap()
