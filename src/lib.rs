@@ -25,6 +25,8 @@
 //! * configure the path and the filenames of the log files,
 //! * use file rotation,
 //! * specify the line format for the log lines,
+//! * use logs deduplication (i.e. log a "last record was skipped N times"
+//!   message after getting the same record for X consecutive times),
 //! * define additional log output streams, e.g for alert or security messages,
 //! * support changing the log specification while the program is running,
 //!
@@ -38,6 +40,8 @@
 //! See the documentation of method [`Logger::set_palette`]
 //! for a description how this can be done.
 
+#[cfg(feature = "dedup")]
+mod deduper;
 mod deferred_now;
 mod file_spec;
 mod flexi_error;

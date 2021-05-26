@@ -57,6 +57,8 @@ There are configuration options to e.g.
 * configure the path and the filenames of the log files,
 * use file rotation,
 * specify the line format for the log lines,
+* use logs deduplication (i.e. log a "last record was skipped N times"
+  message after getting the same record for X consecutive times),
 * define additional log streams, e.g for alert or security messages,
 * support changing the log specification on the fly, while the program is running,
 
@@ -122,6 +124,11 @@ See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more detail
 ### **`textfilter`**
 
 Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
+
+### **`dedup`**
+
+The `dedup` feature adds the ability to skip duplicated logs after getting the
+same record for a -configurable- consecutive amount of times.
 
 ### **`syslog`**
 

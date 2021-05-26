@@ -17,6 +17,8 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
 #[cfg(feature = "specfile_without_notification")]
 use std::io::Read;
+#[cfg(feature = "dedup")]
+use std::num::NonZeroUsize;
 #[cfg(feature = "specfile_without_notification")]
 use std::path::Path;
 use std::path::PathBuf;
@@ -64,6 +66,8 @@ pub struct Logger {
     o_flush_wait: Option<std::time::Duration>,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
+    #[cfg(feature = "dedup")]
+    dedup: Option<std::num::NonZeroUsize>,
 }
 
 enum LogTarget {
@@ -154,6 +158,9 @@ impl Logger {
             o_flush_wait: None,
             flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
+
+            #[cfg(feature = "dedup")]
+            dedup: None,
         }
     }
 }
@@ -438,6 +445,41 @@ impl Logger {
         self
     }
 
+    /// Reduces noise by skipping duplicated consecutive logs.
+    ///
+    /// By default, no de-duplication is performed.
+    /// With this option being used, after the number of consecutive duplicated
+    /// records specified by `leeway` is received, following records will be
+    /// skipped until a different record is logged.
+    ///
+    /// Two records are considered to be duplicates if their locations (file &
+    /// line) and messages match.
+    ///
+    /// Possible output using `leeway = 1`:
+    ///
+    /// ```no_run
+    /// // Logs:
+    /// for _ in 0..10 {
+    ///    log::info!("foo");
+    /// }
+    /// log::info!("noisy loop ended");
+    ///
+    /// // Output:
+    /// // [...] INFO [...]: foo
+    /// // [...] INFO [...]: foo    /* 1 consecutive duplicate allowed */
+    /// // [...] WARN [...]: last record has been repeated consecutive times, following duplicates will be skipped
+    /// // [...] INFO [...]: last record was skipped 8 times
+    /// // [...] INFO [...]: noisy loop ended
+    /// ```
+    ///
+    /// Only available with feature `dedup`.
+    #[cfg(feature = "dedup")]
+    #[must_use]
+    pub fn dedup(mut self, leeway: NonZeroUsize) -> Self {
+        self.dedup = Some(leeway);
+        self
+    }
+
     /// Makes the logger append to the specified output file, if it exists already;
     /// by default, the file would be truncated.
     ///
@@ -663,6 +705,8 @@ impl Logger {
             Arc::clone(&a_l_spec),
             Arc::clone(&a_primary_writer),
             Arc::clone(&a_other_writers),
+            #[cfg(feature = "dedup")]
+            self.dedup.map(crate::deduper::Deduper::with_leeway),
         );
 
         let handle = LoggerHandle::new(a_l_spec, a_primary_writer, a_other_writers);

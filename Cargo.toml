@@ -28,6 +28,7 @@ specfile_without_notification = ["serde","toml","serde_derive"]
 syslog_writer = ["libc", "hostname"]
 compress = ["flate2"]
 textfilter = ["regex"]
+dedup = []
 
 [dependencies]
 atty = {version = "0.2", optional = true}
