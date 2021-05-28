@@ -643,7 +643,7 @@ mod platform {
     }
 
     #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &PathBuf, logfile: &Path) {
+    fn linux_create_symlink(link: &Path, logfile: &Path) {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {
