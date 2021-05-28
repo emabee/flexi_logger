@@ -631,7 +631,7 @@ fn get_fake_creation_date() -> DateTime<Local> {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn try_get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
 
