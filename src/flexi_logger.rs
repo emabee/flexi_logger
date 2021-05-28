@@ -164,6 +164,7 @@ impl log::Log for FlexiLogger {
                             .file_static(Some(file!()))
                             .line(Some(line!()))
                             .module_path_static(Some("flexi_logger"))
+                            .target("flexi_logger")
                             .args(format_args!(
                                 "last record has been repeated consecutive times, following duplicates will be skipped...",
                             ))
@@ -178,6 +179,7 @@ impl log::Log for FlexiLogger {
                             .file_static(Some(file!()))
                             .line(Some(line!()))
                             .module_path_static(Some("flexi_logger"))
+                            .target("flexi_logger")
                             .args(format_args!("last record was skipped {} times", skipped))
                             .build(),
                     );
