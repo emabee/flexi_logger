@@ -37,7 +37,8 @@ impl LogWriter for CustomWriter {
 
 #[test]
 fn test_custom_log_writer() {
-    let handle = Logger::with_str("info")
+    let handle = Logger::try_with_str(&String::from("info"))
+        .unwrap()
         .log_to_writer(Box::new(CustomWriter {
             data: Mutex::new(Vec::new()),
         }))

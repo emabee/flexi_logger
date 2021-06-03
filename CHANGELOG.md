@@ -5,20 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.18.0] - 2021-04
+## [0.18.0] - 2021-06-02
 
-API simplification, to better cope with new features and for better readability/applicability.
-
+Significant API revision, to better cope with new features and for better readability/applicability.
+<br>
 Most important changes:
 
-- introduction of `FileSpec`, move of filename-related methods from `Logger` to `FileSpec`
-  (and similarly on the `FileLogWriter`)
+- Better error handling in factory methods:
+  - `Logger::with_env()` is replaced with `Logger::try_with_env()`, which returns a `Result`
+  - `Logger::with_str()` is replaced with `Logger::try_with_str()`, which returns a `Result`
+  - `Logger::with_env_or_str()` is replaced with `Logger::try_with_env_or_str()`,
+    which returns a `Result`
+  - consequently, the method `Logger::check_parser_error` is gone
+- Bundling file-related aspects
+  - introduction of `FileSpec`
+  - move of filename-related methods from `Logger` to `FileSpec`
+    (and similarly on the `FileLogWriter`)
 - `Logger::log_target(LogTarget)` is replaced with a set of methods
-  (`Logger::log_to_file(FileSpec)`, `Logger::log_to_stdout()`, `Logger::log_to_stderr()`,
-  `Logger::log_to_writer(FileSpec)`, `Logger::log_to_file_and_writer(FileSpec,Box<dyn LogWriter>)`,
-  `Logger::do_not_log()`).
-- `Logger::write_mode(WriteMode)` replaces several methods to control buffer handling.
+  - `Logger::log_to_file(FileSpec)`
+  - `Logger::log_to_stdout()`
+  - `Logger::log_to_stderr()`
+  - `Logger::log_to_writer(FileSpec)`
+  - `Logger::log_to_file_and_writer(FileSpec,Box<dyn LogWriter>)`
+  - `Logger::do_not_log()`
+- The new method
+  [`Logger::write_mode(WriteMode)`](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.buffer_and_flush)
+  - replaces several methods to control buffer handling etc
+  - offers additionally **asynchronous file I/O** (if the crate feature `async` is used)
+- Keeping the `LoggerHandle` alive has become crucial (except for trivial cases)!
 - Several methods are now more generic with their input parameters
+- A new method `LoggerHandle::reset_flw` allows reconfiguring a used `FileLogWriter` at runtime
 
 Fixed error handling in logspec parsing (wrong error was thrown).
 
@@ -457,7 +473,7 @@ Add support for multiple log output streams
 
 ## [0.6.13] 2018-02-09
 
-Add Logger::with_env_or_str()
+Add Logger::try_with_env_or_str()
 
 ## [0.6.12] 2018-2-07
 

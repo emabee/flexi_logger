@@ -9,7 +9,8 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 50;
 
 #[test]
 fn multi_threaded() {
-    let logger = Logger::with_str("debug")
+    let logger = Logger::try_with_str("debug")
+        .unwrap()
         .log_to_stderr()
         .write_mode(WriteMode::BufferAndFlushWith(
             1024,

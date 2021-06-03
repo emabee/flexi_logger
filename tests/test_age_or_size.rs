@@ -9,7 +9,8 @@ use std::ops::Add;
 #[test]
 fn test_age_or_size() {
     let directory = define_directory();
-    Logger::with_str("trace")
+    Logger::try_with_str("trace")
+        .unwrap()
         .log_to_file(FileSpec::default().directory(directory.clone()))
         .duplicate_to_stderr(Duplicate::Info)
         .rotate(

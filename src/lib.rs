@@ -3,14 +3,13 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::unused_self)]
 #![allow(clippy::needless_doctest_main)]
-
 //! A flexible and easy-to-use logger that writes logs to stderr and/or to files
 //! or other output streams.
 //!
 //! To read the log specification from an environment variable and get the log written to `stderr`,
 //! start `flexi_logger` e.g. like this:
 //! ```rust
-//! flexi_logger::Logger::with_env().start().unwrap();
+//! flexi_logger::Logger::try_with_env().unwrap().start().unwrap();
 //! ```
 //!
 //! See
@@ -64,8 +63,17 @@ pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 
 /// Default buffer capacity (8k), when buffering is used.
 pub const DEFAULT_BUFFER_CAPACITY: usize = 8 * 1024;
+
 /// Default flush interval (1s), when flushing is used.
 pub const DEFAULT_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Default size of the message pool that is used with [`WriteMode::Async`];
+/// a higher value could further reduce allocations during log file rotation and cleanup.
+pub const DEFAULT_POOL_CAPA: usize = 50;
+
+/// Default capacity for the message buffers that are used with [`WriteMode::Async`];
+/// a higher value reduces allocations when longer log lines are used.
+pub const DEFAULT_MESSAGE_CAPA: usize = 200;
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};

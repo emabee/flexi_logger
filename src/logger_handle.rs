@@ -4,31 +4,61 @@ use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-/// Allows reconfiguring the logger programmatically.
+/// Shuts down the logger when dropped, and allows reconfiguring the logger programmatically.
 ///
-/// # Example
+/// A `LoggerHandle` is returned from `Logger::start()` and from `Logger::start_with_specfile()`.
+/// When the logger handle is dropped, then it shuts down the Logger!
+/// This matters if you use one of `Logger::log_to_file`, `Logger::log_to_writer`, or
+/// `Logger::log_to_file_and_writer`. It is then important to keep the logger handle alive
+/// until the very end of your program!
 ///
-/// Obtain the `LoggerHandle` (using `.start()`):
+/// `LoggerHandle` offers methods to modify the log specification programmatically,
+/// to flush() the logger explicitly, and even to reconfigure the used `FileLogWriter` --
+/// if one is used.
+///
+/// # Examples
+///
+/// Since dropping the `LoggerHandle` has no effect if you use
+/// `Logger::log_to_stderr` (which is the default) or `Logger::log_to_stdout`.
+/// you can then safely ignore the return value of `Logger::start()`:
+///
 /// ```rust
-/// # use flexi_logger::{Logger, LogSpecBuilder};
-/// let mut logger = Logger::with_str("info")
-///     // ... your logger configuration goes here, as usual
-///     .start()
-///     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-///
-/// // ...
+/// # use flexi_logger::Logger;
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     Logger::try_with_str("info")?
+///         .start()?;
+///     // ...
+/// # Ok(())
+/// # }
 /// ```
 ///
-/// You can permanently exchange the log specification programmatically, anywhere in your code:
+/// When logging to a file or another writer, keep the `LoggerHandle` alive until the program ends:
 ///
 /// ```rust
-/// # use flexi_logger::{Logger, LogSpecBuilder};
-/// # let mut logger = Logger::with_str("info")
-/// #     .start()
-/// #     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-/// // ...
-/// logger.parse_new_spec("warn");
-/// // ...
+/// use flexi_logger::{FileSpec, Logger};
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let _logger = Logger::try_with_str("info")?
+///         .log_to_file(FileSpec::default())
+///         .start()?;
+///
+///     // do work
+///     Ok(())
+/// }
+/// ```
+///
+/// You can use the logger handle to permanently exchange the log specification programmatically,
+/// anywhere in your code:
+///
+/// ```rust
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut logger = flexi_logger::Logger::try_with_str("info")?
+///         .start()
+///         .unwrap();
+///     // ...
+///     logger.parse_new_spec("warn");
+///     // ...
+///     # Ok(())
+/// # }
 /// ```
 ///
 /// However, when debugging, you often want to modify the log spec only temporarily, for  
@@ -36,18 +66,18 @@ use std::sync::{Arc, RwLock};
 /// it allows switching back to the previous spec:
 ///
 /// ```rust
-/// # use flexi_logger::{Logger, LogSpecBuilder};
-/// #    let mut logger = Logger::with_str("info")
-/// #        .start()
-/// #        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// #    let mut logger = flexi_logger::Logger::try_with_str("info")?
+/// #        .start()?;
 /// logger.parse_and_push_temp_spec("trace");
 /// // ...
 /// // critical calls
 /// // ...
-///
 /// logger.pop_temp_spec();
 /// // Continue with the log spec you had before.
 /// // ...
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone)]
 pub struct LoggerHandle {
@@ -93,14 +123,13 @@ impl LoggerHandle {
     }
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String.
-    pub fn parse_new_spec(&mut self, spec: &str) {
-        self.set_new_spec(LogSpecification::parse(spec).unwrap_or_else(|e| {
-            eprintln!(
-                "[flexi_logger] LoggerHandle::parse_new_spec(): failed with {}",
-                e
-            );
-            LogSpecification::off()
-        }))
+    ///
+    /// # Errors
+    ///
+    /// [`FlexiLoggerError::Parse`] if the input is malformed.
+    pub fn parse_new_spec(&mut self, spec: &str) -> Result<(), FlexiLoggerError> {
+        self.set_new_spec(LogSpecification::parse(spec)?);
+        Ok(())
     }
 
     /// Replaces the active `LogSpecification` and pushes the previous one to a Stack.
@@ -108,23 +137,27 @@ impl LoggerHandle {
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
         self.spec_stack
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
-        self.set_new_spec(new_spec);
+        self.set_new_spec(new_spec)
     }
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String
     ///  and pushes the previous one to a Stack.
-    #[allow(clippy::missing_panics_doc)]
-    pub fn parse_and_push_temp_spec<S: AsRef<str>>(&mut self, new_spec: S) {
-        self.spec_stack
-            .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
-        self.set_new_spec(LogSpecification::parse(new_spec).unwrap_or_else(|e| {
-            eprintln!(
-                "[flexi_logger] LoggerHandle::parse_new_spec(): failed with {}, \
-                 falling back to empty log spec",
-                e
-            );
-            LogSpecification::off()
-        }));
+    ///
+    /// # Errors
+    ///
+    /// [`FlexiLoggerError::Parse`] if the input is malformed.
+    pub fn parse_and_push_temp_spec<S: AsRef<str>>(
+        &mut self,
+        new_spec: S,
+    ) -> Result<(), FlexiLoggerError> {
+        self.spec_stack.push(
+            self.spec
+                .read()
+                .map_err(|_| FlexiLoggerError::Poison)?
+                .clone(),
+        );
+        self.set_new_spec(LogSpecification::parse(new_spec)?);
+        Ok(())
     }
 
     /// Reverts to the previous `LogSpecification`, if any.
@@ -142,15 +175,19 @@ impl LoggerHandle {
         }
     }
 
-    /// Replace the configuration of the file log writer.
+    /// Replaces parts of the configuration of the file log writer.
     ///
-    /// Note that there are two exceptions:
-    /// neither the format function nor the line ending can be reset.
+    /// Note that neither the write mode nor the format function can be reset and
+    /// that the provided `FileLogWriterBuilder` must have the same values for these as the
+    /// currently used `FileLogWriter`.
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Reset` if no file log writer is configured.
-    pub fn reset(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
+    /// `FlexiLoggerError::Reset` if no file log writer is configured,
+    ///  or if a reset was tried with a different write mode.
+    /// `FlexiLoggerError::Io` if the specified path doesn't work.
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn reset_flw(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
         if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
             mw.reset_file_log_writer(flwb)
         } else {
@@ -185,9 +222,9 @@ impl LoggerHandle {
 
 impl Drop for LoggerHandle {
     fn drop(&mut self) {
-        self.primary_writer.flush().ok();
+        self.primary_writer.shutdown();
         for writer in self.other_writers.values() {
-            writer.flush().ok();
+            writer.shutdown();
         }
     }
 }

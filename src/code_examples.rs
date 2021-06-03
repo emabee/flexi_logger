@@ -2,9 +2,9 @@
 //!
 //! ## Contents
 //!
-//! - [Write logs to stderr](#write-logs-to-stderr)
+//! - [Start minimal: Write logs to stderr](#start-minimal-write-logs-to-stderr)
 //! - [Choose the log output channel](#choose-the-log-output-channel)
-//! - [Use buffering to reduce I/O overhead](#use-buffering-to-reduce-io-overhead)
+//! - [Choose the write mode](#choose-the-write-mode)
 //! - [Influence the location and name of the log file](#influence-the-location-and-name-of-the-log-file)
 //! - [Specify the format for the log lines explicitly](#specify-the-format-for-the-log-lines-explicitly)
 //! - [Use a fixed log file, and truncate or append the file on each program start](#use-a-fixed-log-file-and-truncate-or-append-the-file-on-each-program-start)
@@ -13,34 +13,54 @@
 //! - [Reconfigure the log specification dynamically by editing a spec-file](#reconfigure-the-log-specification-dynamically-by-editing-a-spec-file)
 //!
 //!
-//! ## Write logs to stderr
+//! ## Start minimal: Write logs to stderr
 //!
-//! Provide the log specification in the environment variable `RUST_LOG`:
+//! Choose one of three options to specify which log output you want to see, and call start:
 //!
-//! ` Logger::`[`with_env()`](crate::Logger::with_env)`.start()?;`
+//! - Use [`Logger::try_with_env`](crate::Logger::try_with_env) to
+//!   provide the log specification in the environment variable `RUST_LOG`:
 //!
-//! (if `RUST_LOG` is not set, or if its value cannot be interpreted, nothing is logged)
+//!   ```rust
+//!   # use flexi_logger::{Logger,FlexiLoggerError};
+//!   # fn main() -> Result<(), FlexiLoggerError> {
+//!   Logger::try_with_env()?.start()?;
+//!   # Ok(())}
+//!   ```
 //!
-//! or provide the log specification programmatically:
+//!   Note that if `RUST_LOG` is not set, or if its value cannot be interpreted, nothing is logged.
 //!
-//! ` Logger::`[`with_str("info")`](crate::Logger::with_str)`.start()?;`
+//! - Use [`Logger::try_with_str`](crate::Logger::try_with_str) to
+//!   provide the log specification programmatically:
 //!
-//! or combine both options:
+//!   ```rust
+//!   # use flexi_logger::{Logger,FlexiLoggerError};
+//!   # fn main() -> Result<(), FlexiLoggerError> {
+//!   Logger::try_with_str("info")?.start()?;
+//!   # Ok(())}
+//!   ```
 //!
-//! ` Logger::`[`with_env_or_str("info")`](crate::Logger::with_env_or_str)`.start()?;`
+//! - or use [`Logger::try_with_env_or_str`](crate::Logger::try_with_env_or_str) to
+//!   combine both options:
+//!
+//!   ```rust
+//!   # use flexi_logger::{Logger,FlexiLoggerError};
+//!   # fn main() -> Result<(), FlexiLoggerError> {
+//!   Logger::try_with_env_or_str("info")?.start()?;
+//!   # Ok(())}
+//!   ```
 //!
 //! After that, you just use the log-macros from the log crate.
 //!
 //! ## Choose the log output channel
 //!
 //! By default, logs are written to `stderr`.
-//! With
+//! With one of
 //! [`Logger::log_to_stdout`](crate::Logger::log_to_stdout),
 //! [`Logger::log_to_file`](crate::Logger::log_to_file),
 //! [`Logger::log_to_writer`](crate::Logger::log_to_writer),
-//! [`Logger::do_not_log`](crate::Logger::do_not_log)
-//! you can send the logs alternatively to `stdout`, to a file, to an implementation of `LogWriter`,
-//! or write them not at all.
+//! [`Logger::log_to_file_and_writer`](crate::Logger::log_to_file_and_writer),
+//! or [`Logger::do_not_log`](crate::Logger::do_not_log),
+//! you can send the logs to other destinations, or write them not at all.
 //!
 //! When writing to files or to a writer,
 //! you sometimes want to see some parts of the log additionally on the terminal;
@@ -52,56 +72,67 @@
 //! ```rust
 //! # use flexi_logger::{Logger,Duplicate, FileSpec};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! Logger::with_str("info")
-//!    .log_to_file(FileSpec::default())         // write logs to file
-//!    .duplicate_to_stderr(Duplicate::Warn)     // print warnings and errors also to the console
-//!    .start()?;
+//! Logger::try_with_str("info")?
+//!     .log_to_file(FileSpec::default())         // write logs to file
+//!     .duplicate_to_stderr(Duplicate::Warn)     // print warnings and errors also to the console
+//!     .start()?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! ## Use buffering to reduce I/O overhead
+//! ## Choose the write mode
 //!
 //! By default, every log line is directly written to the output, without buffering.
 //! This allows seeing new log lines in real time.
 //!
-//! Using buffering reduces the program's I/O overhead, and thus increases overall performance,
-//! which can be important if logging is used heavily.
+//! With [`Logger::write_mode`](crate::Logger::write_mode)
+//! you have some options to change this behavior, e.g.
+//! - with [`WriteMode::BufferAndFlush`](crate::WriteMode::BufferAndFlush),
+//!   you can reduce the program's I/O overhead and thus increase overall performance,
+//!   which can be relevant if logging is used heavily.
+//!   In addition, to keep a short maximum wait time
+//!   until a log line is visible in the output channel,
+//!   an extra thread is created that flushes the buffers regularly.
 //!
-//! You control buffering with [`Logger::write_mode`](crate::Logger::write_mode).
+//!   ```rust
+//!   # use flexi_logger::{WriteMode,FileSpec,Logger,Duplicate};
+//!   fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!       let _logger = Logger::try_with_str("info")?
+//!          .log_to_file(FileSpec::default())
+//!          .write_mode(WriteMode::BufferAndFlush)
+//!          .start()?;
+//!       // ... do all your work ...
+//!       Ok(())
+//!   }
+//!   ```
 //!
-//! **Note** that with buffering you should keep the [`LoggerHandle`](crate::LoggerHandle)
-//! alive to the very end of your program, because it will, in its Drop implementation,
-//! flush all writers
-//! to ensure that all buffered log lines are flushed before the program terminates.
+//! - with [`WriteMode::Async`](crate::WriteMode::Async), the `FileLogWriter` (!)
+//!   - send logs from your application threads through an unbounded channel to an output thread,
+//!     which does the file output, the rotation, and the cleanup.
+//!   - additionally uses buffered output, and a bounded message pool to reduce allocations,
+//!     and flushing.
+//!   If duplication is used, the messages to `stdout` or `stderr` are written synchronously.
 //!
-//! ```rust
-//! # use flexi_logger::{WriteMode,FileSpec,Logger,Duplicate};
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let _logger = Logger::with_str("info")
-//!        .log_to_file(FileSpec::default())
-//!        .write_mode(WriteMode::Buffered)
-//!        .start()?;
-//!     // ... do all your work ...
-//!     Ok(())
-//! }
-//! ```
+//!   ```rust
+//!   # use flexi_logger::{WriteMode, Duplicate, FileSpec, Logger};
+//!   fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!   # #[cfg(feature="async")]
+//!       let _logger = Logger::try_with_str("info")?
+//!          .log_to_file(FileSpec::default())
+//!          .write_mode(WriteMode::Async)
+//!          .start()?;
+//!       // ... do all your work ...
+//!       Ok(())
+//!   }
+//!   ```
 //!
-//! If logging is used with low frequency, buffering can delay the appearance of log lines
-//! significantly. To avoid that, you can get the buffers flushed automatically in regular
-//! intervals. `Flexi_logger` will use a little thread to do that.
-//!
-//! ```rust
-//! # use flexi_logger::{WriteMode, Duplicate, FileSpec, Logger};
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let _logger = Logger::with_str("info")
-//!        .log_to_file(FileSpec::default())
-//!        .write_mode(WriteMode::BufferAndFlush)
-//!        .start()?;
-//!     // ... do all your work ...
-//!     Ok(())
-//! }
-//! ```
+//! **Note** that with all write modes
+//! except [`WriteMode::Direct`](crate::WriteMode::Direct) (which is the default)
+//! you should keep the [`LoggerHandle`](crate::LoggerHandle) alive
+//! up to the very end of your program,
+//! because it will, in its Drop implementation, flush all writers
+//! to ensure that all buffered log lines are flushed before the program terminates,
+//! and then it calls their shutdown method.
 //!
 //! ## Influence the location and name of the log file
 //!
@@ -127,7 +158,7 @@
 //! ```rust
 //! # use flexi_logger::{FileSpec,Logger};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! Logger::with_str("info")
+//! Logger::try_with_str("info")?
 //!     .log_to_file(
 //!         FileSpec::default()
 //!             .directory("traces")             // create files in folder ./traces
@@ -195,7 +226,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(feature = "atty")]
 //! # {
-//!       flexi_logger::Logger::with_str("info")
+//!       flexi_logger::Logger::try_with_str("info")?
 //!           .adaptive_format_for_stderr(AdaptiveFormat::Detailed);
 //! # }
 //! #     Ok(())
@@ -212,13 +243,14 @@
 //! # use flexi_logger::{Logger,AdaptiveFormat,default_format, FileSpec};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # Logger::with_str("info")      // Write all error, warn, and info messages
-//! #   .log_to_file(FileSpec::default().directory(std::env::temp_dir()))
-//!     .adaptive_format_for_stderr(AdaptiveFormat::Default)
-//!     .adaptive_format_for_stdout(AdaptiveFormat::Default)
-//!     .format_for_files(default_format)
-//!     .format_for_writer(default_format)
-//! #    .start()?;
+//! # Logger::try_with_str("info")?      // Write all error, warn, and info messages
+//! #     .log_to_file(FileSpec::default().directory(std::env::temp_dir()))
+//!       // ...
+//!       .adaptive_format_for_stderr(AdaptiveFormat::Default)
+//!       .adaptive_format_for_stdout(AdaptiveFormat::Default)
+//!       .format_for_files(default_format)
+//!       .format_for_writer(default_format)
+//! #     .start()?;
 //! # error!("This is an error message");
 //! # warn!("This is a warning");
 //! # info!("This is an info message");
@@ -249,7 +281,7 @@
 //! # use flexi_logger::{FileSpec, Logger};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! Logger::with_str("info") // Write all error, warn, and info messages
+//! Logger::try_with_str("info")? // Write all error, warn, and info messages
 //!     // use a simple filename without a timestamp
 //!     .log_to_file(
 //!         FileSpec::default().suppress_timestamp()
@@ -309,7 +341,7 @@
 //! # use flexi_logger::{Age, Cleanup, Criterion, FileSpec, Logger, Naming};
 //! # use log::{debug, error, info, trace, warn};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! Logger::with_str("info")          // Write all error, warn, and info messages
+//! Logger::try_with_str("info")?      // Write all error, warn, and info messages
 //!     .log_to_file(
 //!         FileSpec::default()
 //! #           .directory(std::env::temp_dir())
@@ -340,7 +372,7 @@
 //!
 //! ```rust
 //! # use flexi_logger::Logger;
-//! let mut logger = Logger::with_str("info")
+//! let mut logger = Logger::try_with_str("info").unwrap()
 //!     // ... logger configuration ...
 //!     .start()
 //!     .unwrap();
@@ -349,6 +381,8 @@
 //! and modify the effective log specification from within your code:
 //!
 //! ```rust, ignore
+//! # use flexi_logger::Logger;
+//! # let mut logger = Logger::try_with_str("info").unwrap().start().unwrap();
 //! // ...
 //! logger.parse_and_push_temp_spec("info, critical_mod = trace");
 //! // ... critical calls ...
@@ -363,7 +397,7 @@
 //! ```rust
 //! # use flexi_logger::Logger;
 //! # let logger =
-//! Logger::with_str("info")
+//! Logger::try_with_str("info").unwrap()
 //!     // ... logger configuration ...
 //! # ;
 //! # #[cfg(feature = "specfile")]
@@ -384,8 +418,6 @@
 //! For the sake of completeness, we refer here to some more configuration methods.
 //! See their documentation for more details.
 //!
-//! [`Logger::check_parser_error`](crate::Logger::check_parser_error)
-//!
 //! [`Logger::set_palette`](crate::Logger::set_palette)
 //!
 //! [`Logger::cleanup_in_background_thread`](crate::Logger::cleanup_in_background_thread)
@@ -393,3 +425,5 @@
 //! [`Logger::use_windows_line_ending`](crate::Logger::use_windows_line_ending)
 //!
 //! [`Logger::add_writer`](crate::Logger::add_writer)
+//!
+//! [`Logger::add_writer`](crate::LoggerHandle::reset_flw)

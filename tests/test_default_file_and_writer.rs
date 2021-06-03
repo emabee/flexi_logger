@@ -9,7 +9,8 @@ fn test_default_file_and_writer() {
         .try_build()
         .unwrap();
 
-    let handle = Logger::with_str("info")
+    let handle = Logger::try_with_str("info")
+        .unwrap()
         .log_to_file_and_writer(FileSpec::default().discriminant("foo"), Box::new(w))
         .format(detailed_format)
         .start()

@@ -27,7 +27,8 @@ mod test {
             syslog_connector,
         )
         .unwrap();
-        let logger = Logger::with_str("info")
+        let logger = Logger::try_with_str("info")
+            .unwrap()
             .format(detailed_format)
             .log_to_file(FileSpec::default())
             .print_message()

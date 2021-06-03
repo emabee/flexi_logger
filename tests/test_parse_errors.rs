@@ -65,13 +65,12 @@ fn parse_errors_logspec() {
 
 #[test]
 fn parse_errors_logger() {
-    let result = Logger::with_str("info, foo=baz").check_parser_error();
+    let result = Logger::try_with_str("info, foo=baz");
     assert!(result.is_err());
     let error = result.err().unwrap();
     println!("err: {}", error);
 
-    Logger::with_str("info, foo=debug")
-        .check_parser_error()
+    Logger::try_with_str("info, foo=debug")
         .unwrap()
         .start()
         .unwrap();

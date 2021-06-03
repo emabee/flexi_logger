@@ -4,7 +4,6 @@ use crate::FileSpec;
 use crate::FormatFunction;
 use crate::{Cleanup, Criterion, Naming};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use super::{Config, FileLogWriter, RotationConfig, State};
 
@@ -13,7 +12,7 @@ use super::{Config, FileLogWriter, RotationConfig, State};
 pub struct FileLogWriterBuilder {
     cfg_print_message: bool,
     cfg_append: bool,
-    cfg_o_buffersize: Option<usize>,
+    cfg_write_mode: FlWriteMode,
     file_spec: FileSpec,
     cfg_o_create_symlink: Option<PathBuf>,
     cfg_line_ending: &'static [u8],
@@ -31,7 +30,7 @@ impl FileLogWriterBuilder {
             cfg_print_message: false,
             file_spec,
             cfg_append: false,
-            cfg_o_buffersize: None,
+            cfg_write_mode: FlWriteMode::DontBuffer,
             cfg_o_create_symlink: None,
             cfg_line_ending: super::UNIX_LINE_ENDING,
             format: default_format,
@@ -55,19 +54,20 @@ impl FileLogWriterBuilder {
         self
     }
 
-    /// When rotation is used with some [`Cleanup`] variant, then this option defines
-    /// if the cleanup activities (finding files, deleting files, evtl compressing files) is done
-    /// in the current thread (in the current log-call), or whether cleanup is delegated to a
-    /// background thread.
+    /// Influences how the cleanup activities
+    /// (finding files, deleting files, optionally compressing files) are done
+    /// when rotation is used with some [`Cleanup`] variant.
     ///
-    /// As of `flexi_logger` version `0.14.7`,
-    /// the cleanup activities are done by default in a background thread.
-    /// This minimizes the blocking impact to your application caused by IO operations.
+    /// With the synchronous [write modes](crate::WriteMode),
+    /// the cleanup activities are done by default in a dedicated background thread, to
+    /// minimize the blocking impact on your application.
+    /// You can avoid this extra thread by calling this method with
+    /// `use_background_thread = false`; the cleanup is then done synchronously
+    /// by the thread that is currently logging and - by chance - causing a file rotation.
     ///
-    /// In earlier versions of `flexi_logger`, or if you call this method with
-    /// `use_background_thread = false`,
-    /// the cleanup is done synchronously by the thread that is currently logging and
-    /// - by chance - causing a file rotation.
+    /// With an [asynchronous write mode](crate::WriteMode::Async),
+    /// the cleanup activities are always done by the same background thread
+    /// that also does the file I/O, this method then has no effect.
     #[must_use]
     pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
         self.cleanup_in_background_thread = use_background_thread;
@@ -145,37 +145,40 @@ impl FileLogWriterBuilder {
         self
     }
 
-    /// Defines if and how buffering should be used.
+    /// Sets the write mode for the `FileLogWriter`.
     ///
-    /// By default, every log line is directly written to the output, without buffering.
-    /// This allows seeing new log lines in real time.
-    ///
-    /// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
-    /// which can be important if logging is used heavily.
-    /// On the other hand, if logging is used with low frequency,
-    /// the log lines can become visible in the output with significant deferral.
-    /// Furthermore, if the program is closed without flushing, some log output may get lost.
+    /// See [`FlWriteMode`] for more (important!) details.
     #[must_use]
-    pub fn write_mode(mut self, o_buffersize: Option<usize>) -> Self {
-        self.cfg_o_buffersize = o_buffersize;
+    pub fn write_mode(mut self, write_mode: FlWriteMode) -> Self {
+        self.cfg_write_mode = write_mode;
         self
     }
 
+    pub(crate) fn assert_write_mode(
+        &self,
+        write_mode: FlWriteMode,
+    ) -> Result<(), FlexiLoggerError> {
+        if self.cfg_write_mode == write_mode {
+            Ok(())
+        } else {
+            Err(FlexiLoggerError::Reset)
+        }
+    }
+
     #[must_use]
-    pub(crate) fn buffersize(&self) -> &Option<usize> {
-        &self.cfg_o_buffersize
+    pub(crate) fn buffersize(&self) -> Option<usize> {
+        self.cfg_write_mode.buffersize()
     }
 
     /// Produces the `FileLogWriter`.
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Io`.
+    /// `FlexiLoggerError::Io` if the specified path doesn't work.
     pub fn try_build(self) -> Result<FileLogWriter, FlexiLoggerError> {
         Ok(FileLogWriter::new(
             self.format,
-            self.cfg_line_ending,
-            Mutex::new(self.try_build_state()?),
+            self.try_build_state()?,
             self.max_log_level,
         ))
     }
@@ -189,19 +192,27 @@ impl FileLogWriterBuilder {
             return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
+        #[cfg(feature = "async")]
+        let cleanup_in_background_thread =
+            if let FlWriteMode::BufferAsync(_, _, _) = self.cfg_write_mode {
+                false
+            } else {
+                self.cleanup_in_background_thread
+            };
+        #[cfg(not(feature = "async"))]
+        let cleanup_in_background_thread = self.cleanup_in_background_thread;
+
         State::try_new(
             Config {
                 print_message: self.cfg_print_message,
                 append: self.cfg_append,
-                o_buffersize: self.cfg_o_buffersize,
+                line_ending: self.cfg_line_ending,
+                write_mode: self.cfg_write_mode,
                 file_spec: self.file_spec.clone(),
-                o_create_symlink: self
-                    .cfg_o_create_symlink
-                    .as_ref()
-                    .map(|pb| pb.to_path_buf()),
+                o_create_symlink: self.cfg_o_create_symlink.as_ref().map(Clone::clone),
             },
             self.o_rotation_config.as_ref().map(Clone::clone),
-            self.cleanup_in_background_thread,
+            cleanup_in_background_thread,
         )
     }
 }
@@ -257,5 +268,39 @@ impl FileLogWriterBuilder {
     pub fn o_create_symlink<S: Into<PathBuf>>(mut self, symlink: Option<S>) -> Self {
         self.cfg_o_create_symlink = symlink.map(Into::into);
         self
+    }
+}
+
+/// Write modes for the `FileLogWriter`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FlWriteMode {
+    /// Write log messages directly to the file, without buffering (this is the default).
+    DontBuffer,
+    /// Use a buffer when writing log messages to the file.
+    Buffer(usize),
+    #[cfg(feature = "async")]
+    /// Send log messages to a dedicated output thread, using a channel with a configurable
+    /// capacity, and a pool for the messages with configurable size, and a max capacity
+    /// for the elements that are pooled
+
+    /// Lets the FileLogWriter send logs through an unbounded channel to an output thread, which
+    /// does the file I/O, the rotation, and the cleanup.
+    ///
+    /// Uses buffered I/O (with buffer size .0),
+    /// and a bounded message pool (with capacity .1),
+    /// and an initial capacity for the message buffers (.2).
+    ///
+    /// Only available with feature `async`.
+    BufferAsync(usize, usize, usize),
+}
+impl FlWriteMode {
+    #[must_use]
+    pub(crate) fn buffersize(&self) -> Option<usize> {
+        match self {
+            Self::DontBuffer => None,
+            Self::Buffer(bufsize) => Some(*bufsize),
+            #[cfg(feature = "async")]
+            Self::BufferAsync(bufsize, _poolsize, _elementsize) => Some(*bufsize),
+        }
     }
 }

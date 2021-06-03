@@ -69,7 +69,8 @@
 //!   }
 //!
 //!   fn main() {
-//!       Logger::with_env_or_str("info")
+//!       Logger::try_with_env_or_str("info")
+//!           .expect("LogSpecification String has errors")
 //!           .print_message()
 //!           .log_to_file(FileSpec::default())
 //!           .add_writer("Alert", alert_logger())
@@ -106,5 +107,5 @@ pub use self::syslog_writer::{
     LevelToSyslogSeverity, SyslogConnector, SyslogFacility, SyslogSeverity, SyslogWriter,
 };
 
-pub use self::file_log_writer::{FileLogWriter, FileLogWriterBuilder};
+pub use self::file_log_writer::{FileLogWriter, FileLogWriterBuilder, FlWriteMode};
 pub use self::log_writer::LogWriter;

@@ -68,7 +68,6 @@ fn main() {
     run_command!("cargo", "test", "--release");
     #[rustfmt::skip]
     run_command!("cargo", "test", "--release", "--features", "specfile_without_notification");
-    run_script("cleanup");
 
     // doc
     run_command!("cargo", "doc", "--all-features", "--no-deps", "--open");
@@ -81,7 +80,9 @@ fn main() {
         print!("> {}", yansi::Paint::red("there are unsubmitted files"));
         std::process::exit(-1);
     }
-
     // say goodbye
     println!("\n> all done :-)  Looks like you're ready to \"cargo publish\"?");
+
+    // cleanup
+    run_script("cleanup");
 }

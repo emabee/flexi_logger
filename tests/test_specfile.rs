@@ -15,7 +15,8 @@ mod a {
         std::fs::remove_file(specfile).ok();
         assert!(!std::path::Path::new(specfile).exists());
 
-        Logger::with_str("info")
+        Logger::try_with_str("info")
+            .unwrap()
             .log_to_file(FileSpec::default().suppress_timestamp())
             .format(detailed_format)
             .start_with_specfile(specfile)

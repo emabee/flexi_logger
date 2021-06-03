@@ -1,8 +1,9 @@
+use crate::writers::file_log_writer::builder::FlWriteMode;
 use crate::{Cleanup, Criterion, FileSpec, Naming};
 use std::path::PathBuf;
 
 // Describes how rotation should work
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RotationConfig {
     // Defines if rotation should be based on size or date
     pub(crate) criterion: Criterion,
@@ -13,10 +14,12 @@ pub(crate) struct RotationConfig {
 }
 
 // The immutable configuration of a FileLogWriter.
+#[derive(Debug)]
 pub(crate) struct Config {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
-    pub(crate) o_buffersize: Option<usize>,
+    pub(crate) write_mode: FlWriteMode,
     pub(crate) file_spec: FileSpec,
     pub(crate) o_create_symlink: Option<PathBuf>,
+    pub(crate) line_ending: &'static [u8],
 }

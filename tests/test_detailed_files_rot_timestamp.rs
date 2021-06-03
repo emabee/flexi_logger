@@ -3,7 +3,8 @@ use log::*;
 
 #[test]
 fn test_detailed_files_rot_timestamp() {
-    let handle = Logger::with_str("info")
+    let handle = Logger::try_with_str("info")
+        .unwrap()
         .format(detailed_format)
         .log_to_file(FileSpec::default().use_timestamp(true))
         .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)

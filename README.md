@@ -22,7 +22,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.18", features = ["specfile", "compress"] }
+flexi_logger = { version = "0.18", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -37,6 +37,12 @@ log = "0.4"
 Note: `log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
 by the [log crate](https://crates.io/crates/log),
 and you use the ```log``` macros to write log lines from your code.
+
+## Versions
+
+Version "0.18" is a significant API revision and brings incompatible changes!
+
+See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md) for more details.
 
 ## Code examples
 
@@ -60,6 +66,12 @@ See the API documentation for a complete reference.
 
 Make use of any of these features by specifying them in your `Cargo.toml`
 (see above in the usage section).
+
+### **`async`**
+
+Adds an additional write mode that decouples `flexi_logger`'s file I/O from your application threads. See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
+
+Adds a dependency to [`crossbeam`](https://docs.rs/crossbeam/0.8.1/crossbeam/index.html).
 
 ### **`colors`**
 
@@ -115,7 +127,3 @@ Removes the ability to filter logs by text, but also removes the dependency on t
 
 This is still an experimental feature, likely working, but not well tested.
 Feedback of all kinds is highly appreciated.
-
-## Versions
-
-See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md).

@@ -14,7 +14,8 @@ impl fmt::Display for Struct {
 fn main() {
     // --------------------------------
     println!("flexi_logger");
-    flexi_logger::Logger::with_str("off")
+    flexi_logger::Logger::try_with_str("off")
+        .unwrap()
         .format(flexi_logger::detailed_format)
         .start()
         .unwrap();

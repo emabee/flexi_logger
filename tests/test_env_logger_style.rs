@@ -2,7 +2,10 @@ use log::*;
 
 #[test]
 fn you_must_see_exactly_three_messages_above_1_err_1_warn_1_info() {
-    flexi_logger::Logger::with_str("info").start().unwrap();
+    flexi_logger::Logger::try_with_str("info")
+        .unwrap()
+        .start()
+        .unwrap();
 
     error!("This is an error message");
     warn!("This is a warning");

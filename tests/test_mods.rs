@@ -3,9 +3,10 @@ use log::*;
 
 #[test]
 fn test_mods() {
-    let handle = Logger::with_env_or_str(
+    let handle = Logger::try_with_env_or_str(
         "info, test_mods::mymod1=debug, test_mods::mymod2=error, test_mods::mymod1::mysubmod = off",
     )
+    .unwrap()
     .format(detailed_format)
     .log_to_file(FileSpec::default())
     .start()

@@ -3,11 +3,13 @@ use crate::formats::default_format;
 #[cfg(feature = "atty")]
 use crate::formats::AdaptiveFormat;
 use crate::primary_writer::PrimaryWriter;
-use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
+use crate::writers::{FileLogWriter, FileLogWriterBuilder, FlWriteMode, LogWriter};
 use crate::{
     Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
     Naming, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL,
 };
+#[cfg(feature = "async")]
+use crate::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
 use std::time::Duration;
 
 #[cfg(feature = "specfile")]
@@ -28,20 +30,20 @@ use std::sync::{Arc, RwLock};
 /// ```rust
 /// use flexi_logger::{Duplicate, FileSpec, Logger};
 ///
-/// Logger::with_str("info, mycrate = debug")
+/// Logger::try_with_str("info, mycrate = debug")
+///         .unwrap()
 ///         .log_to_file(FileSpec::default())
 ///         .duplicate_to_stderr(Duplicate::Warn)
 ///         .start()
-///         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-///
+///         .unwrap();
 /// ```
 ///
 ///
 /// `Logger` is a builder class that allows you to
 /// * specify your desired (initial) loglevel-specification
-///   * either programmatically as a String ([`Logger::with_str`])
-///   * or by providing a String in the environment ([`Logger::with_env`]),
-///   * or by combining both options ([`Logger::with_env_or_str`]),
+///   * either programmatically as a String ([`Logger::try_with_str`])
+///   * or by providing a String in the environment ([`Logger::try_with_env`]),
+///   * or by combining both options ([`Logger::try_with_env_or_str`]),
 ///   * or by building a [`LogSpecification`] programmatically ([`Logger::with`]),
 /// * use the desired configuration methods,
 /// * and finally start the logger with
@@ -50,7 +52,6 @@ use std::sync::{Arc, RwLock};
 ///   * [`Logger::start_with_specfile`].
 pub struct Logger {
     spec: LogSpecification,
-    parse_errs: Option<String>,
     log_target: LogTarget,
     duplicate_err: Duplicate,
     duplicate_out: Duplicate,
@@ -77,43 +78,42 @@ impl Logger {
     /// Creates a Logger that you provide with an explicit [`LogSpecification`].
     #[must_use]
     pub fn with(logspec: LogSpecification) -> Self {
-        Self::from_spec_and_errs(logspec, None)
+        Self::from_spec_and_errs(logspec)
     }
 
     /// Creates a Logger that reads the [`LogSpecification`] from a `String` or `&str`.
     /// See [`LogSpecification`] for the syntax.
-    #[must_use]
-    pub fn with_str<S: AsRef<str>>(s: S) -> Self {
-        Self::from_result(LogSpecification::parse(s.as_ref()))
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the String uses an erroneous syntax.
+    pub fn try_with_str<S: AsRef<str>>(s: S) -> Result<Self, FlexiLoggerError> {
+        Ok(Self::from_spec_and_errs(LogSpecification::parse(
+            s.as_ref(),
+        )?))
     }
 
     /// Creates a Logger that reads the [`LogSpecification`] from the environment variable
     /// `RUST_LOG`.
-    #[must_use]
-    pub fn with_env() -> Self {
-        Self::from_result(LogSpecification::env())
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the value of `RUST_LOG` uses an erroneous syntax.
+    pub fn try_with_env() -> Result<Self, FlexiLoggerError> {
+        Ok(Self::from_spec_and_errs(LogSpecification::env()?))
     }
 
     /// Creates a Logger that reads the [`LogSpecification`] from the environment variable
     /// `RUST_LOG`, or derives it from the given `String`, if `RUST_LOG` is not set.
-    #[must_use]
-    pub fn with_env_or_str<S: AsRef<str>>(s: S) -> Self {
-        Self::from_result(LogSpecification::env_or_parse(s))
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Parse` if the used String uses an erroneous syntax.
+    pub fn try_with_env_or_str<S: AsRef<str>>(s: S) -> Result<Self, FlexiLoggerError> {
+        Ok(Self::from_spec_and_errs(LogSpecification::env_or_parse(s)?))
     }
 
-    fn from_result(result: Result<LogSpecification, FlexiLoggerError>) -> Self {
-        match result {
-            Ok(logspec) => Self::from_spec_and_errs(logspec, None),
-            Err(e) => match e {
-                FlexiLoggerError::Parse(parse_errs, logspec) => {
-                    Self::from_spec_and_errs(logspec, Some(parse_errs))
-                }
-                _ => Self::from_spec_and_errs(LogSpecification::off(), None),
-            },
-        }
-    }
-
-    fn from_spec_and_errs(spec: LogSpecification, parse_errs: Option<String>) -> Self {
+    fn from_spec_and_errs(spec: LogSpecification) -> Self {
         #[cfg(feature = "colors")]
         {
             // Enable ASCII escape sequence support on Windows consoles,
@@ -125,7 +125,6 @@ impl Logger {
 
         Self {
             spec,
-            parse_errs,
             log_target: LogTarget::StdErr,
             duplicate_err: Duplicate::None,
             duplicate_out: Duplicate::None,
@@ -161,38 +160,6 @@ impl Logger {
 
 /// Simple methods for influencing the behavior of the Logger.
 impl Logger {
-    /// Allows verifying that no parsing errors have occured in the used factory method,
-    /// and examining the parse error.
-    ///
-    /// Most of the factory methods for Logger (`Logger::with_...()`)
-    /// parse a log specification String, and deduce from it a [`LogSpecification`] object.
-    /// If parsing fails, errors are reported to stdout, but effectively ignored.
-    /// In worst case, nothing is logged!
-    ///
-    /// This method gives programmatic access to parse errors, if there were any, so that errors
-    /// don't happen unnoticed.
-    ///
-    /// In the following example we just panic if the spec was not free of errors:
-    ///
-    /// ```should_panic
-    /// # use flexi_logger::{Logger,FileSpec};
-    /// Logger::with_str("hello world")
-    /// .check_parser_error()
-    /// .unwrap()       // <-- here we could do better than panic
-    /// .log_to_file(FileSpec::default())
-    /// .start();
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// [`FlexiLoggerError::Parse`] if the input for the log specification is malformed.
-    pub fn check_parser_error(self) -> Result<Self, FlexiLoggerError> {
-        match self.parse_errs {
-            Some(parse_errs) => Err(FlexiLoggerError::Parse(parse_errs, self.spec)),
-            None => Ok(self),
-        }
-    }
-
     /// Log is written to stderr (which is the default).
     #[must_use]
     pub fn log_to_stderr(mut self) -> Self {
@@ -517,27 +484,13 @@ impl Logger {
         self
     }
 
-    /// Defines if buffering and optionally flushing should be used.
+    /// Sets the write mode for the logger.
     ///
-    /// By default, every log line is directly written to the output, without buffering.
-    /// This allows seeing new log lines in real time.
-    ///
-    /// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
-    /// which can become relevant if logging is used heavily.
-    /// On the other hand, if logging is used with low frequency,
-    /// buffering can defer the appearance of log lines significantly.
-    ///
-    /// **Note** that with buffering you should keep the [`LoggerHandle`] alive
-    /// up to the very end of your program to ensure that all buffered log lines are flushed out
-    /// (which happens automatically when the [`LoggerHandle`] is dropped)
-    /// before the program terminates.
-    /// [See here for an example](code_examples/index.html#use-buffering-to-reduce-io-overhead).
-    ///
-    /// **Note** further that flushing uses an extra thread (with minimal stack).
+    /// See [`WriteMode`] for more (important!) details.
     #[must_use]
-    pub fn write_mode(mut self, cfg: WriteMode) -> Self {
-        self.flwb = self.flwb.write_mode(cfg.get_capacity());
-        self.o_flush_wait = cfg.get_duration();
+    pub fn write_mode(mut self, write_mode: WriteMode) -> Self {
+        self.flwb = self.flwb.write_mode(write_mode.get_fl_write_mode());
+        self.o_flush_wait = write_mode.get_duration();
         self
     }
 
@@ -603,8 +556,32 @@ impl Logger {
 impl Logger {
     /// Consumes the Logger object and initializes `flexi_logger`.
     ///
-    /// The returned [`LoggerHandle`] allows updating the log specification programmatically
-    /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
+    /// **Keep the [`LoggerHandle`] alive up to the very end of your program!**
+    /// Dropping the [`LoggerHandle`] flushes and shuts down [`FileLogWriter`]s
+    /// and other [`LogWriter`]s, and then may prevent further logging!
+    /// This should happen immediately before the program terminates, but not earlier.
+    ///
+    /// Dropping the [`LoggerHandle`] is uncritical
+    /// only with [`Logger::log_to_stdout`] or [`Logger::log_to_stderr`].
+    ///
+    /// The [`LoggerHandle`] also allows updating the log specification programmatically,
+    /// e.g. to intensify logging for (buggy) parts of a (test) program, etc.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use flexi_logger::{Logger,WriteMode, FileSpec};
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let _logger = Logger::try_with_str("info")?
+    ///         .log_to_file(FileSpec::default())
+    ///         .write_mode(WriteMode::BufferAndFlush)
+    ///         .start()?;
+    ///
+    ///     // ... do all your work and join back all threads whose logs you want to see ...
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     ///
     /// # Errors
     ///
@@ -618,11 +595,11 @@ impl Logger {
     /// Builds a boxed logger and a `LoggerHandle` for it,
     /// but does not initialize the global logger.
     ///
-    /// The returned boxed logger implements the Log trait and can be installed manually
-    /// or nested within another logger.
+    /// The returned boxed logger implements the [`Log`](log::Log) trait
+    /// and can be installed manually or nested within another logger.
     ///
-    /// The [`LoggerHandle`] allows updating the log specification programmatically
-    /// later on, e.g. to intensify logging for (buggy) parts of a (test) program, etc.
+    /// **Keep the [`LoggerHandle`] alive up to the very end of your program!**
+    /// See [`Logger::start`] for more details.
     ///
     /// # Errors
     ///
@@ -633,10 +610,10 @@ impl Logger {
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
-                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.buffersize())
+                PrimaryWriter::stdout(self.format_for_stdout, &self.flwb.buffersize())
             }
             LogTarget::StdErr => {
-                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.buffersize())
+                PrimaryWriter::stderr(self.format_for_stderr, &self.flwb.buffersize())
             }
             LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
@@ -694,7 +671,8 @@ impl Logger {
     }
 
     /// Consumes the Logger object and initializes `flexi_logger` in a way that
-    /// subsequently the log specification can be updated manually.
+    /// subsequently the log specification can be updated,
+    /// while the program is running, by editing a file.
     ///
     /// Uses the spec that was given to the factory method ([`Logger::with`] etc)
     /// as initial spec and then tries to read the logspec from a file.
@@ -702,7 +680,10 @@ impl Logger {
     /// If the file does not exist, `flexi_logger` creates the file and fills it
     /// with the initial spec (and in the respective file format, of course).
     ///
-    /// ## Feature dependency
+    /// **Keep the returned [`LoggerHandle`] alive up to the very end of your program!**
+    /// See [`Logger::start`] for more details.
+    ///
+    /// # Feature dependency
     ///
     /// The implementation of this configuration method uses some additional crates
     /// that you might not want to depend on with your program if you don't use this functionality.
@@ -710,13 +691,16 @@ impl Logger {
     /// `specfile` feature. See the usage section on
     /// [crates.io](https://crates.io/crates/flexi_logger) for details.
     ///
-    /// ## Usage
+    /// # Usage
     ///
     /// A logger initialization like
     ///
     /// ```rust,no_run
     /// use flexi_logger::Logger;
-    ///     Logger::with_str("info")/*...*/.start_with_specfile("logspecification.toml");
+    /// Logger::try_with_str("info")
+    ///     .unwrap()
+    ///     // more logger configuration
+    ///     .start_with_specfile("logspecification.toml");
     /// ```
     ///
     /// will create the file `logspecification.toml` (if it does not yet exist) with this content:
@@ -750,10 +734,6 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
-    ///
-    /// # Returns
-    ///
-    /// A [`LoggerHandle`].
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<Path>>(
         self,
@@ -769,20 +749,12 @@ impl Logger {
     /// Builds a boxed logger and a `LoggerHandle` for it,
     /// but does not initialize the global logger.
     ///
-    ///
-    /// The returned boxed logger implements the Log trait and can be installed manually
-    /// or nested within another logger.
-    ///
-    /// For the properties of the returned logger, see [`Logger::start_with_specfile()`].
+    /// See also [`Logger::start`] and [`Logger::start_with_specfile`].
+    /// for the properties of the returned logger.
     ///
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
-    ///
-    /// # Returns
-    ///
-    /// A `LoggerHandle` is returned, predominantly to allow using its
-    /// [`LoggerHandle::shutdown`] method.
     #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<Path>>(
         self,
@@ -823,29 +795,25 @@ fn setup_specfile<P: AsRef<Path>>(
                 let _anchor_for_watcher = watcher; // keep it alive!
                 loop {
                     match rx.recv() {
-                        Ok(debounced_event) => {
-                            // println!("got debounced event {:?}", debounced_event);
-                            match debounced_event {
-                                DebouncedEvent::Create(ref path)
-                                | DebouncedEvent::Write(ref path) => {
-                                    if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                                        match log_spec_string_from_file(&specfile)
-                                            .map_err(FlexiLoggerError::SpecfileIo)
-                                            .and_then(|s| LogSpecification::from_toml(&s))
-                                        {
-                                            Ok(spec) => handle.set_new_spec(spec),
-                                            Err(e) => eprintln!(
+                        Ok(debounced_event) => match debounced_event {
+                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
+                                if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
+                                    match log_spec_string_from_file(&specfile)
+                                        .map_err(FlexiLoggerError::SpecfileIo)
+                                        .and_then(|s| LogSpecification::from_toml(&s))
+                                    {
+                                        Ok(spec) => handle.set_new_spec(spec),
+                                        Err(e) => eprintln!(
                                             "[flexi_logger] rereading the log specification file \
-                                         failed with {:?}, \
-                                         continuing with previous log specification",
+                                             failed with {:?}, \
+                                             continuing with previous log specification",
                                             e
                                         ),
-                                        }
                                     }
                                 }
-                                _event => {}
                             }
-                        }
+                            _event => {}
+                        },
                         Err(e) => {
                             eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
                         }
@@ -929,38 +897,110 @@ pub enum Duplicate {
     All,
 }
 
-/// Describes if and how the log output should be buffered and flushed.
+/// Describes if the log output should be written synchronously or asynchronously,
+/// and if and how file I/O should be buffered and flushed.
 ///
-/// Is used in [`Logger::write_mode`], see there for detailed information.
+/// Is used in [`Logger::write_mode`].
+///
+/// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
+/// which can become relevant if logging is used heavily.
+/// On the other hand, if logging is used with low frequency,
+/// buffering can defer the appearance of log lines significantly,
+/// so regular flushing is usually advisable with buffering.
+///
+/// **Note** that for all options except `Direct` you should keep the [`LoggerHandle`] alive
+/// up to the very end of your program to ensure that all buffered log lines are flushed out
+/// (which happens automatically when the [`LoggerHandle`] is dropped)
+/// before the program terminates.
+/// [See here for an example](code_examples/index.html#choose-the-write-mode).
+///
+/// **Note** further that flushing uses an extra thread (with minimal stack).
 #[derive(Copy, Clone)]
 pub enum WriteMode {
     /// Do not buffer (default).
+    ///
+    /// Every log line is directly written to the output, without buffering.
+    /// This allows seeing new log lines in real time, and does not need additional threads.
     Direct,
-    /// Buffer with default capacity ([`DEFAULT_BUFFER_CAPACITY`]), but don't flush.
-    Buffered,
+
     /// Buffer with default capacity ([`DEFAULT_BUFFER_CAPACITY`])
     /// and flush with default interval ([`DEFAULT_FLUSH_INTERVAL`]).
     BufferAndFlush,
-    /// Buffer and  flush with given capacity and interval.
+
+    /// Buffer and  flush with given buffer capacity and flush interval.
     BufferAndFlushWith(usize, Duration),
-    // FIXME try implementing this (using crossbeam?):
-    // /// Send logs through a channel to the output thread which writes to output
-    // /// and flushes regularly
-    // Async,
+
+    /// Lets the `FileLogWriter` send logs through an unbounded channel to an output thread, which
+    /// does the file output, the rotation, and the cleanup.
+    ///
+    /// Uses buffered output to reduce overhead, and a bounded message pool to reduce allocations.
+    /// The log output is flushed regularly with the given interval.
+    ///
+    /// See [here](code_examples/index.html#choose-the-write-mode) for an example.
+    ///
+    /// Only available with feature `async`.
+    #[cfg(feature = "async")]
+    Async,
+
+    /// Like Async, but allows using non-default parameter values.
+    ///
+    /// Only available with feature `async`.
+    #[cfg(feature = "async")]
+    AsyncWith {
+        /// Size of the output buffer for the file.
+        bufsize: usize,
+        /// Capacity of the pool for the message buffers.
+        pool_capa: usize,
+        /// Capacity of an individual message buffer.
+        message_capa: usize,
+        /// The interval for flushing the output.
+        flush_interval: Duration,
+    },
+
+    /// Buffer, but don't flush.
+    ///
+    /// This might be handy if you want to minimize I/O but don't want to create
+    /// the extra thread for flushing and don't care if log lines appear with delay.
+    BufferDontFlush,
 }
 impl WriteMode {
-    pub(crate) fn get_capacity(&self) -> Option<usize> {
+    fn get_fl_write_mode(&self) -> FlWriteMode {
         match self {
-            Self::Direct => None,
-            Self::Buffered | Self::BufferAndFlush => Some(DEFAULT_BUFFER_CAPACITY),
-            Self::BufferAndFlushWith(capacity, _) => Some(*capacity),
+            Self::Direct => FlWriteMode::DontBuffer,
+            Self::BufferDontFlush | Self::BufferAndFlush => {
+                FlWriteMode::Buffer(DEFAULT_BUFFER_CAPACITY)
+            }
+            Self::BufferAndFlushWith(bufsize, _) => FlWriteMode::Buffer(*bufsize),
+            #[cfg(feature = "async")]
+            Self::Async => FlWriteMode::BufferAsync(
+                DEFAULT_BUFFER_CAPACITY,
+                DEFAULT_POOL_CAPA,
+                DEFAULT_MESSAGE_CAPA,
+            ),
+            #[cfg(feature = "async")]
+            Self::AsyncWith {
+                bufsize,
+                pool_capa,
+                message_capa,
+                flush_interval: _,
+            } => FlWriteMode::BufferAsync(*bufsize, *pool_capa, *message_capa),
         }
     }
-    pub(crate) fn get_duration(&self) -> Option<Duration> {
+    fn get_duration(&self) -> Option<Duration> {
+        #[allow(clippy::match_same_arms)]
         match self {
-            Self::Direct | Self::Buffered => None,
+            Self::Direct | Self::BufferDontFlush => None,
             Self::BufferAndFlush => Some(DEFAULT_FLUSH_INTERVAL),
-            Self::BufferAndFlushWith(_, interval) => Some(*interval),
+            Self::BufferAndFlushWith(_, flush_interval) => Some(*flush_interval),
+            #[cfg(feature = "async")]
+            Self::Async => Some(DEFAULT_FLUSH_INTERVAL),
+            #[cfg(feature = "async")]
+            Self::AsyncWith {
+                bufsize: _,
+                pool_capa: _,
+                message_capa: _,
+                flush_interval,
+            } => Some(*flush_interval),
         }
     }
 }

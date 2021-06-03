@@ -3,7 +3,8 @@ use log::{debug, error, info, trace, warn};
 
 #[test]
 fn test_default_files_dir() {
-    let handle = flexi_logger::Logger::with_str("info")
+    let handle = flexi_logger::Logger::try_with_str("info")
+        .unwrap()
         .log_to_file(
             FileSpec::default()
                 .directory("log_files")

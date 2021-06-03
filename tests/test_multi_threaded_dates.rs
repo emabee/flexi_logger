@@ -21,7 +21,8 @@ fn multi_threaded() {
 
     let start = Local::now();
     let directory = define_directory();
-    let mut reconf_handle = Logger::with_str("debug")
+    let mut reconf_handle = Logger::try_with_str("debug")
+        .unwrap()
         .log_to_file(FileSpec::default().directory(directory.clone()))
         .format(test_format)
         .create_symlink("link_to_mt_log")

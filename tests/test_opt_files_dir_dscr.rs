@@ -3,7 +3,8 @@ use log::*;
 
 #[test]
 fn test_opt_files_dir_dscr() {
-    let handle = Logger::with_str("info")
+    let handle = Logger::try_with_str("info")
+        .unwrap()
         .format(opt_format)
         .log_to_file(
             FileSpec::default()

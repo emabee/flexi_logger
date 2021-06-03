@@ -191,7 +191,7 @@ impl FileSpec {
             filename.push_str(suffix);
         }
 
-        let mut p_path = self.directory.to_path_buf();
+        let mut p_path = self.directory.clone();
         p_path.push(filename);
         p_path
     }
@@ -224,7 +224,7 @@ impl FileSpec {
             }
         }
 
-        let mut p_path = self.directory.to_path_buf();
+        let mut p_path = self.directory.clone();
         p_path.push(filename);
         p_path.to_str().unwrap(/* can hardly fail*/).to_string()
     }
@@ -270,13 +270,13 @@ mod test {
             .file_stem()
             .unwrap()
             .to_string_lossy()
-            .to_owned()
+            .clone()
             .to_string();
         let stem = path
             .file_stem()
             .unwrap()
             .to_string_lossy()
-            .to_owned()
+            .clone()
             .to_string();
         assert!(
             stem.starts_with(&progname),
@@ -352,7 +352,7 @@ mod test {
             .file_stem()
             .unwrap()
             .to_string_lossy()
-            .to_owned()
+            .clone()
             .to_string();
         assert_eq!(stem, "d_foo_bar");
 
@@ -375,7 +375,7 @@ mod test {
                 .file_stem()
                 .unwrap()
                 .to_string_lossy()
-                .to_owned()
+                .clone()
                 .to_string();
             assert_eq!(stem, "boo_far");
 

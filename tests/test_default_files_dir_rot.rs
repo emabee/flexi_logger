@@ -2,7 +2,8 @@ use flexi_logger::*;
 use log::*;
 #[test]
 fn test_default_files_dir_rot() {
-    Logger::with_str("info")
+    Logger::try_with_str("info")
+        .unwrap()
         .log_to_file(FileSpec::default().directory("log_files"))
         .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
         .start()

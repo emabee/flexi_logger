@@ -3,7 +3,11 @@ use log::*;
 
 #[test]
 fn you_must_not_see_anything() {
-    Logger::with_str("trace").do_not_log().start().unwrap();
+    Logger::try_with_str("trace")
+        .unwrap()
+        .do_not_log()
+        .start()
+        .unwrap();
 
     error!("This is an error message - you must not see it!");
     warn!("This is a warning - you must not see it!");

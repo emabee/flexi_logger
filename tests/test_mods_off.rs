@@ -3,7 +3,8 @@ use log::*;
 
 #[test]
 fn test_mods_off() {
-    let handle: LoggerHandle = Logger::with_env_or_str("info, test_mods_off::mymod1=off")
+    let handle: LoggerHandle = Logger::try_with_env_or_str("info, test_mods_off::mymod1=off")
+        .unwrap()
         .format(detailed_format)
         .log_to_file(FileSpec::default())
         .start()

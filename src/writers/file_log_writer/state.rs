@@ -15,7 +15,7 @@ fn number_infix(idx: u32) -> String {
 }
 
 //  Describes the latest existing numbered log file.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum IdxState {
     // We rotate to numbered files, and no rotated numbered file exists yet
     Start,
@@ -26,11 +26,13 @@ enum IdxState {
 // Created_at is needed both for
 //      is_rotation_necessary() -> if Criterion::Age -> NamingState::CreatedAt
 //      and rotate_to_date()    -> if Naming::Timestamps -> RollState::Age
+#[derive(Debug)]
 enum NamingState {
     CreatedAt,
     IdxState(IdxState),
 }
 
+#[derive(Debug)]
 enum RollState {
     Size(u64, u64), // max_size, current_size
     Age(Age),
@@ -41,11 +43,13 @@ enum MessageToCleanupThread {
     Act,
     Die,
 }
+#[derive(Debug)]
 struct CleanupThreadHandle {
     sender: std::sync::mpsc::Sender<MessageToCleanupThread>,
     join_handle: std::thread::JoinHandle<()>,
 }
 
+#[derive(Debug)]
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
@@ -106,7 +110,6 @@ impl RotationState {
     }
 }
 
-// Could not implement `std::convert::From` because other parameters are required.
 fn try_roll_state_from_criterion(
     criterion: Criterion,
     config: &Config,
@@ -137,6 +140,16 @@ enum Inner {
     Initial(Option<RotationConfig>, bool),
     Active(Option<RotationState>, Box<dyn Write + Send>),
 }
+impl std::fmt::Debug for Inner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::Initial(o_rot, b) => f.write_fmt(format_args!("Initial({:?}, {}) ", o_rot, b)),
+            Self::Active(o_rot, _) => {
+                f.write_fmt(format_args!("Active({:?}, <some-writer>) ", o_rot,))
+            }
+        }
+    }
+}
 
 // The mutable state of a FileLogWriter.
 pub(crate) struct State {
@@ -150,8 +163,8 @@ impl State {
         cleanup_in_background_thread: bool,
     ) -> Result<Self, FlexiLoggerError> {
         Ok(Self {
-            inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
             config,
+            inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
         })
     }
 
@@ -206,18 +219,13 @@ impl State {
                             let join_handle = std::thread::Builder::new()
                                 .name("flexi_logger-cleanup".to_string())
                                 .stack_size(512 * 1024)
-                                .spawn(move || loop {
-                                    match receiver.recv() {
-                                        Ok(MessageToCleanupThread::Act) => {
-                                            remove_or_compress_too_old_logfiles_impl(
-                                                &cleanup,
-                                                &filename_config,
-                                            )
-                                            .ok();
-                                        }
-                                        Ok(MessageToCleanupThread::Die) | Err(_) => {
-                                            return;
-                                        }
+                                .spawn(move || {
+                                    while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
+                                        remove_or_compress_too_old_logfiles_impl(
+                                            &cleanup,
+                                            &filename_config,
+                                        )
+                                        .ok();
                                     }
                                 })?;
                             // .map_err(FlexiLoggerError::OutputCleanupThread)?;
@@ -241,6 +249,10 @@ impl State {
             }
         }
         Ok(())
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     pub fn flush(&mut self) -> std::io::Result<()> {
@@ -370,6 +382,15 @@ impl State {
     }
 }
 
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        f.write_fmt(format_args!(
+            "Config: {:?}, Inner: {:?}",
+            self.config, self.inner
+        ))
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &Config,
@@ -396,7 +417,7 @@ fn open_log_file(
         .open(&p_path)?;
 
     #[allow(clippy::option_if_let_else)]
-    let w: Box<dyn Write + Send> = if let Some(capacity) = config.o_buffersize {
+    let w: Box<dyn Write + Send> = if let Some(capacity) = config.write_mode.buffersize() {
         Box::new(BufWriter::with_capacity(capacity, log_file))
     } else {
         Box::new(log_file)
@@ -458,8 +479,8 @@ fn remove_or_compress_too_old_logfiles(
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
 ) -> Result<(), std::io::Error> {
-    o_cleanup_thread_handle.as_ref().map_or(
-        remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec),
+    o_cleanup_thread_handle.as_ref().map_or_else(
+        || remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec),
         |cleanup_thread_handle| {
             cleanup_thread_handle
                 .sender
@@ -631,7 +652,7 @@ fn get_fake_creation_date() -> DateTime<Local> {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn try_get_creation_date(path: &PathBuf) -> Result<DateTime<Local>, FlexiLoggerError> {
+fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
 
@@ -643,7 +664,7 @@ mod platform {
     }
 
     #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &PathBuf, logfile: &Path) {
+    fn linux_create_symlink(link: &Path, logfile: &Path) {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {

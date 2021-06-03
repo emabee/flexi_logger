@@ -3,7 +3,8 @@ use log::*;
 
 #[test]
 fn test_reconfigure_methods() {
-    let mut logger = Logger::with_str("info")
+    let mut logger = Logger::try_with_str("info")
+        .unwrap()
         .log_to_file(FileSpec::default())
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -20,21 +21,21 @@ fn test_parse_new_spec(logger: &mut LoggerHandle) {
     debug!("1-debug message - you must not see it!");
     trace!("1-trace message - you must not see it!");
 
-    logger.parse_new_spec("error");
+    logger.parse_new_spec("error").ok();
     error!("1-error message");
     warn!("1-warning - you must not see it!");
     info!("1-info message - you must not see it!");
     debug!("1-debug message - you must not see it!");
     trace!("1-trace message - you must not see it!");
 
-    logger.parse_new_spec("trace");
+    logger.parse_new_spec("trace").ok();
     error!("1-error message");
     warn!("1-warning");
     info!("1-info message");
     debug!("1-debug message");
     trace!("1-trace message");
 
-    logger.parse_new_spec("info");
+    logger.parse_new_spec("info").ok();
 }
 
 #[allow(clippy::cognitive_complexity)]
@@ -45,14 +46,14 @@ fn test_push_new_spec(logger: &mut LoggerHandle) {
     debug!("2-debug message - you must not see it!");
     trace!("2-trace message - you must not see it!");
 
-    logger.parse_and_push_temp_spec("error");
+    logger.parse_and_push_temp_spec("error").ok();
     error!("2-error message");
     warn!("2-warning - you must not see it!");
     info!("2-info message - you must not see it!");
     debug!("2-debug message - you must not see it!");
     trace!("2-trace message - you must not see it!");
 
-    logger.parse_and_push_temp_spec("trace");
+    logger.parse_and_push_temp_spec("trace").ok();
     error!("2-error message");
     warn!("2-warning");
     info!("2-info message");

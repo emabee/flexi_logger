@@ -51,7 +51,8 @@ fn custom_format(
 
 #[test]
 fn test_custom_log_writer_custom_format() {
-    let handle = Logger::with_str("info")
+    let handle = Logger::try_with_str("info")
+        .unwrap()
         .log_to_writer(Box::new(CustomWriter {
             data: Mutex::new(Vec::new()),
             format: default_format,

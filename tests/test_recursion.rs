@@ -1,19 +1,23 @@
 use flexi_logger::DeferredNow;
-use flexi_logger::{
-    colored_detailed_format, detailed_format, AdaptiveFormat, Duplicate, FileSpec, Logger,
-};
+#[cfg(feature = "colors")]
+use flexi_logger::{colored_detailed_format, AdaptiveFormat};
+use flexi_logger::{detailed_format, Duplicate, FileSpec, Logger};
 use log::*;
 use std::sync::atomic::AtomicU32;
 
 #[test]
 fn test_recursion() {
-    let logger = Logger::with_str("info")
+    let logger = Logger::try_with_str("info")
+        .unwrap()
         .format(detailed_format)
         .log_to_file(FileSpec::default())
         .duplicate_to_stderr(Duplicate::All)
         .duplicate_to_stdout(Duplicate::All)
-        .print_message()
-        .format_for_stderr(colored_detailed_format);
+        .print_message();
+    #[cfg(feature = "colors")]
+    let logger = logger.format_for_stderr(colored_detailed_format);
+    #[cfg(not(feature = "colors"))]
+    let logger = logger.format_for_stderr(detailed_format);
     #[cfg(feature = "colors")]
     let logger =
         logger.adaptive_format_for_stdout(AdaptiveFormat::Custom(my_format, my_colored_format));

@@ -13,7 +13,8 @@ fn b10_no_logger_active(b: &mut Bencher) {
 
 #[bench]
 fn b20_initialize_logger(_: &mut Bencher) {
-    Logger::with_str("info")
+    Logger::try_with_str("info")
+        .unwrap()
         .log_to_file(FileSpec::default().directory("log_files"))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

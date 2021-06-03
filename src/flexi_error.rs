@@ -71,4 +71,17 @@ pub enum FlexiLoggerError {
     /// Palette parsing failed
     #[error("Palette parsing failed")]
     Palette(#[from] std::num::ParseIntError),
+
+    #[cfg(feature = "async")]
+    /// Logger is shut down.
+    ///
+    /// Only available with feature `async`.
+    #[error("Logger is shut down")]
+    Shutdown(#[from] crossbeam::channel::SendError<Vec<u8>>),
+}
+
+impl From<std::convert::Infallible> for FlexiLoggerError {
+    fn from(_other: std::convert::Infallible) -> FlexiLoggerError {
+        unreachable!("lkjl,mnkjiu")
+    }
 }

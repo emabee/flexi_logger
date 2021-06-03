@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.18.0-alpha"
+version = "0.18.0"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -21,6 +21,7 @@ all-features = true
 
 [features]
 default = ["colors", "textfilter"]
+async = ["crossbeam"]
 colors = ["atty", "lazy_static","yansi"]
 specfile = ["specfile_without_notification","notify"]
 specfile_without_notification = ["serde","toml","serde_derive"]
@@ -31,6 +32,7 @@ textfilter = ["regex"]
 [dependencies]
 atty = {version = "0.2", optional = true}
 chrono = "0.4"
+crossbeam = {version = "0.8", optional = true}
 glob = "0.3"
 hostname = {version = "0.3", optional = true}
 lazy_static = {version = "1.4", optional = true}
