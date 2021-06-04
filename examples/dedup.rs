@@ -4,7 +4,8 @@ fn main() {
 
     #[cfg(feature = "dedup")]
     {
-        flexi_logger::Logger::with_str("info")
+        flexi_logger::Logger::try_with_str("info")
+            .unwrap()
             .format(flexi_logger::colored_detailed_format)
             .log_to_stdout()
             .dedup(std::num::NonZeroUsize::new(2).unwrap())

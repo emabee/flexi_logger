@@ -1,14 +1,15 @@
 #![feature(test)]
 extern crate test;
 
-use std::num::NonZeroUsize;
-
-use flexi_logger::{FileSpec, Logger};
-use test::Bencher;
-
+#[cfg(feature = "dedup")]
 #[bench]
-fn b10_dedup(b: &mut Bencher) {
-    Logger::with_str("info")
+fn b10_dedup(b: &mut test::Bencher) {
+    use std::num::NonZeroUsize;
+
+    use flexi_logger::{FileSpec, Logger};
+
+    Logger::try_with_str("info")
+        .unwrap()
         .log_to_file(FileSpec::default().directory("log_files"))
         .dedup(NonZeroUsize::new(2).unwrap())
         .start()
