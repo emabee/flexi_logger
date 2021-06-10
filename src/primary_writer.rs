@@ -1,4 +1,5 @@
 use crate::deferred_now::DeferredNow;
+use crate::filter::LogLineWriter;
 use crate::logger::Duplicate;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
 use crate::{FlexiLoggerError, FormatFunction};
@@ -71,6 +72,12 @@ impl PrimaryWriter {
         if let PrimaryWriter::Multi(writer) = self {
             writer.shutdown();
         }
+    }
+}
+
+impl LogLineWriter for PrimaryWriter {
+    fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
+        self.write(now, record)
     }
 }
 

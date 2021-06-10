@@ -1,3 +1,4 @@
+use crate::filter::LogLineFilter;
 use crate::flexi_logger::FlexiLogger;
 use crate::formats::default_format;
 #[cfg(feature = "atty")]
@@ -10,8 +11,6 @@ use crate::{
 };
 #[cfg(feature = "async")]
 use crate::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
-use std::time::Duration;
-
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
@@ -22,6 +21,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 /// The entry-point for using `flexi_logger`.
 ///
@@ -64,6 +64,7 @@ pub struct Logger {
     o_flush_wait: Option<std::time::Duration>,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
+    filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
 }
 
 enum LogTarget {
@@ -154,6 +155,7 @@ impl Logger {
             o_flush_wait: None,
             flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
+            filter: None,
         }
     }
 }
@@ -438,6 +440,15 @@ impl Logger {
         self
     }
 
+    /// Apply the provided filter before really writing log lines.
+    ///
+    /// See the documentation of module [`filter`](crate::filter) for a usage example.
+    #[must_use]
+    pub fn filter(mut self, filter: Box<dyn LogLineFilter + Send + Sync>) -> Self {
+        self.filter = Some(filter);
+        self
+    }
+
     /// Makes the logger append to the specified output file, if it exists already;
     /// by default, the file would be truncated.
     ///
@@ -663,6 +674,7 @@ impl Logger {
             Arc::clone(&a_l_spec),
             Arc::clone(&a_primary_writer),
             Arc::clone(&a_other_writers),
+            self.filter,
         );
 
         let handle = LoggerHandle::new(a_l_spec, a_primary_writer, a_other_writers);

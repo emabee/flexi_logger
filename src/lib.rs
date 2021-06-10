@@ -25,6 +25,7 @@
 //! * configure the path and the filenames of the log files,
 //! * use file rotation,
 //! * specify the line format for the log lines,
+//! * apply a stateful filter before log lines are really written,
 //! * define additional log output streams, e.g for alert or security messages,
 //! * support changing the log specification while the program is running,
 //!
@@ -50,6 +51,7 @@ mod parameters;
 mod primary_writer;
 
 pub mod code_examples;
+pub mod filter;
 pub mod writers;
 
 pub use crate::deferred_now::DeferredNow;
