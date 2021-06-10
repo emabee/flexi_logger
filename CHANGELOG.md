@@ -36,6 +36,9 @@ Most important changes:
 - Several methods are now more generic with their input parameters
 - A new method `LoggerHandle::reset_flw` allows reconfiguring a used `FileLogWriter` at runtime
 
+Added an option to apply a stateful filter before log lines are really written
+(kudos to jesdazrez (Jesús Trinidad Díaz Ramírez)).
+
 Fixed error handling in logspec parsing (wrong error was thrown).
 
 Several docu improvements.

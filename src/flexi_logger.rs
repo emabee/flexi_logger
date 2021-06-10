@@ -1,3 +1,4 @@
+use crate::filter::LogLineFilter;
 use crate::primary_writer::PrimaryWriter;
 use crate::writers::LogWriter;
 use crate::LogSpecification;
@@ -17,6 +18,7 @@ pub(crate) struct FlexiLogger {
     log_specification: Arc<RwLock<LogSpecification>>,
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
+    filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
 }
 
 impl FlexiLogger {
@@ -24,11 +26,13 @@ impl FlexiLogger {
         log_specification: Arc<RwLock<LogSpecification>>,
         primary_writer: Arc<PrimaryWriter>,
         other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
+        filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
     ) -> Self {
         Self {
             log_specification,
             primary_writer,
             other_writers,
+            filter,
         }
     }
 
@@ -80,7 +84,8 @@ impl log::Log for FlexiLogger {
     fn log(&self, record: &log::Record) {
         let target = record.metadata().target();
         let mut now = crate::DeferredNow::new();
-        if target.starts_with('{') {
+        let special_target_is_used = target.starts_with('{');
+        if special_target_is_used {
             let mut use_default = false;
             let targets: Vec<&str> = target[1..(target.len() - 1)].split(',').collect();
             for t in targets {
@@ -93,7 +98,7 @@ impl log::Log for FlexiLogger {
                             writer.write(&mut now, record).unwrap_or_else(|e| {
                                 eprintln!(
                                     "[flexi_logger] writing log line to custom writer \"{}\" \
-                                     failed with: \"{}\"",
+                                         failed with: \"{}\"",
                                     t, e
                                 );
                             });
@@ -106,7 +111,7 @@ impl log::Log for FlexiLogger {
             }
         }
 
-        let effective_target = if target.starts_with('{') {
+        let effective_target = if special_target_is_used {
             record.module_path().unwrap_or_default()
         } else {
             target
@@ -129,11 +134,15 @@ impl log::Log for FlexiLogger {
             }
         }
 
-        self.primary_writer
-            .write(&mut now, record)
-            .unwrap_or_else(|e| {
-                eprintln!("[flexi_logger] writing log line failed with {}", e);
-            });
+        #[allow(clippy::option_if_let_else)]
+        if let Some(ref filter) = self.filter {
+            filter.write(&mut now, record, &(*self.primary_writer))
+        } else {
+            self.primary_writer.write(&mut now, record)
+        }
+        .unwrap_or_else(|e| {
+            eprintln!("[flexi_logger] writing log line failed with {}", e);
+        });
     }
 
     fn flush(&self) {
