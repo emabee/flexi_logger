@@ -4,7 +4,7 @@ rust:
   - stable
   - beta
   - nightly
-  # - 1.37.0  // does not work since cargo test is executed automatically
+  # - 1.41.1  // does not work since cargo test is executed automatically
 
 os:
   - linux
@@ -29,7 +29,7 @@ jobs:
         - cargo test --release
         - cargo test --release --no-default-features
 
-    - if: rust = "1.37.0"
+    - if: rust = "1.41.1"
       script:
         - cargo build --release
         - cargo build --release --no-default-features
