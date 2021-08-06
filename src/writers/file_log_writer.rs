@@ -1,3 +1,4 @@
+#![allow(clippy::module_name_repetitions)]
 mod builder;
 mod config;
 mod state;
@@ -280,13 +281,13 @@ impl LogWriter for FileLogWriter {
         match &self.state_handle {
             StateHandle::Sync(state) => {
                 if let Ok(ref mut state) = state.lock() {
-                    state.validate_logs(expected)
+                    state.validate_logs(expected);
                 }
             }
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 if let Ok(ref mut state) = handle.am_state.lock() {
-                    state.validate_logs(expected)
+                    state.validate_logs(expected);
                 }
             }
         }

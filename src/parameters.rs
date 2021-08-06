@@ -134,7 +134,9 @@ impl Cleanup {
     #[must_use]
     #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn do_cleanup(&self) -> bool {
-        // !matches!(self, Self::Never) would be nicer, but is not possible with 1.37
+        // !matches!(self, Self::Never) would be nicer, but is not possible with  1.41.1
+        // doing it clippy-pedantic-conform would bloat the code due to dependencies to optional features
+        #[allow(clippy::match_wildcard_for_single_variants)]
         match self {
             Self::Never => false,
             _ => true,

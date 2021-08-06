@@ -827,7 +827,7 @@ fn setup_specfile<P: AsRef<Path>>(
                             _event => {}
                         },
                         Err(e) => {
-                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e)
+                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e);
                         }
                     }
                 }

@@ -161,11 +161,11 @@ impl State {
         config: Config,
         o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
-    ) -> Result<Self, FlexiLoggerError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             config,
             inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
-        })
+        }
     }
 
     fn initialize(&mut self) -> Result<(), std::io::Error> {
@@ -510,7 +510,7 @@ fn remove_or_compress_too_old_logfiles_impl(
         }
     };
 
-    for (index, file) in list_of_log_and_compressed_files(&file_spec).enumerate() {
+    for (index, file) in list_of_log_and_compressed_files(file_spec).enumerate() {
         if index >= log_limit + compress_limit {
             // delete (log or log.gz)
             std::fs::remove_file(&file)?;

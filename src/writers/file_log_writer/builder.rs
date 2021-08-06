@@ -202,7 +202,7 @@ impl FileLogWriterBuilder {
         #[cfg(not(feature = "async"))]
         let cleanup_in_background_thread = self.cleanup_in_background_thread;
 
-        State::try_new(
+        Ok(State::try_new(
             Config {
                 print_message: self.cfg_print_message,
                 append: self.cfg_append,
@@ -213,7 +213,7 @@ impl FileLogWriterBuilder {
             },
             self.o_rotation_config.as_ref().map(Clone::clone),
             cleanup_in_background_thread,
-        )
+        ))
     }
 }
 

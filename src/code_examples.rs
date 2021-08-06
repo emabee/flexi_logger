@@ -11,7 +11,7 @@
 //! - [Rotate the log file](#rotate-the-log-file)
 //! - [Reconfigure the log specification programmatically](#reconfigure-the-log-specification-programmatically)
 //! - [Reconfigure the log specification dynamically by editing a spec-file](#reconfigure-the-log-specification-dynamically-by-editing-a-spec-file)
-//!
+//! - [Reconfigure the file log writer](#reconfigure-the-file-log-writer)
 //!
 //! ## Start minimal: Write logs to stderr
 //!
@@ -413,6 +413,52 @@
 //! See [`Logger::start_with_specfile`](crate::Logger::start_with_specfile)
 //! for more information.
 //!
+//! ## [Reconfigure the file log writer](#reconfigure-the-file-log-writer)
+//! When using `Logger::log_to_file()`, you can change most of the properties of the
+//! embedded `FileLogWriter` while the program is running using
+//! [`Logger::reset_flw`](crate::LoggerHandle::reset_flw).
+//!
+//! Obtain the [`LoggerHandle`](crate::LoggerHandle) when the program is started
+//!
+//! ```rust
+//! use flexi_logger::{writers::FileLogWriter, Cleanup, Criterion, FileSpec, Naming};
+//!
+//! # use std::error::Error;
+//! # fn main() -> Result<(), Box<dyn Error>> {
+//! let logger = flexi_logger::Logger::try_with_str("info")?
+//!     .log_to_file(FileSpec::default().basename("phase1").directory("./log"))
+//!     .start()?;
+//!
+//! log::info!("start of phase 1");
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! and modify the file log writer later:
+//!
+//! ```rust
+//! # use std::error::Error;
+//! # use flexi_logger::{writers::FileLogWriter, Cleanup, Criterion, FileSpec, Naming};
+//! # fn main() -> Result<(), Box<dyn Error>> {
+//! #    let logger = flexi_logger::Logger::try_with_str("info")?
+//! #       .log_to_file(FileSpec::default().directory("./phase1"))
+//! #       .start()?;
+//! logger.reset_flw(
+//!     &FileLogWriter::builder(FileSpec::default().basename("phase2").directory("./log"))
+//!         .append()
+//!         .rotate(
+//!             Criterion::Size(1024 * 1000 * 1),
+//!             Naming::Numbers,
+//!             Cleanup::KeepLogFiles(3),
+//!         )
+//! )?;
+//!
+//! log::info!("start of phase 2");
+//! # Ok(())
+//! # }
+//! ```
+//!
+//!
 //! ## Miscellaneous
 //!
 //! For the sake of completeness, we refer here to some more configuration methods.
@@ -425,5 +471,3 @@
 //! [`Logger::use_windows_line_ending`](crate::Logger::use_windows_line_ending)
 //!
 //! [`Logger::add_writer`](crate::Logger::add_writer)
-//!
-//! [`Logger::add_writer`](crate::LoggerHandle::reset_flw)

@@ -137,7 +137,7 @@ impl LoggerHandle {
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
         self.spec_stack
             .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
-        self.set_new_spec(new_spec)
+        self.set_new_spec(new_spec);
     }
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String
@@ -181,11 +181,17 @@ impl LoggerHandle {
     /// that the provided `FileLogWriterBuilder` must have the same values for these as the
     /// currently used `FileLogWriter`.
     ///
+    /// # Example
+    ///
+    /// See [`code_examples`](code_examples/index.html#reconfigure-the-file-log-writer).
+    ///
     /// # Errors
     ///
     /// `FlexiLoggerError::Reset` if no file log writer is configured,
     ///  or if a reset was tried with a different write mode.
+    ///
     /// `FlexiLoggerError::Io` if the specified path doesn't work.
+    ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
     pub fn reset_flw(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
         if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
@@ -216,7 +222,7 @@ impl LoggerHandle {
     // Allows checking the logs written so far to the writer
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        self.primary_writer.validate_logs(expected)
+        self.primary_writer.validate_logs(expected);
     }
 }
 

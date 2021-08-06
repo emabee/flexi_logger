@@ -203,10 +203,10 @@ impl FileSpec {
 
         if let Some(discriminant) = &self.o_discriminant {
             filename.push('_');
-            filename.push_str(&discriminant);
+            filename.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            filename.push_str(&timestamp);
+            filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
             filename.push_str(infix);
@@ -214,12 +214,12 @@ impl FileSpec {
         match o_suffix {
             Some(s) => {
                 filename.push('.');
-                filename.push_str(&s);
+                filename.push_str(s);
             }
             None => {
                 if let Some(suffix) = &self.o_suffix {
                     filename.push('.');
-                    filename.push_str(&suffix);
+                    filename.push_str(suffix);
                 }
             }
         }

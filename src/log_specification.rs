@@ -376,9 +376,7 @@ impl LogSpecification {
     #[cfg(feature = "textfilter")]
     #[must_use]
     pub fn text_filter(&self) -> Option<&Regex> {
-        self.textfilter
-            .as_ref()
-            .map(|boxed_re| std::ops::Deref::deref(boxed_re))
+        self.textfilter.as_deref()
     }
 }
 
