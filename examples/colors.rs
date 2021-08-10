@@ -4,11 +4,11 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
+        use ansi_term::Color;
         use atty::Stream::{Stderr, Stdout};
-        use yansi::{Color, Paint, Style};
 
         for i in 0..=255 {
-            println!("{}: {}", i, Paint::fixed(i, i));
+            println!("{}: {}", i, Color::Fixed(i).paint(i.to_string()));
         }
 
         println!("");
@@ -37,39 +37,55 @@ fn main() {
             );
         }
 
-        // Enable ASCII escape sequence support on Windows consoles,
-        // but disable coloring on unsupported Windows consoles
         if cfg!(windows) {
-            if !Paint::enable_windows_ascii() {
-                println!("unsupported windows console detected => coloring disabled");
-                Paint::disable();
-                return;
+            if !ansi_term::enable_ansi_support().is_ok() {
+                println!("Unsupported windows console detected, coloring will likely not work");
             }
         }
 
         println!(
             "\n{}",
-            Style::new(Color::Fixed(196))
+            Color::Fixed(196)
                 .bold()
-                .paint("This is red output like by default with err!")
+                .paint("err! output (red) with default palette")
         );
         println!(
             "{}",
-            Style::new(Color::Fixed(208))
+            Color::Fixed(208)
                 .bold()
-                .paint("This is yellow output like by default with warn!")
+                .paint("warn! output (yellow) with default palette")
+        );
+        println!("{}", "info! output (normal) with default palette");
+        println!(
+            "{}",
+            Color::Fixed(7).paint("debug! output (normal) with default palette")
         );
         println!(
             "{}",
-            Style::new(Color::Unset).paint("This is normal output like by default with info!")
+            Color::Fixed(8).paint("trace! output (grey) with default palette")
+        );
+
+        println!(
+            "\n{}",
+            Color::Red
+                .bold()
+                .paint("err! output (red) with env_logger-palette")
         );
         println!(
             "{}",
-            Style::new(Color::Fixed(7)).paint("This is output like by default with debug!")
+            Color::Yellow.paint("warn! output (yellow) with env_logger-palette")
         );
         println!(
             "{}",
-            Style::new(Color::Fixed(8)).paint("This is grey output like by default with trace!")
+            Color::Green.paint("info! output (green) with env_logger-palette")
+        );
+        println!(
+            "{}",
+            Color::Blue.paint("debug! output (blue) with env_logger-palette")
+        );
+        println!(
+            "{}",
+            Color::Cyan.paint("trace! output (cyan) with env_logger-palette")
         );
     }
 }

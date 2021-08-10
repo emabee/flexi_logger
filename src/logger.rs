@@ -115,14 +115,15 @@ impl Logger {
     }
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
-        #[cfg(feature = "colors")]
-        {
-            // Enable ASCII escape sequence support on Windows consoles,
-            // but disable coloring on unsupported Windows consoles
-            if cfg!(windows) && !yansi::Paint::enable_windows_ascii() {
-                yansi::Paint::disable();
-            }
-        }
+        // FIXME no replacement???
+        // #[cfg(feature = "colors")]
+        // {
+        //     // Enable ASCII escape sequence support on Windows consoles,
+        //     // but disable coloring on unsupported Windows consoles
+        //     if cfg!(windows) && !yansi::Paint::enable_windows_ascii() {
+        //         yansi::Paint::disable();
+        //     }
+        // }
 
         Self {
             spec,

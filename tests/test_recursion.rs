@@ -56,13 +56,13 @@ pub fn my_colored_format(
     record: &Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
-    let style = yansi::Style::new(yansi::Color::Fixed(165));
+    let style = ansi_term::Style::new().fg(ansi_term::Color::Fixed(165));
     write!(
         w,
         "{} [{}] {}",
-        style.paint(level),
+        style.paint(level.to_string()),
         record.module_path().unwrap_or("<unnamed>"),
-        style.paint(record.args())
+        style.paint(record.args().to_string())
     )
 }
 pub fn my_format(

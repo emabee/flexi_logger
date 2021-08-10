@@ -1,8 +1,9 @@
 use crate::DeferredNow;
+#[cfg(feature = "colors")]
+use ansi_term::{Color, Style};
 use log::Record;
 use std::thread;
-#[cfg(feature = "colors")]
-use yansi::{Color, Paint, Style};
+// use yansi::{Color, Paint, Style};
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
@@ -46,9 +47,9 @@ pub fn colored_default_format(
     write!(
         w,
         "{} [{}] {}",
-        style(level, level),
+        style(level).paint(level.to_string()),
         record.module_path().unwrap_or("<unnamed>"),
-        style(level, record.args())
+        style(level).paint(record.args().to_string())
     )
 }
 
@@ -94,11 +95,11 @@ pub fn colored_opt_format(
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
-        style(level, level),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level, &record.args())
+        style(level).paint(&record.args().to_string())
     )
 }
 
@@ -146,12 +147,12 @@ pub fn colored_detailed_format(
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
-        style(level, record.level()),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(record.level().to_string()),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level, &record.args())
+        style(level).paint(&record.args().to_string())
     )
 }
 
@@ -199,12 +200,12 @@ pub fn colored_with_thread(
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        style(level, now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z")),
-        style(level, thread::current().name().unwrap_or("<unnamed>")),
-        style(level, level),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
+        style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level, &record.args())
+        style(level).paint(&record.args().to_string())
     )
 }
 
@@ -216,7 +217,8 @@ pub fn colored_with_thread(
 #[allow(clippy::missing_panics_doc)]
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
-pub fn style<T>(level: log::Level, item: T) -> Paint<T> {
+#[must_use]
+pub fn style(level: log::Level) -> Style {
     let palette = &*(PALETTE.read().unwrap());
     match level {
         log::Level::Error => palette.error,
@@ -225,7 +227,6 @@ pub fn style<T>(level: log::Level, item: T) -> Paint<T> {
         log::Level::Debug => palette.debug,
         log::Level::Trace => palette.trace,
     }
-    .paint(item)
 }
 
 #[cfg(feature = "colors")]
@@ -265,16 +266,16 @@ struct Palette {
 impl Palette {
     fn default() -> Palette {
         Palette {
-            error: Style::new(Color::Fixed(196)).bold(),
-            warn: Style::new(Color::Fixed(208)).bold(),
-            info: Style::new(Color::Unset),
-            debug: Style::new(Color::Fixed(7)),
-            trace: Style::new(Color::Fixed(8)),
+            error: Style::default().fg(Color::Fixed(196)).bold(),
+            warn: Style::default().fg(Color::Fixed(208)).bold(),
+            info: Style::default(),
+            debug: Style::default().fg(Color::Fixed(7)),
+            trace: Style::default().fg(Color::Fixed(8)),
         }
     }
 
-    fn from(palette: &str) -> Result<Palette, std::num::ParseIntError> {
-        let mut items = palette.split(';');
+    fn from(palette_string: &str) -> Result<Palette, std::num::ParseIntError> {
+        let mut items = palette_string.split(';');
         Ok(Palette {
             error: parse_style(items.next().unwrap_or("196").trim())?,
             warn: parse_style(items.next().unwrap_or("208").trim())?,
@@ -288,9 +289,12 @@ impl Palette {
 #[cfg(feature = "colors")]
 fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
     Ok(if input == "-" {
-        Style::new(Color::Unset)
+        Style::new()
     } else {
-        Style::new(Color::Fixed(input.parse()?))
+        match input.strip_prefix('b') {
+            None => Style::new().fg(Color::Fixed(input.parse()?)),
+            Some(s) => Style::new().bold().fg(Color::Fixed(s.parse()?)),
+        }
     })
 }
 
