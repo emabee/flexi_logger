@@ -278,19 +278,17 @@ pub enum FlWriteMode {
     DontBuffer,
     /// Use a buffer when writing log messages to the file.
     Buffer(usize),
-    #[cfg(feature = "async")]
     /// Send log messages to a dedicated output thread, using a channel with a configurable
     /// capacity, and a pool for the messages with configurable size, and a max capacity
     /// for the elements that are pooled
-
     /// Lets the FileLogWriter send logs through an unbounded channel to an output thread, which
     /// does the file I/O, the rotation, and the cleanup.
     ///
     /// Uses buffered I/O (with buffer size .0),
     /// and a bounded message pool (with capacity .1),
     /// and an initial capacity for the message buffers (.2).
-    ///
-    /// Only available with feature `async`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+    #[cfg(feature = "async")]
     BufferAsync(usize, usize, usize),
 }
 impl FlWriteMode {

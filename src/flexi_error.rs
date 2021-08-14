@@ -72,10 +72,9 @@ pub enum FlexiLoggerError {
     #[error("Palette parsing failed")]
     Palette(#[from] std::num::ParseIntError),
 
-    #[cfg(feature = "async")]
     /// Logger is shut down.
-    ///
-    /// Only available with feature `async`.
+    #[cfg(feature = "async")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[error("Logger is shut down")]
     Shutdown(#[from] crossbeam::channel::SendError<Vec<u8>>),
 }

@@ -111,8 +111,7 @@ pub enum Cleanup {
 
     /// The specified number of rotated log files are compressed and kept.
     /// Older files are deleted, if necessary.
-    ///
-    /// This option is only available with feature `compress`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "compress")))]
     #[cfg(feature = "compress")]
     KeepCompressedFiles(usize),
 
@@ -123,8 +122,7 @@ pub enum Cleanup {
     /// `KeepLogAndCompressedFiles(5,30)` ensures that the youngest five log files are
     /// kept as text files, the next 30 are kept as compressed files with additional suffix `.gz`,
     /// and older files are removed.
-    ///
-    /// This option is only available with feature `compress`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "compress")))]
     #[cfg(feature = "compress")]
     KeepLogAndCompressedFiles(usize, usize),
 }
@@ -134,12 +132,6 @@ impl Cleanup {
     #[must_use]
     #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn do_cleanup(&self) -> bool {
-        // !matches!(self, Self::Never) would be nicer, but is not possible with  1.41.1
-        // doing it clippy-pedantic-conform would bloat the code due to dependencies to optional features
-        #[allow(clippy::match_wildcard_for_single_variants)]
-        match self {
-            Self::Never => false,
-            _ => true,
-        }
+        !matches!(self, Self::Never)
     }
 }

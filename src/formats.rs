@@ -32,11 +32,10 @@ pub fn default_format(
 ///
 /// See method [style](crate::style) if you want to influence coloring.
 ///
-/// Only available with feature `colors`.
-///
 /// # Errors
 ///
 /// See `std::write`
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_default_format(
     w: &mut dyn std::io::Write,
@@ -81,11 +80,10 @@ pub fn opt_format(
 ///
 /// See method [style](crate::style) if you want to influence coloring.
 ///
-/// Only available with feature `colors`.
-///
 /// # Errors
 ///
 /// See `std::write`
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_opt_format(
     w: &mut dyn std::io::Write,
@@ -134,11 +132,10 @@ pub fn detailed_format(
 ///
 /// See method [style](crate::style) if you want to influence coloring.
 ///
-/// Only available with feature `colors`.
-///
 /// # Errors
 ///
 /// See `std::write`
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_detailed_format(
     w: &mut dyn std::io::Write,
@@ -188,11 +185,10 @@ pub fn with_thread(
 ///
 /// See method [style](crate::style) if you want to influence coloring.
 ///
-/// Only available with feature `colors`.
-///
 /// # Errors
 ///
 /// See `std::write`
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_with_thread(
     w: &mut dyn std::io::Write,
@@ -217,9 +213,8 @@ pub fn colored_with_thread(
 ///
 /// See [`Logger::set_palette`](crate::Logger::set_palette) if you want to
 /// modify the color palette.
-///
-/// Only available with feature `colors`.
 #[allow(clippy::missing_panics_doc)]
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn style<T>(level: log::Level, item: T) -> Paint<T> {
     let palette = &*(PALETTE.read().unwrap());
@@ -306,33 +301,28 @@ fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
 ///
 /// This is helpful if the output is sometimes piped into other programs, which usually
 /// do not expect color control byte sequences.
-///
-/// Only available with feature `atty`.
+#[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
 #[cfg(feature = "atty")]
 #[derive(Clone, Copy)]
 pub enum AdaptiveFormat {
     /// Chooses between [`default_format`](crate::default_format)
     /// and [`colored_default_format`](crate::colored_default_format).
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
     #[cfg(feature = "colors")]
     Default,
     /// Chooses between [`detailed_format`](crate::detailed_format)
     /// and [`colored_detailed_format`](crate::colored_detailed_format).
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
     #[cfg(feature = "colors")]
     Detailed,
     /// Chooses between [`opt_format`](crate::opt_format)
     /// and [`colored_opt_format`](crate::colored_opt_format).
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
     #[cfg(feature = "colors")]
     Opt,
     /// Chooses between [`with_thread`](crate::with_thread)
     /// and [`colored_with_thread`](crate::colored_with_thread).
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
     #[cfg(feature = "colors")]
     WithThread,
     /// Chooses between the first format function (which is supposed to be uncolored)

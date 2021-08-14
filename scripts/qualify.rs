@@ -47,8 +47,8 @@ fn main() {
 
     // Build in important variants
     std::fs::remove_file("Cargo.lock").ok();
-    run_command!("cargo", "+1.41.1", "build", "--no-default-features");
-    run_command!("cargo", "+1.41.1", "build", "--all-features");
+    run_command!("cargo", "+1.46.0", "build", "--no-default-features");
+    run_command!("cargo", "+1.46.0", "build", "--all-features");
 
     std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo", "build");
@@ -70,7 +70,9 @@ fn main() {
     run_command!("cargo", "test", "--release", "--features", "specfile_without_notification");
 
     // doc
-    run_command!("cargo", "doc", "--all-features", "--no-deps", "--open");
+    run_command!("cargo", "+nightly", "test", "--doc");
+    #[rustfmt::skip]
+    run_command!("cargo", "+nightly", "doc", "--all-features", "--no-deps", "--open");
 
     // check git status
     let mut cmd = command!("git", "status", "-s");

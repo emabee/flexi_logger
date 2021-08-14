@@ -300,17 +300,11 @@ impl Logger {
     /// Coloring is used if `stderr` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
     #[cfg(feature = "atty")]
     #[must_use]
     pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        #[cfg(feature = "atty")]
-        let is_tty = atty::is(atty::Stream::Stderr);
-        #[cfg(not(feature = "atty"))]
-        let is_tty = false;
-
-        self.format_for_stderr = adaptive_format.format_function(is_tty);
+        self.format_for_stderr = adaptive_format.format_function(atty::is(atty::Stream::Stderr));
         self
     }
 
@@ -327,17 +321,11 @@ impl Logger {
     /// Coloring is used if `stdout` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
     #[cfg(feature = "atty")]
     #[must_use]
     pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        #[cfg(feature = "atty")]
-        let is_tty = atty::is(atty::Stream::Stdout);
-        #[cfg(not(feature = "atty"))]
-        let is_tty = false;
-
-        self.format_for_stdout = adaptive_format.format_function(is_tty);
+        self.format_for_stdout = adaptive_format.format_function(atty::is(atty::Stream::Stdout));
         self
     }
 
@@ -371,8 +359,7 @@ impl Logger {
     ///
     /// For your convenience, if you want to specify your own palette,
     /// you can produce a colored list with all 255 colors with `cargo run --example colors`.
-    ///
-    /// Only available with feature `colors`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
     #[cfg(feature = "colors")]
     #[must_use]
     pub fn set_palette(mut self, palette: String) -> Self {
@@ -746,6 +733,7 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile_without_notification")))]
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<Path>>(
         self,
@@ -949,14 +937,12 @@ pub enum WriteMode {
     /// The log output is flushed regularly with the given interval.
     ///
     /// See [here](code_examples/index.html#choose-the-write-mode) for an example.
-    ///
-    /// Only available with feature `async`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[cfg(feature = "async")]
     Async,
 
     /// Like Async, but allows using non-default parameter values.
-    ///
-    /// Only available with feature `async`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[cfg(feature = "async")]
     AsyncWith {
         /// Size of the output buffer for the file.

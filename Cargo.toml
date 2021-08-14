@@ -16,8 +16,15 @@ It also allows defining additional log streams, e.g. for alert or security messa
 keywords = ["file", "logger"]
 categories = ["development-tools::debugging"]
 
+[lib]
+doctest = false
+
+# docs.rs-specific configuration
 [package.metadata.docs.rs]
+# document all features
 all-features = true
+# define the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["colors", "textfilter"]

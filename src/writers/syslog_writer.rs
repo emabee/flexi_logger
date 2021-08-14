@@ -219,15 +219,13 @@ impl LogWriter for SyslogWriter {
 pub enum SyslogConnector {
     /// Sends log lines to the syslog via a
     /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-    ///
-    /// Is only available on linux.
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     Stream(BufWriter<std::os::unix::net::UnixStream>),
 
     /// Sends log lines to the syslog via a
     /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
-    ///
-    /// Is only available on linux.
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     Datagram(std::os::unix::net::UnixDatagram),
 
@@ -241,8 +239,7 @@ pub enum SyslogConnector {
 }
 impl SyslogConnector {
     /// Returns a [`SyslogConnector::Datagram`] to the specified path.
-    ///
-    /// Is only available on linux.
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         let ud = std::os::unix::net::UnixDatagram::unbound()?;
@@ -251,8 +248,7 @@ impl SyslogConnector {
     }
 
     /// Returns a [`SyslogConnector::Stream`] to the specified path.
-    ///
-    /// Is only available on linux.
+    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         Ok(SyslogConnector::Stream(BufWriter::new(
