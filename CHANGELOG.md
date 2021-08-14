@@ -25,7 +25,7 @@ Most important changes:
   - `Logger::log_to_file(FileSpec)`
   - `Logger::log_to_stdout()`
   - `Logger::log_to_stderr()`
-  - `Logger::log_to_writer(FileSpec)`
+  - `Logger::log_to_writer(Box<dyn LogWriter>)`
   - `Logger::log_to_file_and_writer(FileSpec,Box<dyn LogWriter>)`
   - `Logger::do_not_log()`
 - The new method
