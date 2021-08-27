@@ -72,7 +72,7 @@ Make use of any of these features by specifying them in your `Cargo.toml`
 
 ### **`async`**
 
-Adds an additional write mode that decouples `flexi_logger`'s file I/O from your application threads. See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
+Adds an additional write mode that decouples `flexi_logger`'s I/O from your application threads. Works with `log_to_stdout()`, `log_to_stderr()`, and `log_to_file()`. See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
 
 Adds a dependency to [`crossbeam`](https://docs.rs/crossbeam/0.8.1/crossbeam/index.html).
 

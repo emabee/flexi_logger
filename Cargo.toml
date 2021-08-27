@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.18.0"
+version = "0.18.1"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ repository = "https://github.com/emabee/flexi_logger"
 documentation = "https://docs.rs/flexi_logger"
 homepage = "https://crates.io/crates/flexi_logger"
 description = """
-An easy-to-configure and flexible logger that writes logs to stderr and/or to files. \
+An easy-to-configure and flexible logger that writes logs to stderr or stdout and/or to files. \
 It allows custom logline formats, and it allows changing the log specification at runtime. \
 It also allows defining additional log streams, e.g. for alert or security messages.\
 """

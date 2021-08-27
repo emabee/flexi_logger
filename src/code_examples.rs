@@ -106,11 +106,11 @@
 //!   }
 //!   ```
 //!
-//! - with [`WriteMode::Async`](crate::WriteMode::Async), the `FileLogWriter` (!)
-//!   - send logs from your application threads through an unbounded channel to an output thread,
-//!     which does the file output, the rotation, and the cleanup.
-//!   - additionally uses buffered output, and a bounded message pool to reduce allocations,
-//!     and flushing.
+//! - with [`WriteMode::Async`](crate::WriteMode::Async),
+//!   logs are sent from your application threads through an unbounded channel
+//!   to an output thread, which does the output (and the rotation and the cleanup, if applicable).
+//!   Additionally the output is buffered, and a bounded message pool is used to reduce allocations,
+//!   and flushing is used to avoid long delays.
 //!   If duplication is used, the messages to `stdout` or `stderr` are written synchronously.
 //!
 //!   ```rust

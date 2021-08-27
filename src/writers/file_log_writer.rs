@@ -3,18 +3,19 @@ mod builder;
 mod config;
 mod state;
 pub use self::builder::{FileLogWriterBuilder, FlWriteMode};
-
 use self::config::{Config, RotationConfig};
-use crate::primary_writer::buffer_with;
-use crate::writers::LogWriter;
-use crate::{DeferredNow, FileSpec, FlexiLoggerError, FormatFunction};
+use self::state::State;
+use crate::util::{buffer_with, write_err};
+#[cfg(feature = "async")]
+use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN, ERR_FLUSHING};
+use crate::util::{ERR_FORMATTING, ERR_WRITING};
+use crate::{writers::LogWriter, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction};
 #[cfg(feature = "async")]
 use crossbeam::{
     channel::{self, SendError, Sender},
     queue::ArrayQueue,
 };
 use log::Record;
-use state::State;
 use std::io::Write;
 use std::path::PathBuf;
 #[cfg(feature = "async")]
@@ -25,19 +26,6 @@ use std::thread::JoinHandle;
 
 const WINDOWS_LINE_ENDING: &[u8] = b"\r\n";
 const UNIX_LINE_ENDING: &[u8] = b"\n";
-#[cfg(feature = "async")]
-const ASYNC_FLW_FLUSH: &[u8] = b"F";
-#[cfg(feature = "async")]
-const ASYNC_FLW_SHUTDOWN: &[u8] = b"S";
-
-const ERR_1: &str = "FileLogWriter: formatting failed ";
-const ERR_2: &str = "FileLogWriter: writing failed ";
-#[cfg(feature = "async")]
-const ERR_3: &str = "FileLogWriter: flushing failed ";
-
-fn write_err(msg: &str, err: &std::io::Error) {
-    eprintln!("[flexi_logger] {} with {}", msg, err);
-}
 
 /// A configurable [`LogWriter`] implementation that writes to a file or a sequence of files.
 ///
@@ -112,20 +100,22 @@ impl FileLogWriter {
                             Ok(mut message) => {
                                 let mut state = t_state.lock().unwrap();
                                 match message.as_ref() {
-                                    ASYNC_FLW_FLUSH => {
-                                        state.flush().unwrap_or_else(|e| write_err(ERR_3, &e));
+                                    ASYNC_FLUSH => {
+                                        state
+                                            .flush()
+                                            .unwrap_or_else(|e| write_err(ERR_FLUSHING, &e));
                                     }
-                                    ASYNC_FLW_SHUTDOWN => {
+                                    ASYNC_SHUTDOWN => {
                                         state.shutdown();
                                         break;
                                     }
                                     _ => {
                                         message
                                             .write_all(state.config().line_ending)
-                                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                                         state
                                             .write_buffer(&message)
-                                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                                     }
                                 }
                                 if message.capacity() <= msg_capa {
@@ -212,15 +202,15 @@ impl LogWriter for FileLogWriter {
                 buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
                     Ok(mut buffer) => {
                         (self.format)(&mut *buffer, now, record)
-                            .unwrap_or_else(|e| write_err(ERR_1, &e));
+                            .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
                         let mut state_guard = state.lock().unwrap();
                         let state = &mut *state_guard;
                         buffer
                             .write_all(state.config().line_ending)
-                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                         state
                             .write_buffer(&*buffer)
-                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                         buffer.clear();
                     }
                     Err(_e) => {
@@ -230,22 +220,23 @@ impl LogWriter for FileLogWriter {
                         // outer most message is printed
                         let mut tmp_buf = Vec::<u8>::with_capacity(200);
                         (self.format)(&mut tmp_buf, now, record)
-                            .unwrap_or_else(|e| write_err(ERR_1, &e));
+                            .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
                         let mut state_guard = state.lock().unwrap();
                         let state = &mut *state_guard;
                         tmp_buf
                             .write_all(state.config().line_ending)
-                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                         state
                             .write_buffer(&tmp_buf)
-                            .unwrap_or_else(|e| write_err(ERR_2, &e));
+                            .unwrap_or_else(|e| write_err(ERR_WRITING, &e));
                     }
                 });
             }
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                (self.format)(&mut buffer, now, record).unwrap_or_else(|e| write_err(ERR_1, &e));
+                (self.format)(&mut buffer, now, record)
+                    .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
                 handle.send(buffer).unwrap();
             }
         }
@@ -264,7 +255,7 @@ impl LogWriter for FileLogWriter {
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                buffer.extend(ASYNC_FLW_FLUSH);
+                buffer.extend(ASYNC_FLUSH);
                 handle.send(buffer).ok();
             }
         }
@@ -304,7 +295,7 @@ impl LogWriter for FileLogWriter {
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                buffer.extend(ASYNC_FLW_SHUTDOWN);
+                buffer.extend(ASYNC_SHUTDOWN);
                 handle.send(buffer).unwrap();
                 if let Ok(ref mut o_th) = handle.mo_thread_handle.lock() {
                     o_th.take().and_then(|th| th.join().ok());

@@ -166,8 +166,8 @@ impl FileLogWriterBuilder {
     }
 
     #[must_use]
-    pub(crate) fn buffersize(&self) -> Option<usize> {
-        self.cfg_write_mode.buffersize()
+    pub(crate) fn fl_write_mode(&self) -> &FlWriteMode {
+        &self.cfg_write_mode
     }
 
     /// Produces the `FileLogWriter`.

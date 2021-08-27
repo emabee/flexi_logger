@@ -22,7 +22,9 @@ pub trait LogWriter: Sync + Send {
     fn flush(&self) -> std::io::Result<()>;
 
     /// Provides the maximum log level that is to be written.
-    fn max_log_level(&self) -> log::LevelFilter;
+    fn max_log_level(&self) -> log::LevelFilter {
+        log::LevelFilter::Trace
+    }
 
     /// Sets the format function.
     ///

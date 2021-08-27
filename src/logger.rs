@@ -608,10 +608,10 @@ impl Logger {
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
-                PrimaryWriter::stdout(self.format_for_stdout, &self.flwb.buffersize())
+                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.fl_write_mode())
             }
             LogTarget::StdErr => {
-                PrimaryWriter::stderr(self.format_for_stderr, &self.flwb.buffersize())
+                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.fl_write_mode())
             }
             LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
@@ -897,12 +897,12 @@ pub enum Duplicate {
     All,
 }
 
-/// Describes if the log output should be written synchronously or asynchronously,
-/// and if and how file I/O should be buffered and flushed.
+/// Describes whether the log output should be written synchronously or asynchronously,
+/// and if and how I/O should be buffered and flushed.
 ///
 /// Is used in [`Logger::write_mode`].
 ///
-/// Using buffering reduces the program's I/O overhead, and thus increases overall performance,
+/// Buffering reduces the program's I/O overhead, and thus increases overall performance,
 /// which can become relevant if logging is used heavily.
 /// On the other hand, if logging is used with low frequency,
 /// buffering can defer the appearance of log lines significantly,
@@ -915,6 +915,20 @@ pub enum Duplicate {
 /// [See here for an example](code_examples/index.html#choose-the-write-mode).
 ///
 /// **Note** further that flushing uses an extra thread (with minimal stack).
+///
+/// The console is a slow output device (at least on Windows).
+/// With `WriteMode::Async` it can happen that in phases with vast log output
+/// the log lines appear significantly later than they were written.
+/// Also, a final printing phase is possible at the end of the program when the logger handle
+/// is dropped (and all output is flushed automatically).
+///
+/// `WriteMode::Direct` (i.e. without buffering) is the slowest option with all output devices,
+/// showing that buffered I/O pays off. But it takes slightly more resources, especially
+/// if you do not suppress flushing.
+///
+/// Using `log_to_stdout()` and then redirecting the output to a file makes things faster,
+/// but is still significantly slower than writing to files directly.
+///
 #[derive(Copy, Clone)]
 pub enum WriteMode {
     /// Do not buffer (default).
@@ -930,8 +944,8 @@ pub enum WriteMode {
     /// Buffer and  flush with given buffer capacity and flush interval.
     BufferAndFlushWith(usize, Duration),
 
-    /// Lets the `FileLogWriter` send logs through an unbounded channel to an output thread, which
-    /// does the file output, the rotation, and the cleanup.
+    /// Log lines are sent through an unbounded channel to an output thread, which
+    /// does the I/O, and, if `log_to_file()` is chosen, also the rotation and the cleanup.
     ///
     /// Uses buffered output to reduce overhead, and a bounded message pool to reduce allocations.
     /// The log output is flushed regularly with the given interval.

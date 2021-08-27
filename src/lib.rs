@@ -54,6 +54,7 @@ mod primary_writer;
 
 pub mod code_examples;
 pub mod filter;
+mod util;
 pub mod writers;
 
 pub use crate::deferred_now::DeferredNow;

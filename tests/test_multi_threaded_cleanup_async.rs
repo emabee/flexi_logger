@@ -14,7 +14,6 @@ mod d {
     use std::ops::Add;
     use std::path::PathBuf;
     use std::thread::{self, JoinHandle};
-    use std::time::Duration;
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 1_000_000;
@@ -61,13 +60,14 @@ mod d {
 
         wait_for_workers_to_close(worker_handles);
 
-        let delta = Local::now().signed_duration_since(start).num_milliseconds();
-        debug!(
-            "Task executed with {} threads in {}ms.",
-            NO_OF_THREADS, delta
-        );
+        let delta1 = Local::now().signed_duration_since(start).num_milliseconds();
 
-        std::thread::sleep(Duration::from_millis(500));
+        std::mem::drop(logger);
+        let delta2 = Local::now().signed_duration_since(start).num_milliseconds();
+        println!(
+            "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
+            NO_OF_THREADS, delta1, delta2
+        );
         verify_logs(&directory);
     }
 
