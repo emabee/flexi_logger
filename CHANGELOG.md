@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2021-09-10
+
+`FileLogWriter` has been functionally extended to make it usable "stand-alone".
+As part of that, the `FlWriteMode` is gone, and the normal `WriteMode` is used.
+
+`WriteMode::BufferDontFlushWith` was added.
+
+A new experimental feature (and module) "trc" allows using `flexi_logger` functionality
+with `tracing`.
+
+Error handling is improved, error codes are documented comprehensively,
+errors now also print a link to the error documentation.
+
+Default color for DEBUG lines was changed (fixes issue#88).
+
+Test coverage is improved.
+
 ## [0.18.1] - 2021-08-27
 
 Implement async mode also for `log_to_stdout()` and `log_to_stderr()`.

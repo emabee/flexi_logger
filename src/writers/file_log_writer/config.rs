@@ -1,5 +1,4 @@
-use crate::writers::file_log_writer::builder::FlWriteMode;
-use crate::{Cleanup, Criterion, FileSpec, Naming};
+use crate::{Cleanup, Criterion, FileSpec, Naming, WriteMode};
 use std::path::PathBuf;
 
 // Describes how rotation should work
@@ -18,7 +17,7 @@ pub(crate) struct RotationConfig {
 pub(crate) struct Config {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
-    pub(crate) write_mode: FlWriteMode,
+    pub(crate) write_mode: WriteMode,
     pub(crate) file_spec: FileSpec,
     pub(crate) o_create_symlink: Option<PathBuf>,
     pub(crate) line_ending: &'static [u8],

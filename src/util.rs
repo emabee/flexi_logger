@@ -3,21 +3,56 @@ use log::Record;
 use std::cell::RefCell;
 use std::io::Write;
 
+#[cfg(test)]
+use std::io::Cursor;
+#[cfg(test)]
+use std::sync::{Arc, Mutex};
+
 #[cfg(feature = "async")]
 pub(crate) const ASYNC_FLUSH: &[u8] = b"F";
 #[cfg(feature = "async")]
 pub(crate) const ASYNC_SHUTDOWN: &[u8] = b"S";
 
-#[cfg(feature = "async")]
-pub(crate) const ERR_FLUSHING: &str = "[flexi_logger] flushing failed ";
-pub(crate) const ERR_WRITING: &str = "[flexi_logger] writing failed ";
-pub(crate) const ERR_FORMATTING: &str = "[flexi_logger] formatting failed ";
-
-pub(crate) fn write_err(msg: &str, err: &std::io::Error) {
-    eprintln!("[flexi_logger] {} with {}", msg, err);
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ERRCODE {
+    Write,
+    Flush,
+    Format,
+    Poison,
+    LogFile,
+    #[cfg(feature = "specfile_without_notification")]
+    LogSpecFile,
+    #[cfg(target_os = "linux")]
+    Symlink,
+}
+impl ERRCODE {
+    fn as_index(self) -> &'static str {
+        match self {
+            Self::Write => "write",
+            Self::Flush => "flush",
+            Self::Format => "format",
+            Self::Poison => "poison",
+            Self::LogFile => "logfile",
+            #[cfg(feature = "specfile_without_notification")]
+            Self::LogSpecFile => "logspecfile",
+            #[cfg(target_os = "linux")]
+            Self::Symlink => "symlink",
+        }
+    }
 }
 
-pub(crate) fn poison_err(s: &'static str, _e: &dyn std::error::Error) -> std::io::Error {
+pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Error) {
+    eprintln!(
+        "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err}\n\
+         See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
+        msg = msg,
+        err = err,
+        code = errcode,
+        code_lc = errcode.as_index(),
+    );
+}
+
+pub(crate) fn io_err(s: &'static str) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, s)
 }
 
@@ -38,22 +73,27 @@ pub(crate) fn write_buffered(
     now: &mut DeferredNow,
     record: &Record,
     w: &mut dyn Write,
+    #[cfg(test)] o_validation_buffer: Option<&Arc<Mutex<Cursor<Vec<u8>>>>>,
 ) -> Result<(), std::io::Error> {
     let mut result: Result<(), std::io::Error> = Ok(());
 
     buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
         Ok(mut buffer) => {
             (format_function)(&mut *buffer, now, record)
-                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+                .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
             buffer
                 .write_all(b"\n")
-                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+                .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
 
             result = w.write_all(&*buffer).map_err(|e| {
-                write_err(ERR_WRITING, &e);
+                eprint_err(ERRCODE::Write, "writing failed", &e);
                 e
             });
 
+            #[cfg(test)]
+            if let Some(valbuf) = o_validation_buffer {
+                valbuf.lock().unwrap().write_all(&*buffer).ok();
+            }
             buffer.clear();
         }
         Err(_e) => {
@@ -63,15 +103,20 @@ pub(crate) fn write_buffered(
             // outer most message is printed
             let mut tmp_buf = Vec::<u8>::with_capacity(200);
             (format_function)(&mut tmp_buf, now, record)
-                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+                .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
             tmp_buf
                 .write_all(b"\n")
-                .unwrap_or_else(|e| write_err(ERR_FORMATTING, &e));
+                .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
 
             result = w.write_all(&tmp_buf).map_err(|e| {
-                write_err(ERR_WRITING, &e);
+                eprint_err(ERRCODE::Write, "writing failed", &e);
                 e
             });
+
+            #[cfg(test)]
+            if let Some(valbuf) = o_validation_buffer {
+                valbuf.lock().unwrap().write_all(&tmp_buf).ok();
+            }
         }
     });
     result

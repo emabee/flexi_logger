@@ -269,7 +269,7 @@ impl Palette {
             error: Style::default().fg(Color::Fixed(196)).bold(),
             warn: Style::default().fg(Color::Fixed(208)).bold(),
             info: Style::default(),
-            debug: Style::default().fg(Color::Fixed(7)),
+            debug: Style::default().fg(Color::Fixed(27)),
             trace: Style::default().fg(Color::Fixed(8)),
         }
     }
@@ -280,7 +280,7 @@ impl Palette {
             error: parse_style(items.next().unwrap_or("196").trim())?,
             warn: parse_style(items.next().unwrap_or("208").trim())?,
             info: parse_style(items.next().unwrap_or("-").trim())?,
-            debug: parse_style(items.next().unwrap_or("7").trim())?,
+            debug: parse_style(items.next().unwrap_or("27").trim())?,
             trace: parse_style(items.next().unwrap_or("8").trim())?,
         })
     }

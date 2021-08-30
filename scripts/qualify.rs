@@ -70,7 +70,7 @@ fn main() {
     run_command!("cargo", "test", "--release", "--features", "specfile_without_notification");
 
     // doc
-    run_command!("cargo", "+nightly", "test", "--doc");
+    run_command!("cargo", "+nightly", "test", "--all-features", "--doc");
     #[rustfmt::skip]
     run_command!("cargo", "+nightly", "doc", "--all-features", "--no-deps", "--open");
 

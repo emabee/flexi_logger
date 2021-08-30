@@ -5,6 +5,7 @@ use crate::LevelFilter;
 use regex::Regex;
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Write;
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -92,8 +93,20 @@ impl LogSpecification {
     /// Returns a `LogSpecification` where all traces are switched off.
     #[must_use]
     pub fn off() -> Self {
-        #[allow(clippy::default_trait_access)]
-        Default::default()
+        Self::default()
+    }
+
+    /// Returns a `LogSpecification` where the global tracelevel is set to info.
+    #[must_use]
+    pub fn info() -> Self {
+        Self {
+            module_filters: vec![ModuleFilter {
+                module_name: None,
+                level_filter: LevelFilter::Info,
+            }],
+            #[cfg(feature = "textfilter")]
+            textfilter: None,
+        }
     }
 
     /// Returns a log specification from a String.
@@ -302,20 +315,19 @@ impl LogSpecification {
     fn to_toml_impl(&self, w: &mut dyn std::io::Write) -> Result<(), std::io::Error> {
         w.write_all(b"### Optional: Default log level\n")?;
         let last = self.module_filters.last();
-        if last.is_some() && last.as_ref().unwrap().module_name.is_none() {
-            w.write_all(
-                format!(
-                    "global_level = '{}'\n",
-                    last.as_ref()
-                        .unwrap()
-                        .level_filter
-                        .to_string()
-                        .to_lowercase()
-                )
-                .as_bytes(),
-            )?;
-        } else {
-            w.write_all(b"#global_level = 'info'\n")?;
+        match last {
+            Some(last_v) if last_v.module_name.is_none() => {
+                w.write_all(
+                    format!(
+                        "global_level = '{}'\n",
+                        last_v.level_filter.to_string().to_lowercase()
+                    )
+                    .as_bytes(),
+                )?;
+            }
+            _ => {
+                w.write_all(b"#global_level = 'info'\n")?;
+            }
         }
 
         w.write_all(
@@ -333,11 +345,11 @@ impl LogSpecification {
             w.write_all(b"#'mod2::mod3' = 'trace'\n")?;
         }
         for mf in &self.module_filters {
-            if mf.module_name.is_some() {
+            if let Some(ref name) = mf.module_name {
                 w.write_all(
                     format!(
                         "'{}' = '{}'\n",
-                        mf.module_name.as_ref().unwrap(),
+                        name,
                         mf.level_filter.to_string().to_lowercase()
                     )
                     .as_bytes(),
@@ -380,6 +392,38 @@ impl LogSpecification {
     }
 }
 
+impl ToString for LogSpecification {
+    #[must_use]
+    fn to_string(&self) -> String {
+        let mut w = String::new();
+        // Optional: Default log level
+        if let Some(last) = self.module_filters.last() {
+            if last.module_name.is_none() {
+                write!(w, "{},", last.level_filter.to_string().to_lowercase()).ok();
+            }
+        }
+
+        // Optional: specify a regular expression to suppress all messages that don't match
+        // w.write_all(b"#global_pattern = 'foo'\n")?;
+
+        // Specific log levels per module
+        for mf in &self.module_filters {
+            if let Some(ref name) = mf.module_name {
+                write!(
+                    w,
+                    "{}={},",
+                    name,
+                    mf.level_filter.to_string().to_lowercase()
+                )
+                .ok();
+            }
+        }
+        match w.strip_suffix(',') {
+            Some(inner) => inner.to_string(),
+            None => w,
+        }
+    }
+}
 impl std::convert::TryFrom<&str> for LogSpecification {
     type Error = FlexiLoggerError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -613,6 +657,19 @@ impl LevelSort for Vec<ModuleFilter> {
 mod tests {
     use crate::LogSpecification;
     use log::{Level, LevelFilter};
+
+    #[test]
+    fn parse_roundtrip() {
+        let ss = [
+            "crate1::mod1=error,crate1::mod2=trace,crate2=debug",
+            "debug,crate1::mod2=trace,crate2=error",
+        ];
+        for s in ss {
+            let spec = LogSpecification::parse(s).unwrap();
+            assert_eq!(s, spec.to_string().as_str());
+        }
+        assert_eq!("", LogSpecification::default().to_string().as_str());
+    }
 
     #[test]
     fn parse_logging_spec_valid() {

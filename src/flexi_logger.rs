@@ -1,5 +1,6 @@
 use crate::filter::LogLineFilter;
 use crate::primary_writer::PrimaryWriter;
+use crate::util::{eprint_err, ERRCODE};
 use crate::writers::LogWriter;
 use crate::LogSpecification;
 
@@ -37,9 +38,11 @@ impl FlexiLogger {
     }
 
     fn primary_enabled(&self, level: log::Level, module: &str) -> bool {
-        self.log_specification.read().as_ref()
-                                .unwrap(/* catch and expose error? */)
-                                .enabled(level, module)
+        self.log_specification
+            .read()
+            .map_err(|e| eprint_err(ERRCODE::Poison, "rwlock on log spec is poisoned", &e))
+            .unwrap()
+            .enabled(level, module)
     }
 }
 
@@ -141,17 +144,17 @@ impl log::Log for FlexiLogger {
             self.primary_writer.write(&mut now, record)
         }
         .unwrap_or_else(|e| {
-            eprintln!("[flexi_logger] writing log line failed with {}", e);
+            eprint_err(ERRCODE::Write, "writing log line failed", &e);
         });
     }
 
     fn flush(&self) {
         self.primary_writer.flush().unwrap_or_else(|e| {
-            eprintln!("[flexi_logger] flushing primary writer failed with {}", e);
+            eprint_err(ERRCODE::Flush, "flushing primary writer failed", &e);
         });
         for writer in self.other_writers.values() {
             writer.flush().unwrap_or_else(|e| {
-                eprintln!("[flexi_logger] flushing custom writer failed with {}", e);
+                eprint_err(ERRCODE::Flush, "flushing custom writer failed", &e);
             });
         }
     }

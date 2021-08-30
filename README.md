@@ -14,7 +14,7 @@ Add flexi_logger to the dependencies section in your project's `Cargo.toml`, wit
 
 ```toml
 [dependencies]
-flexi_logger = "0.18"
+flexi_logger = "0.19"
 log = "0.4"
 ```
 
@@ -22,7 +22,7 @@ or, if you want to use some of the optional features, with something like
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.18", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.19", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -30,7 +30,7 @@ or, to get the smallest footprint (and no colors), with
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.18", default_features = false }
+flexi_logger = { version = "0.19", default_features = false }
 log = "0.4"
 ```
 
@@ -41,8 +41,6 @@ and you use the ```log``` macros to write log lines from your code.
 The minimal rust version is currently "1.46.0".
 
 ## Versions
-
-Version "0.18" is a significant API revision and brings incompatible changes!
 
 See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md) for more details.
 
@@ -122,11 +120,15 @@ For that reason the feature is not active by default.
 Pretty much like `specfile`, except that updates to the file are being ignored.
 See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more details.
 
-### **`textfilter`**
-
-Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
-
 ### **`syslog`**
 
 This is still an experimental feature, likely working, but not well tested.
 Feedback of all kinds is highly appreciated.
+
+### **`textfilter`**
+
+Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
+
+### **`trc`**
+
+An experimental feature that allows using `flexi_logger` functionality with `tracing`.

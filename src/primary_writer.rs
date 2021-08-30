@@ -8,8 +8,8 @@ use self::stdout_writer::StdOutWriter;
 use crate::deferred_now::DeferredNow;
 use crate::filter::LogLineWriter;
 use crate::logger::Duplicate;
-use crate::writers::{FileLogWriter, FlWriteMode, LogWriter};
-use crate::FormatFunction;
+use crate::writers::{FileLogWriter, LogWriter};
+use crate::{FormatFunction, WriteMode};
 use log::Record;
 
 // Writes either to stdout, or to stderr,
@@ -39,12 +39,12 @@ impl PrimaryWriter {
             o_other_writer,
         ))
     }
-    pub fn stderr(format: FormatFunction, fl_write_mode: &FlWriteMode) -> Self {
-        Self::StdErr(StdErrWriter::new(format, fl_write_mode))
+    pub fn stderr(format: FormatFunction, write_mode: &WriteMode) -> Self {
+        Self::StdErr(StdErrWriter::new(format, write_mode))
     }
 
-    pub fn stdout(format: FormatFunction, fl_write_mode: &FlWriteMode) -> Self {
-        Self::StdOut(StdOutWriter::new(format, fl_write_mode))
+    pub fn stdout(format: FormatFunction, write_mode: &WriteMode) -> Self {
+        Self::StdOut(StdOutWriter::new(format, write_mode))
     }
 
     // Write out a log line.
@@ -66,21 +66,30 @@ impl PrimaryWriter {
     }
 
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        if let Self::Multi(ref w) = *self {
-            w.validate_logs(expected);
+        self.shutdown();
+        match self {
+            Self::StdOut(writer) => {
+                writer.validate_logs(expected);
+            }
+            Self::StdErr(writer) => {
+                writer.validate_logs(expected);
+            }
+            Self::Multi(writer) => {
+                writer.validate_logs(expected);
+            }
         }
     }
 
     pub fn shutdown(&self) {
         self.flush().ok();
         match self {
-            PrimaryWriter::StdOut(writer) => {
+            Self::StdOut(writer) => {
                 writer.shutdown();
             }
-            PrimaryWriter::StdErr(writer) => {
+            Self::StdErr(writer) => {
                 writer.shutdown();
             }
-            PrimaryWriter::Multi(writer) => {
+            Self::Multi(writer) => {
                 writer.shutdown();
             }
         }

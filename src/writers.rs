@@ -107,5 +107,7 @@ pub use self::syslog_writer::{
     LevelToSyslogSeverity, SyslogConnector, SyslogFacility, SyslogSeverity, SyslogWriter,
 };
 
-pub use self::file_log_writer::{FileLogWriter, FileLogWriterBuilder, FlWriteMode};
+pub use self::file_log_writer::{
+    ArcFileLogWriter, FileLogWriter, FileLogWriterBuilder, FileLogWriterHandle,
+};
 pub use self::log_writer::LogWriter;

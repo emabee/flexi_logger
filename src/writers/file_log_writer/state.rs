@@ -1,3 +1,4 @@
+use crate::util::{eprint_err, ERRCODE};
 use crate::FileSpec;
 use crate::{Age, Cleanup, Criterion, FlexiLoggerError, Naming};
 use chrono::{DateTime, Datelike, Local, Timelike};
@@ -152,6 +153,7 @@ impl std::fmt::Debug for Inner {
 }
 
 // The mutable state of a FileLogWriter.
+#[derive(Debug)]
 pub(crate) struct State {
     config: Config,
     inner: Inner,
@@ -306,7 +308,7 @@ impl State {
         // rotate if necessary
         self.mount_next_linewriter_if_necessary()
             .unwrap_or_else(|e| {
-                eprintln!("[flexi_logger] opening file failed with {}", e);
+                eprint_err(ERRCODE::LogFile, "can't open file", &e);
             });
 
         if let Inner::Active(ref mut o_rotation_state, ref mut log_file) = self.inner {
@@ -344,7 +346,7 @@ impl State {
 
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
-            self.initialize().unwrap();
+            self.initialize().unwrap(/*validate_logs*/);
         }
         if let Inner::Active(ref mut o_rotation_state, _) = self.inner {
             let path = self.config.file_spec.as_pathbuf(
@@ -352,18 +354,18 @@ impl State {
                     .as_ref()
                     .map(|_| super::state::CURRENT_INFIX),
             );
-            let f = File::open(path).unwrap();
+            let f = File::open(path).unwrap(/*validate_logs*/);
             let mut reader = BufReader::new(f);
             let mut buf = String::new();
             for tuple in expected {
                 buf.clear();
-                reader.read_line(&mut buf).unwrap();
+                reader.read_line(&mut buf).unwrap(/*validate_logs*/);
                 assert!(buf.contains(&tuple.0), "Did not find tuple.0 = {}", tuple.0);
                 assert!(buf.contains(&tuple.1), "Did not find tuple.1 = {}", tuple.1);
                 assert!(buf.contains(&tuple.2), "Did not find tuple.2 = {}", tuple.2);
             }
             buf.clear();
-            reader.read_line(&mut buf).unwrap();
+            reader.read_line(&mut buf).unwrap(/*validate_logs*/);
             assert!(
                 buf.is_empty(),
                 "Found more log lines than expected: {} ",
@@ -379,15 +381,6 @@ impl State {
             }
             writer.flush().ok();
         }
-    }
-}
-
-impl std::fmt::Debug for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        f.write_fmt(format_args!(
-            "Config: {:?}, Inner: {:?}",
-            self.config, self.inner
-        ))
     }
 }
 
@@ -569,14 +562,14 @@ fn rotate_output_file_to_date(
         let mut number = if vec.is_empty() {
             0
         } else {
-            rotated_path = vec.pop().unwrap(/*Ok*/);
+            rotated_path = vec.pop().unwrap(/*ok*/);
             let file_stem = rotated_path
                 .file_stem()
                 .unwrap(/*ok*/)
                 .to_string_lossy()
                 .to_string();
-            let index = file_stem.find(".restart-").unwrap();
-            file_stem[(index + 9)..].parse::<usize>().unwrap()
+            let index = file_stem.find(".restart-").unwrap(/*ok*/);
+            file_stem[(index + 9)..].parse::<usize>().unwrap(/*ok*/)
         };
 
         while (*rotated_path).exists() {
@@ -668,21 +661,13 @@ mod platform {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {
-                eprintln!(
-                    "[flexi_logger] deleting old symlink to log file failed with {:?}",
-                    e
-                );
+                eprint_err(ERRCODE::Symlink, "cannot delete symlink to log file", e);
             }
         }
 
         // create new symlink
         if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
-            eprintln!(
-                "[flexi_logger] cannot create symlink {:?} for logfile \"{}\" due to {:?}",
-                link,
-                &logfile.display(),
-                e
-            );
+            eprint_err(ERRCODE::Symlink, "cannot create symlink to logfile", e);
         }
     }
 

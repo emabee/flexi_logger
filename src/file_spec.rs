@@ -63,7 +63,7 @@ impl FileSpec {
         } else {
             Ok(FileSpec {
                 directory: p.parent().unwrap(/*cannot fail*/).to_path_buf(),
-                basename: p.file_stem().unwrap().to_string_lossy().to_string(),
+                basename: p.file_stem().unwrap(/*ok*/).to_string_lossy().to_string(),
                 o_discriminant: None,
                 o_suffix: p.extension().map(|s| s.to_string_lossy().to_string()),
                 timestamp_cfg: TimestampCfg::No,

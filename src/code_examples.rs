@@ -87,7 +87,7 @@
 //!
 //! With [`Logger::write_mode`](crate::Logger::write_mode)
 //! you have some options to change this behavior, e.g.
-//! - with [`WriteMode::BufferAndFlush`](crate::WriteMode::BufferAndFlush),
+//! - with [`WriteMode::BufferAndFlushWith`](crate::WriteMode::BufferAndFlushWith),
 //!   you can reduce the program's I/O overhead and thus increase overall performance,
 //!   which can be relevant if logging is used heavily.
 //!   In addition, to keep a short maximum wait time
@@ -106,7 +106,8 @@
 //!   }
 //!   ```
 //!
-//! - with [`WriteMode::Async`](crate::WriteMode::Async),
+//! - with [`WriteMode::Async`](crate::WriteMode::Async)
+//!   or [`WriteMode::AsyncWith`](crate::WriteMode::AsyncWith),
 //!   logs are sent from your application threads through an unbounded channel
 //!   to an output thread, which does the output (and the rotation and the cleanup, if applicable).
 //!   Additionally the output is buffered, and a bounded message pool is used to reduce allocations,
@@ -457,7 +458,6 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
 //!
 //! ## Miscellaneous
 //!

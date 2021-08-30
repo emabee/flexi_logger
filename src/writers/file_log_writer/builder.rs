@@ -1,18 +1,17 @@
 use crate::flexi_error::FlexiLoggerError;
 use crate::formats::default_format;
-use crate::FileSpec;
-use crate::FormatFunction;
-use crate::{Cleanup, Criterion, Naming};
+use crate::{Cleanup, Criterion, FileSpec, FormatFunction, Naming, WriteMode};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use super::{Config, FileLogWriter, RotationConfig, State};
+use super::{Config, FileLogWriter, LogWriter, RotationConfig, State};
 
 /// Builder for [`FileLogWriter`].
 #[allow(clippy::module_name_repetitions)]
 pub struct FileLogWriterBuilder {
     cfg_print_message: bool,
     cfg_append: bool,
-    cfg_write_mode: FlWriteMode,
+    cfg_write_mode: WriteMode,
     file_spec: FileSpec,
     cfg_o_create_symlink: Option<PathBuf>,
     cfg_line_ending: &'static [u8],
@@ -30,7 +29,7 @@ impl FileLogWriterBuilder {
             cfg_print_message: false,
             file_spec,
             cfg_append: false,
-            cfg_write_mode: FlWriteMode::DontBuffer,
+            cfg_write_mode: WriteMode::Direct,
             cfg_o_create_symlink: None,
             cfg_line_ending: super::UNIX_LINE_ENDING,
             format: default_format,
@@ -65,7 +64,7 @@ impl FileLogWriterBuilder {
     /// `use_background_thread = false`; the cleanup is then done synchronously
     /// by the thread that is currently logging and - by chance - causing a file rotation.
     ///
-    /// With an [asynchronous write mode](crate::WriteMode::Async),
+    /// With [`WriteMode::AsyncWith`](crate::WriteMode::AsyncWith),
     /// the cleanup activities are always done by the same background thread
     /// that also does the file I/O, this method then has no effect.
     #[must_use]
@@ -147,17 +146,14 @@ impl FileLogWriterBuilder {
 
     /// Sets the write mode for the `FileLogWriter`.
     ///
-    /// See [`FlWriteMode`] for more (important!) details.
+    /// See [`WriteMode`] for more (important!) details.
     #[must_use]
-    pub fn write_mode(mut self, write_mode: FlWriteMode) -> Self {
+    pub fn write_mode(mut self, write_mode: WriteMode) -> Self {
         self.cfg_write_mode = write_mode;
         self
     }
 
-    pub(crate) fn assert_write_mode(
-        &self,
-        write_mode: FlWriteMode,
-    ) -> Result<(), FlexiLoggerError> {
+    pub(crate) fn assert_write_mode(&self, write_mode: WriteMode) -> Result<(), FlexiLoggerError> {
         if self.cfg_write_mode == write_mode {
             Ok(())
         } else {
@@ -166,7 +162,7 @@ impl FileLogWriterBuilder {
     }
 
     #[must_use]
-    pub(crate) fn fl_write_mode(&self) -> &FlWriteMode {
+    pub(crate) fn get_write_mode(&self) -> &WriteMode {
         &self.cfg_write_mode
     }
 
@@ -177,10 +173,28 @@ impl FileLogWriterBuilder {
     /// `FlexiLoggerError::Io` if the specified path doesn't work.
     pub fn try_build(self) -> Result<FileLogWriter, FlexiLoggerError> {
         Ok(FileLogWriter::new(
-            self.format,
             self.try_build_state()?,
             self.max_log_level,
+            self.format,
         ))
+    }
+
+    /// Produces the `FileLogWriter` and a handle that is connected with it.
+    ///
+    /// This allows handing out the `FileLogWriter` instance to methods that consume it, and still
+    /// be able to influence it via the handle.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Io` if the specified path doesn't work.
+    pub fn try_build_with_handle(
+        self,
+    ) -> Result<(ArcFileLogWriter, FileLogWriterHandle), FlexiLoggerError> {
+        Ok(ArcFileLogWriter::new(FileLogWriter::new(
+            self.try_build_state()?,
+            self.max_log_level,
+            self.format,
+        )))
     }
 
     pub(crate) fn try_build_state(&self) -> Result<State, FlexiLoggerError> {
@@ -193,12 +207,17 @@ impl FileLogWriterBuilder {
         };
 
         #[cfg(feature = "async")]
-        let cleanup_in_background_thread =
-            if let FlWriteMode::BufferAsync(_, _, _) = self.cfg_write_mode {
-                false
-            } else {
-                self.cleanup_in_background_thread
-            };
+        let cleanup_in_background_thread = if let WriteMode::AsyncWith {
+            bufsize: _,
+            pool_capa: _,
+            message_capa: _,
+            flush_interval: _,
+        } = self.cfg_write_mode
+        {
+            false
+        } else {
+            self.cleanup_in_background_thread
+        };
         #[cfg(not(feature = "async"))]
         let cleanup_in_background_thread = self.cleanup_in_background_thread;
 
@@ -271,34 +290,34 @@ impl FileLogWriterBuilder {
     }
 }
 
-/// Write modes for the `FileLogWriter`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum FlWriteMode {
-    /// Write log messages directly to the file, without buffering (this is the default).
-    DontBuffer,
-    /// Use a buffer when writing log messages to the file.
-    Buffer(usize),
-    /// Send log messages to a dedicated output thread, using a channel with a configurable
-    /// capacity, and a pool for the messages with configurable size, and a max capacity
-    /// for the elements that are pooled
-    /// Lets the FileLogWriter send logs through an unbounded channel to an output thread, which
-    /// does the file I/O, the rotation, and the cleanup.
-    ///
-    /// Uses buffered I/O (with buffer size .0),
-    /// and a bounded message pool (with capacity .1),
-    /// and an initial capacity for the message buffers (.2).
-    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-    #[cfg(feature = "async")]
-    BufferAsync(usize, usize, usize),
+/// A shareable `FileLogWriter` with a handle.
+pub struct ArcFileLogWriter(Arc<FileLogWriter>);
+impl ArcFileLogWriter {
+    pub(crate) fn new(flw: FileLogWriter) -> (Self, FileLogWriterHandle) {
+        let a_flw = Arc::new(flw);
+        let handle = FileLogWriterHandle(a_flw.clone());
+        (Self(a_flw), handle)
+    }
 }
-impl FlWriteMode {
-    #[must_use]
-    pub(crate) fn buffersize(&self) -> Option<usize> {
-        match self {
-            Self::DontBuffer => None,
-            Self::Buffer(bufsize) => Some(*bufsize),
-            #[cfg(feature = "async")]
-            Self::BufferAsync(bufsize, _poolsize, _elementsize) => Some(*bufsize),
-        }
+impl Clone for ArcFileLogWriter {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+impl std::io::Write for ArcFileLogWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        (*self.0).plain_write(buffer)
+    }
+    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
+        LogWriter::flush(&*self.0)
+    }
+}
+
+/// Handle to the `FileLogWriter` in an `ArcFileLogWriter`
+/// that shuts down the `FileLogWriter` in its `Drop` implementation.
+pub struct FileLogWriterHandle(Arc<FileLogWriter>);
+impl Drop for FileLogWriterHandle {
+    fn drop(&mut self) {
+        self.0.shutdown();
     }
 }

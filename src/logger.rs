@@ -3,14 +3,18 @@ use crate::flexi_logger::FlexiLogger;
 use crate::formats::default_format;
 #[cfg(feature = "atty")]
 use crate::formats::AdaptiveFormat;
+#[cfg(feature = "specfile_without_notification")]
+use crate::logger_handle::LogSpecSubscriber;
 use crate::primary_writer::PrimaryWriter;
-use crate::writers::{FileLogWriter, FileLogWriterBuilder, FlWriteMode, LogWriter};
+#[cfg(feature = "specfile")]
+use crate::util::{eprint_err, ERRCODE};
+use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
+use crate::WriteMode;
 use crate::{
     Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
-    Naming, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL,
+    Naming,
 };
-#[cfg(feature = "async")]
-use crate::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
+
 #[cfg(feature = "specfile")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
@@ -61,7 +65,7 @@ pub struct Logger {
     format_for_writer: FormatFunction,
     #[cfg(feature = "colors")]
     o_palette: Option<String>,
-    o_flush_wait: Option<std::time::Duration>,
+    flush_interval: std::time::Duration,
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
@@ -115,15 +119,10 @@ impl Logger {
     }
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
-        // FIXME no replacement???
-        // #[cfg(feature = "colors")]
-        // {
-        //     // Enable ASCII escape sequence support on Windows consoles,
-        //     // but disable coloring on unsupported Windows consoles
-        //     if cfg!(windows) && !yansi::Paint::enable_windows_ascii() {
-        //         yansi::Paint::disable();
-        //     }
-        // }
+        #[cfg(feature = "colors")]
+        if cfg!(windows) {
+            ansi_term::enable_ansi_support().ok();
+        }
 
         Self {
             spec,
@@ -153,7 +152,7 @@ impl Logger {
             format_for_writer: default_format,
             #[cfg(feature = "colors")]
             o_palette: None,
-            o_flush_wait: None,
+            flush_interval: Duration::from_secs(0),
             flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
             filter: None,
@@ -354,6 +353,9 @@ impl Logger {
     /// used for error messages, and so on. The `-` means that no coloring is done,
     /// i.e., with `"-;-;-;-;-"` all coloring is switched off.
     ///
+    /// Prefixing a number with 'b' makes the output being written in bold.
+    /// The String `"b1;3;2;4;6"` e.g. describes the palette used by `env_logger`.
+    ///
     /// The palette can further be overridden at runtime by setting the environment variable
     /// `FLEXI_LOGGER_PALETTE` to a palette String. This allows adapting the used text colors to
     /// differently colored terminal backgrounds.
@@ -488,8 +490,8 @@ impl Logger {
     /// See [`WriteMode`] for more (important!) details.
     #[must_use]
     pub fn write_mode(mut self, write_mode: WriteMode) -> Self {
-        self.flwb = self.flwb.write_mode(write_mode.get_fl_write_mode());
-        self.o_flush_wait = write_mode.get_duration();
+        self.flwb = self.flwb.write_mode(write_mode.without_flushing());
+        self.flush_interval = write_mode.get_flush_interval();
         self
     }
 
@@ -609,10 +611,10 @@ impl Logger {
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
-                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.fl_write_mode())
+                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.get_write_mode())
             }
             LogTarget::StdErr => {
-                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.fl_write_mode())
+                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.get_write_mode())
             }
             LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
@@ -637,7 +639,8 @@ impl Logger {
 
         let a_other_writers = Arc::new(self.other_writers);
 
-        if let Some(wait_time) = self.o_flush_wait {
+        if self.flush_interval != Duration::from_secs(0) {
+            let flush_interval = self.flush_interval;
             let pw = Arc::clone(&a_primary_writer);
             let ows = Arc::clone(&a_other_writers);
             std::thread::Builder::new()
@@ -646,7 +649,7 @@ impl Logger {
                 .spawn(move || {
                     let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
                     loop {
-                        receiver.recv_timeout(wait_time).ok();
+                        receiver.recv_timeout(flush_interval).ok();
                         pw.flush().ok();
                         for w in ows.values() {
                             w.flush().ok();
@@ -743,7 +746,7 @@ impl Logger {
         // Make logging work, before caring for the specfile
         let (boxed_logger, handle) = self.build()?;
         log::set_boxed_logger(boxed_logger)?;
-        setup_specfile(specfile, handle.clone())?;
+        subscribe_to_specfile(specfile, handle.clone())?;
         Ok(handle)
     }
 
@@ -762,18 +765,19 @@ impl Logger {
         specfile: P,
     ) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         let (boxed_log, handle) = self.build()?;
-        setup_specfile(specfile, handle.clone())?;
+        subscribe_to_specfile(specfile, handle.clone())?;
         Ok((boxed_log, handle))
     }
 }
 
+#[allow(clippy::missing_panics_doc)]
 #[cfg(feature = "specfile_without_notification")]
-fn setup_specfile<P: AsRef<Path>>(
+pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
     specfile: P,
-    mut handle: LoggerHandle,
+    mut subscriber: H,
 ) -> Result<(), FlexiLoggerError> {
-    let specfile = specfile.as_ref().to_owned();
-    synchronize_handle_with_specfile(&mut handle, &specfile)?;
+    let specfile = specfile.as_ref();
+    synchronize_subscriber_with_specfile(&mut subscriber, specfile)?;
 
     #[cfg(feature = "specfile")]
     {
@@ -786,7 +790,10 @@ fn setup_specfile<P: AsRef<Path>>(
         let (tx, rx) = std::sync::mpsc::channel();
         let debouncing_delay = std::time::Duration::from_millis(1000);
         let mut watcher = watcher(tx, debouncing_delay)?;
-        watcher.watch(&specfile.parent().unwrap(), RecursiveMode::NonRecursive)?;
+        watcher.watch(
+            &specfile.parent().unwrap(/*cannot fail*/),
+            RecursiveMode::NonRecursive,
+        )?;
 
         // in a separate thread, reread the specfile when it was updated
         std::thread::Builder::new()
@@ -799,24 +806,28 @@ fn setup_specfile<P: AsRef<Path>>(
                         Ok(debounced_event) => match debounced_event {
                             DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
                                 if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                                    match log_spec_string_from_file(&specfile)
+                                    log_spec_string_from_file(&specfile)
                                         .map_err(FlexiLoggerError::SpecfileIo)
                                         .and_then(|s| LogSpecification::from_toml(&s))
-                                    {
-                                        Ok(spec) => handle.set_new_spec(spec),
-                                        Err(e) => eprintln!(
-                                            "[flexi_logger] rereading the log specification file \
-                                             failed with {:?}, \
-                                             continuing with previous log specification",
-                                            e
-                                        ),
-                                    }
+                                        .and_then(|spec| subscriber.set_new_spec(spec))
+                                        .map_err(|e| {
+                                            eprint_err(ERRCODE::LogSpecFile,
+                                            "continuing with previous log specification, because \
+                                             rereading the log specification file failed",
+                                            &e
+                                        );
+                                        })
+                                        .ok();
                                 }
                             }
                             _event => {}
                         },
                         Err(e) => {
-                            eprintln!("[flexi_logger] error while watching the specfile: {:?}", e);
+                            eprint_err(
+                                ERRCODE::LogSpecFile,
+                                "error while watching the specfile",
+                                &e,
+                            );
                         }
                     }
                 }
@@ -828,8 +839,8 @@ fn setup_specfile<P: AsRef<Path>>(
 // If the specfile exists, read the file and update the log_spec from it;
 // otherwise try to create the file, with the current spec as content, under the specified name.
 #[cfg(feature = "specfile_without_notification")]
-pub(crate) fn synchronize_handle_with_specfile(
-    handle: &mut LoggerHandle,
+pub(crate) fn synchronize_subscriber_with_specfile<H: LogSpecSubscriber>(
+    subscriber: &mut H,
     specfile: &Path,
 ) -> Result<(), FlexiLoggerError> {
     if specfile
@@ -846,7 +857,7 @@ pub(crate) fn synchronize_handle_with_specfile(
 
     if Path::is_file(specfile) {
         let s = log_spec_string_from_file(specfile).map_err(FlexiLoggerError::SpecfileIo)?;
-        handle.set_new_spec(LogSpecification::from_toml(&s)?);
+        subscriber.set_new_spec(LogSpecification::from_toml(&s)?)?;
     } else {
         if let Some(specfolder) = specfile.parent() {
             std::fs::DirBuilder::new()
@@ -860,11 +871,7 @@ pub(crate) fn synchronize_handle_with_specfile(
             .open(specfile)
             .map_err(FlexiLoggerError::SpecfileIo)?;
 
-        handle
-            .current_spec()
-            .read()
-            .map_err(|_e| FlexiLoggerError::Poison)?
-            .to_toml(&mut file)?;
+        subscriber.initial_spec()?.to_toml(&mut file)?;
     }
     Ok(())
 }
@@ -896,124 +903,4 @@ pub enum Duplicate {
     Trace,
     /// All messages are duplicated.
     All,
-}
-
-/// Describes whether the log output should be written synchronously or asynchronously,
-/// and if and how I/O should be buffered and flushed.
-///
-/// Is used in [`Logger::write_mode`].
-///
-/// Buffering reduces the program's I/O overhead, and thus increases overall performance,
-/// which can become relevant if logging is used heavily.
-/// On the other hand, if logging is used with low frequency,
-/// buffering can defer the appearance of log lines significantly,
-/// so regular flushing is usually advisable with buffering.
-///
-/// **Note** that for all options except `Direct` you should keep the [`LoggerHandle`] alive
-/// up to the very end of your program to ensure that all buffered log lines are flushed out
-/// (which happens automatically when the [`LoggerHandle`] is dropped)
-/// before the program terminates.
-/// [See here for an example](code_examples/index.html#choose-the-write-mode).
-///
-/// **Note** further that flushing uses an extra thread (with minimal stack).
-///
-/// The console is a slow output device (at least on Windows).
-/// With `WriteMode::Async` it can happen that in phases with vast log output
-/// the log lines appear significantly later than they were written.
-/// Also, a final printing phase is possible at the end of the program when the logger handle
-/// is dropped (and all output is flushed automatically).
-///
-/// `WriteMode::Direct` (i.e. without buffering) is the slowest option with all output devices,
-/// showing that buffered I/O pays off. But it takes slightly more resources, especially
-/// if you do not suppress flushing.
-///
-/// Using `log_to_stdout()` and then redirecting the output to a file makes things faster,
-/// but is still significantly slower than writing to files directly.
-///
-#[derive(Copy, Clone)]
-pub enum WriteMode {
-    /// Do not buffer (default).
-    ///
-    /// Every log line is directly written to the output, without buffering.
-    /// This allows seeing new log lines in real time, and does not need additional threads.
-    Direct,
-
-    /// Buffer with default capacity ([`DEFAULT_BUFFER_CAPACITY`])
-    /// and flush with default interval ([`DEFAULT_FLUSH_INTERVAL`]).
-    BufferAndFlush,
-
-    /// Buffer and  flush with given buffer capacity and flush interval.
-    BufferAndFlushWith(usize, Duration),
-
-    /// Log lines are sent through an unbounded channel to an output thread, which
-    /// does the I/O, and, if `log_to_file()` is chosen, also the rotation and the cleanup.
-    ///
-    /// Uses buffered output to reduce overhead, and a bounded message pool to reduce allocations.
-    /// The log output is flushed regularly with the given interval.
-    ///
-    /// See [here](code_examples/index.html#choose-the-write-mode) for an example.
-    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-    #[cfg(feature = "async")]
-    Async,
-
-    /// Like Async, but allows using non-default parameter values.
-    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-    #[cfg(feature = "async")]
-    AsyncWith {
-        /// Size of the output buffer for the file.
-        bufsize: usize,
-        /// Capacity of the pool for the message buffers.
-        pool_capa: usize,
-        /// Capacity of an individual message buffer.
-        message_capa: usize,
-        /// The interval for flushing the output.
-        flush_interval: Duration,
-    },
-
-    /// Buffer, but don't flush.
-    ///
-    /// This might be handy if you want to minimize I/O but don't want to create
-    /// the extra thread for flushing and don't care if log lines appear with delay.
-    BufferDontFlush,
-}
-impl WriteMode {
-    fn get_fl_write_mode(&self) -> FlWriteMode {
-        match self {
-            Self::Direct => FlWriteMode::DontBuffer,
-            Self::BufferDontFlush | Self::BufferAndFlush => {
-                FlWriteMode::Buffer(DEFAULT_BUFFER_CAPACITY)
-            }
-            Self::BufferAndFlushWith(bufsize, _) => FlWriteMode::Buffer(*bufsize),
-            #[cfg(feature = "async")]
-            Self::Async => FlWriteMode::BufferAsync(
-                DEFAULT_BUFFER_CAPACITY,
-                DEFAULT_POOL_CAPA,
-                DEFAULT_MESSAGE_CAPA,
-            ),
-            #[cfg(feature = "async")]
-            Self::AsyncWith {
-                bufsize,
-                pool_capa,
-                message_capa,
-                flush_interval: _,
-            } => FlWriteMode::BufferAsync(*bufsize, *pool_capa, *message_capa),
-        }
-    }
-    fn get_duration(&self) -> Option<Duration> {
-        #[allow(clippy::match_same_arms)]
-        match self {
-            Self::Direct | Self::BufferDontFlush => None,
-            Self::BufferAndFlush => Some(DEFAULT_FLUSH_INTERVAL),
-            Self::BufferAndFlushWith(_, flush_interval) => Some(*flush_interval),
-            #[cfg(feature = "async")]
-            Self::Async => Some(DEFAULT_FLUSH_INTERVAL),
-            #[cfg(feature = "async")]
-            Self::AsyncWith {
-                bufsize: _,
-                pool_capa: _,
-                message_capa: _,
-                flush_interval,
-            } => Some(*flush_interval),
-        }
-    }
 }

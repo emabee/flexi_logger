@@ -51,34 +51,32 @@ mod logger;
 mod logger_handle;
 mod parameters;
 mod primary_writer;
+#[cfg(feature = "trc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "trc")))]
+pub mod trc;
+mod write_mode;
 
 pub mod code_examples;
 pub mod filter;
 mod util;
 pub mod writers;
 
+pub mod error_info;
+
 pub use crate::deferred_now::DeferredNow;
 pub use crate::file_spec::FileSpec;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
-pub use crate::logger::{Duplicate, Logger, WriteMode};
+pub use crate::logger::{Duplicate, Logger};
 pub use crate::logger_handle::LoggerHandle;
 pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
+pub(crate) use crate::write_mode::EffectiveWriteMode;
+pub use crate::write_mode::WriteMode;
 
-/// Default buffer capacity (8k), when buffering is used.
-pub const DEFAULT_BUFFER_CAPACITY: usize = 8 * 1024;
-
-/// Default flush interval (1s), when flushing is used.
-pub const DEFAULT_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
-
-/// Default size of the message pool that is used with [`WriteMode::Async`];
-/// a higher value could further reduce allocations during log file rotation and cleanup.
-pub const DEFAULT_POOL_CAPA: usize = 50;
-
-/// Default capacity for the message buffers that are used with [`WriteMode::Async`];
-/// a higher value reduces allocations when longer log lines are used.
-pub const DEFAULT_MESSAGE_CAPA: usize = 200;
+pub use crate::write_mode::{DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL};
+#[cfg(feature = "async")]
+pub use crate::write_mode::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};

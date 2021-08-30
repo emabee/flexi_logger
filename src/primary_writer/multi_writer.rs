@@ -64,7 +64,14 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(self.format_for_stderr, now, record, &mut std::io::stderr())?;
+            write_buffered(
+                self.format_for_stderr,
+                now,
+                record,
+                &mut std::io::stderr(),
+                #[cfg(test)]
+                None,
+            )?;
         }
 
         if match self.duplicate_stdout {
@@ -75,7 +82,14 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(self.format_for_stdout, now, record, &mut std::io::stdout())?;
+            write_buffered(
+                self.format_for_stdout,
+                now,
+                record,
+                &mut std::io::stdout(),
+                #[cfg(test)]
+                None,
+            )?;
         }
 
         if let Some(ref writer) = self.o_file_writer {
@@ -101,7 +115,7 @@ impl LogWriter for MultiWriter {
                     .iter(),
             )
             .max()
-            .unwrap()
+            .unwrap(/*ok*/)
     }
 
     fn flush(&self) -> std::io::Result<()> {

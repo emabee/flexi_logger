@@ -1,4 +1,5 @@
 use crate::primary_writer::PrimaryWriter;
+use crate::util::{eprint_err, ERRCODE};
 use crate::writers::{FileLogWriterBuilder, LogWriter};
 use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
@@ -101,11 +102,6 @@ impl LoggerHandle {
         }
     }
 
-    #[cfg(feature = "specfile_without_notification")]
-    pub(crate) fn current_spec(&self) -> Arc<RwLock<LogSpecification>> {
-        Arc::clone(&self.spec)
-    }
-
     //
     pub(crate) fn reconfigure(&self, mut max_level: log::LevelFilter) {
         for w in self.other_writers.as_ref().values() {
@@ -118,7 +114,11 @@ impl LoggerHandle {
     #[allow(clippy::missing_panics_doc)]
     pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
         let max_level = new_spec.max_level();
-        self.spec.write().unwrap(/* catch and expose error? */).update_from(new_spec);
+        self.spec
+            .write()
+            .map_err(|e| eprint_err(ERRCODE::Poison, "rwlock on log spec is poisoned", &e))
+            .unwrap(/*ok*/)
+            .update_from(new_spec);
         self.reconfigure(max_level);
     }
 
@@ -232,5 +232,35 @@ impl Drop for LoggerHandle {
         for writer in self.other_writers.values() {
             writer.shutdown();
         }
+    }
+}
+
+/// Trait that allows to register for changes to the log specification.
+#[cfg(feature = "specfile_without_notification")]
+pub trait LogSpecSubscriber: 'static + Send {
+    /// Apply a new `LogSpecification`.
+    ///
+    /// # Errors
+    fn set_new_spec(&mut self, new_spec: LogSpecification) -> Result<(), FlexiLoggerError>;
+
+    /// Provide the current log spec.
+    ///
+    /// # Errors
+    fn initial_spec(&self) -> Result<LogSpecification, FlexiLoggerError>;
+}
+#[cfg(feature = "specfile_without_notification")]
+impl LogSpecSubscriber for LoggerHandle {
+    fn set_new_spec(&mut self, new_spec: LogSpecification) -> Result<(), FlexiLoggerError> {
+        let max_level = new_spec.max_level();
+        self.spec
+            .write()
+            .map_err(|_| FlexiLoggerError::Poison)?
+            .update_from(new_spec);
+        self.reconfigure(max_level);
+        Ok(())
+    }
+
+    fn initial_spec(&self) -> Result<LogSpecification, FlexiLoggerError> {
+        Ok((*self.spec.read().map_err(|_e| FlexiLoggerError::Poison)?).clone())
     }
 }
