@@ -120,7 +120,8 @@ impl Logger {
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
         #[cfg(feature = "colors")]
-        if cfg!(windows) {
+        #[cfg(windows)]
+        {
             ansi_term::enable_ansi_support().ok();
         }
 
