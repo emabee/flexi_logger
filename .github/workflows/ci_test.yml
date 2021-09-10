@@ -32,7 +32,7 @@ jobs:
       - name: Run cargo check with all features
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --all-features
 
       - name: Run cargo check with "trc"
@@ -44,8 +44,14 @@ jobs:
       - name: Run cargo check with "specfile"
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --features specfile
+
+      - name: Run cargo test with all features
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
@@ -81,7 +87,7 @@ jobs:
       - name: Run cargo check with all features
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --all-features
 
       - name: Run cargo check with "trc"
@@ -93,8 +99,14 @@ jobs:
       - name: Run cargo check with "specfile"
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --features specfile
+
+      - name: Run cargo test with all features
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
 
   check_test_macos:
     name: Check and test macOS
@@ -124,7 +136,7 @@ jobs:
       - name: Run cargo check with all features
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --all-features
 
       - name: Run cargo check with "trc"
@@ -136,10 +148,14 @@ jobs:
       - name: Run cargo check with "specfile"
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: check
           args: --features specfile
 
-
+      - name: Run cargo test with all features
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
 
 
 
