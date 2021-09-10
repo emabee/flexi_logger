@@ -239,6 +239,10 @@ pub enum SyslogConnector {
 }
 impl SyslogConnector {
     /// Returns a [`SyslogConnector::Datagram`] to the specified path.
+    ///
+    /// # Errors
+    ///
+    /// Any kind of I/O error can occur.
     #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
@@ -248,6 +252,10 @@ impl SyslogConnector {
     }
 
     /// Returns a [`SyslogConnector::Stream`] to the specified path.
+    ///
+    /// # Errors
+    ///
+    /// Any kind of I/O error can occur.
     #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
     #[cfg(target_os = "linux")]
     pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
@@ -283,20 +291,22 @@ impl Write for SyslogConnector {
         //     "syslog: got message \"{}\" ",
         //     String::from_utf8_lossy(message)
         // );
+
+        #[allow(clippy::match_same_arms)]
         match *self {
             #[cfg(target_os = "linux")]
             Self::Datagram(ref ud) => {
-                // todo: reconnect of conn is broken
+                // todo: reconnect if conn is broken
                 ud.send(message)
             }
             #[cfg(target_os = "linux")]
             Self::Stream(ref mut w) => {
-                // todo: reconnect of conn is broken
+                // todo: reconnect if conn is broken
                 w.write(message)
                     .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
             }
             Self::Tcp(ref mut w) => {
-                // todo: reconnect of conn is broken
+                // todo: reconnect if conn is broken
                 w.write(message)
             }
             Self::Udp(ref socket) => {
