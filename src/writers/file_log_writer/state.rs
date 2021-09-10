@@ -663,13 +663,13 @@ mod platform {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {
-                eprint_err(ERRCODE::Symlink, "cannot delete symlink to log file", e);
+                eprint_err(ERRCODE::Symlink, "cannot delete symlink to log file", &e);
             }
         }
 
         // create new symlink
         if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
-            eprint_err(ERRCODE::Symlink, "cannot create symlink to logfile", e);
+            eprint_err(ERRCODE::Symlink, "cannot create symlink to logfile", &e);
         }
     }
 
