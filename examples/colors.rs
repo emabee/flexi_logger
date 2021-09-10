@@ -37,10 +37,9 @@ fn main() {
             );
         }
 
-        if cfg!(windows) {
-            if !ansi_term::enable_ansi_support().is_ok() {
-                println!("Unsupported windows console detected, coloring will likely not work");
-            }
+        #[cfg(target_os = "windows")]
+        if !ansi_term::enable_ansi_support().is_ok() {
+            println!("Unsupported windows console detected, coloring will likely not work");
         }
 
         println!(
