@@ -316,6 +316,7 @@ impl Write for SyslogConnector {
         }
     }
 
+    #[allow(clippy::match_same_arms)]
     fn flush(&mut self) -> IoResult<()> {
         match *self {
             #[cfg(target_os = "linux")]
