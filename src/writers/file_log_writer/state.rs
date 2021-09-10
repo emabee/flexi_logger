@@ -650,6 +650,8 @@ fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerErro
 }
 
 mod platform {
+    #[cfg(target_os = "linux")]
+    use crate::util::{eprint_err, ERRCODE};
     use std::path::Path;
 
     pub fn create_symlink_if_possible(link: &Path, path: &Path) {
