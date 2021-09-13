@@ -46,19 +46,7 @@ jobs:
           override: true
           components: clippy
 
-      - name: Run cargo clippy without features
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets --no-default-features -- -D warnings
-
-      - name: Run cargo clippy with default features
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets -- -D warnings
-
-      - name: Run cargo clippy with all features
+      - name: Run cargo clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -67,12 +55,10 @@ jobs:
   build_and_test:
     name: Build and test
     strategy:
-      fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
-        rust: [ stable, nightly, 1.46.0 ]
+        rust: [ stable, 1.46.0 ]
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v2
 
@@ -83,35 +69,13 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Run cargo build without features
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --no-default-features
-
-      - name: Run cargo test without features
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features
-
-      - name: Run cargo build with default features
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-
-      - name: Run cargo test with default features
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-
-      - name: Run cargo build with all features
+      - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all-features
 
-      - name: Run cargo test with all features
+      - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
