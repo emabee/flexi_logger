@@ -3,7 +3,6 @@ use crate::DeferredNow;
 use ansi_term::{Color, Style};
 use log::Record;
 use std::thread;
-// use yansi::{Color, Paint, Style};
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```

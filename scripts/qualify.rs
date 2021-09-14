@@ -83,7 +83,11 @@ fn main() {
         std::process::exit(-1);
     }
     // say goodbye
-    println!("\n> all done :-)  Looks like you're ready to \"cargo publish\"?");
+    println!("\n\
+    > all done :-)  Looks like you're ready to\n\
+    - \"git push external github master\"\n\
+    - \check if the github actions were successful, and then\n\
+    - \"cargo publish\"");
 
     // cleanup
     run_script("cleanup");
