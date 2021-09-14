@@ -39,7 +39,7 @@ fn test_textfilter() {
     let mut buffer = String::new();
     let mut count = 0;
     while reader.read_line(&mut buffer).unwrap() > 0 {
-        if buffer.find("Hello").is_none() {
+        if !buffer.contains("Hello") {
             panic!(
                 "line in log file without Hello {:?}: \"{}\"",
                 filename, buffer

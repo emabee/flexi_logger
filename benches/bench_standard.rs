@@ -1,4 +1,3 @@
-#![feature(extern_crate_item_prelude)]
 #![feature(test)]
 
 extern crate flexi_logger;

@@ -50,7 +50,7 @@ fn multi_threaded() {
         .spawn(move || {
             std::thread::sleep(time::Duration::from_millis(1000));
             logger2.set_new_spec(new_spec);
-            0 as u8
+            0
         })
         .unwrap();
 
@@ -76,7 +76,7 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
                 .name(thread_number.to_string())
                 .spawn(move || {
                     do_work(thread_number);
-                    0 as u8
+                    0
                 })
                 .unwrap(),
         );

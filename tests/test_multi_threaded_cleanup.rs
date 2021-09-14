@@ -72,7 +72,7 @@ mod d {
                     .name(thread_number.to_string())
                     .spawn(move || {
                         do_work(thread_number);
-                        0 as u8
+                        0
                     })
                     .unwrap(),
             );

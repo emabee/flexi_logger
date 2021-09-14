@@ -83,7 +83,7 @@ mod a {
         debug!("This is a debug-2");
         trace!("This is a trace-2");
 
-        let logfile = std::path::Path::new(&std::env::args().nth(0).unwrap())
+        let logfile = std::path::Path::new(&std::env::args().next().unwrap())
             .file_stem()
             .unwrap()
             .to_string_lossy()

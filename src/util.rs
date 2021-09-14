@@ -20,7 +20,7 @@ pub(crate) enum ERRCODE {
     Format,
     Poison,
     LogFile,
-    #[cfg(feature = "specfile_without_notification")]
+    #[cfg(feature = "specfile")]
     LogSpecFile,
     #[cfg(target_os = "linux")]
     Symlink,
@@ -33,7 +33,7 @@ impl ERRCODE {
             Self::Format => "format",
             Self::Poison => "poison",
             Self::LogFile => "logfile",
-            #[cfg(feature = "specfile_without_notification")]
+            #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
             #[cfg(target_os = "linux")]
             Self::Symlink => "symlink",

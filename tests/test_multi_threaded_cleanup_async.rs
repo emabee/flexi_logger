@@ -12,7 +12,7 @@ mod d {
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
     use std::ops::Add;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::thread::{self, JoinHandle};
 
     const NO_OF_THREADS: usize = 5;
@@ -82,7 +82,7 @@ mod d {
                     .name(thread_number.to_string())
                     .spawn(move || {
                         do_work(thread_number);
-                        0 as u8
+                        0
                     })
                     .unwrap(),
             );
@@ -185,7 +185,7 @@ mod d {
         write_csv(directory, "thread_4.csv", &counters.threads[4].1);
     }
 
-    fn inspect_file(p: &PathBuf, counters: &mut Counters) {
+    fn inspect_file(p: &Path, counters: &mut Counters) {
         let buf_reader: Box<dyn BufRead> = if p.extension().unwrap() == "gz" {
             Box::new(BufReader::new(GzDecoder::new(BufReader::new(
                 File::open(p).unwrap(),

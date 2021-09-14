@@ -5,8 +5,8 @@ other output streams, and that can be influenced while the program is running.**
 
 [![Latest version](https://img.shields.io/crates/v/flexi_logger.svg)](https://crates.io/crates/flexi_logger)
 [![Documentation](https://docs.rs/flexi_logger/badge.svg)](https://docs.rs/flexi_logger)
-![License](https://img.shields.io/crates/l/flexi_logger.svg)
-[![Travis CI](https://travis-ci.org/emabee/flexi_logger.svg?branch=master)](https://travis-ci.org/emabee/flexi_logger)
+[![License](https://img.shields.io/crates/l/flexi_logger.svg)](https://github.com/emabee/flexi_logger)
+[![Build](https://img.shields.io/github/workflow/status/emabee/flexi_logger/CI/master)](https://github.com/emabee/flexi_logger/actions?query=workflow%3ACI)
 
 ## Usage
 

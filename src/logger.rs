@@ -771,7 +771,6 @@ impl Logger {
     }
 }
 
-#[allow(clippy::missing_panics_doc)]
 #[cfg(feature = "specfile_without_notification")]
 pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
     specfile: P,

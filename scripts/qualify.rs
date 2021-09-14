@@ -61,6 +61,8 @@ fn main() {
     // Clippy in important variants
     run_command!("cargo", "clippy", "--", "-D", "warnings");
     run_command!("cargo", "clippy", "--all-features", "--", "-D", "warnings");
+    #[rustfmt::skip]
+    run_command!("cargo", "+nightly", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings");
 
     // Run tests in important variants
     run_command!("cargo", "test", "--release", "--all-features");
@@ -83,11 +85,13 @@ fn main() {
         std::process::exit(-1);
     }
     // say goodbye
-    println!("\n\
+    println!(
+        "\n\
     > all done :-)  Looks like you're ready to\n\
-    - \"git push external github master\"\n\
-    - \check if the github actions were successful, and then\n\
-    - \"cargo publish\"");
+    - \"git push\"\n\
+    - check if the github actions were successful, and then\n\
+    - \"cargo publish\""
+    );
 
     // cleanup
     run_script("cleanup");
