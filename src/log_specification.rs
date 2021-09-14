@@ -666,7 +666,7 @@ mod tests {
         ];
         for s in &ss {
             let spec = LogSpecification::parse(s).unwrap();
-            assert_eq!(s, spec.to_string().as_str());
+            assert_eq!(*s, spec.to_string().as_str());
         }
         assert_eq!("", LogSpecification::default().to_string().as_str());
     }
