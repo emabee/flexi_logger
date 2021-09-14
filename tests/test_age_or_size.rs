@@ -14,7 +14,7 @@ fn test_age_or_size() {
         .log_to_file(FileSpec::default().directory(directory.clone()))
         .duplicate_to_stderr(Duplicate::Info)
         .rotate(
-            Criterion::AgeOrSize(Age::Second, 80),
+            Criterion::AgeOrSize(Age::Second, 75),
             Naming::Numbers,
             Cleanup::Never,
         )
@@ -95,11 +95,12 @@ fn verify_logs(directory: &str) {
         let mut buffer = String::new();
         while reader.read_line(&mut buffer).unwrap() > 0 {
             line_count += 1;
-            buffer.clear();
+            // buffer.clear();
         }
         assert_eq!(
             line_count, expected_line_counts[index],
-            "file has wrong size"
+            "file {:?} has wrong line count\n{}",
+            pathbuf, buffer
         );
         total_line_count += line_count;
     }
