@@ -22,13 +22,12 @@ fn multi_threaded() {
     // verify that all log lines are written correctly
 
     let start = Local::now();
-    let directory = define_directory();
     let logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_file(
             FileSpec::default()
                 .basename("test_mtn")
-                .directory(directory.clone()),
+                .directory(define_directory()),
         )
         .write_mode(WriteMode::BufferAndFlush)
         .format(test_format)
@@ -47,6 +46,7 @@ fn multi_threaded() {
         "create a huge number of log lines with a considerable number of threads, verify the log"
     );
 
+    #[allow(clippy::redundant_clone)]
     let mut logger2 = logger.clone();
     let worker_handles = start_worker_threads(NO_OF_THREADS);
     let new_spec = LogSpecification::parse("trace").unwrap();
@@ -54,7 +54,7 @@ fn multi_threaded() {
         .spawn(move || {
             std::thread::sleep(time::Duration::from_millis(1000));
             logger2.set_new_spec(new_spec);
-            0 as u8
+            0
         })
         .unwrap();
 
@@ -78,7 +78,7 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
                 .name(thread_number.to_string())
                 .spawn(move || {
                     do_work(thread_number);
-                    0 as u8
+                    0
                 })
                 .unwrap(),
         );

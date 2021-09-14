@@ -664,7 +664,7 @@ mod tests {
             "crate1::mod1=error,crate1::mod2=trace,crate2=debug",
             "debug,crate1::mod2=trace,crate2=error",
         ];
-        for s in ss {
+        for s in &ss {
             let spec = LogSpecification::parse(s).unwrap();
             assert_eq!(s, spec.to_string().as_str());
         }
