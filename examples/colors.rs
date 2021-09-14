@@ -11,7 +11,7 @@ fn main() {
             println!("{}: {}", i, Color::Fixed(i).paint(i.to_string()));
         }
 
-        println!("");
+        println!();
 
         if atty::is(Stdout) {
             println!(
@@ -54,7 +54,7 @@ fn main() {
                 .bold()
                 .paint("warn! output (yellow) with default palette")
         );
-        println!("{}", "info! output (normal) with default palette");
+        println!("info! output (normal) with default palette");
         println!(
             "{}",
             Color::Fixed(7).paint("debug! output (normal) with default palette")
