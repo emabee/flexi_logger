@@ -40,7 +40,7 @@ impl SyncHandle {
                 .name("flexi_logger-flusher".to_string())
                 .stack_size(128)
                 .spawn(move || {
-                    let (_, receiver): (
+                    let (_sender, receiver): (
                         std::sync::mpsc::Sender<()>,
                         std::sync::mpsc::Receiver<()>,
                     ) = std::sync::mpsc::channel();
@@ -140,7 +140,7 @@ impl AsyncHandle {
                 .name("flexi_logger-flusher".to_string())
                 .stack_size(128)
                 .spawn(move || {
-                    let (_, receiver): (
+                    let (_sender, receiver): (
                         std::sync::mpsc::Sender<()>,
                         std::sync::mpsc::Receiver<()>,
                     ) = std::sync::mpsc::channel();
