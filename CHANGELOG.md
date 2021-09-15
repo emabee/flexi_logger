@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.19.0] - 2021-09-10
+## [0.19.4] - 2021-09-15
+
+Fix [issue-94](https://github.com/emabee/flexi_logger/issues/94) -
+kudos goes to [leishiao](https://github.com/leishiao)!
+
+## [0.19.3] - 2021-09-10
+
+Platform-specific fixes, and introduction of github-actions-based CI.
+Kudos to [dallenng](https://github.com/dallenng) and [HEnquist](https://github.com/HEnquist)!
 
 `FileLogWriter` has been functionally extended to make it usable "stand-alone".
 As part of that, the `FlWriteMode` is gone, and the normal `WriteMode` is used.
@@ -18,7 +26,8 @@ with `tracing`.
 Error handling is improved, error codes are documented comprehensively,
 errors now also print a link to the error documentation.
 
-Default color for DEBUG lines was changed (fixes issue#88).
+Default color for DEBUG lines was changed
+(fixes [issue-88](https://github.com/emabee/flexi_logger/issues/88), kudos goes to [HEnquist](https://github.com/HEnquist)!).
 
 Test coverage is improved.
 
@@ -58,7 +67,7 @@ Most important changes:
 - A new method `LoggerHandle::reset_flw` allows reconfiguring a used `FileLogWriter` at runtime
 
 Added an option to apply a stateful filter before log lines are really written
-(kudos to jesdazrez (Jesús Trinidad Díaz Ramírez)).
+(kudos to jesdazrez (Jesús Trinidad Díaz Ramírez)!).
 
 Fixed error handling in logspec parsing (wrong error was thrown).
 
@@ -101,7 +110,7 @@ This is a follow-up of a PR, kudos goes to [devzbysiu](https://github.com/devzby
 ## [0.16.1] - 2020-09-20
 
 Support empty toml spec files (kudos to ijackson for
-[pull request 66](https://github.com/emabee/flexi_logger/pull/66))
+[pull request 66](https://github.com/emabee/flexi_logger/pull/66)!)
 (was supposed to be part of 0.16.0, but I had forgotten to merge it).
 
 ## [0.16.0] - 2020-09-19
@@ -158,21 +167,21 @@ Solves [issue-57](https://github.com/emabee/flexi_logger/issues/57).
 
 Add variant Criterion::AgeOrSize
 (kudos to
-[pscott](https://github.com/pscott),
+[pscott](https://github.com/pscott)!,
 [PR-54](https://github.com/emabee/flexi_logger/pull/54)).
 
 ## [0.15.7] - 2020-07-02
 
 Add some Debug derives
 (kudos to
-[pscott](https://github.com/pscott),
+[pscott](https://github.com/pscott)!,
 [PR-52](https://github.com/emabee/flexi_logger/pull/52)).
 
 ## [0.15.6] - 2020-07-02
 
 Introduce separate formatting for stdout
 (kudos to
-[pscott](https://github.com/pscott),
+[pscott](https://github.com/pscott)!,
 [PR-51](https://github.com/emabee/flexi_logger/pull/51)).
 
 Deprecate `Logger::do_not_log()`.
@@ -187,7 +196,7 @@ Add `Logger::duplicate_to_stdout()` to fix
 Fix [issue-45](https://github.com/emabee/flexi_logger/issues/45), which was a panic in
 the specfile watcher when some log files were deleted manually while the program was running
 (kudos to
-[avl](https://github.com/avl),
+[avl](https://github.com/avl)!,
 [PR-46](https://github.com/emabee/flexi_logger/pull/46)).
 
 ## [0.15.3] - 2020-06-04
@@ -208,7 +217,7 @@ Fix default format for files (was and is documented to be uncolored, but was col
 Make the textfilter functionality an optional default feature;
 deselecting it removes the regex crate as a required dependency,
 which reduces the size overhead for any binary using `flexi_logger`
-(kudos to [Petre Eftime](petre.eftime@gmail.com)).
+(kudos to [Petre Eftime](petre.eftime@gmail.com)!).
 
 ## [0.15.0] - 2020-02-27
 

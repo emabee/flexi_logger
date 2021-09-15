@@ -23,6 +23,7 @@ const UNIX_LINE_ENDING: &[u8] = b"\n";
 /// A configurable [`LogWriter`] implementation that writes to a file or a sequence of files.
 ///
 /// See [writers](crate::writers) for usage guidance.
+#[derive(Debug)]
 pub struct FileLogWriter {
     // the state needs to be mutable; since `Log.log()` requires an unmutable self,
     // which translates into a non-mutating `LogWriter::write()`,
@@ -121,12 +122,6 @@ impl LogWriter for FileLogWriter {
 
     fn shutdown(&self) {
         self.state_handle.shutdown();
-    }
-}
-
-impl std::fmt::Debug for FileLogWriter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        f.write_fmt(format_args!("{:?}", self.state_handle))
     }
 }
 

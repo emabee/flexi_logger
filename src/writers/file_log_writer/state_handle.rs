@@ -1,4 +1,6 @@
 use super::{builder::FileLogWriterBuilder, state::State};
+#[cfg(feature = "async")]
+use crate::util::eprint_msg;
 use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
@@ -12,11 +14,11 @@ use crossbeam::{
 };
 use log::Record;
 use std::io::Write;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{mpsc, Arc, Mutex};
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
 
+#[derive(Debug)]
 pub(super) enum StateHandle {
     Sync(SyncHandle),
     #[cfg(feature = "async")]
@@ -41,9 +43,9 @@ impl SyncHandle {
                 .stack_size(128)
                 .spawn(move || {
                     let (_sender, receiver): (
-                        std::sync::mpsc::Sender<()>,
-                        std::sync::mpsc::Receiver<()>,
-                    ) = std::sync::mpsc::channel();
+                        mpsc::Sender<()>,
+                        mpsc::Receiver<()>,
+                    ) = mpsc::channel();
                     loop {
                         receiver.recv_timeout(flush_interval).ok();
                         (*t_am_state).lock().map_or_else(
@@ -94,7 +96,7 @@ impl AsyncHandle {
         let flush_interval = state.config().write_mode.get_flush_interval();
         let line_ending = state.config().line_ending;
         let am_state = Arc::new(Mutex::new(state));
-        let (sender, receiver) = channel::unbounded::<Vec<u8>>();
+        let (async_sender, receiver) = channel::unbounded::<Vec<u8>>();
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
 
         let t_state = Arc::clone(&am_state);
@@ -135,18 +137,24 @@ impl AsyncHandle {
         ));
 
         if flush_interval != std::time::Duration::from_secs(0) {
-            let cloned_sender = sender.clone();
+            let cloned_async_sender = async_sender.clone();
             std::thread::Builder::new()
                 .name("flexi_logger-flusher".to_string())
                 .stack_size(128)
                 .spawn(move || {
                     let (_sender, receiver): (
-                        std::sync::mpsc::Sender<()>,
-                        std::sync::mpsc::Receiver<()>,
-                    ) = std::sync::mpsc::channel();
+                        mpsc::Sender<()>,
+                        mpsc::Receiver<()>,
+                    ) = mpsc::channel();
                     loop {
-                        receiver.recv_timeout(flush_interval).ok();
-                        cloned_sender.send(ASYNC_FLUSH.to_vec()).ok();
+                        if let Err(mpsc::RecvTimeoutError::Disconnected) =
+                            receiver.recv_timeout(flush_interval)
+                        {
+                            eprint_msg(ERRCODE::Flush, "Flushing unexpectedly stopped working");
+                            break;
+                        }
+
+                        cloned_async_sender.send(ASYNC_FLUSH.to_vec()).ok();
                     }
                 })
                 .unwrap(/* yes, let's panic if the thread can't be spawned */);
@@ -154,7 +162,7 @@ impl AsyncHandle {
 
         Self {
             am_state,
-            sender,
+            sender: async_sender,
             mo_thread_handle,
             a_pool,
             message_capa,
@@ -180,9 +188,6 @@ impl AsyncHandle {
             .pop()
             .unwrap_or_else(|| Vec::with_capacity(self.message_capa))
     }
-    // fn send(&self, buffer: Vec<u8>) -> Result<(), SendError<Vec<u8>>> {
-    //     self.sender.send(buffer)
-    // }
 }
 #[cfg(feature = "async")]
 impl std::fmt::Debug for AsyncHandle {
@@ -366,16 +371,6 @@ impl StateHandle {
                     o_th.take().and_then(|th| th.join().ok());
                 }
             }
-        }
-    }
-}
-
-impl std::fmt::Debug for StateHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            Self::Sync(ref sync_handle) => f.write_fmt(format_args!("{:?}", sync_handle)),
-            #[cfg(feature = "async")]
-            Self::Async(ref async_handle) => f.write_fmt(format_args!("{:?}", async_handle)),
         }
     }
 }
