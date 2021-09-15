@@ -73,7 +73,8 @@
 //! Examples:
 //!
 //! ```text
-//! [flexi_logger][ERRCODE::LogSpecFile] continuing with previous log specification, because rereading the log specification file failed, caused by ...
+//! [flexi_logger][ERRCODE::LogSpecFile] continuing with previous log specification,
+//! because rereading the log specification file failed, caused by ...
 //! ```
 //!
 //! The log-specification-file you chose with `Logger::start_with_specfile` cannot be opened,
@@ -89,3 +90,9 @@
 //!
 //! This error can only occur on linux systems, and when you use `Logger::create_symlink`, and
 //! indicates an issue with creating or replacing the symbolic link to the log file.
+//!
+//! ## `WriterSpec`
+//!
+//! The code uses in some log macro call the syntax to send the log line to a certain `LogWriter`,
+//! but this log writer does not exist.
+//!

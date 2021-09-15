@@ -1,6 +1,6 @@
 use crate::filter::LogLineFilter;
 use crate::primary_writer::PrimaryWriter;
-use crate::util::{eprint_err, ERRCODE};
+use crate::util::{eprint_err, eprint_msg, ERRCODE};
 use crate::writers::LogWriter;
 use crate::LogSpecification;
 
@@ -70,7 +70,7 @@ impl log::Log for FlexiLogger {
             for t in targets {
                 if t != "_Default" {
                     match self.other_writers.get(t) {
-                        None => eprintln!("[flexi_logger] bad writer spec: {}", t),
+                        None => eprint_msg(ERRCODE::WriterSpec, &format!("bad writer spec: {}", t)),
                         Some(writer) => {
                             if level < writer.max_log_level() {
                                 return true;
@@ -96,13 +96,13 @@ impl log::Log for FlexiLogger {
                     use_default = true;
                 } else {
                     match self.other_writers.get(t) {
-                        None => eprintln!("[flexi_logger] found bad writer spec: {}", t),
+                        None => eprint_msg(ERRCODE::WriterSpec, &format!("bad writer spec: {}", t)),
                         Some(writer) => {
                             writer.write(&mut now, record).unwrap_or_else(|e| {
-                                eprintln!(
-                                    "[flexi_logger] writing log line to custom writer \"{}\" \
-                                         failed with: \"{}\"",
-                                    t, e
+                                eprint_err(
+                                    ERRCODE::Write,
+                                    &format!("writing log line to custom writer \"{}\" failed", t),
+                                    &e,
                                 );
                             });
                         }

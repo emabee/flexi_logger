@@ -20,6 +20,7 @@ pub(crate) enum ERRCODE {
     Format,
     Poison,
     LogFile,
+    WriterSpec,
     #[cfg(feature = "specfile")]
     LogSpecFile,
     #[cfg(target_os = "linux")]
@@ -33,6 +34,7 @@ impl ERRCODE {
             Self::Format => "format",
             Self::Poison => "poison",
             Self::LogFile => "logfile",
+            Self::WriterSpec => "writerspec",
             #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
             #[cfg(target_os = "linux")]
@@ -42,7 +44,7 @@ impl ERRCODE {
 }
 
 pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Error) {
-    eprintln!(
+    let s = format!(
         "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err}\n\
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
@@ -50,6 +52,27 @@ pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Erro
         code = errcode,
         code_lc = errcode.as_index(),
     );
+    try_to_write(&s);
+}
+
+pub(crate) fn eprint_msg(errcode: ERRCODE, msg: &str) {
+    let s = format!(
+        "[flexi_logger][ERRCODE::{code:?}] {msg}\n\
+         See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
+        msg = msg,
+        code = errcode,
+        code_lc = errcode.as_index(),
+    );
+    try_to_write(&s);
+}
+
+fn try_to_write(s: &str) {
+    eprintln!("{}", s);
+    // TODO DOES THIS MAKE SENSE (for issue#75)? NEEDS SOME TESTING
+    // let w = std::io::stderr();
+    // let mut wl = w.lock();
+    // let result = wl.write(s.as_bytes());
+    // result.ok();
 }
 
 pub(crate) fn io_err(s: &'static str) -> std::io::Error {
