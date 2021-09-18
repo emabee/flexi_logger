@@ -1,3 +1,5 @@
+mod test_utils;
+
 use flexi_logger::{detailed_format, FileSpec, Logger, LoggerHandle};
 use log::*;
 
@@ -6,7 +8,7 @@ fn test_mods_off() {
     let handle: LoggerHandle = Logger::try_with_env_or_str("info, test_mods_off::mymod1=off")
         .unwrap()
         .format(detailed_format)
-        .log_to_file(FileSpec::default())
+        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

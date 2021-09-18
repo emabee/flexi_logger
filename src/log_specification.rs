@@ -90,7 +90,7 @@ impl LogSpecification {
             .unwrap_or(log::LevelFilter::Off)
     }
 
-    /// Returns a `LogSpecification` where all traces are switched off.
+    /// Returns a `LogSpecification` where all log output is switched off.
     #[must_use]
     pub fn off() -> Self {
         Self::default()

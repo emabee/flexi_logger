@@ -1,3 +1,5 @@
+mod test_utils;
+
 use flexi_logger::DeferredNow;
 #[cfg(feature = "colors")]
 use flexi_logger::{colored_detailed_format, AdaptiveFormat};
@@ -10,7 +12,7 @@ fn test_recursion() {
     let logger = Logger::try_with_str("info")
         .unwrap()
         .format(detailed_format)
-        .log_to_file(FileSpec::default())
+        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
         .duplicate_to_stderr(Duplicate::All)
         .duplicate_to_stdout(Duplicate::All)
         .print_message();

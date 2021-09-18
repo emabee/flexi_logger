@@ -162,7 +162,7 @@
 //! Logger::try_with_str("info")?
 //!     .log_to_file(
 //!         FileSpec::default()
-//!             .directory("traces")             // create files in folder ./traces
+//!             .directory("log_files")          // create files in folder ./log_files
 //!             .basename("foo")
 //!             .discriminant("Sample4711A")     // use infix in log file name
 //!             .suffix("trc")                   // use suffix .trc instead of .log
@@ -175,7 +175,7 @@
 //! ```
 //!
 //! This example will print a message like
-//! "Log is written to `./traces/foo_Sample4711A_2020-11-17_19-24-35.trc`"
+//! "Log is written to `./log_files/foo_Sample4711A_2020-11-17_19-24-35.trc`"
 //! and, on unix, create a symbolic link called `current_run`.
 //!
 //! ## Specify the format for the log lines explicitly
@@ -367,7 +367,7 @@
 //! ## Reconfigure the log specification programmatically
 //!
 //! This can be especially handy in debugging situations where you want to see
-//! traces only for a short instant.
+//! log output only for a short instant.
 //!
 //! Obtain the [`LoggerHandle`](crate::LoggerHandle)
 //!
@@ -408,7 +408,7 @@
 //! ```
 //!
 //! then you can change the log specification dynamically, *while your program is running*,
-//! by editing the specfile. This can be a great help e.g. if you want to get detailed traces
+//! by editing the specfile. This can be a great help e.g. if you want to get detailed log output
 //! for _some_ requests to a long running server.
 //!
 //! See [`Logger::start_with_specfile`](crate::Logger::start_with_specfile)
@@ -427,7 +427,11 @@
 //! # use std::error::Error;
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! let logger = flexi_logger::Logger::try_with_str("info")?
-//!     .log_to_file(FileSpec::default().basename("phase1").directory("./log"))
+//!     .log_to_file(
+//!         FileSpec::default()
+//!             .basename("phase1")
+//!             .directory("./log_files")
+//!     )
 //!     .start()?;
 //!
 //! log::info!("start of phase 1");
@@ -442,16 +446,20 @@
 //! # use flexi_logger::{writers::FileLogWriter, Cleanup, Criterion, FileSpec, Naming};
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! #    let logger = flexi_logger::Logger::try_with_str("info")?
-//! #       .log_to_file(FileSpec::default().directory("./phase1"))
+//! #       .log_to_file(FileSpec::default().basename("phase1").directory("./log_files"))
 //! #       .start()?;
 //! logger.reset_flw(
-//!     &FileLogWriter::builder(FileSpec::default().basename("phase2").directory("./log"))
-//!         .append()
-//!         .rotate(
-//!             Criterion::Size(1024 * 1000 * 1),
-//!             Naming::Numbers,
-//!             Cleanup::KeepLogFiles(3),
-//!         )
+//!     &FileLogWriter::builder(
+//!         FileSpec::default()
+//!             .basename("phase2")
+//!             .directory("./log_files")
+//!     )
+//!     .append()
+//!     .rotate(
+//!         Criterion::Size(1024 * 1000 * 1),
+//!         Naming::Numbers,
+//!         Cleanup::KeepLogFiles(3),
+//!     ),
 //! )?;
 //!
 //! log::info!("start of phase 2");

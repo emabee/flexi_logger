@@ -1,3 +1,5 @@
+mod test_utils;
+
 use flexi_logger::{FileSpec, Logger, LoggerHandle};
 use log::*;
 
@@ -5,7 +7,7 @@ use log::*;
 fn test_reconfigure_methods() {
     let mut logger = Logger::try_with_str("info")
         .unwrap()
-        .log_to_file(FileSpec::default())
+        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 

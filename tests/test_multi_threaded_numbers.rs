@@ -1,3 +1,5 @@
+mod test_utils;
+
 use chrono::Local;
 use flexi_logger::{
     Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming, Record,
@@ -12,8 +14,8 @@ use std::thread::JoinHandle;
 use std::time;
 
 const NO_OF_THREADS: usize = 5;
-const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
-const ROTATE_OVER_SIZE: u64 = 4_000_000;
+const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
+const ROTATE_OVER_SIZE: u64 = 800_000;
 
 #[test]
 fn multi_threaded() {
@@ -21,13 +23,13 @@ fn multi_threaded() {
     // verify that all log lines are written correctly
 
     let start = Local::now();
-    let directory = define_directory();
+    let directory = test_utils::dir();
     let logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_file(
             FileSpec::default()
                 .basename("test_mtn")
-                .directory(directory.clone()),
+                .directory(&directory),
         )
         .write_mode(WriteMode::BufferAndFlush)
         .format(test_format)
@@ -48,7 +50,7 @@ fn multi_threaded() {
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
-            std::thread::sleep(time::Duration::from_millis(1000));
+            std::thread::sleep(time::Duration::from_millis(500));
             logger2.set_new_spec(new_spec);
             0
         })
@@ -62,7 +64,7 @@ fn multi_threaded() {
         NO_OF_THREADS, delta
     );
     logger.shutdown();
-    verify_logs(&directory);
+    verify_logs(&directory.display().to_string());
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
@@ -101,13 +103,6 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
             .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
     }
     trace!("All worker threads joined.");
-}
-
-fn define_directory() -> String {
-    format!(
-        "./log_files/mt_logs/{}",
-        Local::now().format("%Y-%m-%d_%H-%M-%S")
-    )
 }
 
 pub fn test_format(

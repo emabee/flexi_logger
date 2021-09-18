@@ -1,3 +1,5 @@
+mod test_utils;
+
 use chrono::Local;
 use flexi_logger::filter::LogLineFilter;
 use flexi_logger::filter::LogLineWriter;
@@ -13,8 +15,8 @@ use std::thread::JoinHandle;
 use std::time;
 
 const NO_OF_THREADS: usize = 5;
-const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
-const ROTATE_OVER_SIZE: u64 = 4_000_000;
+const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
+const ROTATE_OVER_SIZE: u64 = 800_000;
 
 #[test]
 fn multi_threaded() {
@@ -27,7 +29,7 @@ fn multi_threaded() {
         .log_to_file(
             FileSpec::default()
                 .basename("test_mtn")
-                .directory(define_directory()),
+                .directory(test_utils::dir()),
         )
         .write_mode(WriteMode::BufferAndFlush)
         .format(test_format)
@@ -104,13 +106,6 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
             .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
     }
     trace!("All worker threads joined.");
-}
-
-fn define_directory() -> String {
-    format!(
-        "./log_files/mt_logs/{}",
-        Local::now().format("%Y-%m-%d_%H-%M-%S")
-    )
 }
 
 pub fn test_format(

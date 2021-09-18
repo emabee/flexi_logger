@@ -1,3 +1,5 @@
+mod test_utils;
+
 use flexi_logger::writers::{FileLogWriter, LogWriter};
 use flexi_logger::{detailed_format, DeferredNow, FileSpec, Logger, Record};
 use log::*;
@@ -21,7 +23,7 @@ fn test() {
         .unwrap()
         .format(detailed_format)
         .print_message()
-        .log_to_file(FileSpec::default())
+        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
         .add_writer("Sec", sec_writer)
         .add_writer("Alert", alert_logger())
         .start()
@@ -73,6 +75,7 @@ impl SecWriter {
         let a_flw = Arc::new(
             FileLogWriter::builder(
                 FileSpec::default()
+                    .directory(self::test_utils::dir())
                     .discriminant("Security")
                     .suffix("seclog"),
             )
@@ -97,9 +100,14 @@ impl LogWriter for SecWriter {
 
 pub fn alert_logger() -> Box<FileLogWriter> {
     Box::new(
-        FileLogWriter::builder(FileSpec::default().discriminant("Alert").suffix("alerts"))
-            .print_message()
-            .try_build()
-            .unwrap(),
+        FileLogWriter::builder(
+            FileSpec::default()
+                .directory(self::test_utils::dir())
+                .discriminant("Alert")
+                .suffix("alerts"),
+        )
+        .print_message()
+        .try_build()
+        .unwrap(),
     )
 }

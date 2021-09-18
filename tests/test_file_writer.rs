@@ -20,25 +20,29 @@ fn work(value: u8) {
         0 => {
             logger = logger.log_to_file(
                 FileSpec::default()
-                    .directory("log_files")
+                    .directory(self::test_utils::dir())
                     .basename("to_foo_or_not_to_foo"),
             );
         }
         1 => {
             logger = logger
-                .log_to_file(FileSpec::default().directory("log_files"))
+                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         2 => {
             logger = logger
                 .format(detailed_format)
-                .log_to_file(FileSpec::default().use_timestamp(true))
+                .log_to_file(
+                    FileSpec::default()
+                        .directory(self::test_utils::dir())
+                        .use_timestamp(true),
+                )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         3 => {
             logger = logger
                 .format(detailed_format)
-                .log_to_file(FileSpec::default())
+                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         4 => {
@@ -46,7 +50,7 @@ fn work(value: u8) {
                 .format(opt_format)
                 .log_to_file(
                     FileSpec::default()
-                        .directory("log_files")
+                        .directory(self::test_utils::dir())
                         .discriminant("foo".to_string()),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
@@ -55,7 +59,7 @@ fn work(value: u8) {
         5 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
-                    .directory("log_files")
+                    .directory(self::test_utils::dir())
                     .discriminant("foo"),
             );
         }

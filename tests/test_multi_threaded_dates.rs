@@ -1,3 +1,5 @@
+mod test_utils;
+
 use chrono::Local;
 use flexi_logger::{
     Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
@@ -12,7 +14,7 @@ use std::thread::JoinHandle;
 use std::time;
 
 const NO_OF_THREADS: usize = 5;
-const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
+const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
 
 #[test]
 fn multi_threaded() {
@@ -20,10 +22,10 @@ fn multi_threaded() {
     // verify that all log lines are written correctly
 
     let start = Local::now();
-    let directory = define_directory();
+    let directory = test_utils::dir();
     let mut reconf_handle = Logger::try_with_str("debug")
         .unwrap()
-        .log_to_file(FileSpec::default().directory(directory.clone()))
+        .log_to_file(FileSpec::default().directory(&directory))
         .format(test_format)
         .create_symlink("link_to_mt_log")
         .duplicate_to_stderr(Duplicate::Info)
@@ -55,7 +57,7 @@ fn multi_threaded() {
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
     );
-    verify_logs(&directory);
+    verify_logs(&directory.display().to_string());
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
@@ -94,13 +96,6 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
             .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
     }
     trace!("All worker threads joined.");
-}
-
-fn define_directory() -> String {
-    format!(
-        "./log_files/mt_logs/{}",
-        Local::now().format("%Y-%m-%d_%H-%M-%S")
-    )
 }
 
 pub fn test_format(

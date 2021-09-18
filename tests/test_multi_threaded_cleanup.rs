@@ -1,3 +1,5 @@
+mod test_utils;
+
 #[cfg(feature = "compress")]
 mod d {
     use chrono::Local;
@@ -11,8 +13,8 @@ mod d {
     use std::thread::{self, JoinHandle};
 
     const NO_OF_THREADS: usize = 5;
-    const NO_OF_LOGLINES_PER_THREAD: usize = 100_000;
-    const ROTATE_OVER_SIZE: u64 = 3_000_000;
+    const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
+    const ROTATE_OVER_SIZE: u64 = 600_000;
     const NO_OF_LOG_FILES: usize = 2;
     const NO_OF_GZ_FILES: usize = 5;
 
@@ -22,10 +24,10 @@ mod d {
         // verify that all log lines are written correctly
 
         let start = Local::now();
-        let directory = define_directory();
-        let mut reconf_handle = Logger::try_with_str("debug")
+        let directory = super::test_utils::dir();
+        let mut logger = Logger::try_with_str("debug")
             .unwrap()
-            .log_to_file(FileSpec::default().directory(directory.clone()))
+            .log_to_file(FileSpec::default().directory(&directory))
             .write_mode(WriteMode::BufferAndFlushWith(
                 10 * 1024,
                 std::time::Duration::from_millis(600),
@@ -47,7 +49,7 @@ mod d {
         let worker_handles = start_worker_threads(NO_OF_THREADS);
         let new_spec = LogSpecification::parse("trace").unwrap();
         thread::sleep(std::time::Duration::from_millis(1000));
-        reconf_handle.set_new_spec(new_spec);
+        logger.set_new_spec(new_spec);
 
         wait_for_workers_to_close(worker_handles);
 
@@ -57,8 +59,8 @@ mod d {
             NO_OF_THREADS, delta
         );
 
-        reconf_handle.shutdown();
-        verify_logs(&directory);
+        logger.shutdown();
+        verify_logs(&directory.display().to_string());
     }
 
     // Starts given number of worker threads and lets each execute `do_work`
@@ -97,13 +99,6 @@ mod d {
                 .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
         }
         trace!("All worker threads joined.");
-    }
-
-    fn define_directory() -> String {
-        format!(
-            "./log_files/mt_logs/{}",
-            Local::now().format("%Y-%m-%d_%H-%M-%S")
-        )
     }
 
     pub fn test_format(

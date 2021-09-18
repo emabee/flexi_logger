@@ -346,7 +346,7 @@ impl State {
 
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
-            self.initialize().unwrap(/*validate_logs*/);
+            self.initialize().expect("validate_logs: initialize failed");
         }
         if let Inner::Active(ref mut o_rotation_state, _) = self.inner {
             let path = self.config.file_spec.as_pathbuf(
@@ -354,18 +354,43 @@ impl State {
                     .as_ref()
                     .map(|_| super::state::CURRENT_INFIX),
             );
-            let f = File::open(path).unwrap(/*validate_logs*/);
+            let f = File::open(path.clone()).unwrap_or_else(|e| {
+                panic!(
+                    "validate_logs: can't open file {} due to {:?}",
+                    path.display(),
+                    e
+                )
+            });
             let mut reader = BufReader::new(f);
             let mut buf = String::new();
             for tuple in expected {
                 buf.clear();
-                reader.read_line(&mut buf).unwrap(/*validate_logs*/);
-                assert!(buf.contains(&tuple.0), "Did not find tuple.0 = {}", tuple.0);
-                assert!(buf.contains(&tuple.1), "Did not find tuple.1 = {}", tuple.1);
-                assert!(buf.contains(&tuple.2), "Did not find tuple.2 = {}", tuple.2);
+                reader
+                    .read_line(&mut buf)
+                    .expect("validate_logs: can't read file");
+                assert!(
+                    buf.contains(&tuple.0),
+                    "Did not find tuple.0 = {} in file {}",
+                    tuple.0,
+                    path.display()
+                );
+                assert!(
+                    buf.contains(&tuple.1),
+                    "Did not find tuple.1 = {} in file {}",
+                    tuple.1,
+                    path.display()
+                );
+                assert!(
+                    buf.contains(&tuple.2),
+                    "Did not find tuple.2 = {} in file {}",
+                    tuple.2,
+                    path.display()
+                );
             }
             buf.clear();
-            reader.read_line(&mut buf).unwrap(/*validate_logs*/);
+            reader
+                .read_line(&mut buf)
+                .expect("validate_logs: can't read file");
             assert!(
                 buf.is_empty(),
                 "Found more log lines than expected: {} ",

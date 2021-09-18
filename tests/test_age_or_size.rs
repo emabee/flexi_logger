@@ -1,17 +1,19 @@
-use chrono::Local;
+mod test_utils;
+
 use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
 use glob::glob;
 use log::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Add;
+use std::path::Path;
 
 #[test]
 fn test_age_or_size() {
-    let directory = define_directory();
+    let directory = test_utils::dir();
     Logger::try_with_str("trace")
         .unwrap()
-        .log_to_file(FileSpec::default().directory(directory.clone()))
+        .log_to_file(FileSpec::default().directory(&directory))
         .duplicate_to_stderr(Duplicate::Info)
         .rotate(
             Criterion::AgeOrSize(Age::Second, 75),
@@ -65,17 +67,10 @@ fn write_log_lines() {
     // trace!("{}",'t');
 }
 
-fn define_directory() -> String {
-    format!(
-        "./log_files/age_or_size/{}",
-        Local::now().format("%Y-%m-%d_%H-%M-%S")
-    )
-}
-
-fn verify_logs(directory: &str) {
+fn verify_logs(directory: &Path) {
     let expected_line_counts = [3, 3, 3, 1, 1, 3, 1];
     // read all files
-    let pattern = String::from(directory).add("/*");
+    let pattern = directory.display().to_string().add("/*");
     let globresults = match glob(&pattern) {
         Err(e) => panic!(
             "Is this ({}) really a directory? Listing failed with {}",

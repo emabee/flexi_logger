@@ -49,6 +49,7 @@
 //!   pub fn alert_logger() -> Box<FileLogWriter> {
 //!       Box::new(FileLogWriter::builder(
 //!           FileSpec::default()
+//!   #           .directory("log_files/writers_mod_docu")
 //!               .discriminant("Alert")
 //!               .suffix("alerts")
 //!           )
@@ -73,6 +74,7 @@
 //!           .expect("LogSpecification String has errors")
 //!           .print_message()
 //!           .log_to_file(FileSpec::default())
+//!   #       .log_to_file(FileSpec::default().directory("log_files/writers_mod_docu"))
 //!           .add_writer("Alert", alert_logger())
 //!           .start()
 //!           .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

@@ -4,12 +4,11 @@ use log::*;
 use std::thread::{self, JoinHandle};
 
 const NO_OF_THREADS: usize = 5;
-// const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
-const NO_OF_LOGLINES_PER_THREAD: usize = 50;
+const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
 
 #[test]
 fn multi_threaded() {
-    let logger = Logger::try_with_str("debug")
+    let _logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_stderr()
         .write_mode(WriteMode::BufferAndFlushWith(
@@ -34,8 +33,6 @@ fn multi_threaded() {
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
     );
-
-    logger.shutdown();
 }
 
 // Starts given number of worker threads and lets each execute `do_work`

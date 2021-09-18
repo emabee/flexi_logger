@@ -1,5 +1,8 @@
+mod test_utils;
+
 #[cfg(feature = "syslog_writer")]
 mod test {
+
     use flexi_logger::writers::{SyslogConnector, SyslogFacility, SyslogWriter};
     use flexi_logger::{detailed_format, FileSpec, Logger};
     use log::*;
@@ -30,7 +33,7 @@ mod test {
         let logger = Logger::try_with_str("info")
             .unwrap()
             .format(detailed_format)
-            .log_to_file(FileSpec::default())
+            .log_to_file(FileSpec::default().directory(super::test_utils::dir()))
             .print_message()
             .add_writer("Syslog", boxed_syslog_writer)
             .start()

@@ -1,19 +1,21 @@
+mod test_utils;
+
+use log::*;
+
 #[test]
 #[cfg(feature = "textfilter")]
 fn test_textfilter() {
     use flexi_logger::{default_format, FileSpec, LogSpecification, Logger};
-    use log::*;
-
-    use std::env;
-    use std::fs::File;
-    use std::io::{BufRead, BufReader};
-    use std::path::Path;
 
     let logspec = LogSpecification::parse("info/Hello").unwrap();
-    Logger::with(logspec)
+    let logger = Logger::with(logspec)
         .format(default_format)
         .print_message()
-        .log_to_file(FileSpec::default().suppress_timestamp())
+        .log_to_file(
+            FileSpec::default()
+                .directory(self::test_utils::dir())
+                .suppress_timestamp(),
+        )
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
@@ -29,25 +31,9 @@ fn test_textfilter() {
     debug!("Hello, this is a debug message - you must not see it!");
     trace!("Hello, this is a trace message - you must not see it!");
 
-    let arg0 = env::args().next().unwrap();
-    let progname = Path::new(&arg0).file_stem().unwrap().to_string_lossy();
-    let filename = format!("{}.log", &progname);
-
-    let f = File::open(&filename)
-        .unwrap_or_else(|e| panic!("Cannot open file {:?} due to {}", filename, e));
-    let mut reader = BufReader::new(f);
-    let mut buffer = String::new();
-    let mut count = 0;
-    while reader.read_line(&mut buffer).unwrap() > 0 {
-        if !buffer.contains("Hello") {
-            panic!(
-                "line in log file without Hello {:?}: \"{}\"",
-                filename, buffer
-            );
-        } else {
-            count += 1;
-        }
-        buffer.clear();
-    }
-    assert_eq!(count, 3);
+    logger.validate_logs(&[
+        ("ERROR", "test_textfilter", "Hello, this"),
+        ("WARN", "test_textfilter", "! Hello!!"),
+        ("INFO", "test_textfilter", "! Hello"),
+    ]);
 }

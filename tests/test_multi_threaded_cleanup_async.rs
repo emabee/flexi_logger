@@ -1,3 +1,5 @@
+mod test_utils;
+
 #[cfg(feature = "compress")]
 mod d {
     use chrono::{Local, NaiveDateTime};
@@ -16,8 +18,8 @@ mod d {
     use std::thread::{self, JoinHandle};
 
     const NO_OF_THREADS: usize = 5;
-    const NO_OF_LOGLINES_PER_THREAD: usize = 1_000_000;
-    const ROTATE_OVER_SIZE: u64 = 30_000_000;
+    const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
+    const ROTATE_OVER_SIZE: u64 = 600_000;
     const NO_OF_LOG_FILES: usize = 2;
     const NO_OF_GZ_FILES: usize = 5;
 
@@ -27,10 +29,10 @@ mod d {
         // verify that all log lines are written correctly
 
         let start = Local::now();
-        let directory = define_directory();
+        let directory = super::test_utils::dir();
         let logger = Logger::try_with_str("debug")
             .unwrap()
-            .log_to_file(FileSpec::default().directory(directory.clone()));
+            .log_to_file(FileSpec::default().directory(&directory));
 
         #[cfg(not(feature = "async"))]
         let logger = logger.write_mode(WriteMode::BufferAndFlush);
@@ -68,7 +70,7 @@ mod d {
             "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
             NO_OF_THREADS, delta1, delta2
         );
-        verify_logs(&directory);
+        verify_logs(&directory.display().to_string());
     }
 
     // Starts given number of worker threads and lets each execute `do_work`
@@ -110,13 +112,6 @@ mod d {
                 .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
         }
         trace!("All worker threads joined.");
-    }
-
-    fn define_directory() -> String {
-        format!(
-            "./log_files/mt_logs/{}",
-            Local::now().format("%Y-%m-%d_%H-%M-%S")
-        )
     }
 
     pub fn test_format(

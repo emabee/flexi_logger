@@ -1,25 +1,30 @@
+mod test_utils;
+
 #[cfg(feature = "specfile_without_notification")]
 mod a {
     use flexi_logger::{detailed_format, FileSpec, Logger};
     use log::*;
-    use std::io::{BufRead, Write};
-    use std::ops::Add;
+    use std::io::Write;
 
     const WAIT_MILLIS: u64 = 2000;
 
-    /// Test of the specfile feature, using the file ./tests/logspec.toml.
+    /// Test of the specfile feature
     #[test]
     fn test_specfile() {
-        let specfile = "test_spec/test_specfile_logspec.toml";
+        let specfile = super::test_utils::file("logspec.toml");
 
-        std::fs::remove_file(specfile).ok();
-        assert!(!std::path::Path::new(specfile).exists());
+        std::fs::remove_file(&specfile).ok();
+        assert!(!specfile.exists());
 
-        Logger::try_with_str("info")
+        let logger = Logger::try_with_str("info")
             .unwrap()
-            .log_to_file(FileSpec::default().suppress_timestamp())
+            .log_to_file(
+                FileSpec::default()
+                    .directory(super::test_utils::dir())
+                    .suppress_timestamp(),
+            )
             .format(detailed_format)
-            .start_with_specfile(specfile)
+            .start_with_specfile(&specfile)
             .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
 
         error!("This is an error-0");
@@ -33,11 +38,13 @@ mod a {
             chrono::Local::now()
         );
         {
-            std::fs::rename(&specfile, "old_logspec.toml").unwrap();
+            let mut old_name = specfile.clone();
+            old_name.set_file_name("old_logspec.toml");
+            std::fs::rename(&specfile, old_name).unwrap();
             let mut file = std::fs::OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(specfile)
+                .open(&specfile)
                 .unwrap();
             file.write_all(
                 b"
@@ -64,7 +71,7 @@ mod a {
             let mut file = std::fs::OpenOptions::new()
                 .truncate(true)
                 .write(true)
-                .open(specfile)
+                .open(&specfile)
                 .unwrap();
             file.write_all(
                 b"
@@ -83,65 +90,29 @@ mod a {
         debug!("This is a debug-2");
         trace!("This is a trace-2");
 
-        let logfile = std::path::Path::new(&std::env::args().next().unwrap())
-            .file_stem()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
-            .add(".log");
-
         if cfg!(feature = "specfile") {
             eprintln!("feature is: specfile!");
-            validate_logs(
-                &logfile,
-                &[
-                    ("ERROR", "test_specfile::a", "error-0"),
-                    ("WARN", "test_specfile::a", "warning-0"),
-                    ("INFO", "test_specfile::a", "info-0"),
-                    ("ERROR", "test_specfile::a", "error-1"),
-                    ("WARN", "test_specfile::a", "warning-1"),
-                    ("ERROR", "test_specfile::a", "error-2"),
-                ],
-            );
+            logger.validate_logs(&[
+                ("ERROR", "test_specfile::a", "error-0"),
+                ("WARN", "test_specfile::a", "warning-0"),
+                ("INFO", "test_specfile::a", "info-0"),
+                ("ERROR", "test_specfile::a", "error-1"),
+                ("WARN", "test_specfile::a", "warning-1"),
+                ("ERROR", "test_specfile::a", "error-2"),
+            ]);
         } else {
             eprintln!("feature is: specfile_without_notification!");
-            validate_logs(
-                &logfile,
-                &[
-                    ("ERROR", "test_specfile::a", "error-0"),
-                    ("WARN", "test_specfile::a", "warning-0"),
-                    ("INFO", "test_specfile::a", "info-0"),
-                    ("ERROR", "test_specfile::a", "error-1"),
-                    ("WARN", "test_specfile::a", "warning-1"),
-                    ("INFO", "test_specfile::a", "info-1"),
-                    ("ERROR", "test_specfile::a", "error-2"),
-                    ("WARN", "test_specfile::a", "warning-2"),
-                    ("INFO", "test_specfile::a", "info-2"),
-                ],
-            );
+            logger.validate_logs(&[
+                ("ERROR", "test_specfile::a", "error-0"),
+                ("WARN", "test_specfile::a", "warning-0"),
+                ("INFO", "test_specfile::a", "info-0"),
+                ("ERROR", "test_specfile::a", "error-1"),
+                ("WARN", "test_specfile::a", "warning-1"),
+                ("INFO", "test_specfile::a", "info-1"),
+                ("ERROR", "test_specfile::a", "error-2"),
+                ("WARN", "test_specfile::a", "warning-2"),
+                ("INFO", "test_specfile::a", "info-2"),
+            ]);
         }
-    }
-
-    fn validate_logs(logfile: &str, expected: &[(&'static str, &'static str, &'static str)]) {
-        println!("validating log file = {}", logfile);
-
-        let f = std::fs::File::open(logfile).unwrap();
-        let mut reader = std::io::BufReader::new(f);
-
-        let mut buf = String::new();
-        for tuple in expected {
-            buf.clear();
-            reader.read_line(&mut buf).unwrap();
-            assert!(buf.contains(&tuple.0), "Did not find tuple.0 = {}", tuple.0);
-            assert!(buf.contains(&tuple.1), "Did not find tuple.1 = {}", tuple.1);
-            assert!(buf.contains(&tuple.2), "Did not find tuple.2 = {}", tuple.2);
-        }
-        buf.clear();
-        reader.read_line(&mut buf).unwrap();
-        assert!(
-            buf.is_empty(),
-            "Found more log lines than expected: {} ",
-            buf
-        );
     }
 }
