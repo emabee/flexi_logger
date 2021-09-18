@@ -20,7 +20,15 @@ pub fn dir() -> PathBuf {
 pub fn add_prog_name(pb: &mut PathBuf) {
     let path = PathBuf::from(std::env::args().next().unwrap());
     let filename = path.file_stem().unwrap(/*ok*/).to_string_lossy();
-    let (progname, _) = filename.rsplit_once('-').unwrap_or((&filename, ""));
+
+    // rsplit not available with rustc 1.46
+    // let (progname, _) = filename.rsplit_once('-').unwrap_or((&filename, ""));
+    let filename = filename.to_string();
+    let progname = match filename.rfind('-') {
+        Some(idx) => &filename[0..idx],
+        None => filename.as_str(),
+    };
+
     pb.push(progname);
 }
 
