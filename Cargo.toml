@@ -40,7 +40,7 @@ trc =["async", "specfile", "tracing-subscriber"]
 [dependencies]
 atty = {version = "0.2", optional = true}
 ansi_term = {version = "0.12", optional = true}
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 crossbeam = {version = "0.8", optional = true}
 flate2 = {version = "1.0", optional = true}
 glob = "0.3"
