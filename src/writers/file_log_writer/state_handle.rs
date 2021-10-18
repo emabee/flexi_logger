@@ -38,10 +38,10 @@ impl SyncHandle {
         // Create a flusher if needed
         if flush_interval != std::time::Duration::from_secs(0) {
             let t_am_state = Arc::clone(&am_state);
-            std::thread::Builder::new()
-                .name("flexi_logger-flusher".to_string())
-                .stack_size(128)
-                .spawn(move || {
+            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
+            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+            let builder = builder.stack_size(128);
+            builder.spawn(move || {
                     let (_sender, receiver): (
                         mpsc::Sender<()>,
                         mpsc::Receiver<()>,
@@ -138,10 +138,10 @@ impl AsyncHandle {
 
         if flush_interval != std::time::Duration::from_secs(0) {
             let cloned_async_sender = async_sender.clone();
-            std::thread::Builder::new()
-                .name("flexi_logger-flusher".to_string())
-                .stack_size(128)
-                .spawn(move || {
+            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
+            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+            let builder = builder.stack_size(128);
+            builder.spawn(move || {
                     let (_sender, receiver): (
                         mpsc::Sender<()>,
                         mpsc::Receiver<()>,

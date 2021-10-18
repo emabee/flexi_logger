@@ -644,19 +644,19 @@ impl Logger {
             let flush_interval = self.flush_interval;
             let pw = Arc::clone(&a_primary_writer);
             let ows = Arc::clone(&a_other_writers);
-            std::thread::Builder::new()
-                .name("flexi_logger-flusher".to_string())
-                .stack_size(128)
-                .spawn(move || {
-                    let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
-                    loop {
-                        receiver.recv_timeout(flush_interval).ok();
-                        pw.flush().ok();
-                        for w in ows.values() {
-                            w.flush().ok();
-                        }
+            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
+            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+            let builder = builder.stack_size(128);
+            builder.spawn(move || {
+                let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
+                loop {
+                    receiver.recv_timeout(flush_interval).ok();
+                    pw.flush().ok();
+                    for w in ows.values() {
+                        w.flush().ok();
                     }
-                })?;
+                }
+            })?;
         }
 
         let max_level = self.spec.max_level();
@@ -796,42 +796,43 @@ pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
         )?;
 
         // in a separate thread, reread the specfile when it was updated
-        std::thread::Builder::new()
-            .name("flexi_logger-specfile-watcher".to_string())
-            .stack_size(128 * 1024)
-            .spawn(move || {
-                let _anchor_for_watcher = watcher; // keep it alive!
-                loop {
-                    match rx.recv() {
-                        Ok(debounced_event) => match debounced_event {
-                            DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                                if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                                    log_spec_string_from_file(&specfile)
-                                        .map_err(FlexiLoggerError::SpecfileIo)
-                                        .and_then(|s| LogSpecification::from_toml(&s))
-                                        .and_then(|spec| subscriber.set_new_spec(spec))
-                                        .map_err(|e| {
-                                            eprint_err(ERRCODE::LogSpecFile,
+        let builder = std::thread::Builder::new().name("flexi_logger-specfile-watcher".to_string());
+        #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+        let builder = builder.stack_size(128 * 1024);
+        builder.spawn(move || {
+            let _anchor_for_watcher = watcher; // keep it alive!
+            loop {
+                match rx.recv() {
+                    Ok(debounced_event) => match debounced_event {
+                        DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
+                            if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
+                                log_spec_string_from_file(&specfile)
+                                    .map_err(FlexiLoggerError::SpecfileIo)
+                                    .and_then(|s| LogSpecification::from_toml(&s))
+                                    .and_then(|spec| subscriber.set_new_spec(spec))
+                                    .map_err(|e| {
+                                        eprint_err(
+                                            ERRCODE::LogSpecFile,
                                             "continuing with previous log specification, because \
                                              rereading the log specification file failed",
-                                            &e
+                                            &e,
                                         );
-                                        })
-                                        .ok();
-                                }
+                                    })
+                                    .ok();
                             }
-                            _event => {}
-                        },
-                        Err(e) => {
-                            eprint_err(
-                                ERRCODE::LogSpecFile,
-                                "error while watching the specfile",
-                                &e,
-                            );
                         }
+                        _event => {}
+                    },
+                    Err(e) => {
+                        eprint_err(
+                            ERRCODE::LogSpecFile,
+                            "error while watching the specfile",
+                            &e,
+                        );
                     }
                 }
-            })?;
+            }
+        })?;
     }
     Ok(())
 }

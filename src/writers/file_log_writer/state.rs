@@ -218,19 +218,19 @@ impl State {
                             let cleanup = rotate_config.cleanup;
                             let filename_config = self.config.file_spec.clone();
                             let (sender, receiver) = std::sync::mpsc::channel();
-                            let join_handle = std::thread::Builder::new()
-                                .name("flexi_logger-cleanup".to_string())
-                                .stack_size(512 * 1024)
-                                .spawn(move || {
-                                    while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
-                                        remove_or_compress_too_old_logfiles_impl(
-                                            &cleanup,
-                                            &filename_config,
-                                        )
-                                        .ok();
-                                    }
-                                })?;
-                            // .map_err(FlexiLoggerError::OutputCleanupThread)?;
+                            let builder = std::thread::Builder::new()
+                                .name("flexi_logger-cleanup".to_string());
+                            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+                            let builder = builder.stack_size(512 * 1024);
+                            let join_handle = builder.spawn(move || {
+                                while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
+                                    remove_or_compress_too_old_logfiles_impl(
+                                        &cleanup,
+                                        &filename_config,
+                                    )
+                                    .ok();
+                                }
+                            })?;
                             o_cleanup_thread_handle = Some(CleanupThreadHandle {
                                 sender,
                                 join_handle,

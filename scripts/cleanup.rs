@@ -8,14 +8,17 @@ extern crate glob;
 
 fn main() {
     for pattern in &[
-        "./*.log",
         "./*.alerts",
+        "./*.log",
         "./*.seclog",
         "./*logspec.toml",
-        "./log_files/**/*.log",
+        "./log_files/**/*.alerts",
         "./log_files/**/*.csv",
-        "./log_files/**/*.zip",
         "./log_files/**/*.gz",
+        "./log_files/**/*.log",
+        "./log_files/**/*.seclog",
+        "./log_files/**/*.toml",
+        "./log_files/**/*.zip",
         "./test_spec/*.toml",
     ] {
         for globresult in glob::glob(pattern).unwrap() {

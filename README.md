@@ -42,7 +42,8 @@ The minimal rust version is currently "1.46.0".
 
 ## Versions
 
-See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md) for more details.
+See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md)
+for more details.
 
 ## Code examples
 
@@ -70,11 +71,13 @@ Make use of any of these features by specifying them in your `Cargo.toml`
 
 ### **`async`**
 
-Adds an additional write mode that decouples `flexi_logger`'s I/O from your application threads. Works with `log_to_stdout()`, `log_to_stderr()`, and `log_to_file()`. See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
+Adds an additional write mode that decouples `flexi_logger`'s I/O from your application threads.
+Works with `log_to_stdout()`, `log_to_stderr()`, and `log_to_file()`.
+See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
 
 Adds a dependency to [`crossbeam`](https://docs.rs/crossbeam/0.8.1/crossbeam/index.html).
 
-### **`colors`**
+### **`colors`** (*default feature*)
 
 Getting colored output is also possible without this feature,
 by implementing and using your own coloring format function.
@@ -89,18 +92,28 @@ The default feature `colors` simplifies this by doing three things:
   coloring if the output is not sent to a terminal but e.g. piped to another program.
 
 **<span style="color:red">C</span><span style="color:blue">o</span><span style="color:green">l</span><span style="color:orange">o</span><span style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
-or styles in general, are a matter of taste, and no choice will fit every need. So you can override the default formatting and coloring in various ways.
+or styles in general, are a matter of taste, and no choice will fit every need.
+So you can override the default formatting and coloring in various ways.
 
-With `--no-default-features --features="atty"` you can remove the ansi_term-based coloring but keep the capability to switch off your own coloring.
+With switching off the default features and choosing feature `atty` explicitly
+(see [usage](#usage)) you can remove the ansi_term-based coloring
+but keep the capability to switch off your own coloring.
 
 ### **`compress`**
 
-The `compress` feature adds two options to the `Logger::Cleanup` `enum`, which allow keeping some
+Adds two variants to the `enum` `Logger::Cleanup`, which allow keeping some
 or all rotated log files in compressed form (`.gz`) rather than as plain text files.
+
+### **`dont_minimize_extra_stacks`**
+
+Normally, `flexi_logger` reduces the stack size of all threads that it might spawn
+(flusher, specfile-watcher, async writer, cleanup) to a bare minimum.
+For usecases where this is not desirable
+(see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)), you can activate this feature.
 
 ### **`specfile`**
 
-The `specfile` feature adds a method `Logger::start_with_specfile(specfile)`.
+Adds a method `Logger::start_with_specfile(specfile)`.
 
 If started with this method, `flexi_logger` uses the log specification
 that was given to the factory method (one of `Logger::with...()`) as initial spec
@@ -125,9 +138,9 @@ See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more detail
 This is still an experimental feature, likely working, but not well tested.
 Feedback of all kinds is highly appreciated.
 
-### **`textfilter`**
+### **`textfilter`** (*default feature*)
 
-Removes the ability to filter logs by text, but also removes the dependency on the regex crate.
+Adds the ability to filter logs by text, but also adds a dependency on the regex crate.
 
 ### **`trc`**
 
