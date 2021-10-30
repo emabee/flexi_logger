@@ -2,7 +2,6 @@ mod test_utils;
 
 #[cfg(feature = "compress")]
 mod d {
-    use chrono::Local;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
         Record, WriteMode,
@@ -20,10 +19,10 @@ mod d {
 
     #[test]
     fn multi_threaded() {
-        // we use a special log line format that starts with a special string so that it is easier to
-        // verify that all log lines are written correctly
+        // we use a special log line format that starts with a special string
+        // so that it is easier to verify that all log lines are written correctly
 
-        let start = Local::now();
+        let start = super::test_utils::now_local_or_utc();
         let directory = super::test_utils::dir();
         let mut logger = Logger::try_with_str("debug")
             .unwrap()
@@ -53,7 +52,7 @@ mod d {
 
         wait_for_workers_to_close(worker_handles);
 
-        let delta = Local::now().signed_duration_since(start).num_milliseconds();
+        let delta = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
         debug!(
             "Task executed with {} threads in {}ms.",
             NO_OF_THREADS, delta
@@ -109,7 +108,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+            now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
             thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),

@@ -9,6 +9,7 @@ use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 #[cfg(target_os = "linux")]
 use std::path::Path;
 use std::sync::Mutex;
+use time::Format;
 
 /// Syslog Facility.
 ///
@@ -181,8 +182,7 @@ impl LogWriter for SyslogWriter {
             format!(
                 "<{}>1 {} {:?} {} {} {} - {}\n",
                 self.facility as u8 | severity as u8,
-                now.now()
-                    .to_rfc3339_opts(chrono::SecondsFormat::Micros, false),
+                now.now().format(Format::Rfc3339),
                 self.hostname,
                 self.process,
                 self.pid,

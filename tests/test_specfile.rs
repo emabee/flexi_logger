@@ -35,7 +35,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== behave like many editors: rename and recreate, as warn",
-            chrono::Local::now()
+            super::test_utils::now_local_or_utc()
         );
         {
             let mut old_name = specfile.clone();
@@ -65,7 +65,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== truncate and rewrite, update to error",
-            chrono::Local::now()
+            super::test_utils::now_local_or_utc()
         );
         {
             let mut file = std::fs::OpenOptions::new()

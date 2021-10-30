@@ -1,9 +1,7 @@
 mod test_utils;
 
-use chrono::Local;
-use flexi_logger::filter::LogLineFilter;
-use flexi_logger::filter::LogLineWriter;
 use flexi_logger::{
+    filter::{LogLineFilter, LogLineWriter},
     Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming, Record,
     WriteMode,
 };
@@ -12,7 +10,6 @@ use std::cmp::Ordering;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
-use std::time;
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -23,7 +20,7 @@ fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
 
-    let start = Local::now();
+    let start = test_utils::now_local_or_utc();
     let logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_file(
@@ -54,7 +51,7 @@ fn multi_threaded() {
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
-            std::thread::sleep(time::Duration::from_millis(1000));
+            std::thread::sleep(std::time::Duration::from_millis(1000));
             logger2.set_new_spec(new_spec);
             0
         })
@@ -62,7 +59,7 @@ fn multi_threaded() {
 
     wait_for_workers_to_close(worker_handles);
 
-    let delta = Local::now().signed_duration_since(start).num_milliseconds();
+    let delta = (test_utils::now_local_or_utc() - start).whole_milliseconds();
     debug!(
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
@@ -116,7 +113,7 @@ pub fn test_format(
     write!(
         w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
         std::thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),

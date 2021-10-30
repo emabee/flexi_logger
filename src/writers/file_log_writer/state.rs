@@ -1,12 +1,13 @@
+use crate::deferred_now::now_local_or_utc;
 use crate::util::{eprint_err, ERRCODE};
 use crate::FileSpec;
 use crate::{Age, Cleanup, Criterion, FlexiLoggerError, Naming};
-use chrono::{DateTime, Datelike, Local, Timelike};
 use std::cmp::max;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use time::OffsetDateTime;
 
 use super::{Config, RotationConfig};
 
@@ -54,7 +55,7 @@ struct CleanupThreadHandle {
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
-    created_at: DateTime<Local>,
+    created_at: OffsetDateTime,
     cleanup: Cleanup,
     o_cleanup_thread_handle: Option<CleanupThreadHandle>,
 }
@@ -64,20 +65,30 @@ impl RotationState {
     }
 
     fn age_rotation_necessary(&self, age: Age) -> bool {
-        let now = Local::now();
+        let now = now_local_or_utc();
         match age {
-            Age::Day => self.created_at.num_days_from_ce() != now.num_days_from_ce(),
+            Age::Day => {
+                self.created_at.year() != now.year()
+                    || self.created_at.month() != now.month()
+                    || self.created_at.day() != now.day()
+            }
             Age::Hour => {
-                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                self.created_at.year() != now.year()
+                    || self.created_at.month() != now.month()
+                    || self.created_at.day() != now.day()
                     || self.created_at.hour() != now.hour()
             }
             Age::Minute => {
-                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                self.created_at.year() != now.year()
+                    || self.created_at.month() != now.month()
+                    || self.created_at.day() != now.day()
                     || self.created_at.hour() != now.hour()
                     || self.created_at.minute() != now.minute()
             }
             Age::Second => {
-                self.created_at.num_days_from_ce() != now.num_days_from_ce()
+                self.created_at.year() != now.year()
+                    || self.created_at.month() != now.month()
+                    || self.created_at.day() != now.day()
                     || self.created_at.hour() != now.hour()
                     || self.created_at.minute() != now.minute()
                     || self.created_at.second() != now.second()
@@ -413,7 +424,7 @@ impl State {
 fn open_log_file(
     config: &Config,
     with_rotation: bool,
-) -> Result<(Box<dyn Write + Send>, DateTime<Local>, PathBuf), std::io::Error> {
+) -> Result<(Box<dyn Write + Send>, OffsetDateTime, PathBuf), std::io::Error> {
     let o_infix = if with_rotation {
         Some(CURRENT_INFIX)
     } else {
@@ -564,13 +575,13 @@ fn remove_or_compress_too_old_logfiles_impl(
 // Cleaning up can leave some restart-files with higher numbers; if we still are in the same
 // second, we need to continue with the restart-incrementing.
 fn rotate_output_file_to_date(
-    creation_date: &DateTime<Local>,
+    creation_date: &OffsetDateTime,
     config: &Config,
 ) -> Result<(), std::io::Error> {
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
-    let mut rotated_path = config.file_spec.as_pathbuf(Some(
-        &creation_date.format("_r%Y-%m-%d_%H-%M-%S").to_string(),
-    ));
+    let mut rotated_path = config
+        .file_spec
+        .as_pathbuf(Some(&creation_date.format("_r%Y-%m-%d_%H-%M-%S")));
 
     // Search for rotated_path as is and for restart-siblings;
     // if any exists, find highest restart and add 1, else continue without restart
@@ -601,7 +612,6 @@ fn rotate_output_file_to_date(
             rotated_path = config.file_spec.as_pathbuf(Some(
                 &creation_date
                     .format("_r%Y-%m-%d_%H-%M-%S")
-                    .to_string()
                     .add(&format!(".restart-{:04}", number)),
             ));
             number += 1;
@@ -650,7 +660,7 @@ fn rotate_output_file_to_idx(
 
 // See documentation of Criterion::Age.
 #[allow(unused_variables)]
-fn get_creation_date(path: &Path) -> DateTime<Local> {
+fn get_creation_date(path: &Path) -> OffsetDateTime {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     // On linux, we know that try_get_creation_date() returns an error.
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -665,8 +675,8 @@ fn get_creation_date(path: &Path) -> DateTime<Local> {
     }
 }
 
-fn get_fake_creation_date() -> DateTime<Local> {
-    Local::now()
+fn get_fake_creation_date() -> OffsetDateTime {
+    now_local_or_utc()
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]

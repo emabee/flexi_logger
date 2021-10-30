@@ -4,6 +4,13 @@ use ansi_term::{Color, Style};
 use log::Record;
 use std::thread;
 
+// const TS_S: &str = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
+// [offset_hour sign:mandatory]:[offset_minute]";
+// lazy_static::lazy_static! {
+//     static ref TS: Vec<format_description::FormatItem<'static>>
+//         = format_description::parse(TS_S).unwrap(/*ok*/);
+// }
+
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
 ///
@@ -68,7 +75,7 @@ pub fn opt_format(
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
@@ -94,7 +101,7 @@ pub fn colored_opt_format(
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S.%N %z")), //9 fraction digits, should be 6
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
@@ -119,7 +126,7 @@ pub fn detailed_format(
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
         record.level(),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
@@ -146,7 +153,7 @@ pub fn colored_detailed_format(
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S.%N %z")), //9 fraction digits, should be 6
         style(level).paint(record.level().to_string()),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
@@ -172,7 +179,7 @@ pub fn with_thread(
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
@@ -199,7 +206,7 @@ pub fn colored_with_thread(
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z").to_string()),
+        style(level).paint(now.now().format("%Y-%m-%d %H:%M:%S.%N %z")), //9 fraction digits, should be 6
         style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),

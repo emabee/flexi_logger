@@ -1,6 +1,5 @@
 mod test_utils;
 
-use chrono::Local;
 use flexi_logger::{
     Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
     Record,
@@ -11,7 +10,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Add;
 use std::thread::JoinHandle;
-use std::time;
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -21,7 +19,7 @@ fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
 
-    let start = Local::now();
+    let start = test_utils::now_local_or_utc();
     let directory = test_utils::dir();
     let mut reconf_handle = Logger::try_with_str("debug")
         .unwrap()
@@ -44,7 +42,7 @@ fn multi_threaded() {
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
-            std::thread::sleep(time::Duration::from_millis(1000));
+            std::thread::sleep(std::time::Duration::from_millis(1000));
             reconf_handle.set_new_spec(new_spec);
             0
         })
@@ -52,7 +50,7 @@ fn multi_threaded() {
 
     wait_for_workers_to_close(worker_handles);
 
-    let delta = Local::now().signed_duration_since(start).num_milliseconds();
+    let delta = (test_utils::now_local_or_utc() - start).whole_milliseconds();
     debug!(
         "Task executed with {} threads in {}ms.",
         NO_OF_THREADS, delta
@@ -106,7 +104,7 @@ pub fn test_format(
     write!(
         w,
         "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-        now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+        now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
         std::thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),

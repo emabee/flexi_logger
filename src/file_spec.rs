@@ -1,7 +1,7 @@
 use crate::FlexiLoggerError;
-use chrono::Local;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use time::OffsetDateTime;
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -230,6 +230,12 @@ impl FileSpec {
     }
 }
 
+// const TS_S: &str = "_[year]-[month]-[day]_[hour]-[minute]-[second]";
+// lazy_static::lazy_static! {
+//     static ref TS: Vec<format_description::FormatItem<'static>>
+//         = format_description::parse(TS_S).unwrap(/*ok*/);
+// }
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum TimestampCfg {
     Default,
@@ -240,7 +246,7 @@ impl TimestampCfg {
     fn get_timestamp(&self) -> Option<String> {
         match self {
             Self::Default | Self::Yes => {
-                Some(Local::now().format("_%Y-%m-%d_%H-%M-%S").to_string())
+                Some(OffsetDateTime::now_utc().format("_%Y-%m-%d_%H-%M-%S"))
             }
             Self::No => None,
         }
@@ -251,6 +257,7 @@ impl TimestampCfg {
 mod test {
     use super::FileSpec;
     use std::path::{Path, PathBuf};
+    use time::PrimitiveDateTime;
 
     #[test]
     fn test_default() {
@@ -289,7 +296,7 @@ mod test {
             assert_eq!(stem.as_bytes()[progname.len()], b'_');
             let s_ts = &stem[progname.len() + 1..];
             assert!(
-                chrono::naive::NaiveDateTime::parse_from_str(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
+                PrimitiveDateTime::parse(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
                 "s_ts: \"{}\"",
                 s_ts
             );

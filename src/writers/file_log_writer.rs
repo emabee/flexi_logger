@@ -133,10 +133,9 @@ impl Drop for FileLogWriter {
 
 #[cfg(test)]
 mod test {
+    use crate::deferred_now::now_local_or_utc;
     use crate::writers::LogWriter;
     use crate::{Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
-    use chrono::Local;
-
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
@@ -156,9 +155,7 @@ mod test {
     #[test]
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now()
-            .format("false-numbers-%Y-%m-%d_%H-%M-%S")
-            .to_string();
+        let ts = now_local_or_utc().format("false-numbers-%Y-%m-%d_%H-%M-%S");
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -197,9 +194,7 @@ mod test {
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now()
-            .format("true-numbers-%Y-%m-%d_%H-%M-%S")
-            .to_string();
+        let ts = now_local_or_utc().format("true-numbers-%Y-%m-%d_%H-%M-%S");
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -247,9 +242,7 @@ mod test {
     #[test]
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now()
-            .format("false-timestamps-%Y-%m-%d_%H-%M-%S")
-            .to_string();
+        let ts = now_local_or_utc().format("false-timestamps-%Y-%m-%d_%H-%M-%S");
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -283,9 +276,7 @@ mod test {
     #[test]
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = Local::now()
-            .format("true-timestamps-%Y-%m-%d_%H-%M-%S")
-            .to_string();
+        let ts = now_local_or_utc().format("true-timestamps-%Y-%m-%d_%H-%M-%S");
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())

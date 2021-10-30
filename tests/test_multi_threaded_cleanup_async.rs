@@ -1,8 +1,6 @@
 mod test_utils;
 
-#[cfg(feature = "compress")]
 mod d {
-    use chrono::{Local, NaiveDateTime};
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
@@ -16,6 +14,7 @@ mod d {
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::thread::{self, JoinHandle};
+    use time::OffsetDateTime;
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -28,7 +27,7 @@ mod d {
         // we use a special log line format that starts with a special string so that it is easier to
         // verify that all log lines are written correctly
 
-        let start = Local::now();
+        let start = super::test_utils::now_local_or_utc();
         let directory = super::test_utils::dir();
         let logger = Logger::try_with_str("debug")
             .unwrap()
@@ -62,12 +61,12 @@ mod d {
 
         wait_for_workers_to_close(worker_handles);
 
-        let delta1 = Local::now().signed_duration_since(start).num_milliseconds();
+        let delta1 = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
 
         std::mem::drop(logger);
-        let delta2 = Local::now().signed_duration_since(start).num_milliseconds();
+        let delta2 = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
         println!(
-            "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
+            "Task executed with {} threads in {}ms, writing logs extended to {}ms.",
             NO_OF_THREADS, delta1, delta2
         );
         verify_logs(&directory.display().to_string());
@@ -122,7 +121,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+            now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
             thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),
@@ -191,8 +190,8 @@ mod d {
 
         for line in buf_reader.lines() {
             let line = line.unwrap();
-
-            if let Ok(ts) = NaiveDateTime::parse_from_str(&line[7..40], "%Y-%m-%d %H:%M:%S%.f %z") {
+            //9 fraction digits, should be 6
+            if let Ok(ts) = OffsetDateTime::parse(&line[7..40], "%Y-%m-%d %H:%M:%S.%N %z") {
                 let n = match &line[45..46].parse::<usize>() {
                     Ok(n) => *n,
                     Err(_) => continue,
@@ -202,7 +201,7 @@ mod d {
                     *counters
                         .total
                         .1
-                        .entry((ts - bts).num_microseconds().unwrap())
+                        .entry((ts - bts).whole_microseconds())
                         .or_insert(1) += 1;
                 }
                 counters.total.0 = Some(ts);
@@ -210,7 +209,7 @@ mod d {
                 if let Some(bts) = counters.threads[n].0 {
                     *counters.threads[n]
                         .1
-                        .entry((ts - bts).num_microseconds().unwrap())
+                        .entry((ts - bts).whole_microseconds())
                         .or_insert(1) += 1;
                 }
                 counters.threads[n].0 = Some(ts);
@@ -218,7 +217,7 @@ mod d {
         }
     }
 
-    fn write_csv(directory: &str, name: &str, data: &BTreeMap<i64, usize>) {
+    fn write_csv(directory: &str, name: &str, data: &BTreeMap<i128, usize>) {
         let mut path = PathBuf::from(directory);
         path.push(name);
         let mut file = std::io::BufWriter::new(
@@ -235,7 +234,7 @@ mod d {
     }
 
     struct Counters {
-        total: (Option<NaiveDateTime>, BTreeMap<i64, usize>),
-        threads: [(Option<NaiveDateTime>, BTreeMap<i64, usize>); 5],
+        total: (Option<OffsetDateTime>, BTreeMap<i128, usize>),
+        threads: [(Option<OffsetDateTime>, BTreeMap<i128, usize>); 5],
     }
 }

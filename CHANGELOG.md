@@ -5,18 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.6] - 2021-10-26
+
+Use `time` (0.2) directly, instead of `chrono`,
+due to [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159).
+
 ## [0.19.5] - 2021-10-19
 
-Remove time 0.1 from dependency tree (see [PR 96](https://github.com/emabee/flexi_logger/issues/96)) - kudos to [complexspaces](https://github.com/complexspaces)!
+Remove time 0.1 from dependency tree
+(see [PR 96](https://github.com/emabee/flexi_logger/issues/96)) -
+kudos to [complexspaces](https://github.com/complexspaces)!
 
-Add feature `dont_minimize_extra_stacks` (fixes [issue-95](https://github.com/emabee/flexi_logger/issues/95)) - kudos to [leishiao](https://github.com/leishiao)!
+Add feature `dont_minimize_extra_stacks`
+(fixes [issue-95](https://github.com/emabee/flexi_logger/issues/95)) -
+kudos to [leishiao](https://github.com/leishiao)!
 
 ## [0.19.4] - 2021-09-15
 
 Fix [issue-94](https://github.com/emabee/flexi_logger/issues/94) -
 kudos to [leishiao](https://github.com/leishiao)!
 
-## [0.19.3] - 2021-09-10
+## [0.19.0] - [0.19.3] - 2021-09-10
 
 Platform-specific fixes, and introduction of github-actions-based CI.
 Kudos to [dallenng](https://github.com/dallenng) and [HEnquist](https://github.com/HEnquist)!
