@@ -38,7 +38,7 @@ Note: `log` is needed because `flexi_logger` plugs into the standard Rust loggin
 by the [log crate](https://crates.io/crates/log),
 and you use the ```log``` macros to write log lines from your code.
 
-The minimal rust version is currently "1.46.0".
+The minimal rust version is currently "1.51.0".
 
 ## Versions
 

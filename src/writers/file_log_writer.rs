@@ -139,6 +139,8 @@ mod test {
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
+    use time::format_description;
+
     const DIRECTORY: &str = r"log_files/rotate";
     const ONE: &str = "ONE";
     const TWO: &str = "TWO";
@@ -155,7 +157,14 @@ mod test {
     #[test]
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc().format("false-numbers-%Y-%m-%d_%H-%M-%S");
+        let ts = now_local_or_utc()
+            .format(
+                &format_description::parse(
+                    "false-numbers-[year]-[month]-[day]_[hour]-[minute]-[second]",
+                )
+                .unwrap(),
+            )
+            .unwrap();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -194,7 +203,14 @@ mod test {
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc().format("true-numbers-%Y-%m-%d_%H-%M-%S");
+        let ts = now_local_or_utc()
+            .format(
+                &format_description::parse(
+                    "true-numbers-[year]-[month]-[day]_[hour]-[minute]-[second]",
+                )
+                .unwrap(),
+            )
+            .unwrap();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -242,7 +258,14 @@ mod test {
     #[test]
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc().format("false-timestamps-%Y-%m-%d_%H-%M-%S");
+        let ts = now_local_or_utc()
+            .format(
+                &format_description::parse(
+                    "false-timestamps-[year]-[month]-[day]_[hour]-[minute]-[second]",
+                )
+                .unwrap(),
+            )
+            .unwrap();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -276,7 +299,14 @@ mod test {
     #[test]
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc().format("true-timestamps-%Y-%m-%d_%H-%M-%S");
+        let ts = now_local_or_utc()
+            .format(
+                &format_description::parse(
+                    "true-timestamps-[year]-[month]-[day]_[hour]-[minute]-[second]",
+                )
+                .unwrap(),
+            )
+            .unwrap();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())

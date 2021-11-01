@@ -7,9 +7,11 @@ mod d {
         Record, WriteMode,
     };
     use glob::glob;
+    use lazy_static::lazy_static;
     use log::*;
     use std::ops::Add;
     use std::thread::{self, JoinHandle};
+    use time::format_description::{self, FormatItem};
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -100,6 +102,12 @@ mod d {
         trace!("All worker threads joined.");
     }
 
+    const TS_S: &str = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
+                    [offset_hour sign:mandatory]:[offset_minute]";
+    lazy_static! {
+        static ref TS: Vec<FormatItem<'static>> = format_description::parse(TS_S).unwrap(/*ok*/);
+    }
+
     pub fn test_format(
         w: &mut dyn std::io::Write,
         now: &mut DeferredNow,
@@ -108,7 +116,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.now().format("%Y-%m-%d %H:%M:%S.%N %z"), //9 fraction digits, should be 6
+            now.now().format(&TS).unwrap(),
             thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),

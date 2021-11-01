@@ -1,4 +1,4 @@
-use time::OffsetDateTime;
+use time::{formatting::Formattable, OffsetDateTime};
 
 /// Deferred timestamp creation.
 ///
@@ -32,11 +32,11 @@ impl<'a> DeferredNow {
     /// # Panics
     ///
     /// if fmt has an inappropriate value
-    pub fn format(&'a mut self, fmt: impl Into<time::Format>) -> String {
-        self.now().format(fmt)
+    pub fn format(&'a mut self, fmt: &(impl Formattable + ?Sized)) -> String {
+        self.now().format(fmt).unwrap()
     }
 }
 
 pub(crate) fn now_local_or_utc() -> OffsetDateTime {
-    OffsetDateTime::try_now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
+    OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
 }

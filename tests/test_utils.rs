@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::path::PathBuf;
-use time::OffsetDateTime;
+use time::{format_description, OffsetDateTime};
 
 const CTRL_INDEX: &str = "CTRL_INDEX";
 
@@ -10,11 +10,14 @@ pub fn file(filename: &str) -> PathBuf {
     f.push(filename);
     f
 }
+
 pub fn dir() -> PathBuf {
     let mut d = PathBuf::new();
     d.push("log_files");
     add_prog_name(&mut d);
-    d.push(now_local_or_utc().format("%Y-%m-%d_%H-%M-%S"));
+    d.push(now_local_or_utc().format(
+        &format_description::parse("[year]-[month]-[day]_[hour]-[minute]-[second]").unwrap(/*ok*/),
+    ).unwrap());
     d
 }
 pub fn add_prog_name(pb: &mut PathBuf) {
@@ -61,5 +64,5 @@ pub fn dispatch(count: u8) -> Option<u8> {
 }
 
 pub fn now_local_or_utc() -> OffsetDateTime {
-    OffsetDateTime::try_now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
+    OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
 }

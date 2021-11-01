@@ -7,7 +7,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
-use time::OffsetDateTime;
+use time::{format_description, OffsetDateTime};
 
 use super::{Config, RotationConfig};
 
@@ -578,10 +578,16 @@ fn rotate_output_file_to_date(
     creation_date: &OffsetDateTime,
     config: &Config,
 ) -> Result<(), std::io::Error> {
+    const TS_S: &str = "_r[year]-[month]-[day]_[hour]-[minute]-[second]";
+    lazy_static::lazy_static! {
+    static ref TS: Vec<format_description::FormatItem<'static>>
+    = format_description::parse(TS_S).unwrap(/*ok*/);
+    }
+
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
     let mut rotated_path = config
         .file_spec
-        .as_pathbuf(Some(&creation_date.format("_r%Y-%m-%d_%H-%M-%S")));
+        .as_pathbuf(Some(&creation_date.format(&TS).unwrap(/*ok*/)));
 
     // Search for rotated_path as is and for restart-siblings;
     // if any exists, find highest restart and add 1, else continue without restart
@@ -611,7 +617,8 @@ fn rotate_output_file_to_date(
         while (*rotated_path).exists() {
             rotated_path = config.file_spec.as_pathbuf(Some(
                 &creation_date
-                    .format("_r%Y-%m-%d_%H-%M-%S")
+                    .format(&TS)
+                    .unwrap(/*ok*/)
                     .add(&format!(".restart-{:04}", number)),
             ));
             number += 1;

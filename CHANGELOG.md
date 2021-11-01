@@ -7,8 +7,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.19.6] - 2021-10-26
 
-Use `time` (0.2) directly, instead of `chrono`,
+Use `time` directly, instead of `chrono`,
 due to [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159).
+Bumps the minimal supported rust version to 1.51.0. Improves performance a bit.
 
 ## [0.19.5] - 2021-10-19
 

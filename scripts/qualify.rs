@@ -47,8 +47,8 @@ fn main() {
 
     // Build in important variants
     std::fs::remove_file("Cargo.lock").ok();
-    run_command!("cargo", "+1.46.0", "build", "--no-default-features");
-    run_command!("cargo", "+1.46.0", "build", "--all-features");
+    run_command!("cargo", "+1.51.0", "build", "--no-default-features");
+    run_command!("cargo", "+1.51.0", "build", "--all-features");
 
     std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo", "build");

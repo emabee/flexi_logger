@@ -1,7 +1,7 @@
 use crate::FlexiLoggerError;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use time::OffsetDateTime;
+use time::{format_description, OffsetDateTime};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -230,12 +230,6 @@ impl FileSpec {
     }
 }
 
-// const TS_S: &str = "_[year]-[month]-[day]_[hour]-[minute]-[second]";
-// lazy_static::lazy_static! {
-//     static ref TS: Vec<format_description::FormatItem<'static>>
-//         = format_description::parse(TS_S).unwrap(/*ok*/);
-// }
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum TimestampCfg {
     Default,
@@ -246,7 +240,16 @@ impl TimestampCfg {
     fn get_timestamp(&self) -> Option<String> {
         match self {
             Self::Default | Self::Yes => {
-                Some(OffsetDateTime::now_utc().format("_%Y-%m-%d_%H-%M-%S"))
+                Some(
+                    OffsetDateTime::now_utc()
+                    .format(
+                        &format_description::parse(
+                            "_[year]-[month]-[day]_[hour]-[minute]-[second]"
+                        )
+                        .unwrap(/*ok*/)
+                    )
+                    .unwrap(/*ok*/),
+                )
             }
             Self::No => None,
         }
@@ -257,7 +260,7 @@ impl TimestampCfg {
 mod test {
     use super::FileSpec;
     use std::path::{Path, PathBuf};
-    use time::PrimitiveDateTime;
+    use time::{format_description, PrimitiveDateTime};
 
     #[test]
     fn test_default() {
@@ -296,7 +299,14 @@ mod test {
             assert_eq!(stem.as_bytes()[progname.len()], b'_');
             let s_ts = &stem[progname.len() + 1..];
             assert!(
-                PrimitiveDateTime::parse(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
+                PrimitiveDateTime::parse(
+                    s_ts,
+                    &format_description::parse(
+                    "[year]-[month]-[day]_[hour]-[minute]-[second]"
+                )
+                .unwrap(/*ok*/)
+                )
+                .is_ok(),
                 "s_ts: \"{}\"",
                 s_ts
             );
