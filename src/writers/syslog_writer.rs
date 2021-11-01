@@ -178,17 +178,14 @@ impl LogWriter for SyslogWriter {
         let severity = (self.determine_severity)(record.level());
         write!(
             syslog,
-            "{}",
-            format!(
-                "<{}>1 {} {:?} {} {} {} - {}\n",
-                self.facility as u8 | severity as u8,
-                now.now().format(&Rfc3339).unwrap(/*ok*/),
-                self.hostname,
-                self.process,
-                self.pid,
-                self.message_id,
-                &record.args()
-            )
+            "<{}>1 {} {:?} {} {} {} - {}\n",
+            self.facility as u8 | severity as u8,
+            now.now().format(&Rfc3339).unwrap(/*ok*/),
+            self.hostname,
+            self.process,
+            self.pid,
+            self.message_id,
+            &record.args()
         )
     }
 
