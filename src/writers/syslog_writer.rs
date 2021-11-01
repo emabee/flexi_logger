@@ -176,9 +176,9 @@ impl LogWriter for SyslogWriter {
         let mut syslog = mr_syslog.borrow_mut();
 
         let severity = (self.determine_severity)(record.level());
-        write!(
+        writeln!(
             syslog,
-            "<{}>1 {} {:?} {} {} {} - {}\n",
+            "<{}>1 {} {:?} {} {} {} - {}",
             self.facility as u8 | severity as u8,
             now.now().format(&Rfc3339).unwrap(/*ok*/),
             self.hostname,
