@@ -71,7 +71,7 @@ mod d {
         std::mem::drop(logger);
         let delta2 = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
         println!(
-            "Task executed with {} threads in {}ms, writing logs extended to {}ms.",
+            "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
             NO_OF_THREADS, delta1, delta2
         );
         verify_logs(&directory.display().to_string());

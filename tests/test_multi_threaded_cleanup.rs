@@ -56,7 +56,7 @@ mod d {
 
         let delta = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
         debug!(
-            "Task executed with {} threads in {}ms.",
+            "Task executed with {} threads in {} ms.",
             NO_OF_THREADS, delta
         );
 
