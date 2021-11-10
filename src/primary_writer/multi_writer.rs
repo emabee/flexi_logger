@@ -1,8 +1,7 @@
-use crate::deferred_now::DeferredNow;
 use crate::logger::Duplicate;
 use crate::util::write_buffered;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
-use crate::{FlexiLoggerError, FormatFunction};
+use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 use std::io::Write;
 

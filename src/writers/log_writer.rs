@@ -1,5 +1,4 @@
-use crate::deferred_now::DeferredNow;
-use crate::FormatFunction;
+use crate::{DeferredNow, FormatFunction};
 use log::Record;
 
 /// Writes to a single log output stream.

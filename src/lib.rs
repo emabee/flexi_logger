@@ -63,7 +63,7 @@ pub mod writers;
 
 pub mod error_info;
 
-pub use crate::deferred_now::DeferredNow;
+pub use crate::deferred_now::{now_local_or_utc, DeferredNow};
 pub use crate::file_spec::FileSpec;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;

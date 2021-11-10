@@ -1,10 +1,9 @@
-use crate::deferred_now::DeferredNow;
 #[cfg(feature = "async")]
 use crate::util::{eprint_err, ERRCODE};
 use crate::util::{io_err, write_buffered};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
-use crate::{writers::LogWriter, EffectiveWriteMode, FormatFunction, WriteMode};
+use crate::{writers::LogWriter, DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode};
 #[cfg(test)]
 use std::io::Cursor;
 

@@ -5,11 +5,10 @@ mod stdout_writer;
 use self::multi_writer::MultiWriter;
 use self::stderr_writer::StdErrWriter;
 use self::stdout_writer::StdOutWriter;
-use crate::deferred_now::DeferredNow;
 use crate::filter::LogLineWriter;
 use crate::logger::Duplicate;
 use crate::writers::{FileLogWriter, LogWriter};
-use crate::{FormatFunction, WriteMode};
+use crate::{DeferredNow, FormatFunction, WriteMode};
 use log::Record;
 
 // Writes either to stdout, or to stderr,

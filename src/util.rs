@@ -1,4 +1,4 @@
-use crate::{deferred_now::DeferredNow, FormatFunction};
+use crate::{DeferredNow, FormatFunction};
 use log::Record;
 use std::cell::RefCell;
 use std::io::Write;
@@ -18,13 +18,14 @@ pub(crate) enum ERRCODE {
     Write,
     Flush,
     Format,
-    Poison,
     LogFile,
-    WriterSpec,
     #[cfg(feature = "specfile")]
     LogSpecFile,
+    Poison,
     #[cfg(target_os = "linux")]
     Symlink,
+    Time,
+    WriterSpec,
 }
 impl ERRCODE {
     fn as_index(self) -> &'static str {
@@ -32,13 +33,14 @@ impl ERRCODE {
             Self::Write => "write",
             Self::Flush => "flush",
             Self::Format => "format",
-            Self::Poison => "poison",
             Self::LogFile => "logfile",
-            Self::WriterSpec => "writerspec",
             #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
+            Self::Poison => "poison",
             #[cfg(target_os = "linux")]
             Self::Symlink => "symlink",
+            Self::Time => "time",
+            Self::WriterSpec => "writerspec",
         }
     }
 }

@@ -1,18 +1,19 @@
-use crate::filter::LogLineFilter;
-use crate::flexi_logger::FlexiLogger;
-use crate::formats::default_format;
 #[cfg(feature = "atty")]
 use crate::formats::AdaptiveFormat;
 #[cfg(feature = "specfile_without_notification")]
 use crate::logger_handle::LogSpecSubscriber;
-use crate::primary_writer::PrimaryWriter;
 #[cfg(feature = "specfile")]
 use crate::util::{eprint_err, ERRCODE};
-use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
-use crate::WriteMode;
+
 use crate::{
+    filter::LogLineFilter,
+    flexi_logger::FlexiLogger,
+    formats::default_format,
+    now_local_or_utc,
+    primary_writer::PrimaryWriter,
+    writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
     Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
-    Naming,
+    Naming, WriteMode,
 };
 
 #[cfg(feature = "specfile")]
@@ -119,6 +120,9 @@ impl Logger {
     }
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
+        // make sure the lazy_static in this function is filled as early as possible:
+        let _ = now_local_or_utc();
+
         #[cfg(feature = "colors")]
         #[cfg(windows)]
         {

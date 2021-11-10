@@ -133,13 +133,12 @@ impl Drop for FileLogWriter {
 
 #[cfg(test)]
 mod test {
-    use crate::deferred_now::now_local_or_utc;
+    use crate::now_local_or_utc;
     use crate::writers::LogWriter;
     use crate::{Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
-    use time::format_description;
 
     const DIRECTORY: &str = r"log_files/rotate";
     const ONE: &str = "ONE";
@@ -152,19 +151,14 @@ mod test {
     const EIGHT: &str = "EIGHT";
     const NINE: &str = "NINE";
 
-    // cargo test --lib -- --nocapture
+    const FMT_DASHES_U_DASHES: &[time::format_description::FormatItem<'static>] =
+        time::macros::format_description!("[year]-[month]-[day]_[hour]-[minute]-[second]");
 
     #[test]
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc()
-            .format(
-                &format_description::parse(
-                    "false-numbers-[year]-[month]-[day]_[hour]-[minute]-[second]",
-                )
-                .unwrap(),
-            )
-            .unwrap();
+        let mut ts = "false-numbers-".to_string();
+        ts.push_str(&now_local_or_utc().format(FMT_DASHES_U_DASHES).unwrap());
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -203,14 +197,8 @@ mod test {
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc()
-            .format(
-                &format_description::parse(
-                    "true-numbers-[year]-[month]-[day]_[hour]-[minute]-[second]",
-                )
-                .unwrap(),
-            )
-            .unwrap();
+        let mut ts = "true-numbers-".to_string();
+        ts.push_str(&now_local_or_utc().format(FMT_DASHES_U_DASHES).unwrap());
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -258,14 +246,8 @@ mod test {
     #[test]
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc()
-            .format(
-                &format_description::parse(
-                    "false-timestamps-[year]-[month]-[day]_[hour]-[minute]-[second]",
-                )
-                .unwrap(),
-            )
-            .unwrap();
+        let mut ts = "false-timestamps-".to_string();
+        ts.push_str(&now_local_or_utc().format(FMT_DASHES_U_DASHES).unwrap());
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -299,14 +281,8 @@ mod test {
     #[test]
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts = now_local_or_utc()
-            .format(
-                &format_description::parse(
-                    "true-timestamps-[year]-[month]-[day]_[hour]-[minute]-[second]",
-                )
-                .unwrap(),
-            )
-            .unwrap();
+        let mut ts = "true-timestamps-".to_string();
+        ts.push_str(&now_local_or_utc().format(FMT_DASHES_U_DASHES).unwrap());
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())

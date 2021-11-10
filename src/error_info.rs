@@ -91,6 +91,11 @@
 //! This error can only occur on linux systems, and when you use `Logger::create_symlink`, and
 //! indicates an issue with creating or replacing the symbolic link to the log file.
 //!
+//! ## `Time`
+//!
+//! `time::OffsetDateTime::now_local()` returns an error, which forces `flexi_logger` to
+//! work with UTC timestamps rather than with local time.
+//!
 //! ## `WriterSpec`
 //!
 //! The code uses in some log macro call the syntax to send the log line to a certain `LogWriter`,

@@ -5,11 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2021-11-13
+
+Switch to `time 0.3.5`, and retrieve the UTC offset while `flexi_logger` is initialized.
+See also `time`'s [CHANGELOG](https://github.com/time-rs/time/blob/main/CHANGELOG.md#035-2021-11-12).
+
+**Reason for the version bump**:
+
+The inner representation of `DeferredNow` has changed from `chrono::DateTime<Local>`
+to `time::OffsetDateTime`, and this is visible e.g. to implementors of format functions.
+
 ## [0.19.6] - 2021-10-26
 
 Use `time` directly, instead of `chrono`,
 due to [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159).
 Bumps the minimal supported rust version to 1.51.0. Improves performance a bit.
+
+Unfortunately, this version suffers on linux from `time`'s somewhat radical behavior
+to not support UTC offsets on linux.
 
 ## [0.19.5] - 2021-10-19
 

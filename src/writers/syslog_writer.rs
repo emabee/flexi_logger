@@ -1,5 +1,4 @@
-use crate::deferred_now::DeferredNow;
-use crate::writers::log_writer::LogWriter;
+use crate::{writers::log_writer::LogWriter, DeferredNow};
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::io::Error as IoError;
@@ -9,7 +8,6 @@ use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 #[cfg(target_os = "linux")]
 use std::path::Path;
 use std::sync::Mutex;
-use time::format_description::well_known::Rfc3339;
 
 /// Syslog Facility.
 ///
@@ -180,7 +178,7 @@ impl LogWriter for SyslogWriter {
             syslog,
             "<{}>1 {} {:?} {} {} {} - {}",
             self.facility as u8 | severity as u8,
-            now.now().format(&Rfc3339).unwrap(/*ok*/),
+            now.format_rfc3339(),
             self.hostname,
             self.process,
             self.pid,

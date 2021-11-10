@@ -5,10 +5,9 @@ mod d {
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-        Record, WriteMode,
+        Record, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
     };
     use glob::glob;
-    use lazy_static::lazy_static;
     use log::*;
     use std::collections::BTreeMap;
     use std::fs::File;
@@ -16,10 +15,7 @@ mod d {
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::thread::{self, JoinHandle};
-    use time::{
-        format_description::{self, FormatItem},
-        OffsetDateTime,
-    };
+    use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -118,12 +114,6 @@ mod d {
         trace!("All worker threads joined.");
     }
 
-    const TS_S: &str = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
-                    [offset_hour sign:mandatory]:[offset_minute]";
-    lazy_static! {
-        static ref TS: Vec<FormatItem<'static>> = format_description::parse(TS_S).unwrap(/*ok*/);
-    }
-
     pub fn test_format(
         w: &mut dyn std::io::Write,
         now: &mut DeferredNow,
@@ -132,7 +122,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.now().format(&TS).unwrap(),
+            now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
             thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),
@@ -199,6 +189,10 @@ mod d {
             Box::new(BufReader::new(File::open(p).unwrap()))
         };
 
+        const TS: &[FormatItem<'static>] = format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
+                [offset_hour sign:mandatory]:[offset_minute]"
+        );
         for line in buf_reader.lines() {
             let line = line.unwrap();
             //9 fraction digits, should be 6
