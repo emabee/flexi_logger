@@ -48,7 +48,7 @@ fn multi_threaded() {
     let new_spec = LogSpecification::parse("trace").unwrap();
     std::thread::Builder::new()
         .spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(500));
             logger2.set_new_spec(new_spec);
             0
         })
@@ -91,6 +91,7 @@ fn do_work(thread_number: usize) {
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("({})  writing out line number {}", thread_number, idx);
     }
+    std::thread::sleep(std::time::Duration::from_millis(500));
     trace!("MUST_BE_PRINTED");
 }
 

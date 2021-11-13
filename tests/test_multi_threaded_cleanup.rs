@@ -47,7 +47,7 @@ mod d {
 
         let worker_handles = start_worker_threads(NO_OF_THREADS);
         let new_spec = LogSpecification::parse("trace").unwrap();
-        thread::sleep(std::time::Duration::from_millis(1000));
+        thread::sleep(std::time::Duration::from_millis(500));
         logger.set_new_spec(new_spec);
 
         wait_for_workers_to_close(worker_handles);
@@ -88,6 +88,7 @@ mod d {
         for idx in 0..NO_OF_LOGLINES_PER_THREAD {
             debug!("({})  writing out line number {}", thread_number, idx);
         }
+        std::thread::sleep(std::time::Duration::from_millis(500));
         trace!("MUST_BE_PRINTED");
     }
 
