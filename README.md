@@ -109,7 +109,8 @@ or all rotated log files in compressed form (`.gz`) rather than as plain text fi
 Normally, `flexi_logger` reduces the stack size of all threads that it might spawn
 (flusher, specfile-watcher, async writer, cleanup) to a bare minimum.
 For usecases where this is not desirable
-(see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)), you can activate this feature.
+(see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)),
+you can activate this feature.
 
 ### **`specfile`**
 
@@ -145,3 +146,28 @@ Adds the ability to filter logs by text, but also adds a dependency on the regex
 ### **`trc`**
 
 An experimental feature that allows using `flexi_logger` functionality with `tracing`.
+
+### **`use_chrono_for_offset`**
+
+The advisory [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159) hits both
+the `chrono` and the `time` crate.
+Since `time` is striving for a solution, while `chrono` appears to be unmaintained,
+`flexi_logger` switched from `chrono` to `time`.
+However, `time`'s "strategy" to solve the advisory is overly puristic:
+it refuses to obtain the UTC offset on unix platforms, if the program is multi-threaded,
+or running on a unix version other than `linux`.
+
+`flexi_logger` tries to solve this dilemma by obtaining the UTC offset only once,
+during initialization, when most programs are still single-threaded.
+`time` should then be able to provide the correct offset on linux.
+
+If this does not work, activate feature `use_chrono_for_offset`, which
+
+* re-introduces the dependency to `chrono`
+* uses `chrono` to determine the UTC offset
+* makes your program again affected by
+  [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159),
+  which in many cases seems acceptable.
+
+Note that this feature will be removed as soon as `time` allows obtaining the UTC offset
+again on all platforms.

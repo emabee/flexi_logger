@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.20.0"
+version = "0.20.1-unpublished"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -37,10 +37,12 @@ specfile_without_notification = ["serde","toml","serde_derive"]
 syslog_writer = ["libc", "hostname"]
 textfilter = ["regex"]
 trc =["async", "specfile", "tracing-subscriber"]
+use_chrono_for_offset = ["chrono"]
 
 [dependencies]
 atty = {version = "0.2", optional = true}
 ansi_term = {version = "0.12", optional = true}
+chrono ={version = "0.4.19", optional = true}
 crossbeam = {version = "0.8", optional = true}
 flate2 = {version = "1.0", optional = true}
 glob = "0.3"
