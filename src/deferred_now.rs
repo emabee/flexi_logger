@@ -50,7 +50,7 @@ impl<'a> DeferredNow {
 /// and is not even tried there if the program is multi-threaded, this method retrieves the
 /// offset only once and caches it then.
 /// The method is called now during the initialization of `flexi_logger`, so when you do this while
-/// the program is single-threaded, you'll likely get the right time offset in yor trace output
+/// the program is single-threaded, you'll likely get the right time offset in your trace output
 /// even on linux.
 #[must_use]
 pub fn now_local_or_utc() -> OffsetDateTime {
