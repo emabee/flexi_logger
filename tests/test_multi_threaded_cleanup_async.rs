@@ -28,7 +28,7 @@ mod d {
         // we use a special log line format that starts with a special string so that it is easier to
         // verify that all log lines are written correctly
 
-        let start = super::test_utils::now_local_or_utc();
+        let start = super::test_utils::now_local();
         let directory = super::test_utils::dir();
         let logger = Logger::try_with_str("debug")
             .unwrap()
@@ -62,10 +62,10 @@ mod d {
 
         wait_for_workers_to_close(worker_handles);
 
-        let delta1 = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
+        let delta1 = (super::test_utils::now_local() - start).whole_milliseconds();
 
         std::mem::drop(logger);
-        let delta2 = (super::test_utils::now_local_or_utc() - start).whole_milliseconds();
+        let delta2 = (super::test_utils::now_local() - start).whole_milliseconds();
         println!(
             "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
             NO_OF_THREADS, delta1, delta2

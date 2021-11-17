@@ -1,7 +1,8 @@
+use crate::now_local;
 use crate::FlexiLoggerError;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use time::{format_description, OffsetDateTime};
+use time::{format_description::FormatItem, macros::format_description};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -230,6 +231,9 @@ impl FileSpec {
     }
 }
 
+const TS_USCORE_DASHES_USCORE_DASHES: &[FormatItem<'static>] =
+    format_description!("_[year]-[month]-[day]_[hour]-[minute]-[second]");
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum TimestampCfg {
     Default,
@@ -240,16 +244,8 @@ impl TimestampCfg {
     fn get_timestamp(&self) -> Option<String> {
         match self {
             Self::Default | Self::Yes => {
-                Some(
-                    OffsetDateTime::now_utc()
-                    .format(
-                        &format_description::parse(
-                            "_[year]-[month]-[day]_[hour]-[minute]-[second]"
-                        )
-                        .unwrap(/*ok*/)
-                    )
-                    .unwrap(/*ok*/),
-                )
+                Some(now_local()
+                    .format(TS_USCORE_DASHES_USCORE_DASHES).unwrap(/*ok*/))
             }
             Self::No => None,
         }

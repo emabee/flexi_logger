@@ -9,7 +9,7 @@ use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
     formats::default_format,
-    now_local_or_utc,
+    now_local,
     primary_writer::PrimaryWriter,
     writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
     Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
@@ -121,7 +121,7 @@ impl Logger {
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
         // make sure the lazy_static in this function is filled as early as possible:
-        let _ = now_local_or_utc();
+        let _ = now_local();
 
         #[cfg(feature = "colors")]
         #[cfg(windows)]

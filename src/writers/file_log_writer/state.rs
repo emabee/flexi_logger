@@ -1,6 +1,6 @@
 use super::{Config, RotationConfig};
 use crate::{
-    now_local_or_utc,
+    now_local,
     util::{eprint_err, ERRCODE},
     Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
 };
@@ -65,7 +65,7 @@ impl RotationState {
     }
 
     fn age_rotation_necessary(&self, age: Age) -> bool {
-        let now = now_local_or_utc();
+        let now = now_local();
         match age {
             Age::Day => {
                 self.created_at.year() != now.year()
@@ -680,7 +680,7 @@ fn get_creation_date(path: &Path) -> OffsetDateTime {
 }
 
 fn get_fake_creation_date() -> OffsetDateTime {
-    now_local_or_utc()
+    now_local()
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]

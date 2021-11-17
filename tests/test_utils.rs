@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
+use chrono::{Local, Offset};
 use std::path::PathBuf;
-use time::{format_description, OffsetDateTime};
+use time::{format_description::FormatItem, macros::format_description, OffsetDateTime, UtcOffset};
 
 const CTRL_INDEX: &str = "CTRL_INDEX";
 
@@ -11,13 +12,14 @@ pub fn file(filename: &str) -> PathBuf {
     f
 }
 
+const TS: &[FormatItem<'static>] =
+    format_description!("[year]-[month]-[day]_[hour]-[minute]-[second]");
+
 pub fn dir() -> PathBuf {
     let mut d = PathBuf::new();
     d.push("log_files");
     add_prog_name(&mut d);
-    d.push(now_local_or_utc().format(
-        &format_description::parse("[year]-[month]-[day]_[hour]-[minute]-[second]").unwrap(/*ok*/),
-    ).unwrap());
+    d.push(now_local().format(TS).unwrap());
     d
 }
 pub fn add_prog_name(pb: &mut PathBuf) {
@@ -63,6 +65,37 @@ pub fn dispatch(count: u8) -> Option<u8> {
     }
 }
 
-pub fn now_local_or_utc() -> OffsetDateTime {
-    OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
+// Due to https://rustsec.org/advisories/RUSTSEC-2020-0159
+// we obtain the offset only once and keep it here
+lazy_static::lazy_static! {
+    static ref OFFSET: UtcOffset = utc_offset();
+}
+
+fn utc_offset() -> UtcOffset {
+    #[cfg(feature = "use_chrono_for_offset")]
+    return utc_offset_with_chrono();
+
+    #[allow(unreachable_code)]
+    utc_offset_with_time()
+}
+
+#[cfg(feature = "use_chrono_for_offset")]
+fn utc_offset_with_chrono() -> UtcOffset {
+    let chrono_offset_seconds = Local::now().offset().fix().local_minus_utc();
+    UtcOffset::from_whole_seconds(chrono_offset_seconds).unwrap(/* ok */)
+}
+
+fn utc_offset_with_time() -> UtcOffset {
+    match OffsetDateTime::now_local() {
+        Ok(ts) => ts.offset(),
+        Err(_) => {
+            eprintln!("flexi_logger-test has to work with UTC rather than with local time",);
+            UtcOffset::UTC
+        }
+    }
+}
+
+#[must_use]
+pub fn now_local() -> OffsetDateTime {
+    OffsetDateTime::now_utc().to_offset(*OFFSET)
 }

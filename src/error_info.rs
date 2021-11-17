@@ -93,8 +93,19 @@
 //!
 //! ## `Time`
 //!
-//! `time::OffsetDateTime::now_local()` returns an error, which forces `flexi_logger` to
-//! work with UTC timestamps rather than with local time.
+//! You're running on unix, and `time::OffsetDateTime::now_local()` returns an error,
+//! due to `time`'s reaction on advisory
+//! [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159).
+//! This forces `flexi_logger` to work with UTC timestamps rather than with local time.
+//! See also [issue-99](https://github.com/emabee/flexi_logger/issues/99) for more details.
+//!
+//! You can work around this issue by either
+//!
+//! - applying the `unsound_local_offset` pseudo-feature of `time` (see their documentation,
+//!   the last section of <https://docs.rs/time/0.3.5/time/#feature-flags>)
+//! - or using `flexi_logger`'s feature `use_chrono_for_offset`, which re-introduces the
+//!   susceptibility to [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159)
+//!   (unfortunate, but maybe acceptable in most cases).
 //!
 //! ## `WriterSpec`
 //!

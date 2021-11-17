@@ -14,7 +14,6 @@ use log::Record;
 // Writes either to stdout, or to stderr,
 // or to a file (with optional duplication to stderr),
 // or to nowhere (with optional "duplication" to stderr).
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum PrimaryWriter {
     StdOut(StdOutWriter),
     StdErr(StdErrWriter),

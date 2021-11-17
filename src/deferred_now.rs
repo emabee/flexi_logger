@@ -27,7 +27,7 @@ impl<'a> DeferredNow {
     ///
     /// Requires mutability because the first caller will generate the timestamp.
     pub fn now(&'a mut self) -> &'a OffsetDateTime {
-        self.0.get_or_insert_with(now_local_or_utc)
+        self.0.get_or_insert_with(now_local)
     }
 
     /// Convert into a formatted String.
@@ -90,7 +90,7 @@ fn utc_offset_with_time() -> UtcOffset {
 /// so when this is done while the program is single-threaded,
 /// we should get the right time offset in the trace output, even on linux.
 #[must_use]
-pub fn now_local_or_utc() -> OffsetDateTime {
+pub fn now_local() -> OffsetDateTime {
     OffsetDateTime::now_utc().to_offset(*OFFSET)
 }
 

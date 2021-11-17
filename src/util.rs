@@ -47,7 +47,7 @@ impl ERRCODE {
 
 pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Error) {
     let s = format!(
-        "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err}\n\
+        "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err:?}\n\
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         err = err,

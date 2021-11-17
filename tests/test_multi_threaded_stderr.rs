@@ -23,13 +23,13 @@ fn multi_threaded() {
         std::thread::sleep(std::time::Duration::from_millis(100));
         info!("********** check delay of this log line ({}) **********", i);
     }
-    let start = test_utils::now_local_or_utc();
+    let start = test_utils::now_local();
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
 
     wait_for_workers_to_close(worker_handles);
 
-    let delta = (test_utils::now_local_or_utc() - start).whole_milliseconds();
+    let delta = (test_utils::now_local() - start).whole_milliseconds();
     debug!(
         "Task executed with {} threads in {} ms.",
         NO_OF_THREADS, delta

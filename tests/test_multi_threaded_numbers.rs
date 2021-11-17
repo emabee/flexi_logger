@@ -20,7 +20,7 @@ fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
 
-    let start = test_utils::now_local_or_utc();
+    let start = test_utils::now_local();
     let directory = test_utils::dir();
     let logger = Logger::try_with_str("debug")
         .unwrap()
@@ -56,7 +56,7 @@ fn multi_threaded() {
 
     wait_for_workers_to_close(worker_handles);
 
-    let delta = (test_utils::now_local_or_utc() - start).whole_milliseconds();
+    let delta = (test_utils::now_local() - start).whole_milliseconds();
     debug!(
         "Task executed with {} threads in {} ms.",
         NO_OF_THREADS, delta

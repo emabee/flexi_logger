@@ -102,7 +102,6 @@ impl From<LogSpecAsFilter> for EnvFilter {
 /// # Errors
 ///
 /// Several variants of [`FlexiLoggerError`] can occur.
-#[allow(clippy::missing_panics_doc)]
 #[cfg(feature = "specfile_without_notification")]
 pub fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
     specfile: P,
