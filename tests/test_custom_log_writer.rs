@@ -32,7 +32,7 @@ fn work(value: u8) {
             }));
             logger = logger.format(custom_format);
         }
-        COUNT.. => unreachable!("asAS"),
+        COUNT..=u8::MAX => unreachable!("asAS"),
     }
     let handle = logger
         .start()
@@ -94,7 +94,7 @@ impl LogWriter for CustomWriter {
                     acc.extend(format!("{}: {}", level, message).bytes());
                     acc
                 }),
-            COUNT.. => {
+            COUNT..=u8::MAX => {
                 unreachable!("sadadsd")
             }
         };

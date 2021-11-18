@@ -73,7 +73,7 @@ fn work(value: u8) {
                     .discriminant("foo"),
             );
         }
-        COUNT.. => {
+        COUNT..=u8::MAX => {
             unreachable!("dtrtgfg")
         }
     };

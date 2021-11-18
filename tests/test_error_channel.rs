@@ -42,7 +42,7 @@ fn work(value: u8) {
         3 => {
             logger = logger.error_channel(ErrorChannel::DevNull);
         }
-        COUNT.. => {
+        COUNT..=u8::MAX => {
             unreachable!("djdjfäfdl")
         }
     };

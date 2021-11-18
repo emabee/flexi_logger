@@ -65,6 +65,7 @@ fn main() {
     run_command!("cargo", "+nightly", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings");
 
     // Run tests in important variants
+    run_command!("cargo", "+1.51.0", "test", "--all-features");
     run_command!("cargo", "test", "--release", "--all-features");
     run_command!("cargo", "test", "--no-default-features");
     run_command!("cargo", "test", "--release");
