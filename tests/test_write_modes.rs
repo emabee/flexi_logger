@@ -72,13 +72,21 @@ fn work(value: u8) {
         8 => {
             println!("file, direct");
             logger
-                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                .log_to_file(
+                    FileSpec::default()
+                        .suppress_timestamp()
+                        .directory(self::test_utils::dir()),
+                )
                 .write_mode(WriteMode::Direct)
         }
         9 => {
             println!("file, buffer+flush");
             logger
-                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                .log_to_file(
+                    FileSpec::default()
+                        .suppress_timestamp()
+                        .directory(self::test_utils::dir()),
+                )
                 .write_mode(WriteMode::BufferAndFlush)
         }
         10 => {
@@ -86,7 +94,11 @@ fn work(value: u8) {
             {
                 println!("file, async");
                 logger
-                    .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                    .log_to_file(
+                        FileSpec::default()
+                            .suppress_timestamp()
+                            .directory(self::test_utils::dir()),
+                    )
                     .write_mode(WriteMode::Async)
             }
             #[cfg(not(feature = "async"))]
@@ -98,7 +110,11 @@ fn work(value: u8) {
         11 => {
             println!("file, buffer no flush");
             logger
-                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                .log_to_file(
+                    FileSpec::default()
+                        .suppress_timestamp()
+                        .directory(self::test_utils::dir()),
+                )
                 .write_mode(WriteMode::BufferDontFlush)
         }
         COUNT..=std::u8::MAX => {

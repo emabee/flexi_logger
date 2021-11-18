@@ -11,6 +11,7 @@ use crate::{
     formats::default_format,
     now_local,
     primary_writer::PrimaryWriter,
+    util::set_error_channel,
     writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
     Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
     Naming, WriteMode,
@@ -70,6 +71,7 @@ pub struct Logger {
     flwb: FileLogWriterBuilder,
     other_writers: HashMap<String, Box<dyn LogWriter>>,
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
+    error_channel: ErrorChannel,
 }
 
 enum LogTarget {
@@ -161,6 +163,7 @@ impl Logger {
             flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
             filter: None,
+            error_channel: ErrorChannel::default(),
         }
     }
 }
@@ -506,6 +509,41 @@ impl Logger {
         self.flwb = self.flwb.use_windows_line_ending();
         self
     }
+
+    /// Define the output channel for `flexi_logger`'s own error messages.
+    ///
+    /// These are only written if `flexi_logger` cannot do what it is supposed to do,
+    /// so under normal circumstances no single message shuld appear.
+    ///
+    /// By default these error messages are printed to `stderr`.
+    #[must_use]
+    pub fn error_channel(mut self, error_channel: ErrorChannel) -> Self {
+        self.error_channel = error_channel;
+        self
+    }
+}
+
+/// Enum for defining the output channel for `flexi_logger`'s own error messages.
+///
+/// These are only written if `flexi_logger` cannot do what it is supposed to do,
+/// so under normal circumstances no single message shuld appear.
+///
+/// By default these error messages are printed to `stderr`.
+#[derive(Debug)]
+pub enum ErrorChannel {
+    /// Write `flexi_logger`'s own error messages to `stderr`.
+    StdErr,
+    /// Write `flexi_logger`'s own error messages to `stdout`.
+    StdOut,
+    /// Write `flexi_logger`'s own error messages to the specified file.
+    File(PathBuf),
+    /// Don't write `flexi_logger`'s own error messages.
+    DevNull,
+}
+impl Default for ErrorChannel {
+    fn default() -> Self {
+        ErrorChannel::StdErr
+    }
 }
 
 /// Alternative set of methods to control the behavior of the Logger.
@@ -665,6 +703,7 @@ impl Logger {
 
         let max_level = self.spec.max_level();
         let a_l_spec = Arc::new(RwLock::new(self.spec));
+        set_error_channel(self.error_channel);
 
         let flexi_logger = FlexiLogger::new(
             Arc::clone(&a_l_spec),

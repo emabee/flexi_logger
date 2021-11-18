@@ -23,7 +23,11 @@ fn test() {
         .unwrap()
         .format(detailed_format)
         .print_message()
-        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+        .log_to_file(
+            FileSpec::default()
+                .suppress_timestamp()
+                .directory(self::test_utils::dir()),
+        )
         .add_writer("Sec", sec_writer)
         .add_writer("Alert", alert_logger())
         .start()

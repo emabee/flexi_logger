@@ -18,7 +18,7 @@
 //! With an asynchronous `WriteMode`, the root cause can be that the logger handle that was returned
 //! from the logger initialization was not assigned to a variable to keep it alive (see also
 //! [`Logger::start()`](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.start)).
-//! It is then dropped immediately, and in its `Drop` impl it cleans up all ressources,
+//! It is then dropped immediately, and in its `Drop` impl it cleans up all resources,
 //! including the asynchronous writer. So the next log output will fail with this error.
 //!
 //! ## `Flush`
@@ -31,13 +31,7 @@
 //! [flexi_logger][ERRCODE::Flush] flushing primary writer failed, caused by Send
 //! ```
 //!
-//! Possible reasons depend on the `WriteMode` and the output channel.
-//!
-//! With an asynchronous `WriteMode`, the root cause can be that the logger handle that was returned
-//! from the logger initialization was not assigned to a variable to keep it alive (see also
-//! [`Logger::start()`](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.start)).
-//! It is then dropped immediately, and in its `Drop` impl it cleans up all ressources,
-//! including the asynchronous writer. So the next log output will fail with this error.
+//! For possible reasons, see [Write](#write).
 //!
 //! ## `Format`
 //!
@@ -54,10 +48,10 @@
 //! ## `Poison`
 //!
 //! Log entries can be written by all threads of your program. Loggers thus must be thread-safe,
-//! by keeping their mutable parts in `Mutex`es, `RwLocks`, etc. In case that a thread panics
+//! by guarding their mutable parts with `Mutex`es, `RwLocks`, etc. In case that a thread panics
 //! while owning one of these locks, the lock is subsequently considered "poisoned".
 //!
-//! Most likely the root cause for this is some panic! in a `Debug` or `Display` implementation
+//! A typical root cause for this is some `panic!` in a `Debug` or `Display` implementation
 //! of a logged object.
 //!
 //! ## `LogFile`

@@ -1,7 +1,10 @@
+use crate::logger::ErrorChannel;
 use crate::{DeferredNow, FormatFunction};
 use log::Record;
 use std::cell::RefCell;
 use std::io::Write;
+use std::path::Path;
+use std::sync::RwLock;
 
 #[cfg(test)]
 use std::io::Cursor;
@@ -47,7 +50,7 @@ impl ERRCODE {
 
 pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Error) {
     let s = format!(
-        "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err:?}\n\
+        "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err:?}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         err = err,
@@ -59,7 +62,7 @@ pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Erro
 
 pub(crate) fn eprint_msg(errcode: ERRCODE, msg: &str) {
     let s = format!(
-        "[flexi_logger][ERRCODE::{code:?}] {msg}\n\
+        "[flexi_logger][ERRCODE::{code:?}] {msg}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         code = errcode,
@@ -68,13 +71,43 @@ pub(crate) fn eprint_msg(errcode: ERRCODE, msg: &str) {
     try_to_write(&s);
 }
 
+lazy_static::lazy_static! {
+    pub(crate) static ref ERROR_CHANNEL: RwLock<ErrorChannel> = RwLock::new(ErrorChannel::default());
+}
+
+pub(crate) fn set_error_channel(channel: ErrorChannel) {
+    match ERROR_CHANNEL.write() {
+        Ok(mut guard) => {
+            *guard = channel;
+        }
+        Err(e) => {
+            eprint_err(ERRCODE::Poison, "Error channel cannot be set", &e);
+        }
+    }
+}
+
 fn try_to_write(s: &str) {
-    eprintln!("{}", s);
-    // TODO DOES THIS MAKE SENSE (for issue#75)? NEEDS SOME TESTING
-    // let w = std::io::stderr();
-    // let mut wl = w.lock();
-    // let result = wl.write(s.as_bytes());
-    // result.ok();
+    match &*(ERROR_CHANNEL.read().unwrap()) {
+        ErrorChannel::StdErr => {
+            eprintln!("{}", s);
+        }
+        ErrorChannel::StdOut => {
+            println!("{}", s);
+        }
+        ErrorChannel::File(path) => try_to_write_to_file(s, path).unwrap_or_else(|e| {
+            eprintln!("{}", s);
+            eprintln!("Can't open error output file, caused by: {}", e);
+        }),
+        ErrorChannel::DevNull => {}
+    }
+}
+
+fn try_to_write_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
+    writeln!(file, "{}", s)
 }
 
 pub(crate) fn io_err(s: &'static str) -> std::io::Error {

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.1] - 2021-11-18
+
+Add the optional feature `use_chrono_for_offset` as a workaround for the current behavior
+of `time` on unix.
+
+Add an option to configure the error output channel.
+
 ## [0.20.0] - 2021-11-13
 
 Switch to `time 0.3.5`, and retrieve the UTC offset while `flexi_logger` is initialized.

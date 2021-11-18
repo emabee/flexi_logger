@@ -68,13 +68,11 @@ pub use crate::file_spec::FileSpec;
 pub use crate::flexi_error::FlexiLoggerError;
 pub use crate::formats::*;
 pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
-pub use crate::logger::{Duplicate, Logger};
+pub use crate::logger::{Duplicate, ErrorChannel, Logger};
 pub use crate::logger_handle::LoggerHandle;
 pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 pub(crate) use crate::write_mode::EffectiveWriteMode;
-pub use crate::write_mode::WriteMode;
-
-pub use crate::write_mode::{DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL};
+pub use crate::write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL};
 #[cfg(feature = "async")]
 pub use crate::write_mode::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
 

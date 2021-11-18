@@ -33,7 +33,11 @@ mod test {
         let logger = Logger::try_with_str("info")
             .unwrap()
             .format(detailed_format)
-            .log_to_file(FileSpec::default().directory(super::test_utils::dir()))
+            .log_to_file(
+                FileSpec::default()
+                    .suppress_timestamp()
+                    .directory(super::test_utils::dir()),
+            )
             .print_message()
             .add_writer("Syslog", boxed_syslog_writer)
             .start()

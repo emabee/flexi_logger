@@ -1,11 +1,10 @@
 mod test_utils;
 
-use log::*;
-
 #[test]
 #[cfg(feature = "textfilter")]
 fn test_textfilter() {
     use flexi_logger::{default_format, FileSpec, LogSpecification, Logger};
+    use log::*;
 
     let logspec = LogSpecification::parse("info/Hello").unwrap();
     let logger = Logger::with(logspec)

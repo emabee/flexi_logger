@@ -10,7 +10,11 @@ fn test_mods() {
     )
     .unwrap()
     .format(detailed_format)
-    .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+    .log_to_file(
+        FileSpec::default()
+            .suppress_timestamp()
+            .directory(self::test_utils::dir()),
+    )
     .use_windows_line_ending()
     .start()
     .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));

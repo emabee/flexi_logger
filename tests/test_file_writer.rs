@@ -3,7 +3,7 @@ mod test_utils;
 use flexi_logger::{detailed_format, opt_format, Cleanup, Criterion, FileSpec, Logger, Naming};
 use log::*;
 
-const COUNT: u8 = 5;
+const COUNT: u8 = 6;
 
 #[test]
 fn test_write_modes() {
@@ -26,7 +26,11 @@ fn work(value: u8) {
         }
         1 => {
             logger = logger
-                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                .log_to_file(
+                    FileSpec::default()
+                        .suppress_timestamp()
+                        .directory(self::test_utils::dir()),
+                )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         2 => {
@@ -35,14 +39,18 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .directory(self::test_utils::dir())
-                        .use_timestamp(true),
+                        .use_timestamp(false),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         3 => {
             logger = logger
                 .format(detailed_format)
-                .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+                .log_to_file(
+                    FileSpec::default()
+                        .suppress_timestamp()
+                        .directory(self::test_utils::dir()),
+                )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         4 => {
@@ -50,6 +58,7 @@ fn work(value: u8) {
                 .format(opt_format)
                 .log_to_file(
                     FileSpec::default()
+                        .suppress_timestamp()
                         .directory(self::test_utils::dir())
                         .discriminant("foo".to_string()),
                 )
@@ -59,11 +68,12 @@ fn work(value: u8) {
         5 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
+                    .suppress_timestamp()
                     .directory(self::test_utils::dir())
                     .discriminant("foo"),
             );
         }
-        _ => {
+        COUNT.. => {
             unreachable!("dtrtgfg")
         }
     };
