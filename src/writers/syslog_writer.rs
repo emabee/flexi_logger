@@ -1,6 +1,5 @@
 use crate::{writers::log_writer::LogWriter, DeferredNow};
 use std::cell::RefCell;
-use std::ffi::OsString;
 use std::io::Error as IoError;
 use std::io::Result as IoResult;
 use std::io::{BufWriter, ErrorKind, Write};
@@ -111,7 +110,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 ///
 /// See the [writers](crate::writers) for guidance how to use additional log writers.
 pub struct SyslogWriter {
-    hostname: OsString,
+    hostname: String,
     process: String,
     pid: u32,
     facility: SyslogFacility,
@@ -148,11 +147,22 @@ impl SyslogWriter {
         message_id: String,
         syslog: SyslogConnector,
     ) -> IoResult<Box<Self>> {
+        const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
+
+        let hostname = hostname::get()
+            .map(|s| 
+                s.into_string()
+                    .map_err(|_| IoError::new(ErrorKind::InvalidData, "Hostname contains non-UTF8 characters".to_owned()))
+            )
+            .unwrap_or_else(|_| Ok(UNKNOWN_HOSTNAME.to_owned()))?;
+
+        let process = std::env::args()
+            .next()
+            .ok_or_else(|| IoError::new(ErrorKind::Other, "Can't infer app name as no env args are present".to_owned()))?;
+
         Ok(Box::new(Self {
-            hostname: hostname::get().unwrap_or_else(|_| OsString::from("<unknown_hostname>")),
-            process: std::env::args()
-                .next()
-                .ok_or_else(|| IoError::new(ErrorKind::Other, "<no progname>".to_owned()))?,
+            hostname,
+            process,
             pid: std::process::id(),
             facility,
             max_log_level,
@@ -175,17 +185,20 @@ impl LogWriter for SyslogWriter {
 
         let severity = (self.determine_severity)(record.level());
 
+        // See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424#page-8).
         let s = format!(
-            "<{}>1 {} {:?} {} {} {} - {}",
-            self.facility as u8 | severity as u8,
-            now.format_rfc3339(),
-            self.hostname,
-            self.process,
-            self.pid,
-            self.message_id,
-            &record.args()
+            "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} {msg}",
+            pri = self.facility as u8 | severity as u8,
+            version = "1",
+            timestamp = now.format_rfc3339(),
+            hostname = self.hostname,
+            appname = self.process,
+            procid = self.pid,
+            msgid = self.message_id,
+            msg = format!("- {}", &record.args())
         );
         
+        // each write generates a syslog entry
         syslog.write_all(s.as_bytes())
     }
 
@@ -234,6 +247,7 @@ pub enum SyslogConnector {
     /// Sends log lines to the syslog via TCP.
     Tcp(BufWriter<TcpStream>),
 }
+
 impl SyslogConnector {
     /// Returns a [`SyslogConnector::Datagram`] to the specified path.
     ///
