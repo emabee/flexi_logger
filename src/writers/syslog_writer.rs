@@ -174,8 +174,8 @@ impl LogWriter for SyslogWriter {
         let mut syslog = mr_syslog.borrow_mut();
 
         let severity = (self.determine_severity)(record.level());
-        writeln!(
-            syslog,
+
+        let s = format!(
             "<{}>1 {} {:?} {} {} {} - {}",
             self.facility as u8 | severity as u8,
             now.format_rfc3339(),
@@ -184,7 +184,9 @@ impl LogWriter for SyslogWriter {
             self.pid,
             self.message_id,
             &record.args()
-        )
+        );
+        
+        syslog.write_all(s.as_bytes())
     }
 
     fn flush(&self) -> IoResult<()> {
