@@ -5,7 +5,7 @@ use std::io::Error as IoError;
 use std::io::Result as IoResult;
 use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
-#[cfg(target_os = "linux")]
+#[cfg(target_family = "unix")]
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -214,14 +214,14 @@ impl LogWriter for SyslogWriter {
 pub enum SyslogConnector {
     /// Sends log lines to the syslog via a
     /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     Stream(BufWriter<std::os::unix::net::UnixStream>),
 
     /// Sends log lines to the syslog via a
     /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     Datagram(std::os::unix::net::UnixDatagram),
 
     /// Sends log lines to the syslog via UDP.
@@ -238,8 +238,8 @@ impl SyslogConnector {
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         let ud = std::os::unix::net::UnixDatagram::unbound()?;
         ud.connect(&path)?;
@@ -251,8 +251,8 @@ impl SyslogConnector {
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         Ok(SyslogConnector::Stream(BufWriter::new(
             std::os::unix::net::UnixStream::connect(path)?,
@@ -289,12 +289,12 @@ impl Write for SyslogConnector {
 
         #[allow(clippy::match_same_arms)]
         match *self {
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Datagram(ref ud) => {
                 // todo: reconnect if conn is broken
                 ud.send(message)
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => {
                 // todo: reconnect if conn is broken
                 w.write(message)
@@ -314,10 +314,10 @@ impl Write for SyslogConnector {
     #[allow(clippy::match_same_arms)]
     fn flush(&mut self) -> IoResult<()> {
         match *self {
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Datagram(_) => Ok(()),
 
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => w.flush(),
 
             Self::Udp(_) => Ok(()),
