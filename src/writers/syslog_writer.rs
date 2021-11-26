@@ -149,16 +149,24 @@ impl SyslogWriter {
     ) -> IoResult<Box<Self>> {
         const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
 
-        let hostname = hostname::get()
-            .map(|s| 
-                s.into_string()
-                    .map_err(|_| IoError::new(ErrorKind::InvalidData, "Hostname contains non-UTF8 characters".to_owned()))
-            )
-            .unwrap_or_else(|_| Ok(UNKNOWN_HOSTNAME.to_owned()))?;
+        let hostname = hostname::get().map_or_else(
+            |_| Ok(UNKNOWN_HOSTNAME.to_owned()),
+            |s| {
+                s.into_string().map_err(|_| {
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "Hostname contains non-UTF8 characters".to_owned(),
+                    )
+                })
+            },
+        )?;
 
-        let process = std::env::args()
-            .next()
-            .ok_or_else(|| IoError::new(ErrorKind::Other, "Can't infer app name as no env args are present".to_owned()))?;
+        let process = std::env::args().next().ok_or_else(|| {
+            IoError::new(
+                ErrorKind::Other,
+                "Can't infer app name as no env args are present".to_owned(),
+            )
+        })?;
 
         Ok(Box::new(Self {
             hostname,
@@ -187,7 +195,7 @@ impl LogWriter for SyslogWriter {
 
         // See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424#page-8).
         let s = format!(
-            "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} {msg}",
+            "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} - {msg}",
             pri = self.facility as u8 | severity as u8,
             version = "1",
             timestamp = now.format_rfc3339(),
@@ -195,9 +203,9 @@ impl LogWriter for SyslogWriter {
             appname = self.process,
             procid = self.pid,
             msgid = self.message_id,
-            msg = format!("- {}", &record.args())
+            msg = &record.args()
         );
-        
+
         // each write generates a syslog entry
         syslog.write_all(s.as_bytes())
     }
