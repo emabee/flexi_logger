@@ -20,6 +20,7 @@ pub(crate) struct FlexiLogger {
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
+    use_utc: bool,
 }
 
 impl FlexiLogger {
@@ -28,12 +29,14 @@ impl FlexiLogger {
         primary_writer: Arc<PrimaryWriter>,
         other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
         filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
+        use_utc: bool,
     ) -> Self {
         Self {
             log_specification,
             primary_writer,
             other_writers,
             filter,
+            use_utc,
         }
     }
 
@@ -86,7 +89,7 @@ impl log::Log for FlexiLogger {
 
     fn log(&self, record: &log::Record) {
         let target = record.metadata().target();
-        let mut now = crate::DeferredNow::new();
+        let mut now = crate::DeferredNow::new(self.use_utc);
         let special_target_is_used = target.starts_with('{');
         if special_target_is_used {
             let mut use_default = false;

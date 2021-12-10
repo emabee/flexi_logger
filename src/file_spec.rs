@@ -2,7 +2,7 @@ use crate::now_local;
 use crate::FlexiLoggerError;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use time::{format_description::FormatItem, macros::format_description};
+use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -24,6 +24,7 @@ pub struct FileSpec {
     pub(crate) o_discriminant: Option<String>,
     timestamp_cfg: TimestampCfg,
     pub(crate) o_suffix: Option<String>,
+    pub(crate) use_utc: bool,
 }
 impl Default for FileSpec {
     /// Describes a file in the current folder,
@@ -37,6 +38,7 @@ impl Default for FileSpec {
             o_discriminant: None,
             timestamp_cfg: TimestampCfg::Default,
             o_suffix: Some(String::from("log")),
+            use_utc: false,
         }
     }
 }
@@ -68,6 +70,7 @@ impl FileSpec {
                 o_discriminant: None,
                 o_suffix: p.extension().map(|s| s.to_string_lossy().to_string()),
                 timestamp_cfg: TimestampCfg::No,
+                use_utc: false,
             })
         }
     }
@@ -181,7 +184,7 @@ impl FileSpec {
             filename.push('_');
             filename.push_str(discriminant);
         }
-        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
+        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp(self.use_utc) {
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
@@ -206,7 +209,7 @@ impl FileSpec {
             filename.push('_');
             filename.push_str(discriminant);
         }
-        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
+        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp(self.use_utc) {
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
@@ -241,11 +244,13 @@ enum TimestampCfg {
     No,
 }
 impl TimestampCfg {
-    fn get_timestamp(&self) -> Option<String> {
+    fn get_timestamp(&self, use_utc: bool) -> Option<String> {
         match self {
             Self::Default | Self::Yes => {
-                Some(now_local()
-                    .format(TS_USCORE_DASHES_USCORE_DASHES).unwrap(/*ok*/))
+                Some(
+                    if use_utc {OffsetDateTime::now_utc()} else {now_local()}
+                    .format(TS_USCORE_DASHES_USCORE_DASHES).unwrap(/*ok*/),
+                )
             }
             Self::No => None,
         }

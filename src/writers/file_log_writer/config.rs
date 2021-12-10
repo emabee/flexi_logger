@@ -21,4 +21,5 @@ pub(crate) struct Config {
     pub(crate) file_spec: FileSpec,
     pub(crate) o_create_symlink: Option<PathBuf>,
     pub(crate) line_ending: &'static [u8],
+    pub(crate) use_utc: bool,
 }

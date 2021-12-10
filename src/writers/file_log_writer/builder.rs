@@ -7,7 +7,7 @@ use std::sync::Arc;
 use super::{Config, FileLogWriter, LogWriter, RotationConfig, State};
 
 /// Builder for [`FileLogWriter`].
-#[allow(clippy::module_name_repetitions)]
+#[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
 pub struct FileLogWriterBuilder {
     cfg_print_message: bool,
     cfg_append: bool,
@@ -19,6 +19,7 @@ pub struct FileLogWriterBuilder {
     o_rotation_config: Option<RotationConfig>,
     max_log_level: log::LevelFilter,
     cleanup_in_background_thread: bool,
+    use_utc: bool,
 }
 
 /// Methods for influencing the behavior of the [`FileLogWriter`].
@@ -35,6 +36,7 @@ impl FileLogWriterBuilder {
             format: default_format,
             max_log_level: log::LevelFilter::Trace,
             cleanup_in_background_thread: true,
+            use_utc: false,
         }
     }
 
@@ -127,6 +129,14 @@ impl FileLogWriterBuilder {
     #[must_use]
     pub fn append(mut self) -> Self {
         self.cfg_append = true;
+        self
+    }
+
+    /// Enforces the use of UTC, rather than local time.
+    #[must_use]
+    pub fn use_utc(mut self) -> Self {
+        self.file_spec.use_utc = true;
+        self.use_utc = true;
         self
     }
 
@@ -229,6 +239,7 @@ impl FileLogWriterBuilder {
                 write_mode: self.cfg_write_mode,
                 file_spec: self.file_spec.clone(),
                 o_create_symlink: self.cfg_o_create_symlink.as_ref().map(Clone::clone),
+                use_utc: self.use_utc,
             },
             self.o_rotation_config.as_ref().map(Clone::clone),
             cleanup_in_background_thread,

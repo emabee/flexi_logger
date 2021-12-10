@@ -582,9 +582,21 @@ fn rotate_output_file_to_date(
         format_description!("_r[year]-[month]-[day]_[hour]-[minute]-[second]");
 
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
-    let mut rotated_path = config
-        .file_spec
-        .as_pathbuf(Some(&creation_date.format(INFIX_DATE).unwrap()));
+
+    let infix_date_string = {
+        // use utc if configured
+        let mut infix_date: OffsetDateTime = *creation_date;
+        if config.use_utc {
+            let (h, m, s) = creation_date.offset().as_hms();
+            if h != 0 || m != 0 || s != 0 {
+                infix_date -=
+                    time::Duration::seconds(i64::from(s) + i64::from(m) * 60 + i64::from(h) * 3600);
+            };
+        }
+        infix_date.format(INFIX_DATE).unwrap()
+    };
+
+    let mut rotated_path = config.file_spec.as_pathbuf(Some(&infix_date_string));
 
     // Search for rotated_path as is and for restart-siblings;
     // if any exists, find highest restart and add 1, else continue without restart
@@ -613,10 +625,9 @@ fn rotate_output_file_to_date(
 
         while (*rotated_path).exists() {
             rotated_path = config.file_spec.as_pathbuf(Some(
-                &creation_date
-                .format(INFIX_DATE)
-                .unwrap(/*ok*/)
-                .add(&format!(".restart-{:04}", number)),
+                &infix_date_string
+                    .clone()
+                    .add(&format!(".restart-{:04}", number)),
             ));
             number += 1;
         }

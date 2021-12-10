@@ -72,6 +72,7 @@ pub struct Logger {
     other_writers: HashMap<String, Box<dyn LogWriter>>,
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
     error_channel: ErrorChannel,
+    use_utc: bool,
 }
 
 enum LogTarget {
@@ -164,6 +165,7 @@ impl Logger {
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
             filter: None,
             error_channel: ErrorChannel::default(),
+            use_utc: false,
         }
     }
 }
@@ -458,6 +460,13 @@ impl Logger {
         self
     }
 
+    /// Makes the logger use UTC timestamps rather than local timestamps.
+    #[must_use]
+    pub fn use_utc(mut self) -> Self {
+        self.use_utc = true;
+        self
+    }
+
     /// The specified path will be used on linux systems to create a symbolic link
     /// to the current log file.
     ///
@@ -648,9 +657,13 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
-    pub fn build(self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
+    pub fn build(mut self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         #[cfg(feature = "colors")]
         crate::formats::set_palette(&self.o_palette)?;
+
+        if self.use_utc {
+            self.flwb = self.flwb.use_utc();
+        }
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
@@ -710,6 +723,7 @@ impl Logger {
             Arc::clone(&a_primary_writer),
             Arc::clone(&a_other_writers),
             self.filter,
+            self.use_utc,
         );
 
         let handle = LoggerHandle::new(a_l_spec, a_primary_writer, a_other_writers);

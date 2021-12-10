@@ -38,6 +38,7 @@ mod d {
                 Naming::Timestamps,
                 Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
             )
+            .use_utc()
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
         info!(

@@ -9,32 +9,35 @@ use time::{formatting::Formattable, OffsetDateTime, UtcOffset};
 /// Is used to ensure that a log record that is sent to multiple outputs
 /// (in maybe different formats) always uses the same timestamp.
 #[derive(Debug)]
-pub struct DeferredNow(Option<OffsetDateTime>);
-impl Default for DeferredNow {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+pub struct DeferredNow(Option<OffsetDateTime>, bool);
 impl<'a> DeferredNow {
     /// Constructs a new instance, but does not generate the timestamp.
+    ///
+    /// If `use_utc` is set to true, a UTC timestamp is produced, otherwise local time is used.
     #[must_use]
-    pub fn new() -> Self {
-        Self(None)
+    pub fn new(use_utc: bool) -> Self {
+        Self(None, use_utc)
     }
 
     /// Retrieve the timestamp.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
     pub fn now(&'a mut self) -> &'a OffsetDateTime {
-        self.0.get_or_insert_with(now_local)
+        let use_utc = self.1;
+        self.0.get_or_insert_with(|| {
+            if use_utc {
+                OffsetDateTime::now_utc()
+            } else {
+                now_local()
+            }
+        })
     }
 
     /// Convert into a formatted String.
     ///
     /// # Panics
     ///
-    /// if fmt has an inappropriate value
+    /// Panics if `fmt` has an inappropriate value.
     pub fn format(&'a mut self, fmt: &(impl Formattable + ?Sized)) -> String {
         self.now().format(fmt).unwrap(/* ok */)
     }
@@ -98,7 +101,7 @@ pub fn now_local() -> OffsetDateTime {
 mod test {
     #[test]
     fn test_deferred_now() {
-        let mut deferred_now = super::DeferredNow::new();
+        let mut deferred_now = super::DeferredNow::new(false);
         let now = deferred_now.now().to_string();
         println!("This should be the current timestamp: {}", now);
         std::thread::sleep(std::time::Duration::from_millis(300));

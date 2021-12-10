@@ -274,13 +274,19 @@ mod test {
 
         rb.level(Error)
             .args(format_args!("This is an error message"));
-        writer.write(&mut DeferredNow::new(), &rb.build()).unwrap();
+        writer
+            .write(&mut DeferredNow::new(false), &rb.build())
+            .unwrap();
 
         rb.level(Warn).args(format_args!("This is a warning"));
-        writer.write(&mut DeferredNow::new(), &rb.build()).unwrap();
+        writer
+            .write(&mut DeferredNow::new(false), &rb.build())
+            .unwrap();
 
         rb.level(Info).args(format_args!("This is an info message"));
-        writer.write(&mut DeferredNow::new(), &rb.build()).unwrap();
+        writer
+            .write(&mut DeferredNow::new(false), &rb.build())
+            .unwrap();
 
         writer.validate_logs(&[
             ("ERROR", "stderr_writer.rs:222", "error"),

@@ -346,7 +346,7 @@ mod test {
             // write some lines, but not enough to rotate
             for i in 0..4 {
                 flw.write(
-                    &mut DeferredNow::new(),
+                    &mut DeferredNow::new(false),
                     &log::Record::builder()
                         .args(format_args!("{}", i))
                         .level(log::Level::Error)
@@ -413,7 +413,7 @@ mod test {
         .unwrap();
 
         flw.write(
-            &mut DeferredNow::new(),
+            &mut DeferredNow::new(false),
             &log::Record::builder()
                 .args(format_args!("{}", "test_reset-1"))
                 .level(log::Level::Error)
@@ -442,7 +442,7 @@ mod test {
         )
         .unwrap();
         flw.write(
-            &mut DeferredNow::new(),
+            &mut DeferredNow::new(false),
             &log::Record::builder()
                 .args(format_args!("{}", "test_reset-2"))
                 .level(log::Level::Error)
@@ -508,7 +508,7 @@ mod test {
         let flw = get_file_log_writer(append, naming, discr);
         for text in texts {
             flw.write(
-                &mut DeferredNow::new(),
+                &mut DeferredNow::new(false),
                 &log::Record::builder()
                     .args(format_args!("{}", text))
                     .level(log::Level::Error)
