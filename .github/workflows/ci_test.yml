@@ -75,7 +75,12 @@ jobs:
           command: build
           args: --all-features
 
-      - name: Run cargo test
+      - name: Run cargo test (default features only, so utc issue is visible)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Run cargo test with all features
         uses: actions-rs/cargo@v1
         with:
           command: test

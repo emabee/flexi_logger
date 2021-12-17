@@ -4,12 +4,12 @@ use crate::formats::AdaptiveFormat;
 use crate::logger_handle::LogSpecSubscriber;
 #[cfg(feature = "specfile")]
 use crate::util::{eprint_err, ERRCODE};
+use crate::DeferredNow;
 
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
     formats::default_format,
-    now_local,
     primary_writer::PrimaryWriter,
     util::set_error_channel,
     writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
@@ -123,9 +123,6 @@ impl Logger {
     }
 
     fn from_spec_and_errs(spec: LogSpecification) -> Self {
-        // make sure the lazy_static in this function is filled as early as possible:
-        let _ = now_local();
-
         #[cfg(feature = "colors")]
         #[cfg(windows)]
         {
@@ -718,12 +715,18 @@ impl Logger {
         let a_l_spec = Arc::new(RwLock::new(self.spec));
         set_error_channel(self.error_channel);
 
+        // initialize the lazy_statics in DeferredNow before threads are spawned
+        if self.use_utc {
+            DeferredNow::force_utc();
+        }
+        let mut now = DeferredNow::new();
+        now.now();
+
         let flexi_logger = FlexiLogger::new(
             Arc::clone(&a_l_spec),
             Arc::clone(&a_primary_writer),
             Arc::clone(&a_other_writers),
             self.filter,
-            self.use_utc,
         );
 
         let handle = LoggerHandle::new(a_l_spec, a_primary_writer, a_other_writers);

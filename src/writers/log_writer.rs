@@ -39,11 +39,11 @@ pub trait LogWriter: Sync + Send {
     /// Cleanup open resources, if necessary.
     fn shutdown(&self) {}
 
-    /// Takes a vec with three patterns per line that represent the log out,
-    /// compares the written log with the expected lines,
-    /// and asserts that both are in sync.
-    ///
-    /// This function is not meant for productive code, only for tests.
+    // Takes a vec with three patterns per line that represent the log line,
+    // compares the written log with the expected lines,
+    // and asserts that both are in sync.
+    //
+    // This function is not meant for productive code, only for tests.
     #[doc(hidden)]
     fn validate_logs(&self, _expected: &[(&'static str, &'static str, &'static str)]) {
         unimplemented!("only useful for tests");

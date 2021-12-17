@@ -115,7 +115,6 @@ impl LogWriter for FileLogWriter {
         self.max_log_level
     }
 
-    #[doc(hidden)]
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         self.state_handle.validate_logs(expected);
     }
@@ -133,9 +132,7 @@ impl Drop for FileLogWriter {
 
 #[cfg(test)]
 mod test {
-    use crate::now_local;
-    use crate::writers::LogWriter;
-    use crate::{Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
+    use crate::{writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
@@ -159,7 +156,11 @@ mod test {
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
         let mut ts = "false-numbers-".to_string();
-        ts.push_str(&now_local().format(FMT_DASHES_U_DASHES).unwrap());
+        ts.push_str(
+            &DeferredNow::now_local()
+                .format(FMT_DASHES_U_DASHES)
+                .unwrap(),
+        );
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -199,7 +200,11 @@ mod test {
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
         let mut ts = "true-numbers-".to_string();
-        ts.push_str(&now_local().format(FMT_DASHES_U_DASHES).unwrap());
+        ts.push_str(
+            &DeferredNow::now_local()
+                .format(FMT_DASHES_U_DASHES)
+                .unwrap(),
+        );
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -248,7 +253,11 @@ mod test {
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
         let mut ts = "false-timestamps-".to_string();
-        ts.push_str(&now_local().format(FMT_DASHES_U_DASHES).unwrap());
+        ts.push_str(
+            &DeferredNow::now_local()
+                .format(FMT_DASHES_U_DASHES)
+                .unwrap(),
+        );
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -283,7 +292,11 @@ mod test {
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
         let mut ts = "true-timestamps-".to_string();
-        ts.push_str(&now_local().format(FMT_DASHES_U_DASHES).unwrap());
+        ts.push_str(
+            &DeferredNow::now_local()
+                .format(FMT_DASHES_U_DASHES)
+                .unwrap(),
+        );
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -346,7 +359,7 @@ mod test {
             // write some lines, but not enough to rotate
             for i in 0..4 {
                 flw.write(
-                    &mut DeferredNow::new(false),
+                    &mut DeferredNow::new(),
                     &log::Record::builder()
                         .args(format_args!("{}", i))
                         .level(log::Level::Error)
@@ -413,7 +426,7 @@ mod test {
         .unwrap();
 
         flw.write(
-            &mut DeferredNow::new(false),
+            &mut DeferredNow::new(),
             &log::Record::builder()
                 .args(format_args!("{}", "test_reset-1"))
                 .level(log::Level::Error)
@@ -442,7 +455,7 @@ mod test {
         )
         .unwrap();
         flw.write(
-            &mut DeferredNow::new(false),
+            &mut DeferredNow::new(),
             &log::Record::builder()
                 .args(format_args!("{}", "test_reset-2"))
                 .level(log::Level::Error)
@@ -508,7 +521,7 @@ mod test {
         let flw = get_file_log_writer(append, naming, discr);
         for text in texts {
             flw.write(
-                &mut DeferredNow::new(false),
+                &mut DeferredNow::new(),
                 &log::Record::builder()
                     .args(format_args!("{}", text))
                     .level(log::Level::Error)

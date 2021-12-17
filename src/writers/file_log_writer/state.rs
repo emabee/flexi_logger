@@ -1,8 +1,7 @@
 use super::{Config, RotationConfig};
 use crate::{
-    now_local,
     util::{eprint_err, ERRCODE},
-    Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
+    Age, Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, Naming,
 };
 use std::cmp::max;
 use std::fs::{File, OpenOptions};
@@ -65,7 +64,7 @@ impl RotationState {
     }
 
     fn age_rotation_necessary(&self, age: Age) -> bool {
-        let now = now_local();
+        let now = DeferredNow::now_local();
         match age {
             Age::Day => {
                 self.created_at.year() != now.year()
@@ -691,7 +690,7 @@ fn get_creation_date(path: &Path) -> OffsetDateTime {
 }
 
 fn get_fake_creation_date() -> OffsetDateTime {
-    now_local()
+    DeferredNow::now_local()
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]

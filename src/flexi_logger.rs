@@ -1,8 +1,10 @@
-use crate::filter::LogLineFilter;
-use crate::primary_writer::PrimaryWriter;
-use crate::util::{eprint_err, eprint_msg, ERRCODE};
-use crate::writers::LogWriter;
-use crate::LogSpecification;
+use crate::{
+    filter::LogLineFilter,
+    primary_writer::PrimaryWriter,
+    util::{eprint_err, eprint_msg, ERRCODE},
+    writers::LogWriter,
+    DeferredNow, LogSpecification,
+};
 
 #[cfg(feature = "textfilter")]
 use regex::Regex;
@@ -20,7 +22,6 @@ pub(crate) struct FlexiLogger {
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
-    use_utc: bool,
 }
 
 impl FlexiLogger {
@@ -29,14 +30,12 @@ impl FlexiLogger {
         primary_writer: Arc<PrimaryWriter>,
         other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
         filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
-        use_utc: bool,
     ) -> Self {
         Self {
             log_specification,
             primary_writer,
             other_writers,
             filter,
-            use_utc,
         }
     }
 
@@ -89,7 +88,7 @@ impl log::Log for FlexiLogger {
 
     fn log(&self, record: &log::Record) {
         let target = record.metadata().target();
-        let mut now = crate::DeferredNow::new(self.use_utc);
+        let mut now = DeferredNow::new();
         let special_target_is_used = target.starts_with('{');
         if special_target_is_used {
             let mut use_default = false;

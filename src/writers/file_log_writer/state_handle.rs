@@ -343,7 +343,6 @@ impl StateHandle {
         Ok(())
     }
 
-    #[doc(hidden)]
     pub(super) fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),
