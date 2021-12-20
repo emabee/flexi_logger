@@ -1,11 +1,10 @@
 use crate::{writers::log_writer::LogWriter, DeferredNow};
 use std::cell::RefCell;
-use std::ffi::OsString;
 use std::io::Error as IoError;
 use std::io::Result as IoResult;
 use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
-#[cfg(target_os = "linux")]
+#[cfg(target_family = "unix")]
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -111,7 +110,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 ///
 /// See the [writers](crate::writers) for guidance how to use additional log writers.
 pub struct SyslogWriter {
-    hostname: OsString,
+    hostname: String,
     process: String,
     pid: u32,
     facility: SyslogFacility,
@@ -148,11 +147,30 @@ impl SyslogWriter {
         message_id: String,
         syslog: SyslogConnector,
     ) -> IoResult<Box<Self>> {
+        const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
+
+        let hostname = hostname::get().map_or_else(
+            |_| Ok(UNKNOWN_HOSTNAME.to_owned()),
+            |s| {
+                s.into_string().map_err(|_| {
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "Hostname contains non-UTF8 characters".to_owned(),
+                    )
+                })
+            },
+        )?;
+
+        let process = std::env::args().next().ok_or_else(|| {
+            IoError::new(
+                ErrorKind::Other,
+                "Can't infer app name as no env args are present".to_owned(),
+            )
+        })?;
+
         Ok(Box::new(Self {
-            hostname: hostname::get().unwrap_or_else(|_| OsString::from("<unknown_hostname>")),
-            process: std::env::args()
-                .next()
-                .ok_or_else(|| IoError::new(ErrorKind::Other, "<no progname>".to_owned()))?,
+            hostname,
+            process,
             pid: std::process::id(),
             facility,
             max_log_level,
@@ -174,17 +192,22 @@ impl LogWriter for SyslogWriter {
         let mut syslog = mr_syslog.borrow_mut();
 
         let severity = (self.determine_severity)(record.level());
-        writeln!(
-            syslog,
-            "<{}>1 {} {:?} {} {} {} - {}",
-            self.facility as u8 | severity as u8,
-            now.format_rfc3339(),
-            self.hostname,
-            self.process,
-            self.pid,
-            self.message_id,
-            &record.args()
-        )
+
+        // See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424#page-8).
+        let s = format!(
+            "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} - {msg}",
+            pri = self.facility as u8 | severity as u8,
+            version = "1",
+            timestamp = now.format_rfc3339(),
+            hostname = self.hostname,
+            appname = self.process,
+            procid = self.pid,
+            msgid = self.message_id,
+            msg = &record.args()
+        );
+
+        // each write generates a syslog entry
+        syslog.write_all(s.as_bytes())
     }
 
     fn flush(&self) -> IoResult<()> {
@@ -214,14 +237,14 @@ impl LogWriter for SyslogWriter {
 pub enum SyslogConnector {
     /// Sends log lines to the syslog via a
     /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     Stream(BufWriter<std::os::unix::net::UnixStream>),
 
     /// Sends log lines to the syslog via a
     /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     Datagram(std::os::unix::net::UnixDatagram),
 
     /// Sends log lines to the syslog via UDP.
@@ -232,14 +255,15 @@ pub enum SyslogConnector {
     /// Sends log lines to the syslog via TCP.
     Tcp(BufWriter<TcpStream>),
 }
+
 impl SyslogConnector {
     /// Returns a [`SyslogConnector::Datagram`] to the specified path.
     ///
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         let ud = std::os::unix::net::UnixDatagram::unbound()?;
         ud.connect(&path)?;
@@ -251,8 +275,8 @@ impl SyslogConnector {
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
-    #[cfg(target_os = "linux")]
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
     pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
         Ok(SyslogConnector::Stream(BufWriter::new(
             std::os::unix::net::UnixStream::connect(path)?,
@@ -289,12 +313,12 @@ impl Write for SyslogConnector {
 
         #[allow(clippy::match_same_arms)]
         match *self {
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Datagram(ref ud) => {
                 // todo: reconnect if conn is broken
                 ud.send(message)
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => {
                 // todo: reconnect if conn is broken
                 w.write(message)
@@ -314,10 +338,10 @@ impl Write for SyslogConnector {
     #[allow(clippy::match_same_arms)]
     fn flush(&mut self) -> IoResult<()> {
         match *self {
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Datagram(_) => Ok(()),
 
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => w.flush(),
 
             Self::Udp(_) => Ok(()),
