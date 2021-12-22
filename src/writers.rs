@@ -98,7 +98,7 @@
 //!   ```
 //!
 
-mod file_log_writer;
+pub(crate) mod file_log_writer;
 mod log_writer;
 
 #[cfg(feature = "syslog_writer")]

@@ -75,6 +75,7 @@ pub(crate) use crate::write_mode::EffectiveWriteMode;
 pub use crate::write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL};
 #[cfg(feature = "async")]
 pub use crate::write_mode::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
+pub use crate::writers::file_log_writer::Config;
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};

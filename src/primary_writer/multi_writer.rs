@@ -1,7 +1,7 @@
 use crate::logger::Duplicate;
 use crate::util::write_buffered;
 use crate::writers::{FileLogWriter, FileLogWriterBuilder, LogWriter};
-use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
+use crate::{Config, DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 use std::io::Write;
 
@@ -41,6 +41,11 @@ impl MultiWriter {
         self.o_file_writer
             .as_ref()
             .map_or(Err(FlexiLoggerError::Reset), |flw| flw.reset(flwb))
+    }
+    pub(crate) fn config(&self) -> Result<Config, FlexiLoggerError> {
+        self.o_file_writer
+            .as_ref()
+            .map_or(Err(FlexiLoggerError::Reset), |flw| flw.config())
     }
 }
 

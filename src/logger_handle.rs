@@ -1,7 +1,7 @@
 use crate::primary_writer::PrimaryWriter;
 use crate::util::{eprint_err, ERRCODE};
 use crate::writers::{FileLogWriterBuilder, LogWriter};
-use crate::{FlexiLoggerError, LogSpecification};
+use crate::{Config, FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -198,6 +198,21 @@ impl LoggerHandle {
             mw.reset_file_log_writer(flwb)
         } else {
             Err(FlexiLoggerError::Reset)
+        }
+    }
+
+    /// Extracts current Config of the file log writer
+    /// 
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Config` if no file log writer is configured.
+    /// `FlexiLoggerError::Io` if the specified path doesn't work.
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn config(&self) -> Result<Config, FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+            mw.config()
+        } else {
+            Err(FlexiLoggerError::Config)
         }
     }
 
