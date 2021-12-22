@@ -9,6 +9,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Extend symlink to all unix platforms, ratehr than just linux.
 
+Rework the optional syslog writer (kudos to [ObsceneGiraffe](https://github.com/ObsceneGiraffe)):
+
+- bugfix: write only full lines
+- use owned buffer to avoid allocations
+- encapsulate implementation details
+- remove additional buffer from `SyslogConnector::Tcp`
+
 ## [0.22.0] - 2021-12-12
 
 Improve the option to use UTC for all timestamps (in filenames and log lines)
