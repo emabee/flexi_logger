@@ -25,7 +25,7 @@ pub(crate) enum ERRCODE {
     #[cfg(feature = "specfile")]
     LogSpecFile,
     Poison,
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     Symlink,
     #[cfg(not(feature = "use_chrono_for_offset"))]
     Time,
@@ -41,7 +41,7 @@ impl ERRCODE {
             #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
             Self::Poison => "poison",
-            #[cfg(target_os = "linux")]
+            #[cfg(target_family = "unix")]
             Self::Symlink => "symlink",
             #[cfg(not(feature = "use_chrono_for_offset"))]
             Self::Time => "time",

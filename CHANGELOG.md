@@ -5,9 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.1-unpublished] - 2021-12-22
+
+Extend symlink to all unix platforms, ratehr than just linux.
+
 ## [0.22.0] - 2021-12-12
 
-Improve the option to use UTC for all timestamps (in filenames and log lines) (<https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.use_utc>) such that
+Improve the option to use UTC for all timestamps (in filenames and log lines)
+(<https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.use_utc>) such that
 the error message regarding a failed offset detection is not provoked if UTC is enforced.
 
 The API modification done in 0.21.0 to `DeferredNow` is reverted.

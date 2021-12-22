@@ -82,7 +82,7 @@
 //!
 //! ## `Symlink`
 //!
-//! This error can only occur on linux systems, and when you use `Logger::create_symlink`, and
+//! This error can only occur on unix systems, and when you use `Logger::create_symlink`, and
 //! indicates an issue with creating or replacing the symbolic link to the log file.
 //!
 //! ## `Time`

@@ -676,13 +676,13 @@ fn rotate_output_file_to_idx(
 #[allow(unused_variables)]
 fn get_creation_date(path: &Path) -> OffsetDateTime {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
-    // On linux, we know that try_get_creation_date() returns an error.
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    // On unix, we know that try_get_creation_date() returns an error.
+    #[cfg(any(target_os = "windows", target_family = "unix"))]
     return get_fake_creation_date();
 
     // On all others of the many platforms, we give the real creation date a try,
     // and fall back to the fake if it is not available.
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(not(any(target_os = "windows", target_family = "unix")))]
     match try_get_creation_date(path) {
         Ok(d) => d,
         Err(e) => get_fake_creation_date(),
@@ -693,22 +693,22 @@ fn get_fake_creation_date() -> OffsetDateTime {
     DeferredNow::now_local()
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[cfg(not(any(target_os = "windows", target_family = "unix")))]
 fn try_get_creation_date(path: &Path) -> Result<OffsetDateTime, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
 
 mod platform {
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     use crate::util::{eprint_err, ERRCODE};
     use std::path::Path;
 
     pub fn create_symlink_if_possible(link: &Path, path: &Path) {
-        linux_create_symlink(link, path);
+        unix_create_symlink(link, path);
     }
 
-    #[cfg(target_os = "linux")]
-    fn linux_create_symlink(link: &Path, logfile: &Path) {
+    #[cfg(target_family = "unix")]
+    fn unix_create_symlink(link: &Path, logfile: &Path) {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {
@@ -722,6 +722,6 @@ mod platform {
         }
     }
 
-    #[cfg(not(target_os = "linux"))]
-    fn linux_create_symlink(_: &Path, _: &Path) {}
+    #[cfg(not(target_family = "unix"))]
+    fn unix_create_symlink(_: &Path, _: &Path) {}
 }

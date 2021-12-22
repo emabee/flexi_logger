@@ -464,7 +464,7 @@ impl Logger {
         self
     }
 
-    /// The specified path will be used on linux systems to create a symbolic link
+    /// The specified path will be used on unix systems to create a symbolic link
     /// to the current log file.
     ///
     /// This option has no effect on filesystems where symlinks are not supported,
@@ -594,7 +594,7 @@ impl Logger {
 
     /// This option only has an effect if `log_to_file` is set to true.
     ///
-    /// If a String is specified, it will be used on linux systems to create in the current folder
+    /// If a String is specified, it will be used on unix systems to create in the current folder
     /// a symbolic link with this name to the current log file.
     pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Self {
         self.flwb = self.flwb.o_create_symlink(symlink);

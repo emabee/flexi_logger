@@ -100,7 +100,7 @@ fn work(value: u8) {
 }
 
 mod platform {
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     pub fn check_link(link_name: &str) {
         match std::fs::symlink_metadata(link_name) {
             Err(e) => panic!("error with symlink: {}", e),
@@ -108,6 +108,6 @@ mod platform {
         }
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(target_family = "unix"))]
     pub fn check_link(_: &str) {}
 }

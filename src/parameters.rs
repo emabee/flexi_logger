@@ -11,7 +11,7 @@ pub enum Criterion {
     ///
     /// ### TL,DR
     /// the combination of `Logger::append()`
-    /// with `Criterion::Age` works OK, but not perfectly correct on Windows or Linux
+    /// with `Criterion::Age` works OK, but not perfectly correct on Windows or unix
     /// when the program is restarted.
     ///
     /// ### Details
@@ -19,11 +19,11 @@ pub enum Criterion {
     /// Ideally, we should also apply it to the rCURRENT file when the program is restarted
     /// and you chose the `Logger::append()` option.
     ///
-    /// Unfortunately, this does not work on Windows, and it does not work on linux,
+    /// Unfortunately, this does not work on Windows, and it does not work on unix,
     /// for different reasons.
     ///
     /// To minimize the impact on age-based file-rotation,
-    /// `flexi_logger` uses on Windows and linux its initialization time
+    /// `flexi_logger` uses on Windows and unix its initialization time
     /// rather than the real file property
     /// as the created_at-info of an rCURRENT file that already exists, and the
     /// current timestamp when file rotation happens during further execution.
@@ -42,9 +42,9 @@ pub enum Criterion {
     ///
     /// <a name="ref-1">\[1\]</a> [https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
     ///
-    /// #### Issue on Linux
+    /// #### Issue on unix
     ///
-    /// `std::fs::metadata.created()` returns `Err`, because linux does not maintain a
+    /// `std::fs::metadata.created()` returns `Err`, because unix does not maintain a
     /// created-at-timestamp.
     ///
     Age(Age),
