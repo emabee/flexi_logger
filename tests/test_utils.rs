@@ -47,7 +47,7 @@ pub fn dispatch(count: u8) -> Option<u8> {
             let progname = std::env::args().next().unwrap();
             let nocapture = std::env::args().any(|a| a == "--nocapture");
             for value in 0..count {
-                let mut command = std::process::Command::new(progname.to_string());
+                let mut command = std::process::Command::new(progname.clone());
                 if nocapture {
                     command.arg("--nocapture");
                 }
