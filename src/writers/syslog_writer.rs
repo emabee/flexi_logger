@@ -272,9 +272,9 @@ impl Syslog {
     #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
     #[cfg(target_family = "unix")]
     pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<Self> {
-        Ok(Syslog(SyslogConnector::Stream(BufWriter::new(
+        Ok(Syslog(SyslogConnector::Stream(
             std::os::unix::net::UnixStream::connect(path)?,
-        ))))
+        )))
     }
 
     /// Returns a Syslog implementation which sends the log lines via TCP to the specified address.
