@@ -1,8 +1,5 @@
 use crate::{writers::log_writer::LogWriter, DeferredNow};
-use std::cell::RefCell;
-use std::io::Error as IoError;
-use std::io::Result as IoResult;
-use std::io::{BufWriter, ErrorKind, Write};
+use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 #[cfg(target_family = "unix")]
 use std::path::Path;
@@ -63,7 +60,7 @@ pub enum SyslogFacility {
     LocalUse7 = 23 << 3,
 }
 
-/// [`SyslogConnector`]'s severity.
+/// Syslog severity.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
 #[derive(Debug)]
@@ -116,7 +113,7 @@ pub struct SyslogWriter {
     facility: SyslogFacility,
     message_id: String,
     determine_severity: LevelToSyslogSeverity,
-    syslog: Mutex<RefCell<SyslogConnector>>,
+    m_conn_buf: Mutex<ConnectorAndBuffer>,
     max_log_level: log::LevelFilter,
 }
 impl SyslogWriter {
@@ -135,7 +132,7 @@ impl SyslogWriter {
     /// is a string without further semantics. It is intended for filtering
     /// messages on a relay or collector.
     ///
-    /// `syslog`: A [`SyslogConnector`](crate::writers::SyslogConnector).
+    /// `syslog`: A [`Syslog`](crate::writers::Syslog).
     ///
     /// # Errors
     ///
@@ -145,7 +142,7 @@ impl SyslogWriter {
         determine_severity: Option<LevelToSyslogSeverity>,
         max_log_level: log::LevelFilter,
         message_id: String,
-        syslog: SyslogConnector,
+        syslog: Syslog,
     ) -> IoResult<Box<Self>> {
         const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
 
@@ -181,20 +178,28 @@ impl SyslogWriter {
                 Some(f) => f,
                 None => default_mapping,
             },
-            syslog: Mutex::new(RefCell::new(syslog)),
+            m_conn_buf: Mutex::new(ConnectorAndBuffer {
+                conn: syslog.into_inner(),
+                buf: Vec::with_capacity(200),
+            }),
         }))
     }
 }
 
 impl LogWriter for SyslogWriter {
     fn write(&self, now: &mut DeferredNow, record: &log::Record) -> IoResult<()> {
-        let mr_syslog = self.syslog.lock().unwrap();
-        let mut syslog = mr_syslog.borrow_mut();
-
+        let mut conn_buf_guard = self
+            .m_conn_buf
+            .lock()
+            .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?;
+        let cb = &mut *conn_buf_guard;
         let severity = (self.determine_severity)(record.level());
 
         // See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424#page-8).
-        let s = format!(
+        cb.buf.clear();
+        #[allow(clippy::write_literal)]
+        write!(
+            cb.buf,
             "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} - {msg}",
             pri = self.facility as u8 | severity as u8,
             version = "1",
@@ -204,17 +209,17 @@ impl LogWriter for SyslogWriter {
             procid = self.pid,
             msgid = self.message_id,
             msg = &record.args()
-        );
-
-        // each write generates a syslog entry
-        syslog.write_all(s.as_bytes())
+        )?;
+        // we _have_ to buffer because each write here generates a syslog entry
+        cb.conn.write_all(&cb.buf)
     }
 
     fn flush(&self) -> IoResult<()> {
-        let mr_syslog = self.syslog.lock().unwrap();
-        let mut syslog = mr_syslog.borrow_mut();
-        syslog.flush()?;
-        Ok(())
+        self.m_conn_buf
+            .lock()
+            .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?
+            .conn
+            .flush()
     }
 
     fn max_log_level(&self) -> log::LevelFilter {
@@ -222,77 +227,67 @@ impl LogWriter for SyslogWriter {
     }
 }
 
-/// Helper struct that connects to the syslog and implements Write.
+struct ConnectorAndBuffer {
+    conn: SyslogConnector,
+    buf: Vec<u8>,
+}
+
+/// Implements the connection to the syslog.
 ///
 /// Is used in [`SyslogWriter::try_new`](crate::writers::SyslogWriter::try_new).
 ///
 /// ## Example
 ///
 /// ```rust,no_run
-///     use flexi_logger::writers::SyslogConnector;
-///    let syslog_connector = SyslogConnector::try_tcp("localhost:7777").unwrap();
+///     use flexi_logger::writers::Syslog;
+///     let syslog = Syslog::try_tcp("localhost:7777").unwrap();
 /// ```
 ///
-#[derive(Debug)]
-pub enum SyslogConnector {
-    /// Sends log lines to the syslog via a
-    /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
-    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
-    #[cfg(target_family = "unix")]
-    Stream(BufWriter<std::os::unix::net::UnixStream>),
-
-    /// Sends log lines to the syslog via a
-    /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
-    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
-    #[cfg(target_family = "unix")]
-    Datagram(std::os::unix::net::UnixDatagram),
-
-    /// Sends log lines to the syslog via UDP.
-    ///
-    /// UDP is fragile and thus discouraged except for local communication.
-    Udp(UdpSocket),
-
-    /// Sends log lines to the syslog via TCP.
-    Tcp(BufWriter<TcpStream>),
+pub struct Syslog(SyslogConnector);
+impl Syslog {
+    fn into_inner(self) -> SyslogConnector {
+        self.0
+    }
 }
 
-impl SyslogConnector {
-    /// Returns a [`SyslogConnector::Datagram`] to the specified path.
+impl Syslog {
+    /// Returns a Syslog implementation that connects via unix datagram to the specified path.
     ///
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
     #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
     #[cfg(target_family = "unix")]
-    pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
+    pub fn try_datagram<P: AsRef<Path>>(path: P) -> IoResult<Self> {
         let ud = std::os::unix::net::UnixDatagram::unbound()?;
         ud.connect(&path)?;
-        Ok(SyslogConnector::Datagram(ud))
+        Ok(Syslog(SyslogConnector::Datagram(ud)))
     }
 
-    /// Returns a [`SyslogConnector::Stream`] to the specified path.
+    /// Returns a Syslog implementation that connects via unix stream to the specified path.
     ///
     /// # Errors
     ///
     /// Any kind of I/O error can occur.
     #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
     #[cfg(target_family = "unix")]
-    pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<SyslogConnector> {
-        Ok(SyslogConnector::Stream(BufWriter::new(
+    pub fn try_stream<P: AsRef<Path>>(path: P) -> IoResult<Self> {
+        Ok(Syslog(SyslogConnector::Stream(BufWriter::new(
             std::os::unix::net::UnixStream::connect(path)?,
-        )))
+        ))))
     }
 
-    /// Returns a [`SyslogConnector`] which sends the log lines via TCP to the specified address.
+    /// Returns a Syslog implementation which sends the log lines via TCP to the specified address.
     ///
     /// # Errors
     ///
     /// `std::io::Error` if opening the stream fails.
     pub fn try_tcp<T: ToSocketAddrs>(server: T) -> IoResult<Self> {
-        Ok(Self::Tcp(BufWriter::new(TcpStream::connect(server)?)))
+        Ok(Syslog(SyslogConnector::Tcp(TcpStream::connect(server)?)))
     }
 
-    /// Returns a `SyslogConnector` which sends log via the fragile UDP protocol from local to server.
+    /// Returns a Syslog implementation which sends log via the fragile UDP protocol from local
+    /// to server.
     ///
     /// # Errors
     ///
@@ -300,37 +295,54 @@ impl SyslogConnector {
     pub fn try_udp<T: ToSocketAddrs>(local: T, server: T) -> IoResult<Self> {
         let socket = UdpSocket::bind(local)?;
         socket.connect(server)?;
-        Ok(Self::Udp(socket))
+        Ok(Syslog(SyslogConnector::Udp(socket)))
     }
 }
 
-impl Write for SyslogConnector {
-    fn write(&mut self, message: &[u8]) -> IoResult<usize> {
-        // eprintln!(
-        //     "syslog: got message \"{}\" ",
-        //     String::from_utf8_lossy(message)
-        // );
+#[derive(Debug)]
+enum SyslogConnector {
+    // Sends log lines to the syslog via a
+    // [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
+    Stream(std::os::unix::net::UnixStream),
 
+    // Sends log lines to the syslog via a
+    // [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
+    #[cfg_attr(docsrs, doc(cfg(target_family = "unix")))]
+    #[cfg(target_family = "unix")]
+    Datagram(std::os::unix::net::UnixDatagram),
+
+    // Sends log lines to the syslog via UDP.
+    //
+    // UDP is fragile and thus discouraged except for local communication.
+    Udp(UdpSocket),
+
+    // Sends log lines to the syslog via TCP.
+    Tcp(TcpStream),
+}
+
+impl Write for SyslogConnector {
+    fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
         #[allow(clippy::match_same_arms)]
         match *self {
             #[cfg(target_family = "unix")]
             Self::Datagram(ref ud) => {
                 // todo: reconnect if conn is broken
-                ud.send(message)
+                ud.send(buf)
             }
             #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => {
                 // todo: reconnect if conn is broken
-                w.write(message)
-                    .and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
+                w.write(buf).and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
             }
             Self::Tcp(ref mut w) => {
                 // todo: reconnect if conn is broken
-                w.write(message)
+                w.write(buf)
             }
             Self::Udp(ref socket) => {
                 // ??
-                socket.send(message)
+                socket.send(buf)
             }
         }
     }

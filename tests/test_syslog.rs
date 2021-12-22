@@ -3,7 +3,7 @@ mod test_utils;
 #[cfg(feature = "syslog_writer")]
 mod test {
 
-    use flexi_logger::writers::{SyslogConnector, SyslogFacility, SyslogWriter};
+    use flexi_logger::writers::{Syslog, SyslogFacility, SyslogWriter};
     use flexi_logger::{detailed_format, FileSpec, Logger};
     use log::*;
 
@@ -19,15 +19,13 @@ mod test {
 
     #[test]
     fn test_syslog() -> std::io::Result<()> {
-        let syslog_connector = SyslogConnector::try_udp("127.0.0.1:5555", "127.0.0.1:514")?;
-        // let syslog_connector = SyslogConnector::try_tcp("localhost:601")?;
-
         let boxed_syslog_writer = SyslogWriter::try_new(
             SyslogFacility::LocalUse0,
             None,
             log::LevelFilter::Trace,
             "JustForTest".to_owned(),
-            syslog_connector,
+            // Syslog::try_tcp("localhost:601")?,
+            Syslog::try_udp("127.0.0.1:5555", "127.0.0.1:514")?,
         )
         .unwrap();
         let logger = Logger::try_with_str("info")

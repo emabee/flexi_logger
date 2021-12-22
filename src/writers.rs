@@ -106,7 +106,7 @@ mod syslog_writer;
 
 #[cfg(feature = "syslog_writer")]
 pub use self::syslog_writer::{
-    LevelToSyslogSeverity, SyslogConnector, SyslogFacility, SyslogSeverity, SyslogWriter,
+    LevelToSyslogSeverity, Syslog, SyslogFacility, SyslogSeverity, SyslogWriter,
 };
 
 pub use self::file_log_writer::{
