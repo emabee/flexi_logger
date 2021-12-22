@@ -277,6 +277,7 @@ impl Logger {
     /// By default, [`default_format`] is used for output to files and to custom writers,
     /// and [`AdaptiveFormat::Default`] is used for output to `stderr` and `stdout`.
     /// If the feature `colors` is switched off, [`default_format`] is used for all outputs.
+    #[must_use]
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self.format_for_stderr = format;
@@ -289,6 +290,7 @@ impl Logger {
     /// that are written to files.
     ///
     /// Regarding the default, see [`Logger::format`].
+    #[must_use]
     pub fn format_for_files(mut self, format: FormatFunction) -> Self {
         self.format_for_file = format;
         self
@@ -298,6 +300,7 @@ impl Logger {
     /// that are written to stderr.
     ///
     /// Regarding the default, see [`Logger::format`].
+    #[must_use]
     pub fn format_for_stderr(mut self, format_function: FormatFunction) -> Self {
         self.format_for_stderr = format_function;
         self
@@ -319,6 +322,7 @@ impl Logger {
     /// that are written to stdout.
     ///
     /// Regarding the default, see [`Logger::format`].
+    #[must_use]
     pub fn format_for_stdout(mut self, format_function: FormatFunction) -> Self {
         self.format_for_stdout = format_function;
         self
@@ -341,6 +345,7 @@ impl Logger {
     /// whether it evaluates this setting or not.
     ///
     /// Regarding the default, see [`Logger::format`].
+    #[must_use]
     pub fn format_for_writer(mut self, format: FormatFunction) -> Self {
         self.format_for_writer = format;
         self
@@ -481,6 +486,7 @@ impl Logger {
     /// tail --follow=name --max-unchanged-stats=1 --retry link_to_log_file
     /// ```
     ///
+    #[must_use]
     pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Self {
         self.flwb = self.flwb.create_symlink(symlink);
         self
@@ -490,6 +496,7 @@ impl Logger {
     ///
     /// The target name must not start with an underscore.
     /// See module [`writers`](crate::writers) for more details.
+    #[must_use]
     pub fn add_writer<S: Into<String>>(
         mut self,
         target_name: S,
@@ -580,22 +587,22 @@ impl Logger {
         self
     }
 
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
     /// If append is set to true, makes the logger append to the specified output file, if it exists.
     /// By default, or with false, the file would be truncated.
     ///
-    /// This option will hardly make an effect if `suppress_timestamp()` is not used.
+    /// This option only has an effect if logs are written to files,
+    /// and it will hardly make an effect if `suppress_timestamp()` is not used.
     #[must_use]
     pub fn o_append(mut self, append: bool) -> Self {
         self.flwb = self.flwb.o_append(append);
         self
     }
 
-    /// This option only has an effect if `log_to_file` is set to true.
-    ///
     /// If a String is specified, it will be used on unix systems to create in the current folder
     /// a symbolic link with this name to the current log file.
+    ///
+    /// This option only has an effect on unix systems and if logs are written to files.
+    #[must_use]
     pub fn o_create_symlink<P: Into<PathBuf>>(mut self, symlink: Option<P>) -> Self {
         self.flwb = self.flwb.o_create_symlink(symlink);
         self

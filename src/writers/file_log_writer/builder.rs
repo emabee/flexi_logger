@@ -50,6 +50,7 @@ impl FileLogWriterBuilder {
 
     /// Makes the [`FileLogWriter`] use the provided format function for the log entries,
     /// rather than [`default_format`].
+    #[must_use]
     pub fn format(mut self, format: FormatFunction) -> Self {
         self.format = format;
         self
@@ -142,6 +143,7 @@ impl FileLogWriterBuilder {
 
     /// The specified String will be used on unix systems to create in the current folder
     /// a symbolic link to the current log file.
+    #[must_use]
     pub fn create_symlink<P: Into<PathBuf>>(mut self, symlink: P) -> Self {
         self.cfg_o_create_symlink = Some(symlink.into());
         self
@@ -295,6 +297,7 @@ impl FileLogWriterBuilder {
 
     /// If a String is specified, it will be used on unix systems to create in the current folder
     /// a symbolic link with this name to the current log file.
+    #[must_use]
     pub fn o_create_symlink<S: Into<PathBuf>>(mut self, symlink: Option<S>) -> Self {
         self.cfg_o_create_symlink = symlink.map(Into::into);
         self

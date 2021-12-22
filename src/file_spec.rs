@@ -76,6 +76,7 @@ impl FileSpec {
 
     /// The specified String is used as the basename of the log file name,
     /// instead of the program name. Using a file separator within the argument is discouraged.
+    #[must_use]
     pub fn basename<S: Into<String>>(mut self, basename: S) -> Self {
         self.basename = basename.into();
         self
@@ -83,6 +84,7 @@ impl FileSpec {
 
     /// The specified String is used as the basename of the log file,
     /// instead of the program name, which is used when `None` is given.
+    #[must_use]
     pub fn o_basename<S: Into<String>>(mut self, o_basename: Option<S>) -> Self {
         self.basename = o_basename.map_or_else(Self::default_basename, Into::into);
         self
@@ -109,11 +111,13 @@ impl FileSpec {
     }
 
     /// The specified String is added to the log file name.
+    #[must_use]
     pub fn discriminant<S: Into<String>>(self, discriminant: S) -> Self {
         self.o_discriminant(Some(discriminant))
     }
 
     /// The specified String is added to the log file name.
+    #[must_use]
     pub fn o_discriminant<S: Into<String>>(mut self, o_discriminant: Option<S>) -> Self {
         self.o_discriminant = o_discriminant.map(Into::into);
         self
