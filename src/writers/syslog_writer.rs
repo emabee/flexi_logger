@@ -96,14 +96,10 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
     }
 }
 
-/// An experimental configurable [`LogWriter`] implementation that writes log messages to the syslog
+/// A configurable [`LogWriter`] implementation that writes log messages to the syslog
 /// (see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424)).
 ///
 /// Only available with optional crate feature `syslog_writer`.
-///
-/// For using the `SyslogWriter`, you need to know how the syslog is managed on your system,  
-/// how you can access it and with which protocol you can write to it,
-/// so that you can choose a variant of the `SyslogConnector` that fits to your environment.
 ///
 /// See the [writers](crate::writers) for guidance how to use additional log writers.
 pub struct SyslogWriter {
@@ -234,22 +230,12 @@ struct ConnectorAndBuffer {
 
 /// Implements the connection to the syslog.
 ///
-/// Is used in [`SyslogWriter::try_new`](crate::writers::SyslogWriter::try_new).
+/// Choose one of the factory methods that matches your environment,
+/// depending on how the syslog is managed on your system,  
+/// how you can access it and with which protocol you can write to it.
 ///
-/// ## Example
-///
-/// ```rust,no_run
-///     use flexi_logger::writers::Syslog;
-///     let syslog = Syslog::try_tcp("localhost:7777").unwrap();
-/// ```
-///
+/// Is required to instantiate a [`SyslogWriter`](crate::writers::SyslogWriter).
 pub struct Syslog(SyslogConnector);
-impl Syslog {
-    fn into_inner(self) -> SyslogConnector {
-        self.0
-    }
-}
-
 impl Syslog {
     /// Returns a Syslog implementation that connects via unix datagram to the specified path.
     ///
@@ -277,7 +263,7 @@ impl Syslog {
         )))
     }
 
-    /// Returns a Syslog implementation which sends the log lines via TCP to the specified address.
+    /// Returns a Syslog implementation that sends the log lines via TCP to the specified address.
     ///
     /// # Errors
     ///
@@ -286,7 +272,7 @@ impl Syslog {
         Ok(Syslog(SyslogConnector::Tcp(TcpStream::connect(server)?)))
     }
 
-    /// Returns a Syslog implementation which sends log via the fragile UDP protocol from local
+    /// Returns a Syslog implementation that sends the log via the fragile UDP protocol from local
     /// to server.
     ///
     /// # Errors
@@ -296,6 +282,10 @@ impl Syslog {
         let socket = UdpSocket::bind(local)?;
         socket.connect(server)?;
         Ok(Syslog(SyslogConnector::Udp(socket)))
+    }
+
+    fn into_inner(self) -> SyslogConnector {
+        self.0
     }
 }
 

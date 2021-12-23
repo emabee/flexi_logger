@@ -98,7 +98,7 @@
 //!   ```
 //!
 
-mod file_log_writer;
+pub(crate) mod file_log_writer;
 mod log_writer;
 
 #[cfg(feature = "syslog_writer")]
@@ -110,6 +110,6 @@ pub use self::syslog_writer::{
 };
 
 pub use self::file_log_writer::{
-    ArcFileLogWriter, FileLogWriter, FileLogWriterBuilder, FileLogWriterHandle,
+    ArcFileLogWriter, FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, FileLogWriterHandle,
 };
 pub use self::log_writer::LogWriter;

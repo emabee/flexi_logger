@@ -2,7 +2,7 @@
 //!
 //! ## Contents
 //!
-//! - [Start minimal: Write logs to stderr](#start-minimal-write-logs-to-stderr)
+//! - [Start minimally: Initialize, and write logs to stderr](#start-minimally-initialize-and-write-logs-to-stderr)
 //! - [Choose the log output channel](#choose-the-log-output-channel)
 //! - [Choose the write mode](#choose-the-write-mode)
 //! - [Influence the location and name of the log file](#influence-the-location-and-name-of-the-log-file)
@@ -13,9 +13,10 @@
 //! - [Reconfigure the log specification dynamically by editing a spec-file](#reconfigure-the-log-specification-dynamically-by-editing-a-spec-file)
 //! - [Reconfigure the file log writer](#reconfigure-the-file-log-writer)
 //!
-//! ## Start minimal: Write logs to stderr
+//! ## Start minimally: Initialize, and write logs to stderr
 //!
-//! Choose one of three options to specify which log output you want to see, and call start:
+//! Initialize by choosing one of three options to specify which log output you want to see,
+//! and call `start()` immediately:
 //!
 //! - Use [`Logger::try_with_env`](crate::Logger::try_with_env) to
 //!   provide the log specification in the environment variable `RUST_LOG`:
@@ -26,8 +27,6 @@
 //!   Logger::try_with_env()?.start()?;
 //!   # Ok(())}
 //!   ```
-//!
-//!   Note that if `RUST_LOG` is not set, or if its value cannot be interpreted, nothing is logged.
 //!
 //! - Use [`Logger::try_with_str`](crate::Logger::try_with_str) to
 //!   provide the log specification programmatically:
@@ -49,7 +48,8 @@
 //!   # Ok(())}
 //!   ```
 //!
-//! After that, you just use the log-macros from the log crate.
+//! After that, you just use the log-macros from the log crate. Those log lines that match the
+//! log specification are then written to the default output channel (stderr).
 //!
 //! ## Choose the log output channel
 //!
@@ -87,7 +87,8 @@
 //!
 //! With [`Logger::write_mode`](crate::Logger::write_mode)
 //! you have some options to change this behavior, e.g.
-//! - with [`WriteMode::BufferAndFlushWith`](crate::WriteMode::BufferAndFlushWith),
+//! - with [`WriteMode::BufferAndFlush`](crate::WriteMode::BufferAndFlush),
+//!   or [`WriteMode::BufferAndFlushWith`](crate::WriteMode::BufferAndFlushWith),
 //!   you can reduce the program's I/O overhead and thus increase overall performance,
 //!   which can be relevant if logging is used heavily.
 //!   In addition, to keep a short maximum wait time

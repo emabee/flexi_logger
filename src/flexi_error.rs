@@ -5,9 +5,13 @@ use thiserror::Error;
 /// Describes errors in the initialization of `flexi_logger`.
 #[derive(Error, Debug)]
 pub enum FlexiLoggerError {
-    /// Reset not possible because not file logger is configured.
-    #[error("Reset not possible because not file logger is configured")]
+    /// Chosen reset not possible.
+    #[error("Chosen reset not possible")]
     Reset,
+
+    /// Method not possible because no file logger is configured.
+    #[error("Method not possible because no file logger is configured")]
+    NoFileLogger,
 
     /// Log file cannot be written because the specified path is not a directory.
     #[error("Log file cannot be written because the specified path is not a directory")]

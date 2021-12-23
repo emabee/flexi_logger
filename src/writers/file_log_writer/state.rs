@@ -1,4 +1,4 @@
-use super::{Config, RotationConfig};
+use super::config::{FileLogWriterConfig, RotationConfig};
 use crate::{
     util::{eprint_err, ERRCODE},
     Age, Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, Naming,
@@ -123,7 +123,7 @@ impl RotationState {
 
 fn try_roll_state_from_criterion(
     criterion: Criterion,
-    config: &Config,
+    config: &FileLogWriterConfig,
     p_path: &Path,
 ) -> Result<RollState, std::io::Error> {
     Ok(match criterion {
@@ -165,12 +165,12 @@ impl std::fmt::Debug for Inner {
 // The mutable state of a FileLogWriter.
 #[derive(Debug)]
 pub(crate) struct State {
-    config: Config,
+    config: FileLogWriterConfig,
     inner: Inner,
 }
 impl State {
     pub fn try_new(
-        config: Config,
+        config: FileLogWriterConfig,
         o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
     ) -> Self {
@@ -263,7 +263,7 @@ impl State {
         Ok(())
     }
 
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &FileLogWriterConfig {
         &self.config
     }
 
@@ -421,7 +421,7 @@ impl State {
 
 #[allow(clippy::type_complexity)]
 fn open_log_file(
-    config: &Config,
+    config: &FileLogWriterConfig,
     with_rotation: bool,
 ) -> Result<(Box<dyn Write + Send>, OffsetDateTime, PathBuf), std::io::Error> {
     let o_infix = if with_rotation {
@@ -575,7 +575,7 @@ fn remove_or_compress_too_old_logfiles_impl(
 // second, we need to continue with the restart-incrementing.
 fn rotate_output_file_to_date(
     creation_date: &OffsetDateTime,
-    config: &Config,
+    config: &FileLogWriterConfig,
 ) -> Result<(), std::io::Error> {
     const INFIX_DATE: &[FormatItem<'static>] =
         format_description!("_r[year]-[month]-[day]_[hour]-[minute]-[second]");
@@ -649,7 +649,7 @@ fn rotate_output_file_to_date(
 // The current file must be closed already.
 fn rotate_output_file_to_idx(
     idx_state: IdxState,
-    config: &Config,
+    config: &FileLogWriterConfig,
 ) -> Result<IdxState, std::io::Error> {
     let new_idx = match idx_state {
         IdxState::Start => 0,

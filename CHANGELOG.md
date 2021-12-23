@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.1-unpublished] - 2021-12-22
+## [0.22.1-unpublished] - 2021-12-23
 
-Extend symlink to all unix platforms, ratehr than just linux.
+Enable symlink on all unix platforms, not just linux.
 
 Rework the optional syslog writer (kudos to [ObsceneGiraffe](https://github.com/ObsceneGiraffe)):
 
@@ -15,6 +15,10 @@ Rework the optional syslog writer (kudos to [ObsceneGiraffe](https://github.com/
 - use owned buffer to avoid allocations
 - encapsulate implementation details
 - remove additional buffer from `SyslogConnector::Tcp`
+
+Add method `LoggerHandle::flw_config` (kudos to [Ivan Azoyan](https://github.com/azoyan).
+
+Reduce the used feature-list of the optional dependency chrono (to get rid of an indirect dependency to an old time version).
 
 ## [0.22.0] - 2021-12-12
 

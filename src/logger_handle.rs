@@ -1,6 +1,6 @@
 use crate::primary_writer::PrimaryWriter;
 use crate::util::{eprint_err, ERRCODE};
-use crate::writers::{FileLogWriterBuilder, LogWriter};
+use crate::writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter};
 use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -187,8 +187,9 @@ impl LoggerHandle {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Reset` if no file log writer is configured,
-    ///  or if a reset was tried with a different write mode.
+    /// `FlexiLoggerError::NoFileLogger` if no file log writer is configured.
+    ///
+    /// `FlexiLoggerError::Reset` if a reset was tried with a different write mode.
     ///
     /// `FlexiLoggerError::Io` if the specified path doesn't work.
     ///
@@ -197,7 +198,22 @@ impl LoggerHandle {
         if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
             mw.reset_file_log_writer(flwb)
         } else {
-            Err(FlexiLoggerError::Reset)
+            Err(FlexiLoggerError::NoFileLogger)
+        }
+    }
+
+    /// Returns the current configuration of the file log writer.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::NoFileLogger` if no file log writer is configured.
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn flw_config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+            mw.flw_config()
+        } else {
+            Err(FlexiLoggerError::NoFileLogger)
         }
     }
 

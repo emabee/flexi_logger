@@ -31,24 +31,10 @@ use std::time::Duration;
 
 /// The entry-point for using `flexi_logger`.
 ///
-/// A simple example with file logging might look like this:
-///
-/// ```rust
-/// use flexi_logger::{Duplicate, FileSpec, Logger};
-///
-/// Logger::try_with_str("info, mycrate = debug")
-///         .unwrap()
-///         .log_to_file(FileSpec::default())
-///         .duplicate_to_stderr(Duplicate::Warn)
-///         .start()
-///         .unwrap();
-/// ```
-///
-///
 /// `Logger` is a builder class that allows you to
 /// * specify your desired (initial) loglevel-specification
-///   * either programmatically as a String ([`Logger::try_with_str`])
-///   * or by providing a String in the environment ([`Logger::try_with_env`]),
+///   * either as a String ([`Logger::try_with_str`])
+///   * or by providing it in the environment ([`Logger::try_with_env`]),
 ///   * or by combining both options ([`Logger::try_with_env_or_str`]),
 ///   * or by building a [`LogSpecification`] programmatically ([`Logger::with`]),
 /// * use the desired configuration methods,
@@ -56,6 +42,10 @@ use std::time::Duration;
 ///
 ///   * [`Logger::start`], or
 ///   * [`Logger::start_with_specfile`].
+///
+/// # Usage
+///
+/// See [`code_examples`](code_examples/index.html) for a comprehensive list of usage possibilities.
 pub struct Logger {
     spec: LogSpecification,
     log_target: LogTarget,
@@ -105,9 +95,11 @@ impl Logger {
     /// Creates a Logger that reads the [`LogSpecification`] from the environment variable
     /// `RUST_LOG`.
     ///
+    /// Note that if `RUST_LOG` is not set, nothing is logged.
+    ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the value of `RUST_LOG` uses an erroneous syntax.
+    /// `FlexiLoggerError::Parse` if the value of `RUST_LOG` is malformed.
     pub fn try_with_env() -> Result<Self, FlexiLoggerError> {
         Ok(Self::from_spec_and_errs(LogSpecification::env()?))
     }
@@ -117,7 +109,7 @@ impl Logger {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Parse` if the used String uses an erroneous syntax.
+    /// `FlexiLoggerError::Parse` if the chosen value is malformed.
     pub fn try_with_env_or_str<S: AsRef<str>>(s: S) -> Result<Self, FlexiLoggerError> {
         Ok(Self::from_spec_and_errs(LogSpecification::env_or_parse(s)?))
     }

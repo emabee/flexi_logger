@@ -5,12 +5,8 @@ mod state;
 mod state_handle;
 
 pub use self::builder::{ArcFileLogWriter, FileLogWriterBuilder, FileLogWriterHandle};
-
-use self::{
-    config::{Config, RotationConfig},
-    state::State,
-    state_handle::StateHandle,
-};
+pub use self::config::FileLogWriterConfig;
+use self::{config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
     writers::LogWriter, DeferredNow, EffectiveWriteMode, FileSpec, FlexiLoggerError, FormatFunction,
 };
@@ -90,12 +86,24 @@ impl FileLogWriter {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::Reset` if no file log writer is configured,
-    ///  or if a reset was tried with a different write mode.
+    /// `FlexiLoggerError::Reset` if a reset was tried with a different write mode.
+    ///
     /// `FlexiLoggerError::Io` if the specified path doesn't work.
+    ///
+    /// `FlexiLoggerError::OutputBadDirectory` if the specified path is not a directory.
+    ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
     pub fn reset(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
         self.state_handle.reset(flwb)
+    }
+
+    /// Returns the current configuration of the file log writer
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
+        self.state_handle.config()
     }
 }
 
