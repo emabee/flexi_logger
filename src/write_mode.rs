@@ -62,7 +62,12 @@ pub enum WriteMode {
     BufferAndFlush,
 
     /// Buffer and flush with given buffer capacity and flush interval.
-    BufferAndFlushWith(usize, Duration),
+    BufferAndFlushWith(
+        /// Buffer capacity.
+        usize,
+        /// Flush interval.
+        Duration,
+    ),
 
     /// Same as `BufferDontFlushWith` with default capacity ([`DEFAULT_BUFFER_CAPACITY`]).
     BufferDontFlush,
@@ -71,7 +76,10 @@ pub enum WriteMode {
     ///
     /// This might be handy if you want to minimize I/O effort and don't want to create
     /// the extra thread for flushing and don't care if log lines appear with delay.
-    BufferDontFlushWith(usize),
+    BufferDontFlushWith(
+        /// Buffer capacity.
+        usize,
+    ),
 
     /// Same as `AsyncWith`, using default values for all parameters.
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]

@@ -4,7 +4,7 @@ use crate::{Cleanup, Criterion, FileSpec, FormatFunction, Naming, WriteMode};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::{Config, FileLogWriter, LogWriter, RotationConfig, State};
+use super::{FileLogWriter, FileLogWriterConfig, LogWriter, RotationConfig, State};
 
 /// Builder for [`FileLogWriter`].
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
@@ -234,7 +234,7 @@ impl FileLogWriterBuilder {
         let cleanup_in_background_thread = self.cleanup_in_background_thread;
 
         Ok(State::try_new(
-            Config {
+            FileLogWriterConfig {
                 print_message: self.cfg_print_message,
                 append: self.cfg_append,
                 line_ending: self.cfg_line_ending,

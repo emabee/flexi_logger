@@ -136,8 +136,9 @@ See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more detail
 
 ### **`syslog`**
 
-This is still an experimental feature, likely working, but not well tested.
-Feedback of all kinds is highly appreciated.
+Adds `SyslogWriter`, a `LogWriter` implementation that sends log entries to the syslog.
+
+Not all variations of it are well tested. Feedback of all kinds is appreciated.
 
 ### **`textfilter`** (*default feature*)
 

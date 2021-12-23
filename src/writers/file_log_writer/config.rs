@@ -12,9 +12,9 @@ pub struct RotationConfig {
     pub(crate) cleanup: Cleanup,
 }
 
-/// The immutable configuration of a `FileLogWriter`
+/// Configuration of a `FileLogWriter`.
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct FileLogWriterConfig {
     pub(crate) print_message: bool,
     pub(crate) append: bool,
     pub(crate) write_mode: WriteMode,
@@ -24,44 +24,45 @@ pub struct Config {
     pub(crate) use_utc: bool,
 }
 
-impl Config {
-    /// Returns `file_spec` configuration
+impl FileLogWriterConfig {
+    /// Returns the configured directory.
     #[must_use]
     pub fn directory(&self) -> &std::path::Path {
         self.file_spec.directory.as_path()
     }
 
-    /// Returns `basename` of log file
+    /// Returns the configured `basename` of the log file.
     #[must_use]
     pub fn basename(&self) -> &str {
         &self.file_spec.basename
     }
 
-    /// Returns `discriminant`
+    /// Returns the configured `discriminant`.
     #[must_use]
     pub fn discriminant(&self) -> Option<String> {
         self.file_spec.o_discriminant.clone()
     }
 
-    /// Returns `suffix`
+    /// Returns the configured `suffix`.
     #[must_use]
     pub fn suffix(&self) -> Option<String> {
         self.file_spec.o_suffix.clone()
     }
 
-    /// Returns `use_utc`
+    /// Returns `true` if UTC is enforced.
     #[must_use]
     pub fn use_utc(&self) -> bool {
         self.use_utc
     }
 
-    /// Returns `append`
+    /// Returns `true` if existing files are appended on program start.
     #[must_use]
     pub fn append(&self) -> bool {
         self.append
     }
 
-    /// Return `print_message`
+    /// Returns `true` if a message should be printed on program start
+    /// to which file the log is written.
     #[must_use]
     pub fn print_message(&self) -> bool {
         self.print_message

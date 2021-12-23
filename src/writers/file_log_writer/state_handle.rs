@@ -1,13 +1,10 @@
-use super::{builder::FileLogWriterBuilder, state::State};
+use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::State};
 #[cfg(feature = "async")]
 use crate::util::eprint_msg;
 use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
-use crate::Config;
-use crate::DeferredNow;
-use crate::FlexiLoggerError;
-use crate::FormatFunction;
+use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 #[cfg(feature = "async")]
 use crossbeam::{
     channel::{self, Sender},
@@ -344,7 +341,7 @@ impl StateHandle {
         Ok(())
     }
 
-    pub(crate) fn config(&self) -> Result<Config, FlexiLoggerError> {
+    pub(crate) fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
         let state = match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),
             #[cfg(feature = "async")]
@@ -352,7 +349,7 @@ impl StateHandle {
         }
         .map_err(|_| FlexiLoggerError::Poison)?;
 
-        Ok((state.config()).clone())
+        Ok(state.config().clone())
     }
 
     pub(super) fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
