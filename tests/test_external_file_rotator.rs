@@ -123,6 +123,7 @@ fn work(value: u8) {
     assert_eq!(203, sum);
 }
 
+#[cfg(feature = "external_rotation")]
 fn count_lines(path: &Path) -> usize {
     std::fs::read_to_string(path)
         .unwrap()
