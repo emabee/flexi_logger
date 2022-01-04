@@ -3,11 +3,23 @@ use crate::{
     util::{eprint_err, ERRCODE},
     Age, Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, Naming,
 };
+#[cfg(feature = "external_rotation")]
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::cmp::max;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::iter::Chain;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use std::vec::IntoIter;
+#[cfg(feature = "external_rotation")]
+use std::{
+    ops::Deref,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
 
 const CURRENT_INFIX: &str = "_rCURRENT";
@@ -149,13 +161,13 @@ fn try_roll_state_from_criterion(
 
 enum Inner {
     Initial(Option<RotationConfig>, bool),
-    Active(Option<RotationState>, Box<dyn Write + Send>),
+    Active(Option<RotationState>, Box<dyn Write + Send>, PathBuf),
 }
 impl std::fmt::Debug for Inner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
             Self::Initial(o_rot, b) => f.write_fmt(format_args!("Initial({:?}, {}) ", o_rot, b)),
-            Self::Active(o_rot, _) => {
+            Self::Active(o_rot, _, _) => {
                 f.write_fmt(format_args!("Active({:?}, <some-writer>) ", o_rot,))
             }
         }
@@ -164,19 +176,36 @@ impl std::fmt::Debug for Inner {
 
 // The mutable state of a FileLogWriter.
 #[derive(Debug)]
-pub(crate) struct State {
+pub(super) struct State {
     config: FileLogWriterConfig,
     inner: Inner,
+    #[cfg(feature = "external_rotation")]
+    external_rotation: Arc<AtomicBool>,
 }
 impl State {
-    pub fn try_new(
+    pub(super) fn new(
         config: FileLogWriterConfig,
         o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
+        #[cfg(feature = "external_rotation")] external_rotate_watcher: bool,
     ) -> Self {
+        let inner = Inner::Initial(o_rotation_config, cleanup_in_background_thread);
+        #[cfg(feature = "external_rotation")]
+        let external_rotation = Arc::new(AtomicBool::new(false));
+        #[cfg(feature = "external_rotation")]
+        if external_rotate_watcher {
+            start_external_rotate_watcher(config.directory(), Arc::clone(&external_rotation))
+                .map_err(|e| {
+                    eprint_err(ERRCODE::Poison, "cannot start external_rotate_watcher", &e);
+                })
+                .ok();
+        }
+
         Self {
             config,
-            inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
+            inner,
+            #[cfg(feature = "external_rotation")]
+            external_rotation,
         }
     }
 
@@ -184,8 +213,8 @@ impl State {
         if let Inner::Initial(o_rotation_config, cleanup_in_background_thread) = &self.inner {
             match o_rotation_config {
                 None => {
-                    let (log_file, _created_at, _p_path) = open_log_file(&self.config, false)?;
-                    self.inner = Inner::Active(None, log_file);
+                    let (log_file, _created_at, p_path) = open_log_file(&self.config, false)?;
+                    self.inner = Inner::Active(None, log_file, p_path);
                 }
                 Some(rotate_config) => {
                     // first rotate, then open the log file
@@ -256,6 +285,7 @@ impl State {
                             o_cleanup_thread_handle,
                         }),
                         log_file,
+                        p_path,
                     );
                 }
             }
@@ -268,7 +298,7 @@ impl State {
     }
 
     pub fn flush(&mut self) -> std::io::Result<()> {
-        if let Inner::Active(_, ref mut file) = self.inner {
+        if let Inner::Active(_, ref mut file, _) = self.inner {
             file.flush()
         } else {
             Ok(())
@@ -280,7 +310,8 @@ impl State {
     // before writing into `_rCURRENT` goes on.
     #[inline]
     fn mount_next_linewriter_if_necessary(&mut self) -> Result<(), FlexiLoggerError> {
-        if let Inner::Active(Some(ref mut rotation_state), ref mut file) = self.inner {
+        if let Inner::Active(Some(ref mut rotation_state), ref mut file, ref mut path) = self.inner
+        {
             if rotation_state.rotation_necessary() {
                 match rotation_state.naming_state {
                     NamingState::CreatedAt => {
@@ -291,8 +322,9 @@ impl State {
                     }
                 }
 
-                let (line_writer, created_at, _) = open_log_file(&self.config, true)?;
+                let (line_writer, created_at, p_path) = open_log_file(&self.config, true)?;
                 *file = line_writer;
+                *path = p_path;
                 rotation_state.created_at = created_at;
                 if let RollState::Size(_, ref mut current_size)
                 | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state
@@ -311,17 +343,21 @@ impl State {
         Ok(())
     }
 
-    pub fn write_buffer(&mut self, buf: &[u8]) -> std::io::Result<()> {
+    pub(super) fn write_buffer(&mut self, buf: &[u8]) -> std::io::Result<()> {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize()?;
         }
+
+        #[cfg(feature = "external_rotation")]
+        self.react_on_external_rotation()?;
+
         // rotate if necessary
         self.mount_next_linewriter_if_necessary()
             .unwrap_or_else(|e| {
                 eprint_err(ERRCODE::LogFile, "can't open file", &e);
             });
 
-        if let Inner::Active(ref mut o_rotation_state, ref mut log_file) = self.inner {
+        if let Inner::Active(ref mut o_rotation_state, ref mut log_file, ref _path) = self.inner {
             log_file.write_all(buf)?;
             if let Some(ref mut rotation_state) = o_rotation_state {
                 if let RollState::Size(_, ref mut current_size)
@@ -343,7 +379,7 @@ impl State {
                     None
                 }
             }
-            Inner::Active(o_rotation_state, _) => {
+            Inner::Active(o_rotation_state, _, _) => {
                 if o_rotation_state.is_some() {
                     Some(CURRENT_INFIX)
                 } else {
@@ -354,11 +390,28 @@ impl State {
         self.config.file_spec.as_pathbuf(o_infix)
     }
 
+    // check if the currently used output file does still exist, and if not, then create and open it
+    #[cfg(feature = "external_rotation")]
+    fn react_on_external_rotation(&mut self) -> Result<(), std::io::Error> {
+        if self
+            .external_rotation
+            .deref()
+            .swap(false, Ordering::Relaxed)
+        {
+            if let Inner::Active(_, ref mut file, ref p_path) = self.inner {
+                if std::fs::metadata(p_path).is_err() {
+                    *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");
         }
-        if let Inner::Active(ref mut o_rotation_state, _) = self.inner {
+        if let Inner::Active(ref mut o_rotation_state, _, _) = self.inner {
             let path = self.config.file_spec.as_pathbuf(
                 o_rotation_state
                     .as_ref()
@@ -410,7 +463,7 @@ impl State {
     }
 
     pub fn shutdown(&mut self) {
-        if let Inner::Active(ref mut o_rotation_state, ref mut writer) = self.inner {
+        if let Inner::Active(ref mut o_rotation_state, ref mut writer, _) = self.inner {
             if let Some(ref mut rotation_state) = o_rotation_state {
                 rotation_state.shutdown();
             }
@@ -419,38 +472,34 @@ impl State {
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &FileLogWriterConfig,
     with_rotation: bool,
 ) -> Result<(Box<dyn Write + Send>, OffsetDateTime, PathBuf), std::io::Error> {
-    let o_infix = if with_rotation {
-        Some(CURRENT_INFIX)
-    } else {
-        None
-    };
-    let p_path = config.file_spec.as_pathbuf(o_infix);
+    let path = config
+        .file_spec
+        .as_pathbuf(with_rotation.then(|| CURRENT_INFIX));
+
     if config.print_message {
-        println!("Log is written to {}", &p_path.display());
+        println!("Log is written to {}", &path.display());
     }
     if let Some(ref link) = config.o_create_symlink {
-        self::platform::create_symlink_if_possible(link, &p_path);
+        self::platform::create_symlink_if_possible(link, &path);
     }
 
-    let log_file = OpenOptions::new()
+    let logfile = OpenOptions::new()
         .write(true)
         .create(true)
         .append(config.append)
         .truncate(!config.append)
-        .open(&p_path)?;
+        .open(&path)?;
 
-    #[allow(clippy::option_if_let_else)]
     let w: Box<dyn Write + Send> = if let Some(capacity) = config.write_mode.buffersize() {
-        Box::new(BufWriter::with_capacity(capacity, log_file))
+        Box::new(BufWriter::with_capacity(capacity, logfile))
     } else {
-        Box::new(log_file)
+        Box::new(logfile)
     };
-    Ok((w, get_creation_date(&p_path), p_path))
+    Ok((w, get_creation_date(&path), path))
 }
 
 fn get_highest_rotate_idx(file_spec: &FileSpec) -> IdxState {
@@ -475,13 +524,7 @@ fn get_highest_rotate_idx(file_spec: &FileSpec) -> IdxState {
 #[allow(clippy::type_complexity)]
 fn list_of_log_and_compressed_files(
     file_spec: &FileSpec,
-) -> std::iter::Chain<
-    std::iter::Chain<
-        std::vec::IntoIter<std::path::PathBuf>,
-        std::vec::IntoIter<std::path::PathBuf>,
-    >,
-    std::vec::IntoIter<std::path::PathBuf>,
-> {
+) -> Chain<Chain<IntoIter<PathBuf>, IntoIter<PathBuf>>, IntoIter<PathBuf>> {
     let o_infix = Some("_r[0-9]*");
 
     let log_pattern = file_spec.as_glob_pattern(o_infix, None);
@@ -696,6 +739,52 @@ fn get_fake_creation_date() -> OffsetDateTime {
 #[cfg(not(any(target_os = "windows", target_family = "unix")))]
 fn try_get_creation_date(path: &Path) -> Result<OffsetDateTime, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
+}
+
+// Watch the parent folder of the log files, using debounced events
+#[cfg(feature = "external_rotation")]
+fn start_external_rotate_watcher(
+    logfile_folder: &Path,
+    trigger: Arc<AtomicBool>,
+) -> Result<(), FlexiLoggerError> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let debouncing_delay = std::time::Duration::from_millis(50);
+    let mut watcher = watcher(tx, debouncing_delay)?;
+    watcher.watch(&logfile_folder, RecursiveMode::Recursive)?;
+
+    // in a separate thread, wait for events for the log file
+    let builder =
+        std::thread::Builder::new().name("flexi_logger-external_rotate_watcher".to_string());
+    #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+    let builder = builder.stack_size(128 * 1024);
+    builder.spawn(move || {
+        let _anchor_for_watcher = watcher; // keep it alive!
+        loop {
+            match rx.recv() {
+                Ok(debounced_event) => {
+                    match debounced_event {
+                        DebouncedEvent::NoticeRemove(ref _path)
+                        | DebouncedEvent::Remove(ref _path)
+                        | DebouncedEvent::Rename(ref _path, _) => {
+                            // if path.canonicalize().map(|x| x == logfile).unwrap_or(false) {
+                            // trigger a restart of the state with append mode
+                            trigger.deref().store(true, Ordering::Relaxed);
+                            // }
+                        }
+                        _event => {}
+                    }
+                }
+                Err(e) => {
+                    eprint_err(
+                        ERRCODE::LogFileWatcher,
+                        "error while watching the log file",
+                        &e,
+                    );
+                }
+            }
+        }
+    })?;
+    Ok(())
 }
 
 mod platform {

@@ -454,6 +454,27 @@ impl Logger {
         self
     }
 
+    /// Makes the logger react cooperative if external tools rename the log file.
+    ///
+    /// By default, `flexi_logger` decides, based on your configuration, to which destination(s)
+    /// the log is written.
+    ///
+    /// If logs are written to files, `flexi_logger` expects that nobody interacts with these,
+    /// and it offers capabilities to rotate, compress, and clean up log files.
+    ///
+    /// Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
+    /// log files. But renaming or deleting the current output file e.g. will not stop
+    /// `flexi_logger` from writing to the now renamed file! You should configure `flexi_logger`
+    /// with `Logger::watch_external_rotations()`
+    /// to make it watch for OS events that affect its outputfile
+    /// and react with closing its current output stream and recreating its configured output file.
+    #[must_use]
+    #[cfg(feature = "external_rotation")]
+    pub fn watch_external_rotations(mut self) -> Self {
+        self.flwb = self.flwb.watch_external_rotations();
+        self
+    }
+
     /// Makes the logger use UTC timestamps rather than local timestamps.
     #[must_use]
     pub fn use_utc(mut self) -> Self {

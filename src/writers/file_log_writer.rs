@@ -28,7 +28,7 @@ pub struct FileLogWriter {
     max_log_level: log::LevelFilter,
 }
 impl FileLogWriter {
-    pub(crate) fn new(
+    fn new(
         state: State,
         max_log_level: log::LevelFilter,
         format_function: FormatFunction,

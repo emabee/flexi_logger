@@ -112,6 +112,18 @@ For usecases where this is not desirable
 (see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)),
 you can activate this feature.
 
+### **`external_rotation`**
+
+If logs are written to files, `flexi_logger` expects that nobody interacts with these,
+and it offers capabilities to rotate, compress, and clean up log files.
+
+Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
+log files. But renaming or deleting the current output file e.g. will not stop
+`flexi_logger` from writing to the now renamed file! You should configure `flexi_logger`
+with `Logger::watch_external_rotations()` (which is only available with feature `external_rotation`)
+to make it watch for OS events that affect its outputfile
+and react with closing its current output stream and recreating its configured output file.
+
 ### **`specfile`**
 
 Adds a method `Logger::start_with_specfile(specfile)`.

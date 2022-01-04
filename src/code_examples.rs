@@ -468,6 +468,21 @@
 //! # }
 //! ```
 //!
+//! ## External file rotators
+//!
+//! By default, `flexi_logger` decides, based on yor configuration, to which destination(s)
+//! the log is written, and expects that nobody interacts with this. In addition, `flexi_logger`
+//! offers quite some functionality to rotate, compress, and clean up log files.
+//!
+//! Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
+//! log files. But renaming or deleting the current output file e.g. might not stop `flexi_logger` from writing
+//! to the now renamed file! You should configure `flexi_logger` with
+//! ```rust, ignore
+//! Logger::watch_external_rotations()
+//! ```
+//! to make it watch for OS events that affect its outputfile
+//! and react with closing its current output stream and recreating its configured output file.
+//!
 //! ## Miscellaneous
 //!
 //! For the sake of completeness, we refer here to some more configuration methods.

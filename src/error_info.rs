@@ -58,6 +58,10 @@
 //!
 //! The `FileLogWriter` is not able to rotate the log file. The reason should be printed as well.
 //!
+//! ## `LogFileWatcher`
+//!
+//! The `FileLogWriter` is not able to watch the log file. The reason should be printed as well.
+//!
 //! ## `LogSpecFile`
 //!
 //! This error can only occur if you use `Logger::start_with_specfile`, where you specify a

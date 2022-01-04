@@ -34,9 +34,9 @@ pub enum FlexiLoggerError {
     OutputIo(#[from] std::io::Error),
 
     /// Filesystem notifications for the specfile could not be set up.
-    #[error("Filesystem notifications for the specfile could not be set up")]
-    #[cfg(feature = "specfile")]
-    SpecfileNotify(#[from] notify::Error),
+    #[error("Filesystem notifications for the specfile or the log file could not be set up")]
+    #[cfg(feature = "notify")]
+    Notify(#[from] notify::Error),
 
     /// Parsing the configured logspec toml-file failed.
     #[error("Parsing the configured logspec toml-file failed")]

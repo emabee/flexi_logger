@@ -178,8 +178,12 @@ impl FileSpec {
         self.directory.clone()
     }
 
-    // <directory>/<basename>_<discr>_<timestamp><infix>.<suffix>
-    pub(crate) fn as_pathbuf(&self, o_infix: Option<&str>) -> PathBuf {
+    /// Creates a `PathBuf` to the described log file.
+    ///
+    /// It is composed like this:
+    ///  `<directory>/<basename>_<discr>_<timestamp><infix>.<suffix>`
+    #[must_use]
+    pub fn as_pathbuf(&self, o_infix: Option<&str>) -> PathBuf {
         let mut filename = self.basename.clone();
         filename.reserve(50);
 

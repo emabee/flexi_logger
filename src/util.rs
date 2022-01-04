@@ -22,6 +22,8 @@ pub(crate) enum ERRCODE {
     Flush,
     Format,
     LogFile,
+    #[cfg(feature = "external_rotation")]
+    LogFileWatcher,
     #[cfg(feature = "specfile")]
     LogSpecFile,
     Poison,
@@ -38,6 +40,8 @@ impl ERRCODE {
             Self::Flush => "flush",
             Self::Format => "format",
             Self::LogFile => "logfile",
+            #[cfg(feature = "external_rotation")]
+            Self::LogFileWatcher => "logfilewatcher",
             #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
             Self::Poison => "poison",
