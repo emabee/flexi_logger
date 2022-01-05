@@ -114,7 +114,10 @@ you can activate this feature.
 
 ### **`external_rotation`**
 
-If logs are written to files, `flexi_logger` expects that nobody modifies these, and it offers its own capabilities to rotate, compress, and clean up log files.
+**This feature is not yet stable - the tests work well on windows, but not on linux and macos.**
+
+If logs are written to files, `flexi_logger` expects that nobody modifies these, and it offers
+its own capabilities to rotate, compress, and clean up log files.
 
 Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
 log files. But renaming or deleting the current output file e.g. will not stop
