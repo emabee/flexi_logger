@@ -748,9 +748,10 @@ fn start_external_rotate_watcher(
     trigger: Arc<AtomicBool>,
 ) -> Result<(), FlexiLoggerError> {
     let (tx, rx) = std::sync::mpsc::channel();
-    let debouncing_delay = std::time::Duration::from_millis(50);
-    let mut watcher = watcher(tx, debouncing_delay)?;
-    watcher.watch(&logfile_folder, RecursiveMode::Recursive)?;
+    let mut watcher = watcher(tx, std::time::Duration::from_millis(50))?;
+    std::fs::create_dir_all(logfile_folder)?;
+    let watched_folder = std::fs::canonicalize(logfile_folder)?;
+    watcher.watch(&watched_folder, RecursiveMode::NonRecursive)?;
 
     // in a separate thread, wait for events for the log file
     let builder =
@@ -758,7 +759,7 @@ fn start_external_rotate_watcher(
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
     let builder = builder.stack_size(128 * 1024);
     builder.spawn(move || {
-        let _anchor_for_watcher = watcher; // keep it alive!
+        let _keep_watcher_alive = watcher;
         loop {
             match rx.recv() {
                 Ok(debounced_event) => {

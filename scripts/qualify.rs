@@ -77,6 +77,9 @@ fn main() {
     #[rustfmt::skip]
     run_command!("cargo", "+nightly", "doc", "--all-features", "--no-deps", "--open");
 
+    // check version consistency
+    run_command!("cargo", "run", "--example", "version_numbers");
+
     // check git status
     let mut cmd = command!("git", "status", "-s");
     let child = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();

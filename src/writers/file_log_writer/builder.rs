@@ -80,15 +80,16 @@ impl FileLogWriterBuilder {
         self
     }
 
-    /// Makes the `FileLogWriter` react cooperative if external tools rename the log file.
+    /// Makes the `FileLogWriter` react cooperatively if external tools rename or delete
+    /// the log file.
     ///
     /// The `FileLogWriter` expects that nobody interacts with the log file,
     /// and it offers capabilities to rotate, compress, and clean up log files.
     ///
     /// Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
     /// log files. But renaming or deleting the current output file e.g. will not stop
-    /// `FileLogWriter` from writing to the now renamed file! You should use this method
-    /// to make it watch for OS events that affect its outputfile
+    /// `FileLogWriter` from writing to the now renamed or even deleted file!
+    /// You should use this method to make it watch for OS events that affect its outputfile
     /// and react with closing its current output stream and recreating its configured output file.
     #[must_use]
     #[cfg(feature = "external_rotation")]

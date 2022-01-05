@@ -5,6 +5,8 @@ use flexi_logger::{FileSpec, Logger, WriteMode};
 #[cfg(feature = "external_rotation")]
 use log::*;
 
+use std::path::Path;
+
 #[cfg(feature = "external_rotation")]
 #[cfg(feature = "async")]
 const COUNT: u8 = 3;
@@ -27,8 +29,7 @@ fn work(value: u8) {
         .directory(self::test_utils::dir())
         .suppress_timestamp()
         .basename("myprog");
-    let file_spec_clone = file_spec.clone();
-    logger = logger.log_to_file(file_spec);
+    logger = logger.log_to_file(file_spec.clone());
 
     // ToDo: test with all write modes, with and without rotation
     match value {
@@ -47,9 +48,8 @@ fn work(value: u8) {
         }
     };
 
-    let logger = logger.watch_external_rotations();
-
-    let handle = logger
+    let _handle = logger
+        .watch_external_rotations()
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
@@ -57,43 +57,35 @@ fn work(value: u8) {
     info!("XXX 1 AAA");
     info!("XXX 2 AAA");
     info!("XXX 3 AAA");
-    handle.flush();
 
-    // start a thread that deletes the output file
-    trace!("Starting file remover thread");
-    let worker_handle = std::thread::Builder::new()
-        .name("file remover".to_string())
-        .spawn(move || {
-            for _ in 0..4 {
-                std::thread::sleep(std::time::Duration::from_millis(400));
-                // remove the log file
-                match std::fs::remove_file(file_spec_clone.as_pathbuf(None)) {
-                    Ok(()) => {
-                        println!(
-                            "Removed the log file {:?}",
-                            file_spec_clone.as_pathbuf(None),
-                        )
-                    }
-                    Err(e) => {
-                        panic!(
-                            "Cannot remove log file {:?}, due to {:?}",
-                            file_spec_clone.as_pathbuf(None),
-                            e
-                        )
-                    }
+    let log_file = file_spec.as_pathbuf(None);
+    // write log lines in a slow loop, and delete the log file intermittently
+    for i in 1..200 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        info!("YYY {} AAA", i);
+        if i % 50 == 0 {
+            let lines = count_lines(&log_file);
+            match std::fs::remove_file(log_file.clone()) {
+                Ok(()) => {
+                    println!(
+                        "Removed the log file {:?}, which had {} lines",
+                        log_file, lines
+                    )
+                }
+                Err(e) => {
+                    panic!("Cannot remove log file {:?}, due to {:?}", log_file, e)
                 }
             }
-        })
-        .unwrap();
-    trace!("file remover thread started.");
-
-    // write log lines in a slow loop
-    for i in 0..200 {
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        info!("YYY {} AAA", i);
+        }
     }
+    assert_eq!(count_lines(&log_file), 49);
+}
 
-    worker_handle.join().unwrap();
-
-    // TODO: Verify that the error channel was not used
+#[cfg(feature = "external_rotation")]
+fn count_lines(path: &Path) -> usize {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .filter(|line| line.contains("AAA"))
+        .count()
 }
