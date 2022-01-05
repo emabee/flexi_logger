@@ -127,9 +127,8 @@ fn work(value: u8) {
 
 #[cfg(feature = "external_rotation")]
 fn count_lines(path: &Path) -> usize {
-    std::fs::read_to_string(path)
-        .unwrap()
-        .lines()
-        .filter(|line| line.contains("AAA"))
-        .count()
+    match std::fs::read_to_string(path) {
+        Ok(s) => s.lines().filter(|line| line.contains("AAA")).count(),
+        Err(_e) => 0,
+    }
 }
