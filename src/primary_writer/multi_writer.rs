@@ -47,6 +47,13 @@ impl MultiWriter {
             .as_ref()
             .map_or(Err(FlexiLoggerError::NoFileLogger), |flw| flw.config())
     }
+    pub(crate) fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        self.o_file_writer
+            .as_ref()
+            .map_or(Err(FlexiLoggerError::NoFileLogger), |flw| {
+                flw.reopen_outputfile()
+            })
+    }
 }
 
 impl LogWriter for MultiWriter {

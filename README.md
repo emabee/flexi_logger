@@ -114,17 +114,7 @@ you can activate this feature.
 
 ### **`external_rotation`**
 
-**This feature is not yet stable - the tests work well on windows, but not on linux and macos.**
-
-If logs are written to files, `flexi_logger` expects that nobody modifies these, and it offers
-its own capabilities to rotate, compress, and clean up log files.
-
-Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
-log files. But renaming or deleting the current output file e.g. will not stop
-`flexi_logger` from writing to the now renamed or even deleted file! You should configure `flexi_logger`
-with `Logger::watch_external_rotations()` (which is only available with feature `external_rotation`)
-to make it watch for OS events that affect its outputfile
-and react with closing its current output stream and recreating its configured output file.
+Obsolete feature - use method `LoggerHandle::reopen_outputfile` instead.
 
 ### **`specfile`**
 

@@ -217,6 +217,36 @@ impl LoggerHandle {
         }
     }
 
+    /// Makes the logger re-open the current log file.
+    ///
+    /// If the log is written to a file, `flexi_logger` expects that nobody else modifies the file,
+    /// and offers capabilities to rotate, compress, and clean up log files.
+    ///
+    /// However, if you use tools like linux' `logrotate`
+    /// to rename or delete the current output file, you need to inform `flexi_logger` about
+    /// such actions by calling this method. Otherwise `flexi_logger` will not stop
+    /// writing to the renamed or even deleted file!
+    ///
+    /// # Example
+    ///
+    /// `logrotate` e.g. can be configured to send a `SIGHUP` signal to your program. You need to
+    /// handle `SIGHUP` in your program explicitly,
+    /// e.g. using a crate like [`ctrlc`](https://docs.rs/ctrlc/latest/ctrlc/),
+    /// and call this function from the registered signal handler.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::NoFileLogger` if no file log writer is configured.
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+            mw.reopen_outputfile()
+        } else {
+            Err(FlexiLoggerError::NoFileLogger)
+        }
+    }
+
     /// Shutdown all participating writers.
     ///
     /// This method is supposed to be called at the very end of your program, if

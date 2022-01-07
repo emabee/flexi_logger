@@ -181,12 +181,14 @@ impl AsyncHandle {
         })?;
         self.sender.send(buffer).map_err(|_e| io_err("Send"))
     }
+
     fn pop_buffer(&self) -> Vec<u8> {
         self.a_pool
             .pop()
             .unwrap_or_else(|| Vec::with_capacity(self.message_capa))
     }
 }
+
 #[cfg(feature = "async")]
 impl std::fmt::Debug for AsyncHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
@@ -339,6 +341,16 @@ impl StateHandle {
         flwb.assert_write_mode((*state).config().write_mode)?;
         *state = flwb.try_build_state()?;
         Ok(())
+    }
+
+    pub(super) fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        let mut state = match self {
+            StateHandle::Sync(handle) => handle.am_state.lock(),
+            #[cfg(feature = "async")]
+            StateHandle::Async(handle) => handle.am_state.lock(),
+        }
+        .map_err(|_| FlexiLoggerError::Poison)?;
+        Ok(state.reopen_outputfile()?)
     }
 
     pub(crate) fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {

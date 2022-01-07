@@ -105,6 +105,30 @@ impl FileLogWriter {
     pub fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
         self.state_handle.config()
     }
+
+    /// Makes the `FileLogWriter` re-open the current log file.
+    ///
+    /// `FileLogWriter` expects that nobody else modifies the file to which it writes,
+    /// and offers capabilities to rotate, compress, and clean up log files.
+    ///
+    /// However, if you use tools like linux' `logrotate`
+    /// to rename or delete the current output file, you need to inform the `FileLogWriter` about
+    /// such actions by calling this method. Otherwise the `FileLogWriter` will not stop
+    /// writing to the renamed or even deleted file!
+    ///
+    /// # Example
+    ///
+    /// `logrotate` e.g. can be configured to send a `SIGHUP` signal to your program. You should
+    /// handle `SIGHUP` in your program explicitly,
+    /// e.g. using a crate like [`ctrlc`](https://docs.rs/ctrlc/latest/ctrlc/),
+    /// and call this function from the registered signal handler.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        self.state_handle.reopen_outputfile()
+    }
 }
 
 impl LogWriter for FileLogWriter {

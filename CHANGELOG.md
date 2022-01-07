@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.1] - 2022-01-05
+## [0.22.2-unpublished] - 2022-01-07
 
-Add feature `external_rotation`.
+Add `LoggerHandle::reopen_outputfile` and deprecate feature `external_rotation`.
+
+## [0.22.1] - 2022-01-05
 
 Enable symlink on all unix platforms, not just linux.
 
@@ -22,6 +24,8 @@ Add method `LoggerHandle::flw_config` (kudos to [Ivan Azoyan](https://github.com
 
 Reduce the used feature-list of the optional dependency chrono
 (to get rid of an indirect dependency to an old time version).
+
+Add feature `external_rotation`.
 
 ## [0.22.0] - 2021-12-12
 

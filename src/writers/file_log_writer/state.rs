@@ -407,6 +407,13 @@ impl State {
         Ok(())
     }
 
+    pub fn reopen_outputfile(&mut self) -> Result<(), std::io::Error> {
+        if let Inner::Active(_, ref mut file, ref p_path) = self.inner {
+            *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
+        }
+        Ok(())
+    }
+
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");
