@@ -81,6 +81,7 @@ fn work(value: u8) {
         // std::thread::sleep(std::time::Duration::from_millis(10));
         info!("YYY {} AAA", i);
     }
+    logger.flush();
 
     // verify that all log lines are written and are found in moved files
     let mut files = 1;
