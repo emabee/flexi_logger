@@ -51,9 +51,11 @@ fn work(value: u8) {
     info!("XXX 2 AAA");
     info!("XXX 3 AAA");
 
-    // write log lines in a slow loop, and delete the log file intermittently
+    // write log lines, and delete the log file intermittently
     for i in 0..100 {
         if i % 25 == 20 {
+            logger.flush();
+            std::thread::sleep(std::time::Duration::from_millis(100));
             let lines = count_lines(&file_path);
             match std::fs::remove_file(file_path.clone()) {
                 Ok(()) => {
@@ -71,12 +73,11 @@ fn work(value: u8) {
                 }
             }
         }
-
-        // std::thread::sleep(std::time::Duration::from_millis(10));
         info!("YYY {} AAA", i);
     }
 
-    assert_eq!(count_lines(&file_path), 5, "wrong number of lines",);
+    logger.flush();
+    assert!(count_lines(&file_path) < 30, "wrong number of lines",);
 }
 
 fn count_lines(path: &Path) -> usize {
