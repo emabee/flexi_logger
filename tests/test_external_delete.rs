@@ -60,21 +60,19 @@ fn work(value: u8) {
                     println!(
                         "Removed the log file {:?}, which had {} lines",
                         file_path, lines
-                    )
+                    );
+                    logger.reopen_outputfile().unwrap();
                 }
                 Err(e) => {
-                    // should be panic - is defused because test doesn't work properly on linux
-                    println!(
+                    panic!(
                         "Cannot remove log file {:?}, i = {}, reason {:?}",
                         file_path, i, e
                     )
                 }
             }
-
-            logger.reopen_outputfile().unwrap();
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        // std::thread::sleep(std::time::Duration::from_millis(10));
         info!("YYY {} AAA", i);
     }
 

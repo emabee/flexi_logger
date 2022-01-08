@@ -6,7 +6,7 @@ use crate::{
 #[cfg(feature = "external_rotation")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::cmp::max;
-use std::fs::{File, OpenOptions};
+use std::fs::{remove_file, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::iter::Chain;
 use std::ops::Add;
@@ -409,7 +409,22 @@ impl State {
 
     pub fn reopen_outputfile(&mut self) -> Result<(), std::io::Error> {
         if let Inner::Active(_, ref mut file, ref p_path) = self.inner {
-            *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
+            match OpenOptions::new().create(true).append(true).open(&p_path) {
+                Ok(f) => {
+                    // proved to work on standard windows, linux, mac
+                    *file = Box::new(f);
+                }
+                Err(_unexpected_error) => {
+                    // there are environments, like github's windows container,
+                    // where this extra step helps to overcome the _unexpected_error
+                    let mut dummy = PathBuf::from(p_path);
+                    dummy.set_extension("ShortLivingTempFileForReOpen");
+                    *file = Box::new(OpenOptions::new().create(true).append(true).open(&dummy)?);
+                    remove_file(&dummy)?;
+
+                    *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
+                }
+            }
         }
         Ok(())
     }
