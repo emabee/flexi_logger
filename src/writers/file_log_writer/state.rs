@@ -72,6 +72,12 @@ struct RotationState {
 }
 impl RotationState {
     fn size_rotation_necessary(max_size: u64, current_size: u64) -> bool {
+        if current_size > max_size {
+            println!(
+                "FIXME Rotating, because current_size: {}, max_size: {}",
+                current_size, max_size
+            );
+        }
         current_size > max_size
     }
 
@@ -97,12 +103,19 @@ impl RotationState {
                     || self.created_at.minute() != now.minute()
             }
             Age::Second => {
-                self.created_at.year() != now.year()
+                let b = self.created_at.year() != now.year()
                     || self.created_at.month() != now.month()
                     || self.created_at.day() != now.day()
                     || self.created_at.hour() != now.hour()
                     || self.created_at.minute() != now.minute()
-                    || self.created_at.second() != now.second()
+                    || self.created_at.second() != now.second();
+                if b {
+                    println!(
+                        "FIXME Rotating, because self.created_at = {}, now= {}",
+                        self.created_at, now
+                    );
+                }
+                b
             }
         }
     }

@@ -68,6 +68,7 @@ fn write_log_lines() {
 }
 
 fn verify_logs(directory: &Path) {
+    let mut error_detected = false;
     let expected_line_counts = [3, 3, 3, 1, 1, 3, 1];
     // read all files
     let pattern = directory.display().to_string().add("/*");
@@ -90,16 +91,22 @@ fn verify_logs(directory: &Path) {
         let mut buffer = String::new();
         while reader.read_line(&mut buffer).unwrap() > 0 {
             line_count += 1;
-            // buffer.clear();
         }
-        assert_eq!(
-            line_count, expected_line_counts[index],
-            "file {:?} has wrong line count\n{}",
-            pathbuf, buffer
-        );
+        println!("file {:?}:\n{}", pathbuf, buffer);
+        if line_count != expected_line_counts[index] {
+            error_detected = true;
+        }
         total_line_count += line_count;
     }
 
-    assert_eq!(no_of_log_files, 7, "wrong file count");
-    assert_eq!(total_line_count, 15, "wrong line count!");
+    if no_of_log_files != 7 {
+        println!("wrong file count: {} instead of 7", no_of_log_files);
+        error_detected = true;
+    }
+    if total_line_count != 15 {
+        println!("wrong line count: {} instead of 15", total_line_count);
+        error_detected = true;
+    };
+
+    assert!(!error_detected);
 }
