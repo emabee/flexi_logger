@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, fix_test_age_or_size ]
   pull_request:
     branches: [ master ]
 
