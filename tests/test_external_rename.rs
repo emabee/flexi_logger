@@ -42,15 +42,6 @@ fn work(value: u8) {
         }
     };
 
-    let logger = logger
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-
-    // write some log lines to initialize the file
-    info!("XXX 1 AAA");
-    info!("XXX 2 AAA");
-    info!("XXX 3 AAA");
-
     // create the "moved" folder
     let mut mv_dir = file_path.clone();
     mv_dir.pop();
@@ -59,29 +50,38 @@ fn work(value: u8) {
     let target_filespec = FileSpec::try_from(&file_path)
         .unwrap()
         .directory(mv_dir.clone());
+    {
+        let logger = logger
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
-    // write log lines in a slow loop, and rename the log file intermittently
-    for i in 0..100 {
-        if i % 25 == 20 {
-            let target_path = target_filespec.as_pathbuf(Some(&i.to_string()));
-            match std::fs::rename(file_path.clone(), &target_path.clone()) {
-                Ok(()) => {
-                    println!("Renamed the log file {:?} to {:?}", file_path, &target_path);
-                    logger.reopen_outputfile().unwrap();
-                }
-                Err(e) => {
-                    panic!(
-                        "Cannot rename log file {:?} to {:?} due to {:?}",
-                        file_path, target_path, e
-                    )
+        // write some log lines to initialize the file
+        info!("XXX 1 AAA");
+        info!("XXX 2 AAA");
+        info!("XXX 3 AAA");
+
+        // write log lines in a slow loop, and rename the log file intermittently
+        for i in 0..100 {
+            if i % 25 == 20 {
+                let target_path = target_filespec.as_pathbuf(Some(&i.to_string()));
+                match std::fs::rename(file_path.clone(), &target_path.clone()) {
+                    Ok(()) => {
+                        println!("Renamed the log file {:?} to {:?}", file_path, &target_path);
+                        logger.reopen_outputfile().unwrap();
+                    }
+                    Err(e) => {
+                        panic!(
+                            "Cannot rename log file {:?} to {:?} due to {:?}",
+                            file_path, target_path, e
+                        )
+                    }
                 }
             }
-        }
 
-        // std::thread::sleep(std::time::Duration::from_millis(10));
-        info!("YYY {} AAA", i);
+            // std::thread::sleep(std::time::Duration::from_millis(10));
+            info!("YYY {} AAA", i);
+        }
     }
-    logger.flush();
 
     // verify that all log lines are written and are found in moved files
     let mut files = 1;
