@@ -21,34 +21,30 @@ fn multi_threaded() {
 
     let start = test_utils::now_local();
     let directory = test_utils::dir();
-    let mut reconf_handle = Logger::try_with_str("debug")
-        .unwrap()
-        .log_to_file(FileSpec::default().directory(&directory))
-        .format(test_format)
-        .create_symlink("link_to_mt_log")
-        .duplicate_to_stderr(Duplicate::Info)
-        .rotate(
-            Criterion::Age(Age::Minute),
-            Naming::Timestamps,
-            Cleanup::Never,
-        )
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    info!(
-        "create a huge number of log lines with a considerable number of threads, verify the log"
-    );
+    {
+        let mut logger = Logger::try_with_str("debug")
+            .unwrap()
+            .log_to_file(FileSpec::default().directory(&directory))
+            .format(test_format)
+            .create_symlink("link_to_mt_log")
+            .duplicate_to_stderr(Duplicate::Info)
+            .rotate(
+                Criterion::Age(Age::Minute),
+                Naming::Timestamps,
+                Cleanup::Never,
+            )
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
-    let worker_handles = start_worker_threads(NO_OF_THREADS);
-    let new_spec = LogSpecification::parse("trace").unwrap();
-    std::thread::Builder::new()
-        .spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            reconf_handle.set_new_spec(new_spec);
-            0
-        })
-        .unwrap();
+        info!("create many log lines with a considerable number of threads, verify the log");
 
-    wait_for_workers_to_close(worker_handles);
+        let worker_handles = start_worker_threads(NO_OF_THREADS);
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        logger.set_new_spec(LogSpecification::parse("trace").unwrap());
+
+        wait_for_workers_to_close(worker_handles);
+    }
 
     let delta = (test_utils::now_local() - start).whole_milliseconds();
     debug!(
