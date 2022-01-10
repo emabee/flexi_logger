@@ -30,6 +30,10 @@ fn test_age_or_size() {
 }
 
 fn write_log_lines() {
+    trace!("{}", 'A');
+    // wait to enforce a rotation
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+
     // Fill first three files by size
     trace!("{}", 'a');
     trace!("{}", 'b');
@@ -69,7 +73,7 @@ fn write_log_lines() {
 
 fn verify_logs(directory: &Path) {
     let mut error_detected = false;
-    let expected_line_counts = [3, 3, 3, 1, 1, 3, 1];
+    let expected_line_counts = [1, 3, 3, 3, 1, 1, 3, 1];
     // read all files
     let pattern = directory.display().to_string().add("/*");
     let globresults = match glob(&pattern) {
@@ -99,12 +103,12 @@ fn verify_logs(directory: &Path) {
         total_line_count += line_count;
     }
 
-    if no_of_log_files != 7 {
-        println!("wrong file count: {} instead of 7", no_of_log_files);
+    if no_of_log_files != 8 {
+        println!("wrong file count: {} instead of 8", no_of_log_files);
         error_detected = true;
     }
-    if total_line_count != 15 {
-        println!("wrong line count: {} instead of 15", total_line_count);
+    if total_line_count != 16 {
+        println!("wrong line count: {} instead of 16", total_line_count);
         error_detected = true;
     };
 
