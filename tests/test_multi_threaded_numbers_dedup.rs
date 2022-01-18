@@ -6,9 +6,13 @@ use flexi_logger::{
     WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 
+use glob::glob;
 use log::*;
 use std::cmp::Ordering;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::num::NonZeroUsize;
+use std::ops::Add;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
@@ -20,51 +24,46 @@ const ROTATE_OVER_SIZE: u64 = 800_000;
 fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
+    let directory = test_utils::dir();
+    {
+        let _stopwatch = test_utils::Stopwatch::default();
+        let logger = Logger::try_with_str("debug")
+            .unwrap()
+            .log_to_file(
+                FileSpec::default()
+                    .basename("test_mtn")
+                    .directory(&directory),
+            )
+            .write_mode(WriteMode::BufferAndFlush)
+            .format(test_format)
+            .duplicate_to_stderr(Duplicate::Info)
+            .rotate(
+                Criterion::Size(ROTATE_OVER_SIZE),
+                Naming::Numbers,
+                Cleanup::Never,
+            )
+            .filter(Box::new(DedupWriter::with_leeway(
+                std::num::NonZeroUsize::new(22).unwrap(),
+            )))
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        info!("create a huge number of log lines, but deduplicate them");
 
-    let start = test_utils::now_local();
-    let logger = Logger::try_with_str("debug")
-        .unwrap()
-        .log_to_file(
-            FileSpec::default()
-                .basename("test_mtn")
-                .directory(test_utils::dir()),
-        )
-        .write_mode(WriteMode::BufferAndFlush)
-        .format(test_format)
-        .duplicate_to_stderr(Duplicate::Info)
-        .rotate(
-            Criterion::Size(ROTATE_OVER_SIZE),
-            Naming::Numbers,
-            Cleanup::Never,
-        )
-        .filter(Box::new(DedupWriter::with_leeway(
-            std::num::NonZeroUsize::new(22).unwrap(),
-        )))
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-    info!(
-        "create a huge number of log lines with a considerable number of threads, verify the log"
-    );
+        #[allow(clippy::redundant_clone)]
+        let mut logger2 = logger.clone();
+        let worker_handles = start_worker_threads(NO_OF_THREADS);
+        let new_spec = LogSpecification::parse("trace").unwrap();
+        std::thread::Builder::new()
+            .spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                logger2.set_new_spec(new_spec);
+                0
+            })
+            .unwrap();
 
-    #[allow(clippy::redundant_clone)]
-    let mut logger2 = logger.clone();
-    let worker_handles = start_worker_threads(NO_OF_THREADS);
-    let new_spec = LogSpecification::parse("trace").unwrap();
-    std::thread::Builder::new()
-        .spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            logger2.set_new_spec(new_spec);
-            0
-        })
-        .unwrap();
-
-    wait_for_workers_to_close(worker_handles);
-
-    let delta = (test_utils::now_local() - start).whole_milliseconds();
-    debug!(
-        "Task executed with {} threads in {} ms.",
-        NO_OF_THREADS, delta
-    );
+        wait_for_workers_to_close(worker_handles);
+    }
+    verify_logs(&directory.display().to_string());
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
@@ -283,4 +282,39 @@ struct LastRecord {
     file: Option<String>,
     line: Option<u32>,
     msg: String,
+}
+
+fn verify_logs(directory: &str) {
+    // read all files
+    let pattern = String::from(directory).add("/*");
+    let globresults = match glob(&pattern) {
+        Err(e) => panic!(
+            "Is this ({}) really a directory? Listing failed with {}",
+            pattern, e
+        ),
+        Ok(globresults) => globresults,
+    };
+    let mut no_of_log_files = 0;
+    let mut line_count = 0_usize;
+    for globresult in globresults {
+        let pathbuf = globresult.unwrap_or_else(|e| panic!("Ups - error occured: {}", e));
+        let f = File::open(&pathbuf)
+            .unwrap_or_else(|e| panic!("Cannot open file {:?} due to {}", pathbuf, e));
+        no_of_log_files += 1;
+        let mut reader = BufReader::new(f);
+        let mut buffer = String::new();
+        while reader.read_line(&mut buffer).unwrap() > 0 {
+            if buffer.starts_with("XXXXX") {
+                line_count += 1;
+            } else {
+                panic!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer);
+            }
+            buffer.clear();
+        }
+    }
+    assert_eq!(line_count, 32);
+    println!(
+        "Found {} log lines from {} threads in {} files",
+        line_count, NO_OF_THREADS, no_of_log_files
+    );
 }

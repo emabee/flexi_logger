@@ -17,49 +17,42 @@ mod d {
     const NO_OF_LOG_FILES: usize = 2;
     const NO_OF_GZ_FILES: usize = 5;
 
+    // we use a special log line format that starts with a special string
+    // so that it is easier to verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
-        // we use a special log line format that starts with a special string
-        // so that it is easier to verify that all log lines are written correctly
-
-        let start = super::test_utils::now_local();
         let directory = super::test_utils::dir();
-        let mut logger = Logger::try_with_str("debug")
-            .unwrap()
-            .log_to_file(FileSpec::default().directory(&directory))
-            .write_mode(WriteMode::BufferAndFlushWith(
-                10 * 1024,
-                std::time::Duration::from_millis(600),
-            ))
-            .format(test_format)
-            .duplicate_to_stderr(Duplicate::Info)
-            .rotate(
-                Criterion::Size(ROTATE_OVER_SIZE),
-                Naming::Timestamps,
-                Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
-            )
-            .use_utc()
-            .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-        info!(
-            "create a huge number of log lines with a considerable number of threads, \
+        {
+            let _stopwatch = super::test_utils::Stopwatch::default();
+            let mut logger = Logger::try_with_str("debug")
+                .unwrap()
+                .log_to_file(FileSpec::default().directory(&directory))
+                .write_mode(WriteMode::BufferAndFlushWith(
+                    10 * 1024,
+                    std::time::Duration::from_millis(600),
+                ))
+                .format(test_format)
+                .duplicate_to_stderr(Duplicate::Info)
+                .rotate(
+                    Criterion::Size(ROTATE_OVER_SIZE),
+                    Naming::Timestamps,
+                    Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
+                )
+                .use_utc()
+                .start()
+                .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            info!(
+                "create a huge number of log lines with a considerable number of threads, \
              verify the log"
-        );
+            );
 
-        let worker_handles = start_worker_threads(NO_OF_THREADS);
-        let new_spec = LogSpecification::parse("trace").unwrap();
-        thread::sleep(std::time::Duration::from_millis(500));
-        logger.set_new_spec(new_spec);
+            let worker_handles = start_worker_threads(NO_OF_THREADS);
+            let new_spec = LogSpecification::parse("trace").unwrap();
+            thread::sleep(std::time::Duration::from_millis(500));
+            logger.set_new_spec(new_spec);
 
-        wait_for_workers_to_close(worker_handles);
-
-        let delta = (super::test_utils::now_local() - start).whole_milliseconds();
-        debug!(
-            "Task executed with {} threads in {} ms.",
-            NO_OF_THREADS, delta
-        );
-
-        logger.shutdown();
+            wait_for_workers_to_close(worker_handles);
+        }
         verify_logs(&directory.display().to_string());
     }
 

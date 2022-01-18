@@ -56,12 +56,6 @@ impl log::Log for FlexiLogger {
     //      Return true if
     //      - target is filled with module path and level is accepted by log specification
     //      - target is filled with crap and ???
-    //
-    // Caveat:
-    // Rocket e.g. sets target explicitly to several fantasy names;
-    // these hopefully do not collide with any of the modules in the log specification;
-    // since they do not conform with the {} syntax expected by flexi_logger, they're treated as
-    // module names.
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         let target = metadata.target();
         let level = metadata.level();
@@ -139,7 +133,6 @@ impl log::Log for FlexiLogger {
             }
         }
 
-        #[allow(clippy::option_if_let_else)]
         if let Some(ref filter) = self.filter {
             filter.write(&mut now, record, &(*self.primary_writer))
         } else {

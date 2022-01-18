@@ -1,18 +1,13 @@
 use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::State};
-#[cfg(feature = "async")]
-use crate::util::eprint_msg;
 use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 #[cfg(feature = "async")]
-use crossbeam::{
-    channel::{self, Sender},
-    queue::ArrayQueue,
-};
+use crossbeam::{channel::Sender, queue::ArrayQueue};
 use log::Record;
 use std::io::Write;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
 
@@ -33,29 +28,11 @@ impl SyncHandle {
         let line_ending = state.config().line_ending;
         let flush_interval = state.config().write_mode.get_flush_interval();
         let am_state = Arc::new(Mutex::new(state));
-        // Create a flusher if needed
-        if flush_interval != std::time::Duration::from_secs(0) {
-            let t_am_state = Arc::clone(&am_state);
-            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
-            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-            let builder = builder.stack_size(128);
-            builder.spawn(move || {
-                    let (_sender, receiver): (
-                        mpsc::Sender<()>,
-                        mpsc::Receiver<()>,
-                    ) = mpsc::channel();
-                    loop {
-                        receiver.recv_timeout(flush_interval).ok();
-                        (*t_am_state).lock().map_or_else(
-                            |_e| (),
-                            |mut state| {
-                                state.flush().ok();
-                            },
-                        );
-                    }
-                })
-                .unwrap(/* yes, let's panic if the thread can't be spawned */);
+
+        if flush_interval.as_secs() != 0 || flush_interval.subsec_nanos() != 0 {
+            super::threads::start_sync_flusher(Arc::clone(&am_state), flush_interval);
         }
+
         Self {
             am_state,
             format_function,
@@ -94,73 +71,21 @@ impl AsyncHandle {
         let flush_interval = state.config().write_mode.get_flush_interval();
         let line_ending = state.config().line_ending;
         let am_state = Arc::new(Mutex::new(state));
-        let (async_sender, receiver) = channel::unbounded::<Vec<u8>>();
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
 
-        let t_state = Arc::clone(&am_state);
-        let t_pool = Arc::clone(&a_pool);
-
-        let mo_thread_handle = Mutex::new(Some(
-            std::thread::Builder::new()
-                .name("flexi_logger-async_file_log_writer".to_string())
-                .spawn(move || loop {
-                    match receiver.recv() {
-                        Err(_) => break,
-                        Ok(mut message) => {
-                            let mut state = t_state.lock().unwrap(/* ok */);
-                            match message.as_ref() {
-                                ASYNC_FLUSH => {
-                                    state.flush().unwrap_or_else(|e| {
-                                        eprint_err(ERRCODE::Flush, "flushing failed", &e);
-                                    });
-                                }
-                                ASYNC_SHUTDOWN => {
-                                    state.shutdown();
-                                    break;
-                                }
-                                _ => {
-                                    state.write_buffer(&message).unwrap_or_else(|e| {
-                                        eprint_err(ERRCODE::Write, "writing failed", &e);
-                                    });
-                                }
-                            }
-                            if message.capacity() <= message_capa {
-                                message.clear();
-                                t_pool.push(message).ok();
-                            }
-                        }
-                    }
-                })
-                .expect("Couldn't spawn flexi_logger-async_file_log_writer"),
-        ));
+        let (sender, mo_thread_handle) = super::threads::start_async_fs_writer(
+            Arc::clone(&am_state),
+            message_capa,
+            Arc::clone(&a_pool),
+        );
 
         if flush_interval != std::time::Duration::from_secs(0) {
-            let cloned_async_sender = async_sender.clone();
-            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
-            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-            let builder = builder.stack_size(128);
-            builder.spawn(move || {
-                    let (_sender, receiver): (
-                        mpsc::Sender<()>,
-                        mpsc::Receiver<()>,
-                    ) = mpsc::channel();
-                    loop {
-                        if let Err(mpsc::RecvTimeoutError::Disconnected) =
-                            receiver.recv_timeout(flush_interval)
-                        {
-                            eprint_msg(ERRCODE::Flush, "Flushing unexpectedly stopped working");
-                            break;
-                        }
-
-                        cloned_async_sender.send(ASYNC_FLUSH.to_vec()).ok();
-                    }
-                })
-                .unwrap(/* yes, let's panic if the thread can't be spawned */);
+            super::threads::start_async_fs_flusher(sender.clone(), flush_interval);
         }
 
         Self {
             am_state,
-            sender: async_sender,
+            sender,
             mo_thread_handle,
             a_pool,
             message_capa,

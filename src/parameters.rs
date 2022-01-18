@@ -130,7 +130,6 @@ pub enum Cleanup {
 impl Cleanup {
     // Returns true if some cleanup is to be done.
     #[must_use]
-    #[allow(clippy::match_like_matches_macro)]
     pub(crate) fn do_cleanup(&self) -> bool {
         !matches!(self, Self::Never)
     }

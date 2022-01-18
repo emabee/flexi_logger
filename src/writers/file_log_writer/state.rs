@@ -1,4 +1,7 @@
-use super::config::{FileLogWriterConfig, RotationConfig};
+use super::{
+    config::{FileLogWriterConfig, RotationConfig},
+    threads::{start_cleanup_thread, MessageToCleanupThread},
+};
 use crate::{
     util::{eprint_err, ERRCODE},
     Age, Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, Naming,
@@ -52,10 +55,6 @@ enum RollState {
     AgeOrSize(Age, u64, u64), // age, max_size, current_size
 }
 
-enum MessageToCleanupThread {
-    Act,
-    Die,
-}
 #[derive(Debug)]
 struct CleanupThreadHandle {
     sender: std::sync::mpsc::Sender<MessageToCleanupThread>,
@@ -187,23 +186,10 @@ impl State {
         config: FileLogWriterConfig,
         o_rotation_config: Option<RotationConfig>,
         cleanup_in_background_thread: bool,
-        #[cfg(feature = "external_rotation")] external_rotate_watcher: bool,
     ) -> Self {
-        let inner = Inner::Initial(o_rotation_config, cleanup_in_background_thread);
-        #[cfg(feature = "external_rotation")]
-        let external_rotation = Arc::new(AtomicBool::new(false));
-        #[cfg(feature = "external_rotation")]
-        if external_rotate_watcher {
-            start_external_rotate_watcher(config.directory(), Arc::clone(&external_rotation))
-                .map_err(|e| {
-                    eprint_err(ERRCODE::Poison, "cannot start external_rotate_watcher", &e);
-                })
-                .ok();
-        }
-
         Self {
             config,
-            inner,
+            inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
             #[cfg(feature = "external_rotation")]
             external_rotation,
         }
@@ -254,22 +240,11 @@ impl State {
                             &self.config.file_spec,
                         )?;
                         if *cleanup_in_background_thread {
-                            let cleanup = rotate_config.cleanup;
-                            let filename_config = self.config.file_spec.clone();
-                            let (sender, receiver) = std::sync::mpsc::channel();
-                            let builder = std::thread::Builder::new()
-                                .name("flexi_logger-cleanup".to_string());
-                            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-                            let builder = builder.stack_size(512 * 1024);
-                            let join_handle = builder.spawn(move || {
-                                while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
-                                    remove_or_compress_too_old_logfiles_impl(
-                                        &cleanup,
-                                        &filename_config,
-                                    )
-                                    .ok();
-                                }
-                            })?;
+                            let (sender, join_handle) = start_cleanup_thread(
+                                rotate_config.cleanup,
+                                self.config.file_spec.clone(),
+                            )?;
+
                             o_cleanup_thread_handle = Some(CleanupThreadHandle {
                                 sender,
                                 join_handle,
@@ -584,7 +559,7 @@ fn remove_or_compress_too_old_logfiles(
     )
 }
 
-fn remove_or_compress_too_old_logfiles_impl(
+pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
 ) -> Result<(), std::io::Error> {
@@ -738,19 +713,18 @@ fn rotate_output_file_to_idx(
 }
 
 // See documentation of Criterion::Age.
-#[allow(unused_variables)]
 fn get_creation_date(path: &Path) -> OffsetDateTime {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     // On unix, we know that try_get_creation_date() returns an error.
-    #[cfg(any(target_os = "windows", target_family = "unix"))]
-    return get_fake_creation_date();
-
-    // On all others of the many platforms, we give the real creation date a try,
-    // and fall back to the fake if it is not available.
-    #[cfg(not(any(target_os = "windows", target_family = "unix")))]
-    match try_get_creation_date(path) {
-        Ok(d) => d,
-        Err(e) => get_fake_creation_date(),
+    if cfg!(any(target_os = "windows", target_family = "unix")) {
+        get_fake_creation_date()
+    } else {
+        // On all others of the many platforms, we give the real creation date a try,
+        // and fall back to the fake if it is not available.
+        match try_get_creation_date(path) {
+            Ok(d) => d,
+            Err(_e) => get_fake_creation_date(),
+        }
     }
 }
 
@@ -758,56 +732,8 @@ fn get_fake_creation_date() -> OffsetDateTime {
     DeferredNow::now_local()
 }
 
-#[cfg(not(any(target_os = "windows", target_family = "unix")))]
 fn try_get_creation_date(path: &Path) -> Result<OffsetDateTime, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
-}
-
-// Watch the parent folder of the log files, using debounced events
-#[cfg(feature = "external_rotation")]
-fn start_external_rotate_watcher(
-    logfile_folder: &Path,
-    trigger: Arc<AtomicBool>,
-) -> Result<(), FlexiLoggerError> {
-    let (tx, rx) = std::sync::mpsc::channel();
-    let mut watcher = watcher(tx, std::time::Duration::from_millis(50))?;
-    std::fs::create_dir_all(logfile_folder)?;
-    let watched_folder = std::fs::canonicalize(logfile_folder)?;
-    watcher.watch(&watched_folder, RecursiveMode::NonRecursive)?;
-
-    // in a separate thread, wait for events for the log file
-    let builder =
-        std::thread::Builder::new().name("flexi_logger-external_rotate_watcher".to_string());
-    #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-    let builder = builder.stack_size(128 * 1024);
-    builder.spawn(move || {
-        let _keep_watcher_alive = watcher;
-        loop {
-            match rx.recv() {
-                Ok(debounced_event) => {
-                    match debounced_event {
-                        DebouncedEvent::NoticeRemove(ref _path)
-                        | DebouncedEvent::Remove(ref _path)
-                        | DebouncedEvent::Rename(ref _path, _) => {
-                            // if path.canonicalize().map(|x| x == logfile).unwrap_or(false) {
-                            // trigger a restart of the state with append mode
-                            trigger.deref().store(true, Ordering::Relaxed);
-                            // }
-                        }
-                        _event => {}
-                    }
-                }
-                Err(e) => {
-                    eprint_err(
-                        ERRCODE::LogFileWatcher,
-                        "error while watching the log file",
-                        &e,
-                    );
-                }
-            }
-        }
-    })?;
-    Ok(())
 }
 
 mod platform {

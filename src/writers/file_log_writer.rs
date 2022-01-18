@@ -3,9 +3,12 @@ mod builder;
 mod config;
 mod state;
 mod state_handle;
+mod threads;
 
 pub use self::builder::{ArcFileLogWriter, FileLogWriterBuilder, FileLogWriterHandle};
 pub use self::config::FileLogWriterConfig;
+pub(crate) use self::state::remove_or_compress_too_old_logfiles_impl;
+
 use self::{config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
     writers::LogWriter, DeferredNow, EffectiveWriteMode, FileSpec, FlexiLoggerError, FormatFunction,
@@ -227,7 +230,6 @@ mod test {
         assert!(contains("CURRENT", &ts, THREE));
     }
 
-    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs

@@ -130,7 +130,6 @@ lazy_static::lazy_static! {
 // lazy_static OFFSET is filled in the first invocation of now_local().
 lazy_static::lazy_static! {
     static ref FORCE_UTC: Arc<Mutex<Option<bool>>> =
-    #[allow(clippy::mutex_atomic)]
     Arc::new(Mutex::new(None));
 }
 

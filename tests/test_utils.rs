@@ -100,3 +100,18 @@ fn utc_offset_with_time() -> UtcOffset {
 pub fn now_local() -> OffsetDateTime {
     OffsetDateTime::now_utc().to_offset(*OFFSET)
 }
+
+pub struct Stopwatch(OffsetDateTime);
+impl Default for Stopwatch {
+    fn default() -> Self {
+        Stopwatch(now_local())
+    }
+}
+impl Drop for Stopwatch {
+    fn drop(&mut self) {
+        log::info!(
+            "Task executed in {} ms.",
+            (now_local() - self.0).whole_milliseconds()
+        );
+    }
+}

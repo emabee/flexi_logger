@@ -2,32 +2,28 @@
 use crate::formats::AdaptiveFormat;
 #[cfg(feature = "specfile_without_notification")]
 use crate::logger_handle::LogSpecSubscriber;
-#[cfg(feature = "specfile")]
-use crate::util::{eprint_err, ERRCODE};
-use crate::DeferredNow;
-
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
     formats::default_format,
     primary_writer::PrimaryWriter,
+    threads::start_flusher_thread,
     util::set_error_channel,
     writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
-    Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification, LoggerHandle,
-    Naming, WriteMode,
+    Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
+    LoggerHandle, Naming, WriteMode,
 };
 
-#[cfg(feature = "specfile")]
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::collections::HashMap;
 #[cfg(feature = "specfile_without_notification")]
 use std::io::Read;
 #[cfg(feature = "specfile_without_notification")]
 use std::path::Path;
-use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::{
+    path::PathBuf,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 /// The entry-point for using `flexi_logger`.
 ///
@@ -703,23 +699,12 @@ impl Logger {
 
         let a_other_writers = Arc::new(self.other_writers);
 
-        if self.flush_interval != Duration::from_secs(0) {
-            let flush_interval = self.flush_interval;
-            let pw = Arc::clone(&a_primary_writer);
-            let ows = Arc::clone(&a_other_writers);
-            let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
-            #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-            let builder = builder.stack_size(128);
-            builder.spawn(move || {
-                let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
-                loop {
-                    receiver.recv_timeout(flush_interval).ok();
-                    pw.flush().ok();
-                    for w in ows.values() {
-                        w.flush().ok();
-                    }
-                }
-            })?;
+        if self.flush_interval.as_secs() != 0 || self.flush_interval.subsec_nanos() != 0 {
+            start_flusher_thread(
+                Arc::clone(&a_primary_writer),
+                Arc::clone(&a_other_writers),
+                self.flush_interval,
+            )?;
         }
 
         let max_level = self.spec.max_level();
@@ -843,76 +828,23 @@ impl Logger {
 }
 
 #[cfg(feature = "specfile_without_notification")]
-pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
+pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, S: LogSpecSubscriber>(
     specfile: P,
-    mut subscriber: H,
+    mut subscriber: S,
 ) -> Result<(), FlexiLoggerError> {
     let specfile = specfile.as_ref();
     synchronize_subscriber_with_specfile(&mut subscriber, specfile)?;
 
     #[cfg(feature = "specfile")]
-    {
-        // Now that the file exists, we can canonicalize the path
-        let specfile = specfile
-            .canonicalize()
-            .map_err(FlexiLoggerError::SpecfileIo)?;
-
-        // Watch the parent folder of the specfile, using debounced events
-        let (tx, rx) = std::sync::mpsc::channel();
-        let debouncing_delay = std::time::Duration::from_millis(1000);
-        let mut watcher = watcher(tx, debouncing_delay)?;
-        watcher.watch(
-            &specfile.parent().unwrap(/*cannot fail*/),
-            RecursiveMode::NonRecursive,
-        )?;
-
-        // in a separate thread, reread the specfile when it was updated
-        let builder = std::thread::Builder::new().name("flexi_logger-specfile-watcher".to_string());
-        #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-        let builder = builder.stack_size(128 * 1024);
-        builder.spawn(move || {
-            let _anchor_for_watcher = watcher; // keep it alive!
-            loop {
-                match rx.recv() {
-                    Ok(debounced_event) => match debounced_event {
-                        DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                            if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                                log_spec_string_from_file(&specfile)
-                                    .map_err(FlexiLoggerError::SpecfileIo)
-                                    .and_then(|s| LogSpecification::from_toml(&s))
-                                    .and_then(|spec| subscriber.set_new_spec(spec))
-                                    .map_err(|e| {
-                                        eprint_err(
-                                            ERRCODE::LogSpecFile,
-                                            "continuing with previous log specification, because \
-                                             rereading the log specification file failed",
-                                            &e,
-                                        );
-                                    })
-                                    .ok();
-                            }
-                        }
-                        _event => {}
-                    },
-                    Err(e) => {
-                        eprint_err(
-                            ERRCODE::LogSpecFile,
-                            "error while watching the specfile",
-                            &e,
-                        );
-                    }
-                }
-            }
-        })?;
-    }
+    crate::threads::start_specfile_watcher_thread(specfile, subscriber)?;
     Ok(())
 }
 
 // If the specfile exists, read the file and update the log_spec from it;
 // otherwise try to create the file, with the current spec as content, under the specified name.
 #[cfg(feature = "specfile_without_notification")]
-pub(crate) fn synchronize_subscriber_with_specfile<H: LogSpecSubscriber>(
-    subscriber: &mut H,
+pub(crate) fn synchronize_subscriber_with_specfile<S: LogSpecSubscriber>(
+    subscriber: &mut S,
     specfile: &Path,
 ) -> Result<(), FlexiLoggerError> {
     if specfile

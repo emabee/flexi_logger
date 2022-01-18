@@ -51,6 +51,7 @@ mod logger;
 mod logger_handle;
 mod parameters;
 mod primary_writer;
+mod threads;
 #[cfg(feature = "trc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "trc")))]
 pub mod trc;

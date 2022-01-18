@@ -112,10 +112,6 @@ For usecases where this is not desirable
 (see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)),
 you can activate this feature.
 
-### **`external_rotation`**
-
-Obsolete feature - use method `LoggerHandle::reopen_outputfile` instead.
-
 ### **`specfile`**
 
 Adds a method `Logger::start_with_specfile(specfile)`.

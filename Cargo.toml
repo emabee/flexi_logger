@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.22.2"
+version = "0.22.3-unpublished"
 authors = ["emabee <meinolf.block@sap.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -32,7 +32,6 @@ async = ["crossbeam"]
 colors = ["ansi_term", "atty"]
 compress = ["flate2"]
 dont_minimize_extra_stacks = []
-external_rotation = ["notify"]
 specfile = ["specfile_without_notification","notify"]
 specfile_without_notification = ["serde","toml","serde_derive"]
 syslog_writer = ["libc", "hostname"]

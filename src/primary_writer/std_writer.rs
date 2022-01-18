@@ -1,35 +1,42 @@
 #[cfg(feature = "async")]
-use crate::util::{eprint_err, ERRCODE};
-use crate::util::{io_err, write_buffered};
-#[cfg(feature = "async")]
-use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
-use crate::{writers::LogWriter, DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode};
+use {
+    crate::util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
+    crossbeam::{
+        channel::{self, SendError, Sender},
+        queue::ArrayQueue,
+    },
+};
+
+use {
+    super::std_stream::StdStream,
+    crate::{
+        util::{io_err, write_buffered},
+        writers::LogWriter,
+        DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode,
+    },
+    log::Record,
+    std::io::{BufWriter, Write},
+};
+
 #[cfg(test)]
 use std::io::Cursor;
 
-#[cfg(feature = "async")]
-use crossbeam::{
-    channel::{self, SendError, Sender},
-    queue::ArrayQueue,
-};
-use log::Record;
-use std::io::{BufWriter, Write};
 #[cfg(any(feature = "async", test))]
 use std::sync::Arc;
 use std::sync::Mutex;
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
 
-// `StdOutWriter` writes logs to stdout.
-pub(crate) struct StdOutWriter {
+// `StdWriter` writes logs to stdout or stderr.
+pub(crate) struct StdWriter {
     format: FormatFunction,
-    writer: OutWriter,
+    writer: InnerStdWriter,
     #[cfg(test)]
     validation_buffer: Arc<Mutex<Cursor<Vec<u8>>>>,
 }
-enum OutWriter {
-    Unbuffered(std::io::Stdout),
-    Buffered(Mutex<BufWriter<std::io::Stdout>>),
+enum InnerStdWriter {
+    Unbuffered(StdStream),
+    Buffered(Mutex<BufWriter<StdStream>>),
     #[cfg(feature = "async")]
     Async(AsyncHandle),
 }
@@ -44,6 +51,7 @@ struct AsyncHandle {
 #[cfg(feature = "async")]
 impl AsyncHandle {
     fn new(
+        stdstream: StdStream,
         _bufsize: usize,
         pool_capa: usize,
         msg_capa: usize,
@@ -51,52 +59,16 @@ impl AsyncHandle {
     ) -> Self {
         let (sender, receiver) = channel::unbounded::<Vec<u8>>();
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
-        let t_pool = Arc::clone(&a_pool);
-        #[cfg(test)]
-        let t_validation_buffer = Arc::clone(validation_buffer);
 
-        let mo_thread_handle = Mutex::new(Some(
-            std::thread::Builder::new()
-                .name("flexi_logger-async_stdout".to_string())
-                .spawn(move || {
-                    let mut stdout = std::io::stdout();
-                    loop {
-                        match receiver.recv() {
-                            Err(_) => break,
-                            Ok(mut message) => {
-                                match message.as_ref() {
-                                    ASYNC_FLUSH => {
-                                        stdout
-                                            .flush()
-                                            .unwrap_or_else(
-                                                |e| eprint_err(ERRCODE::Flush, "flushing failed", &e)
-                                            );
-                                    }
-                                    ASYNC_SHUTDOWN => {
-                                        break;
-                                    }
-                                    _ => {
-                                        stdout
-                                            .write_all(&message)
-                                            .unwrap_or_else(
-                                                |e| eprint_err(ERRCODE::Write,"writing failed", &e)
-                                            );
-                                        #[cfg(test)]
-                                        if let Ok(mut guard) = t_validation_buffer.lock() {
-                                            (*guard).write_all(&message).ok();
-                                        }
-                                    }
-                                }
-                                if message.capacity() <= msg_capa {
-                                    message.clear();
-                                    t_pool.push(message).ok();
-                                }
-                            }
-                        }
-                    }
-                })
-                .unwrap(/* yes, let's panic if the thread can't be spawned */),
-        ));
+        let mo_thread_handle = crate::threads::start_async_stdwriter(
+            stdstream,
+            receiver,
+            Arc::clone(&a_pool),
+            msg_capa,
+            #[cfg(test)]
+            Arc::clone(validation_buffer),
+        );
+
         AsyncHandle {
             sender,
             mo_thread_handle,
@@ -116,18 +88,22 @@ impl AsyncHandle {
     }
 }
 
-impl StdOutWriter {
-    pub(crate) fn new(format: FormatFunction, write_mode: &WriteMode) -> Self {
+impl StdWriter {
+    pub(crate) fn new(
+        stdstream: StdStream,
+        format: FormatFunction,
+        write_mode: &WriteMode,
+    ) -> Self {
         #[cfg(test)]
         let validation_buffer = Arc::new(Mutex::new(Cursor::new(Vec::<u8>::new())));
 
         let writer = match write_mode.inner() {
-            EffectiveWriteMode::Direct => OutWriter::Unbuffered(std::io::stdout()),
-            EffectiveWriteMode::BufferDontFlushWith(capacity) => OutWriter::Buffered(Mutex::new(
-                BufWriter::with_capacity(capacity, std::io::stdout()),
-            )),
+            EffectiveWriteMode::Direct => InnerStdWriter::Unbuffered(stdstream),
+            EffectiveWriteMode::BufferDontFlushWith(capacity) => {
+                InnerStdWriter::Buffered(Mutex::new(BufWriter::with_capacity(capacity, stdstream)))
+            }
             EffectiveWriteMode::BufferAndFlushWith(_, _) => {
-                unreachable!("Sync OutWriter with own flushing is not implemented")
+                unreachable!("Sync InnerStdWriter with own flushing is not implemented")
             }
             #[cfg(feature = "async")]
             EffectiveWriteMode::AsyncWith {
@@ -139,9 +115,10 @@ impl StdOutWriter {
                 assert_eq!(
                     flush_interval,
                     std::time::Duration::from_secs(0),
-                    "Async OutWriter with own flushing is not implemented"
+                    "Async InnerStdWriter with own flushing is not implemented"
                 );
-                OutWriter::Async(AsyncHandle::new(
+                InnerStdWriter::Async(AsyncHandle::new(
+                    stdstream,
                     bufsize,
                     pool_capa,
                     message_capa,
@@ -158,13 +135,12 @@ impl StdOutWriter {
         }
     }
 }
-impl LogWriter for StdOutWriter {
+impl LogWriter for StdWriter {
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match &self.writer {
-            OutWriter::Unbuffered(stdout) => {
-                let mut w = stdout.lock();
-
+            InnerStdWriter::Unbuffered(stdstream) => {
+                let mut w = stdstream.lock();
                 write_buffered(
                     self.format,
                     now,
@@ -174,7 +150,7 @@ impl LogWriter for StdOutWriter {
                     Some(&self.validation_buffer),
                 )
             }
-            OutWriter::Buffered(mbuf_w) => {
+            InnerStdWriter::Buffered(mbuf_w) => {
                 let mut w = mbuf_w.lock().map_err(|_e| io_err("Poison"))?;
                 write_buffered(
                     self.format,
@@ -186,7 +162,7 @@ impl LogWriter for StdOutWriter {
                 )
             }
             #[cfg(feature = "async")]
-            OutWriter::Async(handle) => {
+            InnerStdWriter::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
                 (self.format)(&mut buffer, now, record)
                     .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
@@ -202,16 +178,16 @@ impl LogWriter for StdOutWriter {
     #[inline]
     fn flush(&self) -> std::io::Result<()> {
         match &self.writer {
-            OutWriter::Unbuffered(stdout) => {
-                let mut w = stdout.lock();
+            InnerStdWriter::Unbuffered(stdstream) => {
+                let mut w = stdstream.lock();
                 w.flush()
             }
-            OutWriter::Buffered(mbuf_w) => {
+            InnerStdWriter::Buffered(mbuf_w) => {
                 let mut w = mbuf_w.lock().map_err(|_e| io_err("Poison"))?;
                 w.flush()
             }
             #[cfg(feature = "async")]
-            OutWriter::Async(handle) => {
+            InnerStdWriter::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
                 buffer.extend(ASYNC_FLUSH);
                 handle.send(buffer).ok();
@@ -222,7 +198,7 @@ impl LogWriter for StdOutWriter {
 
     fn shutdown(&self) {
         #[cfg(feature = "async")]
-        if let OutWriter::Async(handle) = &self.writer {
+        if let InnerStdWriter::Async(handle) = &self.writer {
             let mut buffer = handle.pop_buffer();
             buffer.extend(ASYNC_SHUTDOWN);
             handle.send(buffer).ok();
@@ -260,18 +236,22 @@ impl LogWriter for StdOutWriter {
 
 #[cfg(test)]
 mod test {
-    use super::StdOutWriter;
+    use super::{StdStream, StdWriter};
     use crate::{opt_format, writers::LogWriter, DeferredNow, WriteMode};
     use log::Level::{Error, Info, Warn};
 
     #[test]
     fn test_with_validation() {
-        let writer = StdOutWriter::new(opt_format, &WriteMode::Direct);
+        let writer = StdWriter::new(
+            StdStream::Err(std::io::stderr()),
+            opt_format,
+            &WriteMode::Direct,
+        );
         let mut rb = log::Record::builder();
         rb.target("myApp")
-            .file(Some("stdout_writer.rs"))
+            .file(Some("std_writer.rs"))
             .line(Some(222))
-            .module_path(Some("stdout_writer::test::test_with_validation"));
+            .module_path(Some("std_writer::test::test_with_validation"));
 
         rb.level(Error)
             .args(format_args!("This is an error message"));
@@ -284,9 +264,9 @@ mod test {
         writer.write(&mut DeferredNow::new(), &rb.build()).unwrap();
 
         writer.validate_logs(&[
-            ("ERROR", "stdout_writer.rs:222", "error"),
-            ("WARN", "stdout_writer.rs:222", "warning"),
-            ("INFO", "stdout_writer.rs:222", "info"),
+            ("ERROR", "std_writer.rs:222", "error"),
+            ("WARN", "std_writer.rs:222", "warning"),
+            ("INFO", "std_writer.rs:222", "info"),
         ]);
     }
 }

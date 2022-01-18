@@ -113,7 +113,8 @@ fn try_to_write_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
         .create(true)
         .append(true)
         .open(path)?;
-    writeln!(file, "{}", s)
+    writeln!(file, "{}", s)?;
+    file.flush()
 }
 
 pub(crate) fn io_err(s: &'static str) -> std::io::Error {

@@ -30,46 +30,48 @@ mod d {
 
         let start = super::test_utils::now_local();
         let directory = super::test_utils::dir();
-        let logger = Logger::try_with_str("debug")
-            .unwrap()
-            .log_to_file(FileSpec::default().directory(&directory));
+        let end = {
+            let logger = Logger::try_with_str("debug")
+                .unwrap()
+                .log_to_file(FileSpec::default().directory(&directory));
 
-        #[cfg(not(feature = "async"))]
-        let logger = logger.write_mode(WriteMode::BufferAndFlush);
+            #[cfg(not(feature = "async"))]
+            let logger = logger.write_mode(WriteMode::BufferAndFlush);
 
-        #[cfg(feature = "async")]
-        let logger = logger.write_mode(WriteMode::Async);
+            #[cfg(feature = "async")]
+            let logger = logger.write_mode(WriteMode::Async);
 
-        let mut logger = logger
-            .format(test_format)
-            .duplicate_to_stderr(Duplicate::Info)
-            .rotate(
-                Criterion::Size(ROTATE_OVER_SIZE),
-                Naming::Timestamps,
-                Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
-            )
-            .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-        info!(
-            "create a huge number of log lines with a considerable number of threads, \
+            let mut logger = logger
+                .format(test_format)
+                .duplicate_to_stderr(Duplicate::Info)
+                .rotate(
+                    Criterion::Size(ROTATE_OVER_SIZE),
+                    Naming::Timestamps,
+                    Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
+                )
+                .start()
+                .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            info!(
+                "create a huge number of log lines with a considerable number of threads, \
              verify the log"
-        );
+            );
 
-        let worker_handles = start_worker_threads(NO_OF_THREADS);
-        let new_spec = LogSpecification::parse("trace").unwrap();
-        thread::sleep(std::time::Duration::from_millis(500));
-        logger.set_new_spec(new_spec);
+            let worker_handles = start_worker_threads(NO_OF_THREADS);
+            let new_spec = LogSpecification::parse("trace").unwrap();
+            thread::sleep(std::time::Duration::from_millis(500));
+            logger.set_new_spec(new_spec);
 
-        wait_for_workers_to_close(worker_handles);
-
-        let delta1 = (super::test_utils::now_local() - start).whole_milliseconds();
-
-        std::mem::drop(logger);
-        let delta2 = (super::test_utils::now_local() - start).whole_milliseconds();
+            wait_for_workers_to_close(worker_handles);
+            super::test_utils::now_local()
+        };
+        let delta1 = (end - start).whole_milliseconds();
+        let delta2 = (super::test_utils::now_local() - end).whole_milliseconds();
         println!(
-            "Task executed with {} threads in {} ms, writing logs extended to {} ms.",
+            "Task executed with {} threads in {} ms, \
+             program added {} ms to finish writing logs.",
             NO_OF_THREADS, delta1, delta2
         );
+
         verify_logs(&directory.display().to_string());
     }
 

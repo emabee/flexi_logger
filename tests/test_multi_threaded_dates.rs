@@ -19,9 +19,9 @@ fn multi_threaded() {
     // we use a special log line format that starts with a special string so that it is easier to
     // verify that all log lines are written correctly
 
-    let start = test_utils::now_local();
     let directory = test_utils::dir();
     {
+        let _stopwatch = test_utils::Stopwatch::default();
         let mut logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(FileSpec::default().directory(&directory))
@@ -29,7 +29,7 @@ fn multi_threaded() {
             .create_symlink("link_to_mt_log")
             .duplicate_to_stderr(Duplicate::Info)
             .rotate(
-                Criterion::Age(Age::Minute),
+                Criterion::Age(Age::Second),
                 Naming::Timestamps,
                 Cleanup::Never,
             )
@@ -46,11 +46,6 @@ fn multi_threaded() {
         wait_for_workers_to_close(worker_handles);
     }
 
-    let delta = (test_utils::now_local() - start).whole_milliseconds();
-    debug!(
-        "Task executed with {} threads in {} ms.",
-        NO_OF_THREADS, delta
-    );
     verify_logs(&directory.display().to_string());
 }
 
@@ -142,8 +137,8 @@ fn verify_logs(directory: &str) {
         line_count,
         NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 3 + NO_OF_THREADS
     );
-    info!(
-        "Wrote {} log lines from {} threads into {} files",
+    println!(
+        "Found {} log lines from {} threads in {} files",
         line_count, NO_OF_THREADS, no_of_log_files
     );
 }

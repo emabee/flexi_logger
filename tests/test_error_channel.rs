@@ -47,12 +47,11 @@ fn work(value: u8) {
         }
     };
 
-    let logger_handle = logger
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
-
-    // enforce error output
-    drop(logger_handle);
+    {
+        let _logger_handle = logger
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    }
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -61,11 +60,12 @@ fn work(value: u8) {
     trace!("This is a trace message - you must not see it!");
 
     if value == 2 {
+        std::thread::sleep(std::time::Duration::from_millis(200));
         assert_eq!(
             BufReader::new(File::open(test_utils::file("flexi_logger_error_channel.err")).unwrap())
                 .lines()
                 .count(),
-            6
+            6 // two lines per failing error, warn, or info call
         );
     }
 }
