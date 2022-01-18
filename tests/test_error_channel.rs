@@ -27,6 +27,7 @@ fn work(value: u8) {
     {
         logger = logger.write_mode(WriteMode::Async);
     }
+    let err_file = test_utils::file("flexi_logger_error_channel.err");
     match value {
         0 => {
             logger = logger.error_channel(ErrorChannel::StdErr);
@@ -35,9 +36,7 @@ fn work(value: u8) {
             logger = logger.error_channel(ErrorChannel::StdOut);
         }
         2 => {
-            logger = logger.error_channel(ErrorChannel::File(test_utils::file(
-                "flexi_logger_error_channel.err",
-            )));
+            logger = logger.error_channel(ErrorChannel::File(err_file.clone()));
         }
         3 => {
             logger = logger.error_channel(ErrorChannel::DevNull);
@@ -60,9 +59,8 @@ fn work(value: u8) {
     trace!("This is a trace message - you must not see it!");
 
     if value == 2 {
-        std::thread::sleep(std::time::Duration::from_millis(200));
         assert_eq!(
-            BufReader::new(File::open(test_utils::file("flexi_logger_error_channel.err")).unwrap())
+            BufReader::new(File::open(err_file).unwrap())
                 .lines()
                 .count(),
             6 // two lines per failing error, warn, or info call
