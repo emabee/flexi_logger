@@ -10,7 +10,10 @@ other output streams, and that can be influenced while the program is running.**
 
 ## Usage
 
-Add flexi_logger to the dependencies section in your project's `Cargo.toml`, with
+Add `flexi_logger` and `log` to the dependencies section in your project's `Cargo.toml`
+(`log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
+by the [log crate](https://crates.io/crates/log),
+and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
@@ -18,7 +21,48 @@ flexi_logger = "0.22"
 log = "0.4"
 ```
 
-or, if you want to use some of the optional features, with something like
+To get the log simply written to stderr, add to an early place in your main
+
+```rust
+use flexi_logger::Logger;
+
+Logger::try_with_str("info, my::critical::module=trace")?.start()?;
+```
+
+or, to get the log e.g. written with high performance to a file,
+
+```rust
+use flexi_logger::{FileSpec, Logger, WriteMode};
+
+let _logger = Logger::try_with_str("info, my::critical::module=trace")?
+    .log_to_file(FileSpec::default())
+    .write_mode(WriteMode::BufferAndFlush)
+    .start()?;
+```
+
+There are many configuration options to e.g.
+
+* decide whether you want to write your logs to stdout or to a file,
+* configure the path and the filenames of the log files,
+* use file rotation,
+* specify the line format for the log lines,
+* apply a stateful filter before log lines are really written,
+* define additional log streams, e.g for alert or security messages,
+* support changing the log specification on the fly, while the program is running.
+
+See
+
+* the documentation of module
+  [code_examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html) for a bunch of examples,
+* the [API documentation](https://docs.rs/flexi_logger/latest/flexi_logger) for a complete reference.
+
+## Minimal rust version
+
+The earliest supported rust version is currently "1.51.0".
+
+## Crate Features
+
+Make use of the non-default features by specifying them in your `Cargo.toml`, e.g.
 
 ```toml
 [dependencies]
@@ -26,48 +70,13 @@ flexi_logger = { version = "0.22", features = ["async", "specfile", "compress"] 
 log = "0.4"
 ```
 
-or, to get the smallest footprint (and no colors), with
+or, to get the smallest footprint (and no colors), switch off even the default features:
 
 ```toml
 [dependencies]
 flexi_logger = { version = "0.22", default_features = false }
 log = "0.4"
 ```
-
-Note: `log` is needed because `flexi_logger` plugs into the standard Rust logging facade given
-by the [log crate](https://crates.io/crates/log),
-and you use the ```log``` macros to write log lines from your code.
-
-The minimal rust version is currently "1.51.0".
-
-## Versions
-
-See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md)
-for more details.
-
-## Code examples
-
-See the documentation of module
-[code_examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html).
-
-## Options
-
-There are configuration options to e.g.
-
-* decide whether you want to write your logs to stderr or to a file,
-* configure the path and the filenames of the log files,
-* use file rotation,
-* specify the line format for the log lines,
-* apply a stateful filter before log lines are really written,
-* define additional log streams, e.g for alert or security messages,
-* support changing the log specification on the fly, while the program is running,
-
-See the API documentation for a complete reference.
-
-## Crate Features
-
-Make use of any of these features by specifying them in your `Cargo.toml`
-(see above in the usage section).
 
 ### **`async`**
 
@@ -109,7 +118,7 @@ or all rotated log files in compressed form (`.gz`) rather than as plain text fi
 Normally, `flexi_logger` reduces the stack size of all threads that it might spawn
 (flusher, specfile-watcher, async writer, cleanup) to a bare minimum.
 For usecases where this is not desirable
-(see e.g. [issue-95](https://github.com/emabee/flexi_logger/issues/95)),
+(see [here](https://github.com/emabee/flexi_logger/issues/95) for some motivation),
 you can activate this feature.
 
 ### **`specfile`**
@@ -132,7 +141,7 @@ For that reason the feature is not active by default.
 ### **`specfile_without_notification`**
 
 Pretty much like `specfile`, except that updates to the file are being ignored.
-See [issue-59](https://github.com/emabee/flexi_logger/issues/59) for more details.
+See [here](https://github.com/emabee/flexi_logger/issues/59) for more details.
 
 ### **`syslog`**
 
@@ -155,7 +164,7 @@ the `chrono` and the `time` crate.
 Since `time` is striving for a solution, while `chrono` appears to be unmaintained,
 `flexi_logger` switched from `chrono` to `time`.
 However, `time`'s "strategy" to solve the advisory is overly puristic:
-it refuses to obtain the UTC offset on unix platforms, if the program is multi-threaded,
+it refuses to obtain the UTC offset on unix platforms, if the program is multi-threaded
 or running on a unix version other than `linux`.
 
 `flexi_logger` tries to solve this dilemma by obtaining the UTC offset only once,
@@ -172,3 +181,8 @@ If this does not work, activate feature `use_chrono_for_offset`, which
 
 Note that this feature will be removed as soon as `time` allows obtaining the UTC offset
 again on all platforms.
+
+## Versions
+
+See the [change log](https://github.com/emabee/flexi_logger/blob/master/CHANGELOG.md)
+for more details.
