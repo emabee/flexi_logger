@@ -2,8 +2,8 @@ mod test_utils;
 
 use flexi_logger::{
     filter::{LogLineFilter, LogLineWriter},
-    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming, Record,
-    WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, Logger, Naming, Record, WriteMode,
+    TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 
 use glob::glob;
@@ -27,7 +27,7 @@ fn multi_threaded() {
     let directory = test_utils::dir();
     {
         let _stopwatch = test_utils::Stopwatch::default();
-        let logger = Logger::try_with_str("debug")
+        let _logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(
                 FileSpec::default()
@@ -49,19 +49,7 @@ fn multi_threaded() {
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
         info!("create a huge number of log lines, but deduplicate them");
 
-        #[allow(clippy::redundant_clone)]
-        let mut logger2 = logger.clone();
-        let worker_handles = start_worker_threads(NO_OF_THREADS);
-        let new_spec = LogSpecification::parse("trace").unwrap();
-        std::thread::Builder::new()
-            .spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                logger2.set_new_spec(new_spec);
-                0
-            })
-            .unwrap();
-
-        wait_for_workers_to_close(worker_handles);
+        wait_for_workers_to_close(start_worker_threads(NO_OF_THREADS));
     }
     verify_logs(&directory.display().to_string());
 }
@@ -91,10 +79,8 @@ fn do_work(thread_number: usize) {
     trace!("ERROR_IF_PRINTED");
     for _idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("bliblablub");
-        // debug!("({})  writing out line number {}", thread_number, idx);
     }
     std::thread::sleep(std::time::Duration::from_millis(500));
-    trace!("MUST_BE_PRINTED");
 }
 
 fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
@@ -312,7 +298,7 @@ fn verify_logs(directory: &str) {
             buffer.clear();
         }
     }
-    assert_eq!(line_count, 32);
+    assert_eq!(line_count, 25);
     println!(
         "Found {} log lines from {} threads in {} files",
         line_count, NO_OF_THREADS, no_of_log_files
