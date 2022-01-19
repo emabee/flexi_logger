@@ -12,6 +12,8 @@
 //! - [Reconfigure the log specification programmatically](#reconfigure-the-log-specification-programmatically)
 //! - [Reconfigure the log specification dynamically by editing a spec-file](#reconfigure-the-log-specification-dynamically-by-editing-a-spec-file)
 //! - [Reconfigure the file log writer](#reconfigure-the-file-log-writer)
+//! - [External file rotators](#external-file-rotators)
+//! - [Miscellaneous](#miscellaneous)
 //!
 //! ## Start minimally: Initialize, and write logs to stderr
 //!
@@ -470,18 +472,15 @@
 //!
 //! ## External file rotators
 //!
-//! By default, `flexi_logger` decides, based on yor configuration, to which destination(s)
-//! the log is written, and expects that nobody interacts with this. In addition, `flexi_logger`
-//! offers quite some functionality to rotate, compress, and clean up log files.
+//! If the log is written to files, `flexi_logger` decides, based on your configuration,
+//! to which file(s) the log is written, and expects that nobody else modifies these files.
+//! It offers quite some functionality to rotate, compress, and clean up log files.
 //!
 //! Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
-//! log files. But renaming or deleting the current output file e.g. might not stop `flexi_logger` from writing
-//! to the now renamed file! You should configure `flexi_logger` with
-//! ```rust, ignore
-//! Logger::watch_external_rotations()
-//! ```
-//! to make it watch for OS events that affect its outputfile
-//! and react with closing its current output stream and recreating its configured output file.
+//! log files. But renaming or deleting the current output file e.g. might not stop
+//! `flexi_logger` from writing to the now renamed file!
+//! See [`LoggerHandle::reopen_outputfile`](../struct.LoggerHandle.html#method.reopen_outputfile)
+//! to understand how to cope with external rotators.
 //!
 //! ## Miscellaneous
 //!
