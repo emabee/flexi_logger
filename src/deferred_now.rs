@@ -10,13 +10,8 @@ use time::{formatting::Formattable, OffsetDateTime, UtcOffset};
 ///
 /// Is used to ensure that a log record that is sent to multiple outputs
 /// (in maybe different formats) always uses the same timestamp.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DeferredNow(Option<OffsetDateTime>);
-impl Default for DeferredNow {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl DeferredNow {
     /// Constructs a new instance, but does not generate the timestamp.
@@ -138,11 +133,11 @@ mod test {
     #[test]
     fn test_deferred_now() {
         let mut deferred_now = super::DeferredNow::new();
-        let now = deferred_now.now().to_string();
-        println!("This should be the current timestamp: {}", now);
+        let once = deferred_now.now().to_string();
+        println!("This should be the current timestamp: {}", once);
         std::thread::sleep(std::time::Duration::from_millis(300));
         let again = deferred_now.now().to_string();
         println!("This must be the same timestamp:      {}", again);
-        assert_eq!(now, again);
+        assert_eq!(once, again);
     }
 }

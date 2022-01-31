@@ -58,7 +58,7 @@ See
 
 ## Minimal rust version
 
-The earliest supported rust version is currently "1.51.0".
+The earliest supported rust version is currently "1.53.0".
 
 ## Crate Features
 
