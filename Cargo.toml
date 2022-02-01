@@ -55,7 +55,7 @@ rustversion = "1.0"
 serde = { version = "1.0", optional = true }
 serde_derive = {version = "1.0", optional = true}
 thiserror = "1.0"
-time = {version= "0.3.6", features = ["local-offset", "formatting", "macros", "parsing"]}
+time = {version= "0.3.7", features = ["local-offset", "formatting", "macros", "parsing"]}
 toml = { version = "0.5", optional = true }
 tracing-subscriber = {version = "0.3", optional = true, features = ["env-filter"] }
 

@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.3] -  2022-01-31
+## [0.22.3] -  2022-02-01
 
 Code maintenance: remove the feature "external_rotation".
 
-Bump minimal version of `time` crate to "0.3.6".
+Bump minimal version of `time` crate to "0.3.7".
 
 ## [0.22.2] - 2022-01-08
 
