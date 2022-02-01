@@ -200,10 +200,10 @@ impl StateHandle {
                         buffer
                             .write_all(handle.line_ending)
                             .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
-                        (&mut *handle
+                        handle
                             .am_state
                             .lock()
-                            .expect("state_handle.am_state is poisoned"))
+                            .expect("state_handle.am_state is poisoned")
                             .write_buffer(&*buffer)
                             .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
                         buffer.clear();
