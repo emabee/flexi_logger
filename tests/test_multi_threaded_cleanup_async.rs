@@ -237,7 +237,7 @@ mod d {
                 .unwrap(),
         );
         for (interval, count) in data {
-            writeln!(&mut file, "{:?};{};", interval, count).unwrap();
+            writeln!(file, "{:?};{};", interval, count).unwrap();
         }
     }
 
