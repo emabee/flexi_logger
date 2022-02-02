@@ -407,13 +407,9 @@ impl State {
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");
-        }
-        if let Inner::Active(ref mut o_rotation_state, _, _) = self.inner {
-            let path = self.config.file_spec.as_pathbuf(
-                o_rotation_state
-                    .as_ref()
-                    .map(|_| super::state::CURRENT_INFIX),
-            );
+        };
+        if let Inner::Active(ref o_rotation_state, _, ref path) = self.inner {
+            let rotation_possible = o_rotation_state.is_some();
             let f = File::open(path.clone()).unwrap_or_else(|e| {
                 panic!(
                     "validate_logs: can't open file {} due to {:?}",
@@ -422,40 +418,9 @@ impl State {
                 )
             });
             let mut reader = BufReader::new(f);
-            let mut buf = String::new();
-            for tuple in expected {
-                buf.clear();
-                reader
-                    .read_line(&mut buf)
-                    .expect("validate_logs: can't read file");
-                assert!(
-                    buf.contains(&tuple.0),
-                    "Did not find tuple.0 = {} in file {}",
-                    tuple.0,
-                    path.display()
-                );
-                assert!(
-                    buf.contains(&tuple.1),
-                    "Did not find tuple.1 = {} in file {}",
-                    tuple.1,
-                    path.display()
-                );
-                assert!(
-                    buf.contains(&tuple.2),
-                    "Did not find tuple.2 = {} in file {}",
-                    tuple.2,
-                    path.display()
-                );
-            }
-            buf.clear();
-            reader
-                .read_line(&mut buf)
-                .expect("validate_logs: can't read file");
-            assert!(
-                buf.is_empty(),
-                "Found more log lines than expected: {} ",
-                buf
-            );
+            validate_logs_in_file(&mut reader, path, expected, rotation_possible);
+        } else {
+            unreachable!("oiuoiuoiusdsaaöld");
         }
     }
 
@@ -467,6 +432,57 @@ impl State {
             writer.flush().ok();
         }
     }
+}
+
+fn validate_logs_in_file(
+    reader: &mut dyn BufRead,
+    path: &Path,
+    expected: &[(&'static str, &'static str, &'static str)],
+    rotation_possible: bool,
+) {
+    let warning = if rotation_possible {
+        "Warning: Validation is not fully implemented for rotation, old files are ignored"
+    } else {
+        ""
+    };
+
+    let mut buf = String::new();
+    for tuple in expected {
+        buf.clear();
+        reader
+            .read_line(&mut buf)
+            .expect("validate_logs: can't read file");
+        assert!(
+            buf.contains(&tuple.0),
+            "Did not find tuple.0 = {} in file {}; {}",
+            tuple.0,
+            path.display(),
+            warning
+        );
+        assert!(
+            buf.contains(&tuple.1),
+            "Did not find tuple.1 = {} in file {}; {}",
+            tuple.1,
+            path.display(),
+            warning
+        );
+        assert!(
+            buf.contains(&tuple.2),
+            "Did not find tuple.2 = {} in file {}; {}",
+            tuple.2,
+            path.display(),
+            warning
+        );
+    }
+    buf.clear();
+    reader
+        .read_line(&mut buf)
+        .expect("validate_logs: can't read file");
+    assert!(
+        buf.is_empty(),
+        "Found more log lines than expected: {} ",
+        buf
+    );
 }
 
 fn open_log_file(
