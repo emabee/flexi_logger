@@ -406,7 +406,7 @@
 //! # ;
 //! # #[cfg(feature = "specfile")]
 //! # logger
-//!    .start_with_specfile("/server/config/logspec.toml")
+//!    .start_with_specfile("./server/config/logspec.toml")
 //!    .unwrap();
 //! ```
 //!

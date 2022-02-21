@@ -20,7 +20,7 @@ fn main() {
         "./log_files/**/*.seclog",
         "./log_files/**/*.toml",
         "./log_files/**/*.zip",
-        "./test_spec/*.toml",
+        "./server/**/*.toml",
     ] {
         for globresult in glob::glob(pattern).unwrap() {
             match globresult {
@@ -32,20 +32,24 @@ fn main() {
         }
     }
 
-    let dirs: Vec<std::path::PathBuf> = glob::glob("./log_files/**")
-        .unwrap()
-        .filter_map(|r| match r {
-            Err(e) => {
-                eprintln!("Searching for folders produced error {}", e);
-                None
-            }
-            Ok(_) => Some(r.unwrap()),
-        })
-        .collect();
-    for pathbuf in dirs.iter().rev() {
-        std::fs::remove_dir(&pathbuf).expect(&format!("folder not empty? {:?}", pathbuf));
+    for dir_pattern in ["./log_files/**", "./server/**"] {
+        let dirs: Vec<std::path::PathBuf> = glob::glob(dir_pattern)
+            .unwrap()
+            .filter_map(|r| match r {
+                Err(e) => {
+                    eprintln!("Searching for folders produced error {}", e);
+                    None
+                }
+                Ok(_) => Some(r.unwrap()),
+            })
+            .collect();
+        for pathbuf in dirs.iter().rev() {
+            std::fs::remove_dir(&pathbuf).expect(&format!("folder not empty? {:?}", pathbuf));
+        }
     }
 
     std::fs::remove_dir("./log_files/").ok();
-    std::fs::remove_dir("./test_spec/").ok();
+    std::fs::remove_dir("./server/").ok();
+    std::fs::remove_file("./link_to_log").ok();
+    std::fs::remove_file("./link_to_mt_log").ok();
 }
