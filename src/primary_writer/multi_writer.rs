@@ -5,8 +5,8 @@ use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 use std::io::Write;
 
-// The `MultiWriter` writes logs to stderr or to a set of `Writer`s, and in the latter case
-// can duplicate messages to stderr.
+// The `MultiWriter` writes logs to a FileLogWriter and/or another Writer,
+// and can duplicate messages to stderr or stdout.
 pub(crate) struct MultiWriter {
     duplicate_stderr: Duplicate,
     duplicate_stdout: Duplicate,

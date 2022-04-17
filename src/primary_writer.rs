@@ -12,8 +12,8 @@ use crate::{
 use log::Record;
 
 // Writes either to stdout, or to stderr,
-// or to a file (with optional duplication to stderr),
-// or to nowhere (with optional "duplication" to stderr).
+// or to a file (with optional duplication to stderr or stdout),
+// or to nowhere (with optional "duplication" to stderr or stdout).
 pub(crate) enum PrimaryWriter {
     Std(StdWriter),
     Multi(MultiWriter),

@@ -14,9 +14,6 @@ use std::sync::{Arc, RwLock};
 // Implements log::Log to plug into the log crate.
 //
 // Delegates the real logging to the configured PrimaryWriter and optionally to other writers.
-// The `PrimaryWriter` is either a `StdErrWriter` or an `ExtendedFileWriter`.
-// An ExtendedFileWriter logs to a file, by delegating to a FileWriter,
-// and can additionally duplicate log lines to stderr.
 pub(crate) struct FlexiLogger {
     log_specification: Arc<RwLock<LogSpecification>>,
     primary_writer: Arc<PrimaryWriter>,
