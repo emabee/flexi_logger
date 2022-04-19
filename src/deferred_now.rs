@@ -4,6 +4,8 @@ use crate::util::{eprint_err, ERRCODE};
 use chrono::{Local, Offset};
 
 use std::sync::{Arc, Mutex};
+#[cfg(feature = "syslog_writer")]
+use time::Month;
 use time::{formatting::Formattable, OffsetDateTime, UtcOffset};
 
 /// Deferred timestamp creation.
@@ -39,6 +41,37 @@ impl DeferredNow {
     #[cfg(feature = "syslog_writer")]
     pub(crate) fn format_rfc3339(&mut self) -> String {
         self.format(&time::format_description::well_known::Rfc3339)
+    }
+
+    // format_rfc3164: Mmm dd hh:mm:ss, where
+    // mmm = one of "Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec",
+    // dd = "xy" where x = " " or "1" or "2" or "3"
+    // hh = "00" ... "23"
+    // mm, ss= "00" ... "59"
+    #[cfg(feature = "syslog_writer")]
+    pub(crate) fn format_rfc3164(&mut self) -> String {
+        let now = self.now();
+        format!(
+            "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
+            mmm = match now.month() {
+                Month::January => "Jan",
+                Month::February => "Feb",
+                Month::March => "Mar",
+                Month::April => "Apr",
+                Month::May => "May",
+                Month::June => "Jun",
+                Month::July => "Jul",
+                Month::August => "Aug",
+                Month::September => "Sep",
+                Month::October => "Oct",
+                Month::November => "Nov",
+                Month::December => "Dec",
+            },
+            dd = now.day(),
+            hh = now.hour(),
+            mm = now.minute(),
+            ss = now.second()
+        )
     }
 
     /// Enforce the use of UTC rather than local time.
@@ -139,5 +172,21 @@ mod test {
         let again = deferred_now.now().to_string();
         println!("This must be the same timestamp:      {}", again);
         assert_eq!(once, again);
+    }
+
+    #[cfg(feature = "syslog_writer")]
+    #[test]
+    fn test_format_rfc3164() {
+        // println!(
+        //     "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
+        //     mmm = "Jan",
+        //     dd = 1,
+        //     hh = 2,
+        //     mm = 3,
+        //     ss = 4
+        // );
+
+        let mut deferred_now = super::DeferredNow::new();
+        println!("rfc3164: {}", deferred_now.format_rfc3164());
     }
 }
