@@ -28,7 +28,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["colors", "textfilter"]
-async = ["crossbeam"]
+async = ["crossbeam-channel", "crossbeam-queue"]
 colors = ["ansi_term", "atty"]
 compress = ["flate2"]
 dont_minimize_extra_stacks = []
@@ -43,7 +43,8 @@ use_chrono_for_offset = ["chrono"]
 atty = {version = "0.2", optional = true}
 ansi_term = {version = "0.12", optional = true}
 chrono ={version = "0.4.19", optional = true, default-features = false, features = ["clock"]}
-crossbeam = {version = "0.8", optional = true}
+crossbeam-channel = {version = "0.5", optional = true}
+crossbeam-queue = {version = "0.3", optional = true}
 flate2 = {version = "1.0", optional = true}
 glob = "0.3"
 hostname = {version = "0.3", optional = true}

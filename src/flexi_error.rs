@@ -80,7 +80,7 @@ pub enum FlexiLoggerError {
     #[cfg(feature = "async")]
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[error("Logger is shut down")]
-    Shutdown(#[from] crossbeam::channel::SendError<Vec<u8>>),
+    Shutdown(#[from] crossbeam_channel::SendError<Vec<u8>>),
 }
 
 impl From<std::convert::Infallible> for FlexiLoggerError {

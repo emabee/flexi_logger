@@ -19,7 +19,8 @@ use {
         primary_writer::std_stream::StdStream,
         util::{ASYNC_FLUSH, ASYNC_SHUTDOWN},
     },
-    crossbeam::{channel::Receiver as CrossbeamReceiver, queue::ArrayQueue},
+    crossbeam_channel::Receiver as CrossbeamReceiver,
+    crossbeam_queue::ArrayQueue,
     std::{sync::Mutex, thread::JoinHandle},
 };
 
