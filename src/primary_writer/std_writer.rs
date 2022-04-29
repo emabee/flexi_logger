@@ -1,10 +1,8 @@
 #[cfg(feature = "async")]
 use {
     crate::util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
-    crossbeam::{
-        channel::{self, SendError, Sender},
-        queue::ArrayQueue,
-    },
+    crossbeam_channel::{self, SendError, Sender},
+    crossbeam_queue::ArrayQueue,
 };
 
 use {
@@ -57,7 +55,7 @@ impl AsyncHandle {
         msg_capa: usize,
         #[cfg(test)] validation_buffer: &Arc<Mutex<Cursor<Vec<u8>>>>,
     ) -> Self {
-        let (sender, receiver) = channel::unbounded::<Vec<u8>>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
 
         let mo_thread_handle = crate::threads::start_async_stdwriter(

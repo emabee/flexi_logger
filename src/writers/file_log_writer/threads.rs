@@ -15,10 +15,8 @@ use {
 #[cfg(feature = "async")]
 use {
     crate::util::{eprint_err, eprint_msg, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
-    crossbeam::{
-        channel::{self, Sender as CrossbeamSender},
-        queue::ArrayQueue,
-    },
+    crossbeam_channel::{self, Sender as CrossbeamSender},
+    crossbeam_queue::ArrayQueue,
 };
 
 const CLEANER: &str = "flexi_logger-fs-cleanup";
@@ -74,7 +72,7 @@ pub(super) fn start_async_fs_writer(
     message_capa: usize,
     a_pool: Arc<ArrayQueue<Vec<u8>>>,
 ) -> (CrossbeamSender<Vec<u8>>, Mutex<Option<JoinHandle<()>>>) {
-    let (sender, receiver) = channel::unbounded::<Vec<u8>>();
+    let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
     (
         sender,
         Mutex::new(Some(

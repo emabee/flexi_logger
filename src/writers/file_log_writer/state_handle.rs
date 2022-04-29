@@ -3,13 +3,13 @@ use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
-#[cfg(feature = "async")]
-use crossbeam::{channel::Sender, queue::ArrayQueue};
 use log::Record;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
+#[cfg(feature = "async")]
+use {crossbeam_channel::Sender, crossbeam_queue::ArrayQueue};
 
 #[derive(Debug)]
 pub(super) enum StateHandle {
