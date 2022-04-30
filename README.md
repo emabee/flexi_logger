@@ -60,6 +60,17 @@ See
 
 The earliest supported rust version is currently "1.53.0".
 
+## Panic dumps through logger
+
+You can easily redirect panics through the logger, especially handy if you run a multithreaded application:
+
+```rs
+let logger = // ...
+logger.start()?;
+
+panic::set_hook(Box::new(|info| error!("{}", info)));
+```
+
 ## Crate Features
 
 Make use of the non-default features by specifying them in your `Cargo.toml`, e.g.
