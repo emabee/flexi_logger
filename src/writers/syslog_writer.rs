@@ -98,7 +98,7 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 
 enum SyslogType {
     Rfc5424 { pid: u32, message_id: String },
-    Rfc3164,
+    Rfc3164 { pid: u32 },
 }
 
 /// A configurable [`LogWriter`] implementation that writes log messages to the syslog
@@ -215,17 +215,7 @@ impl SyslogWriter {
     ) -> IoResult<Box<Self>> {
         const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
 
-        let hostname = hostname::get().map_or_else(
-            |_| Ok(UNKNOWN_HOSTNAME.to_owned()),
-            |s| {
-                s.into_string().map_err(|_| {
-                    IoError::new(
-                        ErrorKind::InvalidData,
-                        "Hostname contains non-UTF8 characters".to_owned(),
-                    )
-                })
-            },
-        )?;
+        let hostname = UNKNOWN_HOSTNAME.to_owned();
 
         let process = std::env::args().next().ok_or_else(|| {
             IoError::new(
@@ -237,7 +227,9 @@ impl SyslogWriter {
         Ok(Box::new(Self {
             hostname,
             process,
-            syslog_type: SyslogType::Rfc3164,
+            syslog_type: SyslogType::Rfc3164 {
+                pid: std::process::id(),
+            },
             facility,
             max_log_level,
             // shorter variants with unwrap_or() or unwrap_or_else() don't work
@@ -267,15 +259,15 @@ impl LogWriter for SyslogWriter {
         cb.buf.clear();
 
         match &self.syslog_type {
-            SyslogType::Rfc3164 => {
+            SyslogType::Rfc3164 { pid } => {
                 #[allow(clippy::write_literal)]
                 write!(
                     cb.buf,
-                    "<{pri}>{timestamp} {hostname} {tag} {msg}",
+                    "<{pri}>{timestamp} {tag}[{procid}]: {msg}",
                     pri = self.facility as u8 | severity as u8,
                     timestamp = now.format_rfc3164(),
-                    hostname = self.hostname,
                     tag = self.process,
+                    procid = pid,
                     msg = &record.args()
                 )?;
             }
