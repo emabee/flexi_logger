@@ -891,7 +891,7 @@ pub(crate) fn log_spec_string_from_file<P: AsRef<Path>>(
 }
 
 /// Used to control which messages are to be duplicated to stderr, when `log_to_file()` is used.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Duplicate {
     /// No messages are duplicated.
     None,
