@@ -119,7 +119,7 @@ mod d {
         let basename = String::from(directory).add("/").add(
             &std::path::Path::new(&std::env::args().next().unwrap())
             .file_stem().unwrap(/*cannot fail*/)
-            .to_string_lossy().to_string(),
+            .to_string_lossy(),
         );
 
         let fn_pattern = String::with_capacity(180)

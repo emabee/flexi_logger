@@ -104,7 +104,7 @@ struct Deduper {
 }
 
 /// Action to be performed for some record.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum DedupAction {
     /// The record should be allowed and logged normally.
     Allow,

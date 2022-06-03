@@ -297,7 +297,7 @@ mod test {
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
                 .file_stem().unwrap(/*cannot fail*/)
-                .to_string_lossy().to_string(),
+                .to_string_lossy(),
         );
         let naming = Naming::Timestamps;
 
@@ -336,7 +336,7 @@ mod test {
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
                 .file_stem().unwrap(/*cannot fail*/)
-                .to_string_lossy().to_string(),
+                .to_string_lossy(),
         );
         let naming = Naming::Timestamps;
 
@@ -417,7 +417,7 @@ mod test {
                 &String::from(LOG_FOLDER).add("/").add(
                     &Path::new(&std::env::args().next().unwrap())
             .file_stem().unwrap(/*cannot fail*/)
-            .to_string_lossy().to_string(),
+            .to_string_lossy(),
                 ),
             )
             .add("_")
