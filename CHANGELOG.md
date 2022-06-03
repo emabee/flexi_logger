@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.4] - 2022-06-03
+
+Add support for Rfc3164 to `SyslogWriter` (kudos goes to [mbodmer](https://github.com/mbodmer)). 
+
+Add `Clone` and `Copy` implementations to enum Duplicate (kudos goes to
+[ComplexSpaces](complexspacescode@gmail.com)).
+
 ## [0.22.3] -  2022-02-01
 
 Code maintenance: remove the feature "external_rotation".

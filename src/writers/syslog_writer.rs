@@ -97,8 +97,11 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
 }
 
 enum SyslogType {
-    Rfc5424 { pid: u32, message_id: String },
-    Rfc3164 { pid: u32 },
+    Rfc5424 {
+        hostname: String,
+        message_id: String,
+    },
+    Rfc3164,
 }
 
 /// A configurable [`LogWriter`] implementation that writes log messages to the syslog
@@ -108,8 +111,8 @@ enum SyslogType {
 ///
 /// See the [writers](crate::writers) module for guidance how to use additional log writers.
 pub struct SyslogWriter {
-    hostname: String,
     process: String,
+    pid: u32,
     syslog_type: SyslogType,
     facility: SyslogFacility,
     determine_severity: LevelToSyslogSeverity,
@@ -166,10 +169,10 @@ impl SyslogWriter {
         })?;
 
         Ok(Box::new(Self {
-            hostname,
+            pid: std::process::id(),
             process,
             syslog_type: SyslogType::Rfc5424 {
-                pid: std::process::id(),
+                hostname,
                 message_id,
             },
             facility,
@@ -213,10 +216,6 @@ impl SyslogWriter {
         max_log_level: log::LevelFilter,
         syslog: Syslog,
     ) -> IoResult<Box<Self>> {
-        const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
-
-        let hostname = UNKNOWN_HOSTNAME.to_owned();
-
         let process = std::env::args().next().ok_or_else(|| {
             IoError::new(
                 ErrorKind::Other,
@@ -225,11 +224,9 @@ impl SyslogWriter {
         })?;
 
         Ok(Box::new(Self {
-            hostname,
+            pid: std::process::id(),
             process,
-            syslog_type: SyslogType::Rfc3164 {
-                pid: std::process::id(),
-            },
+            syslog_type: SyslogType::Rfc3164,
             facility,
             max_log_level,
             // shorter variants with unwrap_or() or unwrap_or_else() don't work
@@ -259,7 +256,7 @@ impl LogWriter for SyslogWriter {
         cb.buf.clear();
 
         match &self.syslog_type {
-            SyslogType::Rfc3164 { pid } => {
+            SyslogType::Rfc3164 => {
                 #[allow(clippy::write_literal)]
                 write!(
                     cb.buf,
@@ -267,11 +264,14 @@ impl LogWriter for SyslogWriter {
                     pri = self.facility as u8 | severity as u8,
                     timestamp = now.format_rfc3164(),
                     tag = self.process,
-                    procid = pid,
+                    procid = self.pid,
                     msg = &record.args()
                 )?;
             }
-            SyslogType::Rfc5424 { pid, message_id } => {
+            SyslogType::Rfc5424 {
+                hostname,
+                message_id,
+            } => {
                 #[allow(clippy::write_literal)]
                 write!(
                     cb.buf,
@@ -279,9 +279,9 @@ impl LogWriter for SyslogWriter {
                     pri = self.facility as u8 | severity as u8,
                     version = "1",
                     timestamp = now.format_rfc3339(),
-                    hostname = self.hostname,
+                    hostname = hostname,
                     appname = self.process,
-                    procid = pid,
+                    procid = self.pid,
                     msgid = message_id,
                     msg = &record.args()
                 )?;
