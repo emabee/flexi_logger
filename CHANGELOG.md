@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.5] - 2022-06-03
+
+Only depend on the parts of crossbeam that are used (kudos goes to
+[bsilver8192](https://github.com/bsilver8192)).
+
 ## [0.22.4] - 2022-06-03
 
 Add support for Rfc3164 to `SyslogWriter` (kudos goes to [mbodmer](https://github.com/mbodmer)). 

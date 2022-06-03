@@ -47,6 +47,7 @@ fn work(value: u8) {
     };
 
     {
+        // start logger, and force its immediate drop
         let _logger_handle = logger
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
@@ -56,14 +57,19 @@ fn work(value: u8) {
     warn!("This is a warning");
     info!("This is an info message");
     debug!("This is a debug message - you must not see it!");
+    debug!("This is a debug message - you must not see it!");
+    debug!("This is a debug message - you must not see it!");
+    trace!("This is a trace message - you must not see it!");
+    trace!("This is a trace message - you must not see it!");
     trace!("This is a trace message - you must not see it!");
 
     if value == 2 {
-        assert_eq!(
-            BufReader::new(File::open(err_file).unwrap())
-                .lines()
-                .count(),
-            6 // two lines per failing error, warn, or info call
+        let lines = BufReader::new(File::open(err_file).unwrap())
+            .lines()
+            .count();
+        assert!(
+            lines == 6 // two lines per failing error, warn, or info call
+         || lines == 8 // two more lines if UTC issue applies
         );
     }
 }
