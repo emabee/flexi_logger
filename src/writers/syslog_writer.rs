@@ -96,18 +96,22 @@ fn default_mapping(level: log::Level) -> SyslogSeverity {
     }
 }
 
+enum SyslogType {
+    Rfc5424 { pid: u32, message_id: String },
+    Rfc3164 { pid: u32 },
+}
+
 /// A configurable [`LogWriter`] implementation that writes log messages to the syslog
 /// (see [RFC 5424](https://datatracker.ietf.org/doc/rfc5424)).
 ///
 /// Only available with optional crate feature `syslog_writer`.
 ///
-/// See the [writers](crate::writers) for guidance how to use additional log writers.
+/// See the [writers](crate::writers) module for guidance how to use additional log writers.
 pub struct SyslogWriter {
     hostname: String,
     process: String,
-    pid: u32,
+    syslog_type: SyslogType,
     facility: SyslogFacility,
-    message_id: String,
     determine_severity: LevelToSyslogSeverity,
     m_conn_buf: Mutex<ConnectorAndBuffer>,
     max_log_level: log::LevelFilter,
@@ -164,10 +168,70 @@ impl SyslogWriter {
         Ok(Box::new(Self {
             hostname,
             process,
-            pid: std::process::id(),
+            syslog_type: SyslogType::Rfc5424 {
+                pid: std::process::id(),
+                message_id,
+            },
             facility,
             max_log_level,
-            message_id,
+            // shorter variants with unwrap_or() or unwrap_or_else() don't work
+            // with either current clippy or old rustc:
+            determine_severity: match determine_severity {
+                Some(f) => f,
+                None => default_mapping,
+            },
+            m_conn_buf: Mutex::new(ConnectorAndBuffer {
+                conn: syslog.into_inner(),
+                buf: Vec::with_capacity(200),
+            }),
+        }))
+    }
+
+    /// Returns a configured boxed instance.
+    ///
+    /// ## Parameters
+    ///
+    /// `facility`: An value representing a valid syslog facility value according to RFC 5424.
+    ///
+    /// `determine_severity`: (optional) A function that maps the rust log levels
+    /// to the syslog severities. If None is given, a trivial default mapping is used, which
+    /// should be good enough in most cases.
+    ///
+    /// `message_id`: The value being used as syslog's MSGID, which
+    /// should identify the type of message. The value itself
+    /// is a string without further semantics. It is intended for filtering
+    /// messages on a relay or collector.
+    ///
+    /// `syslog`: A [`Syslog`](crate::writers::Syslog).
+    ///
+    /// # Errors
+    ///
+    /// `std::io::Error`
+    pub fn try_new_bsd(
+        facility: SyslogFacility,
+        determine_severity: Option<LevelToSyslogSeverity>,
+        max_log_level: log::LevelFilter,
+        syslog: Syslog,
+    ) -> IoResult<Box<Self>> {
+        const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
+
+        let hostname = UNKNOWN_HOSTNAME.to_owned();
+
+        let process = std::env::args().next().ok_or_else(|| {
+            IoError::new(
+                ErrorKind::Other,
+                "Can't infer app name as no env args are present".to_owned(),
+            )
+        })?;
+
+        Ok(Box::new(Self {
+            hostname,
+            process,
+            syslog_type: SyslogType::Rfc3164 {
+                pid: std::process::id(),
+            },
+            facility,
+            max_log_level,
             // shorter variants with unwrap_or() or unwrap_or_else() don't work
             // with either current clippy or old rustc:
             determine_severity: match determine_severity {
@@ -193,19 +257,36 @@ impl LogWriter for SyslogWriter {
 
         // See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424#page-8).
         cb.buf.clear();
-        #[allow(clippy::write_literal)]
-        write!(
-            cb.buf,
-            "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} - {msg}",
-            pri = self.facility as u8 | severity as u8,
-            version = "1",
-            timestamp = now.format_rfc3339(),
-            hostname = self.hostname,
-            appname = self.process,
-            procid = self.pid,
-            msgid = self.message_id,
-            msg = &record.args()
-        )?;
+
+        match &self.syslog_type {
+            SyslogType::Rfc3164 { pid } => {
+                #[allow(clippy::write_literal)]
+                write!(
+                    cb.buf,
+                    "<{pri}>{timestamp} {tag}[{procid}]: {msg}",
+                    pri = self.facility as u8 | severity as u8,
+                    timestamp = now.format_rfc3164(),
+                    tag = self.process,
+                    procid = pid,
+                    msg = &record.args()
+                )?;
+            }
+            SyslogType::Rfc5424 { pid, message_id } => {
+                #[allow(clippy::write_literal)]
+                write!(
+                    cb.buf,
+                    "<{pri}>{version} {timestamp} {hostname} {appname} {procid} {msgid} - {msg}",
+                    pri = self.facility as u8 | severity as u8,
+                    version = "1",
+                    timestamp = now.format_rfc3339(),
+                    hostname = self.hostname,
+                    appname = self.process,
+                    procid = pid,
+                    msgid = message_id,
+                    msg = &record.args()
+                )?;
+            }
+        }
         // we _have_ to buffer because each write here generates a syslog entry
         cb.conn.write_all(&cb.buf)
     }
