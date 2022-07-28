@@ -25,6 +25,8 @@ use std::{
     time::Duration,
 };
 
+use log::LevelFilter;
+
 /// The entry-point for using `flexi_logger`.
 ///
 /// `Logger` is a builder class that allows you to
@@ -907,4 +909,30 @@ pub enum Duplicate {
     Trace,
     /// All messages are duplicated.
     All,
+}
+
+impl From<LevelFilter> for Duplicate {
+    fn from(level: LevelFilter) -> Self {
+        match level {
+            LevelFilter::Off => Duplicate::None,
+            LevelFilter::Error => Duplicate::Error,
+            LevelFilter::Warn => Duplicate::Warn,
+            LevelFilter::Info => Duplicate::Info,
+            LevelFilter::Debug => Duplicate::Debug,
+            LevelFilter::Trace => Duplicate::Trace,
+        }
+    }
+}
+impl From<Duplicate> for LevelFilter {
+    fn from(level: Duplicate) -> Self {
+        match level {
+            Duplicate::None => LevelFilter::Off,
+            Duplicate::Error => LevelFilter::Error,
+            Duplicate::Warn => LevelFilter::Warn,
+            Duplicate::Info => LevelFilter::Info,
+            Duplicate::Debug => LevelFilter::Debug,
+            Duplicate::Trace => LevelFilter::Trace,
+            Duplicate::All => LevelFilter::Trace,
+        }
+    }
 }
