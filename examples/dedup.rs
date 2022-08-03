@@ -50,7 +50,8 @@ impl LogLineFilter for DedupWriter {
         log_line_writer: &dyn LogLineWriter,
     ) -> std::io::Result<()> {
         let mut deduper = self.deduper.lock().unwrap();
-        match deduper.dedup(record) {
+        let dedup_action = deduper.dedup(record);
+        match dedup_action {
             DedupAction::Allow => {
                 // Just log
                 log_line_writer.write(now, record)

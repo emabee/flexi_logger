@@ -931,8 +931,7 @@ impl From<Duplicate> for LevelFilter {
             Duplicate::Warn => LevelFilter::Warn,
             Duplicate::Info => LevelFilter::Info,
             Duplicate::Debug => LevelFilter::Debug,
-            Duplicate::Trace => LevelFilter::Trace,
-            Duplicate::All => LevelFilter::Trace,
+            Duplicate::Trace | Duplicate::All => LevelFilter::Trace,
         }
     }
 }
