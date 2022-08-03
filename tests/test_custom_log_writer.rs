@@ -99,7 +99,7 @@ impl LogWriter for CustomWriter {
             }
         };
         assert_eq!(
-            String::from_utf8_lossy(&*data),
+            String::from_utf8_lossy(&data),
             String::from_utf8_lossy(&expected_data)
         );
     }

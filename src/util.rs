@@ -150,14 +150,14 @@ pub(crate) fn write_buffered(
                 .write_all(b"\n")
                 .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
 
-            result = w.write_all(&*buffer).map_err(|e| {
+            result = w.write_all(&buffer).map_err(|e| {
                 eprint_err(ERRCODE::Write, "writing failed", &e);
                 e
             });
 
             #[cfg(test)]
             if let Some(valbuf) = o_validation_buffer {
-                valbuf.lock().unwrap().write_all(&*buffer).ok();
+                valbuf.lock().unwrap().write_all(&buffer).ok();
             }
             buffer.clear();
         }

@@ -120,7 +120,7 @@ impl log::Log for FlexiLogger {
         {
             // closure that we need below
             let check_text_filter = |text_filter: Option<&Regex>| {
-                text_filter.map_or(true, |filter| filter.is_match(&*record.args().to_string()))
+                text_filter.map_or(true, |filter| filter.is_match(&record.args().to_string()))
             };
 
             if !check_text_filter(
