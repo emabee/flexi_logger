@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2022-08-04
+
+Switch to edition 2021, use latest patch of `time` version "0.3",
+bump minimal supported rust version to "1.57.0".
+
 ## [0.22.6] - 2022-08-03
 
 Add interconversions between log::LevelFilter and flexi_logger::Duplicate

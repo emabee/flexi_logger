@@ -17,7 +17,7 @@ and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
-flexi_logger = "0.22"
+flexi_logger = "0.23"
 log = "0.4"
 ```
 
@@ -58,7 +58,7 @@ See
 
 ## Minimal rust version
 
-The earliest supported rust version is currently "1.53.0".
+The earliest supported rust version is currently "1.57.0".
 
 ## Crate Features
 
@@ -66,7 +66,7 @@ Make use of the non-default features by specifying them in your `Cargo.toml`, e.
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.22", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.23", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -74,7 +74,7 @@ or, to get the smallest footprint (and no colors), switch off even the default f
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.22", default_features = false }
+flexi_logger = { version = "0.23", default_features = false }
 log = "0.4"
 ```
 
