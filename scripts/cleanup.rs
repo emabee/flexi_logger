@@ -12,6 +12,8 @@ fn main() {
         "./*.log",
         "./*.seclog",
         "./*logspec.toml",
+        "./log_files/**/.DS_Store",
+        "./log_files/**/test_restart_with_no_suffix-*",
         "./log_files/**/*.alerts",
         "./log_files/**/*.csv",
         "./log_files/**/*.err",

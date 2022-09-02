@@ -257,7 +257,6 @@ impl LogWriter for SyslogWriter {
 
         match &self.syslog_type {
             SyslogType::Rfc3164 => {
-                #[allow(clippy::write_literal)]
                 write!(
                     cb.buf,
                     "<{pri}>{timestamp} {tag}[{procid}]: {msg}",

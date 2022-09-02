@@ -149,7 +149,7 @@ fn try_roll_state_from_criterion(
         } // max_size, current_size
         Criterion::AgeOrSize(age, size) => {
             let written_bytes = if config.append {
-                std::fs::metadata(&p_path)?.len()
+                std::fs::metadata(p_path)?.len()
             } else {
                 0
             };
@@ -384,7 +384,7 @@ impl State {
 
     pub fn reopen_outputfile(&mut self) -> Result<(), std::io::Error> {
         if let Inner::Active(_, ref mut file, ref p_path) = self.inner {
-            match OpenOptions::new().create(true).append(true).open(&p_path) {
+            match OpenOptions::new().create(true).append(true).open(p_path) {
                 Ok(f) => {
                     // proved to work on standard windows, linux, mac
                     *file = Box::new(f);
@@ -397,7 +397,7 @@ impl State {
                     *file = Box::new(OpenOptions::new().create(true).append(true).open(&dummy)?);
                     remove_file(&dummy)?;
 
-                    *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
+                    *file = Box::new(OpenOptions::new().create(true).append(true).open(p_path)?);
                 }
             }
         }
@@ -453,21 +453,21 @@ fn validate_logs_in_file(
             .read_line(&mut buf)
             .expect("validate_logs: can't read file");
         assert!(
-            buf.contains(&tuple.0),
+            buf.contains(tuple.0),
             "Did not find tuple.0 = {} in file {}; {}",
             tuple.0,
             path.display(),
             warning
         );
         assert!(
-            buf.contains(&tuple.1),
+            buf.contains(tuple.1),
             "Did not find tuple.1 = {} in file {}; {}",
             tuple.1,
             path.display(),
             warning
         );
         assert!(
-            buf.contains(&tuple.2),
+            buf.contains(tuple.2),
             "Did not find tuple.2 = {} in file {}; {}",
             tuple.2,
             path.display(),
@@ -625,7 +625,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
 }
 
 // Moves the current file to the timestamp of the CURRENT file's creation date.
-// If the rotation comes very fast, the new timestamp would be equal to the old one.
+// If the rotation comes very fast, the new timestamp can be equal to the old one.
 // To avoid file collisions, we insert an additional string to the filename (".restart-<number>").
 // The number is incremented in case of repeated collisions.
 // Cleaning up can leave some restart-files with higher numbers; if we still are in the same
@@ -634,60 +634,12 @@ fn rotate_output_file_to_date(
     creation_date: &OffsetDateTime,
     config: &FileLogWriterConfig,
 ) -> Result<(), std::io::Error> {
-    const INFIX_DATE: &[FormatItem<'static>] =
-        format_description!("_r[year]-[month]-[day]_[hour]-[minute]-[second]");
-
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
-
-    let infix_date_string = {
-        // use utc if configured
-        let mut infix_date: OffsetDateTime = *creation_date;
-        if config.use_utc {
-            let (h, m, s) = creation_date.offset().as_hms();
-            if h != 0 || m != 0 || s != 0 {
-                infix_date -=
-                    time::Duration::seconds(i64::from(s) + i64::from(m) * 60 + i64::from(h) * 3600);
-            };
-        }
-        infix_date.format(INFIX_DATE).unwrap()
-    };
-
-    let mut rotated_path = config.file_spec.as_pathbuf(Some(&infix_date_string));
-
-    // Search for rotated_path as is and for restart-siblings;
-    // if any exists, find highest restart and add 1, else continue without restart
-    let mut pattern = rotated_path.clone();
-    pattern.set_extension("");
-    let mut pattern = pattern.to_string_lossy().to_string();
-    pattern.push_str(".restart-*");
-
-    let file_list = glob::glob(&pattern).unwrap(/*ok*/);
-    let mut vec: Vec<PathBuf> = file_list.map(Result::unwrap).collect();
-    vec.sort_unstable();
-
-    if (*rotated_path).exists() || !vec.is_empty() {
-        let mut number = if vec.is_empty() {
-            0
-        } else {
-            rotated_path = vec.pop().unwrap(/*ok*/);
-            let file_stem = rotated_path
-                .file_stem()
-                .unwrap(/*ok*/)
-                .to_string_lossy()
-                .to_string();
-            let index = file_stem.find(".restart-").unwrap(/*ok*/);
-            file_stem[(index + 9)..].parse::<usize>().unwrap(/*ok*/)
-        };
-
-        while (*rotated_path).exists() {
-            rotated_path = config.file_spec.as_pathbuf(Some(
-                &infix_date_string
-                    .clone()
-                    .add(&format!(".restart-{:04}", number)),
-            ));
-            number += 1;
-        }
-    }
+    let rotated_path = determine_new_name_for_rotate_output_file_to_date(
+        &config.file_spec,
+        config.use_utc,
+        creation_date,
+    );
 
     match std::fs::rename(&current_path, &rotated_path) {
         Ok(()) => Ok(()),
@@ -700,6 +652,65 @@ fn rotate_output_file_to_date(
             }
         }
     }
+}
+
+fn determine_new_name_for_rotate_output_file_to_date(
+    file_spec: &FileSpec,
+    use_utc: bool,
+    creation_date: &OffsetDateTime,
+) -> PathBuf {
+    const INFIX_DATE: &[FormatItem<'static>] =
+        format_description!("_r[year]-[month]-[day]_[hour]-[minute]-[second]");
+    let infix_date_string = {
+        // use utc if configured
+        let mut infix_date: OffsetDateTime = *creation_date;
+        if use_utc {
+            let (h, m, s) = creation_date.offset().as_hms();
+            if h != 0 || m != 0 || s != 0 {
+                infix_date -=
+                    time::Duration::seconds(i64::from(s) + i64::from(m) * 60 + i64::from(h) * 3600);
+            };
+        }
+        infix_date.format(INFIX_DATE).unwrap()
+    };
+    let mut rotated_path = file_spec.as_pathbuf(Some(&infix_date_string));
+    // Search for rotated_path as is and for restart-siblings;
+    // if any exists, find highest restart and add 1, else continue without restart
+    let mut pattern = rotated_path.clone();
+    if file_spec.o_suffix.is_some() {
+        pattern.set_extension("");
+    }
+    let mut pattern = pattern.to_string_lossy().to_string();
+    pattern.push_str(".restart-*");
+    let mut restart_siblings: Vec<PathBuf> =
+        glob::glob(&pattern).unwrap(/*ok*/).map(Result::unwrap).collect();
+    restart_siblings.sort_unstable();
+    if (*rotated_path).exists() || !restart_siblings.is_empty() {
+        let mut number = if restart_siblings.is_empty() {
+            0
+        } else {
+            rotated_path = restart_siblings.pop().unwrap(/*ok*/);
+            let file_stem_string = if file_spec.o_suffix.is_some() {
+                rotated_path
+                    .file_stem().unwrap(/*ok*/)
+                    .to_string_lossy().to_string()
+            } else {
+                rotated_path.to_string_lossy().to_string()
+            };
+            let index = file_stem_string.find(".restart-").unwrap(/*ok*/);
+            file_stem_string[(index + 9)..].parse::<usize>().unwrap(/*ok*/)
+        };
+
+        while (*rotated_path).exists() {
+            rotated_path = file_spec.as_pathbuf(Some(
+                &infix_date_string
+                    .clone()
+                    .add(&format!(".restart-{:04}", number)),
+            ));
+            number += 1;
+        }
+    }
+    rotated_path
 }
 
 // Moves the current file to the name with the next rotate_idx and returns the next rotate_idx.
@@ -772,7 +783,7 @@ mod platform {
         }
 
         // create new symlink
-        if let Err(e) = std::os::unix::fs::symlink(&logfile, link) {
+        if let Err(e) = std::os::unix::fs::symlink(logfile, link) {
             eprint_err(ERRCODE::Symlink, "cannot create symlink to logfile", &e);
         }
     }

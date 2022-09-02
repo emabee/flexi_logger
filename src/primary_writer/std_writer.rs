@@ -217,9 +217,9 @@ impl LogWriter for StdWriter {
             for tuple in expected {
                 buf.clear();
                 reader.read_line(&mut buf).unwrap();
-                assert!(buf.contains(&tuple.0), "Did not find tuple.0 = {}", tuple.0);
-                assert!(buf.contains(&tuple.1), "Did not find tuple.1 = {}", tuple.1);
-                assert!(buf.contains(&tuple.2), "Did not find tuple.2 = {}", tuple.2);
+                assert!(buf.contains(tuple.0), "Did not find tuple.0 = {}", tuple.0);
+                assert!(buf.contains(tuple.1), "Did not find tuple.1 = {}", tuple.1);
+                assert!(buf.contains(tuple.2), "Did not find tuple.2 = {}", tuple.2);
             }
             buf.clear();
             reader.read_line(&mut buf).unwrap();

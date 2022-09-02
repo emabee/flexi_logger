@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.1] - 2022-09-02
+
+Fix a panic that can happen if `Naming::Timestamps` and `FileSpec::o_suffix(None)` are used and
+rotation happens within a second ([issue-116](https://github.com/emabee/flexi_logger/issues/116)).
+
+Bump MSRV to 1.59 (because the `time` crate did this).
+
 ## [0.23.0] - 2022-08-04
 
 Switch to edition 2021, use latest patch of `time` version "0.3",

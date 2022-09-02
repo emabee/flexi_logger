@@ -38,8 +38,9 @@ pub fn add_prog_name(pb: &mut PathBuf) {
     pb.push(progname);
 }
 
-// launch child process from same executable and sets there an additional environment variable
-// or finds this environment variable and returns its value
+// launch child processes from same executable and set for each of them an environment variable
+// with a specific number, and then return None,
+// or, in child processes, find this environment variable and return its value
 pub fn dispatch(count: u8) -> Option<u8> {
     match std::env::var(CTRL_INDEX) {
         Err(_) => {

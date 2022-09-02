@@ -84,7 +84,7 @@ pub(crate) fn start_specfile_watcher_thread<S: LogSpecSubscriber>(
     let debouncing_delay = std::time::Duration::from_millis(1000);
     let mut watcher = watcher(tx, debouncing_delay)?;
     watcher.watch(
-        &specfile.parent().unwrap(/*cannot fail*/),
+        specfile.parent().unwrap(/*cannot fail*/),
         RecursiveMode::NonRecursive,
     )?;
 

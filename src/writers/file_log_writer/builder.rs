@@ -235,8 +235,8 @@ impl FileLogWriterBuilder {
         // make sure the folder exists or create it
         let dir = self.file_spec.get_directory();
         let p_directory = Path::new(&dir);
-        std::fs::create_dir_all(&p_directory)?;
-        if !std::fs::metadata(&p_directory)?.is_dir() {
+        std::fs::create_dir_all(p_directory)?;
+        if !std::fs::metadata(p_directory)?.is_dir() {
             return Err(FlexiLoggerError::OutputBadDirectory);
         };
 
