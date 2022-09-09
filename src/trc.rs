@@ -8,91 +8,70 @@
 //! facilitates contributing "backends", and is used in the example below to plug
 //! `flexi_logger`-functionality into `tracing`.
 //!
-//! **The content of this module is a first attempt to support such an integration.
-//! Every feedback is highly appreciated.**
+//! **The content of this module is an attempt to support such an integration.
+//! Feedback is highly appreciated.**
 //!
 //! ### Example
 //!
-//! The following example uses a `FileLogWriter` as trace writer,
-//! and `flexi_logger`'s specfile handling to adapt `tracing` dynamically,
-//! while your program is running.
-//! The code is a bit cumbersome, maybe there are (oor will be) easier ways to achieve the same.
+//! The following code example uses two features of `flexi_logger`:
+//!
+//! * a fully configurable `FileLogWriter` as trace writer
+//! * and `flexi_logger`'s specfile handling to adapt `tracing` dynamically,
+//!   while your program is running.
 //!
 //! Precondition: add these entries to your `Cargo.toml`:
 //! ```toml
-//! flexi_logger = {version = "0.19", features = ["trc"]}
+//! flexi_logger = {version = "0.23", features = ["trc"]}
 //! tracing = "0.1"
-//! tracing-subscriber = {version = "0.2.20", features = ["env-filter"]}
 //! ```
+//!
+//! In this example, the interaction with `tracing` components is completely hidden,
+//! for convenience.
+//! If you want to influence `tracing` further, what might often be the case,
+//! you need to copy the code of method `setup_tracing` into your program and modify it.
+//!
+//! Unfortunately, especially due to the use of closures in `tracing-subscriber`'s API,
+//! it is not easy to provide a convenient _and_ flexible API for plugging `flexi_logger`
+//! functionality into `tracing`.
 //!
 //! ```rust,ignore
 //! # #[cfg(feature = "specfile_without_notification")]
 //! # {
 //! # use std::error::Error;
 //! use flexi_logger::{
-//!     trc::{subscribe_to_specfile, BasicLogSpecSubscriber, LogSpecAsFilter},
 //!     writers::FileLogWriter,
 //!     Age, Cleanup, Criterion, FileSpec, LogSpecification, Naming, WriteMode,
 //! };
 //!
-//! use tracing::{debug, info, trace, warn};
-//! use tracing_subscriber::FmtSubscriber;
-//!
 //! # fn main() -> Result<(), Box<dyn Error>> {
-//! // Prepare a `FileLogWriter` and a handle to it, and keep the handle alive
-//! // until the program ends (it will flush and shutdown the `FileLogWriter` when dropped).
-//! // For the `FileLogWriter`, use the settings that fit your needs
-//! let (file_writer, _fw_handle) = FileLogWriter::builder(FileSpec::default())
-//!     .rotate(
-//!         // If the program runs long enough,
-//!         Criterion::Age(Age::Day), // - create a new file every day
-//!         Naming::Timestamps,       // - let the rotated files have a timestamp in their name
-//!         Cleanup::KeepLogFiles(7), // - keep at most seven log files
-//!     )
-//!     .write_mode(WriteMode::Async)
-//!     .try_build_with_handle()
-//!     .unwrap();
 //!
-//! // Set up subscriber that makes use of the file writer, with some hardcoded initial log spec
-//! let initial_logspec = LogSpecification::info();
-//! let subscriber_builder = FmtSubscriber::builder()
-//!     .with_writer(move || file_writer.clone())
-//!     .with_env_filter(LogSpecAsFilter(initial_logspec.clone()))
-//!     .with_filter_reloading();
+//! // Drop the keep-alive-handles only in the shutdown of your program
+//! let _keep_alive_handles = flexi_logger::trc::setup_tracing(
+//!     LogSpecification::info(),
+//!     Some(&PathBuf::from("trcspecfile.toml")),
+//!     FileLogWriter::builder(FileSpec::default())
+//!         .rotate(
+//!             Criterion::Age(Age::Day),
+//!             Naming::Timestamps,
+//!             Cleanup::KeepLogFiles(7),
+//!         )
+//!         .write_mode(WriteMode::Async),
+//!)?;
 //!
-//! // Set up specfile tracking and subscribe
-//! let reload_handle = Box::new(subscriber_builder.reload_handle());
-//! subscribe_to_specfile(
-//!     "trcspecfile.toml",
-//!     BasicLogSpecSubscriber::new(
-//!         Box::new(move |logspec| reload_handle.reload(LogSpecAsFilter(logspec)).unwrap()),
-//!         initial_logspec,
-//!     ),
-//! )
-//! .unwrap();
-//!
-//! // Get ready to trace
-//! tracing::subscriber::set_global_default(subscriber_builder.finish())
-//!     .expect("setting default subscriber failed");
-//!
-//! // now do what you really want to do...
+//! tracing::debug!("now we start doing what we really wanted to do...")
 //! # Ok(())}}
 //! ```
 //!
 
 pub use crate::logger_handle::LogSpecSubscriber;
+use crate::{
+    logger::{create_specfile_watcher, synchronize_subscriber_with_specfile},
+    writers::{FileLogWriterBuilder, FileLogWriterHandle},
+};
 use crate::{FlexiLoggerError, LogSpecification};
-use std::path::Path;
-use tracing_subscriber::EnvFilter;
-
-/// Helper struct for using [`LogSpecification`] as filter in `tracing`.
-pub struct LogSpecAsFilter(pub LogSpecification);
-
-impl From<LogSpecAsFilter> for EnvFilter {
-    fn from(my_filter: LogSpecAsFilter) -> Self {
-        Self::new(my_filter.0.to_string())
-    }
-}
+use notify_debouncer_mini::{notify::FsEventWatcher, Debouncer};
+use std::path::{Path, PathBuf};
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 /// Allows registering a `LogSpecSubscriber` to a specfile.
 ///
@@ -103,11 +82,20 @@ impl From<LogSpecAsFilter> for EnvFilter {
 ///
 /// Several variants of [`FlexiLoggerError`] can occur.
 #[cfg(feature = "specfile_without_notification")]
-pub fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
+pub fn subscribe_to_specfile<P: AsRef<Path>>(
     specfile: P,
-    subscriber: H,
-) -> Result<(), FlexiLoggerError> {
-    crate::logger::subscribe_to_specfile(specfile, subscriber)
+    reloader: Box<dyn Fn(LogSpecification) + Send + Sync>,
+    initial_logspec: LogSpecification,
+) -> Result<Option<Debouncer<FsEventWatcher>>, FlexiLoggerError> {
+    let specfile = specfile.as_ref();
+    let mut subscriber = TraceLogSpecSubscriber::new(reloader, initial_logspec);
+    synchronize_subscriber_with_specfile(&mut subscriber, specfile)?;
+
+    if cfg!(feature = "specfile") {
+        Ok(Some(create_specfile_watcher(specfile, subscriber)?))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Helper struct that can be registered in
@@ -115,11 +103,11 @@ pub fn subscribe_to_specfile<P: AsRef<Path>, H: LogSpecSubscriber>(
 /// informed about updates to the specfile,
 /// and can be registered in `tracing` to forward such updates.
 #[cfg(feature = "specfile_without_notification")]
-pub struct BasicLogSpecSubscriber {
+struct TraceLogSpecSubscriber {
     initial_logspec: LogSpecification,
     update: Box<(dyn Fn(LogSpecification) + Send + Sync)>,
 }
-impl BasicLogSpecSubscriber {
+impl TraceLogSpecSubscriber {
     /// Factory method.
     ///
     /// # Parameters
@@ -138,7 +126,7 @@ impl BasicLogSpecSubscriber {
     }
 }
 #[cfg(feature = "specfile_without_notification")]
-impl LogSpecSubscriber for BasicLogSpecSubscriber {
+impl LogSpecSubscriber for TraceLogSpecSubscriber {
     fn set_new_spec(&mut self, logspec: LogSpecification) -> Result<(), FlexiLoggerError> {
         (self.update)(logspec);
         Ok(())
@@ -147,4 +135,59 @@ impl LogSpecSubscriber for BasicLogSpecSubscriber {
     fn initial_spec(&self) -> Result<LogSpecification, FlexiLoggerError> {
         Ok(self.initial_logspec.clone())
     }
+}
+
+/// Rereads the specfile if it was updated and forwards the update to `tracing`'s filter.
+pub struct SpecFileNotifier(Option<Debouncer<FsEventWatcher>>);
+
+/// Set up tracing to write into the specified `FileLogWriter`,
+/// and to use the (optionally) specified specfile.
+///
+/// The returned handles must be kept alive and should be dropped at the very end of the program.
+///
+/// # Panics
+///
+/// # Errors
+///
+/// Various variants of `FlexiLoggerError` can occur.
+#[allow(clippy::missing_panics_doc)]
+pub fn setup_tracing(
+    initial_logspec: LogSpecification,
+    o_specfile: Option<&PathBuf>,
+    flwb: FileLogWriterBuilder,
+) -> Result<(FileLogWriterHandle, SpecFileNotifier), FlexiLoggerError> {
+    struct LogSpecAsFilter(pub LogSpecification);
+    impl From<LogSpecAsFilter> for EnvFilter {
+        fn from(wrapped_logspec: LogSpecAsFilter) -> Self {
+            Self::new(wrapped_logspec.0.to_string())
+        }
+    }
+
+    let (file_writer, fw_handle) = flwb.try_build_with_handle()?;
+
+    // Set up subscriber that makes use of the file writer, with some hardcoded initial log spec
+    let subscriber_builder = FmtSubscriber::builder()
+        .with_writer(move || file_writer.clone())
+        .with_env_filter(LogSpecAsFilter(initial_logspec.clone()))
+        .with_filter_reloading();
+
+    // Set up specfile watching
+    let spec_file_notifier = SpecFileNotifier(match o_specfile {
+        Some(specfile) => {
+            let reload_handle = Box::new(subscriber_builder.reload_handle());
+            subscribe_to_specfile(
+                specfile,
+                Box::new(move |logspec| {
+                    { reload_handle.reload(LogSpecAsFilter(logspec)) }.unwrap(/* OK */);
+                }),
+                initial_logspec,
+            )?
+        }
+        None => None,
+    });
+
+    // Get ready to trace
+    tracing::subscriber::set_global_default(subscriber_builder.finish())?;
+
+    Ok((fw_handle, spec_file_notifier))
 }

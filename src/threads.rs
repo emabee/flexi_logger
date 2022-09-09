@@ -10,14 +10,11 @@ use {
     },
 };
 
-#[cfg(any(feature = "specfile", feature = "async"))]
-use crate::util::{eprint_err, ERRCODE};
-
 #[cfg(feature = "async")]
 use {
     crate::{
         primary_writer::std_stream::StdStream,
-        util::{ASYNC_FLUSH, ASYNC_SHUTDOWN},
+        util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
     },
     crossbeam_channel::Receiver as CrossbeamReceiver,
     crossbeam_queue::ArrayQueue,
@@ -29,20 +26,9 @@ use {
 #[cfg(feature = "async")]
 use std::io::Write;
 
-#[cfg(feature = "specfile")]
-use {
-    crate::{
-        logger::log_spec_string_from_file, logger_handle::LogSpecSubscriber, LogSpecification,
-    },
-    notify::{watcher, DebouncedEvent, RecursiveMode, Watcher},
-    std::path::Path,
-};
-
 #[cfg(feature = "async")]
 const ASYNC_STD_WRITER: &str = "flexi_logger-async_std_writer";
 const FLUSHER: &str = "flexi_logger-flusher";
-#[cfg(feature = "specfile")]
-const SPECFILE_WATCHER: &str = "flexi_logger-specfile-watcher";
 
 // Used in Logger
 pub(crate) fn start_flusher_thread(
@@ -61,68 +47,6 @@ pub(crate) fn start_flusher_thread(
             primary_writer.flush().ok();
             for w in other_writers.values() {
                 w.flush().ok();
-            }
-        }
-    })?;
-    Ok(())
-}
-
-// Used in Logger
-// Reread the specfile when it was updated
-#[cfg(feature = "specfile")]
-pub(crate) fn start_specfile_watcher_thread<S: LogSpecSubscriber>(
-    specfile: &Path,
-    mut subscriber: S,
-) -> Result<(), FlexiLoggerError> {
-    // Now that the file exists, we can canonicalize the path
-    let specfile = specfile
-        .canonicalize()
-        .map_err(FlexiLoggerError::SpecfileIo)?;
-
-    // Watch the parent folder of the specfile, using debounced events
-    let (tx, rx) = std::sync::mpsc::channel();
-    let debouncing_delay = std::time::Duration::from_millis(1000);
-    let mut watcher = watcher(tx, debouncing_delay)?;
-    watcher.watch(
-        specfile.parent().unwrap(/*cannot fail*/),
-        RecursiveMode::NonRecursive,
-    )?;
-
-    // in a separate thread, reread the specfile when it was updated
-    let builder = ThreadBuilder::new().name(SPECFILE_WATCHER.to_string());
-    #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-    let builder = builder.stack_size(128 * 1024);
-    builder.spawn(move || {
-        let _anchor_for_watcher = watcher; // keep it alive!
-        loop {
-            match rx.recv() {
-                Ok(debounced_event) => match debounced_event {
-                    DebouncedEvent::Create(ref path) | DebouncedEvent::Write(ref path) => {
-                        if path.canonicalize().map(|x| x == specfile).unwrap_or(false) {
-                            log_spec_string_from_file(&specfile)
-                                .map_err(FlexiLoggerError::SpecfileIo)
-                                .and_then(|s| LogSpecification::from_toml(&s))
-                                .and_then(|spec| subscriber.set_new_spec(spec))
-                                .map_err(|e| {
-                                    eprint_err(
-                                        ERRCODE::LogSpecFile,
-                                        "continuing with previous log specification, because \
-                                             rereading the log specification file failed",
-                                        &e,
-                                    );
-                                })
-                                .ok();
-                        }
-                    }
-                    _event => {}
-                },
-                Err(e) => {
-                    eprint_err(
-                        ERRCODE::LogSpecFile,
-                        "error while watching the specfile",
-                        &e,
-                    );
-                }
             }
         }
     })?;

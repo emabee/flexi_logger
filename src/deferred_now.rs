@@ -141,7 +141,7 @@ lazy_static::lazy_static! {
                     Err(e) => {
                         eprint_err(
                             ERRCODE::Time,
-                            "flexi_logger has to work with UTC rather than with local time",
+                            "flexi_logger works with UTC rather than with local time",
                             &e,
                         );
                         UtcOffset::UTC

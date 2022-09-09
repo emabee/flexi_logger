@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.2] - 2022-09-06
+
+Fix security advisory (see #117) by replacing the dependency from `notify 4.0` with
+`notify-debouncer-mini 0.2` (which depends on `notify 5.0`). As a side-effect,
+the thread `flexi_logger-specfile-watcher` is replaced with `notify-rs debouncer loop`.
+
+Adapt and simplify the submodule `trc` a bit.
+
 ## [0.23.1] - 2022-09-02
 
 Fix a panic that can happen if `Naming::Timestamps` and `FileSpec::o_suffix(None)` are used and
@@ -29,7 +37,7 @@ Only depend on the parts of crossbeam that are used (kudos to
 
 ## [0.22.4] - 2022-06-03
 
-Add support for Rfc3164 to `SyslogWriter` (kudos to [mbodmer](https://github.com/mbodmer)). 
+Add support for Rfc3164 to `SyslogWriter` (kudos to [mbodmer](https://github.com/mbodmer)).
 
 Add `Clone` and `Copy` implementations to enum Duplicate (kudos to
 [ComplexSpaces](complexspacescode@gmail.com)).
@@ -143,7 +151,7 @@ Implement async mode also for `log_to_stdout()` and `log_to_stderr()`.
 ## [0.18.0] - 2021-06-02
 
 Significant API revision, to better cope with new features and for better readability/applicability.
-<br>
+
 Most important changes:
 
 - Better error handling in factory methods:

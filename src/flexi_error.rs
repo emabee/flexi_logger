@@ -3,6 +3,7 @@ use crate::log_specification::LogSpecification;
 use thiserror::Error;
 
 /// Describes errors in the initialization of `flexi_logger`.
+#[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum FlexiLoggerError {
     /// Chosen reset not possible.
@@ -81,6 +82,11 @@ pub enum FlexiLoggerError {
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[error("Logger is shut down")]
     Shutdown(#[from] crossbeam_channel::SendError<Vec<u8>>),
+
+    ///
+    #[cfg(feature = "trc")]
+    #[error("Tracing initialization failed")]
+    TracingSetup(#[from] tracing::subscriber::SetGlobalDefaultError),
 }
 
 impl From<std::convert::Infallible> for FlexiLoggerError {

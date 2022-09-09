@@ -137,7 +137,6 @@ impl FileLogWriter {
 impl LogWriter for FileLogWriter {
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        // TODO (for #107): use optional filter logic
         self.state_handle.write(now, record)
     }
 

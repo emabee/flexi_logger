@@ -1,10 +1,13 @@
 mod test_utils;
 
-#[cfg(feature = "specfile_without_notification")]
+#[cfg(feature = "trc")]
 mod a {
-    use flexi_logger::{detailed_format, FileSpec, Logger};
-    use log::*;
+    use flexi_logger::{
+        writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, LogSpecification, Naming,
+        WriteMode,
+    };
     use std::io::Write;
+    use tracing::{debug, error, info, trace, warn};
 
     const WAIT_MILLIS: u64 = 2000;
 
@@ -16,16 +19,18 @@ mod a {
         std::fs::remove_file(&specfile).ok();
         assert!(!specfile.exists());
 
-        let logger = Logger::try_with_str("info")
-            .unwrap()
-            .log_to_file(
-                FileSpec::default()
-                    .directory(super::test_utils::dir())
-                    .suppress_timestamp(),
-            )
-            .format(detailed_format)
-            .start_with_specfile(&specfile)
-            .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+        let _keep_alive_handles = flexi_logger::trc::setup_tracing(
+            LogSpecification::info(),
+            Some(&specfile),
+            FileLogWriter::builder(FileSpec::default().directory(super::test_utils::dir()))
+                .rotate(
+                    Criterion::Age(Age::Day),
+                    Naming::Timestamps,
+                    Cleanup::KeepLogFiles(7),
+                )
+                .write_mode(WriteMode::Async),
+        )
+        .unwrap();
 
         assert!(specfile.exists());
 
@@ -92,30 +97,5 @@ mod a {
         info!("This is an info-2");
         debug!("This is a debug-2");
         trace!("This is a trace-2");
-
-        if cfg!(feature = "specfile") {
-            eprintln!("feature is: specfile!");
-            logger.validate_logs(&[
-                ("ERROR", "test_specfile::a", "error-0"),
-                ("WARN", "test_specfile::a", "warning-0"),
-                ("INFO", "test_specfile::a", "info-0"),
-                ("ERROR", "test_specfile::a", "error-1"),
-                ("WARN", "test_specfile::a", "warning-1"),
-                ("ERROR", "test_specfile::a", "error-2"),
-            ]);
-        } else {
-            eprintln!("feature is: specfile_without_notification!");
-            logger.validate_logs(&[
-                ("ERROR", "test_specfile::a", "error-0"),
-                ("WARN", "test_specfile::a", "warning-0"),
-                ("INFO", "test_specfile::a", "info-0"),
-                ("ERROR", "test_specfile::a", "error-1"),
-                ("WARN", "test_specfile::a", "warning-1"),
-                ("INFO", "test_specfile::a", "info-1"),
-                ("ERROR", "test_specfile::a", "error-2"),
-                ("WARN", "test_specfile::a", "warning-2"),
-                ("INFO", "test_specfile::a", "info-2"),
-            ]);
-        }
     }
 }

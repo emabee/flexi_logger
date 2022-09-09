@@ -22,7 +22,7 @@ fn multi_threaded() {
     let directory = test_utils::dir();
     {
         let _stopwatch = test_utils::Stopwatch::default();
-        let mut logger = Logger::try_with_str("debug")
+        let logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(FileSpec::default().directory(&directory))
             .format(test_format)

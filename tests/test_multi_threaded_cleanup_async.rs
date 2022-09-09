@@ -41,7 +41,7 @@ mod d {
             #[cfg(feature = "async")]
             let logger = logger.write_mode(WriteMode::Async);
 
-            let mut logger = logger
+            let logger = logger
                 .format(test_format)
                 .duplicate_to_stderr(Duplicate::Info)
                 .rotate(

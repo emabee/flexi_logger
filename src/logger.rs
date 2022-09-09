@@ -1,7 +1,3 @@
-#[cfg(feature = "atty")]
-use crate::formats::AdaptiveFormat;
-#[cfg(feature = "specfile_without_notification")]
-use crate::logger_handle::LogSpecSubscriber;
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
@@ -13,19 +9,29 @@ use crate::{
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
 };
-
-use std::collections::HashMap;
-#[cfg(feature = "specfile_without_notification")]
-use std::io::Read;
-#[cfg(feature = "specfile_without_notification")]
-use std::path::Path;
+use log::LevelFilter;
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, RwLock},
     time::Duration,
 };
 
-use log::LevelFilter;
+#[cfg(feature = "atty")]
+use crate::formats::AdaptiveFormat;
+
+#[cfg(feature = "specfile_without_notification")]
+use {crate::logger_handle::LogSpecSubscriber, std::io::Read, std::path::Path};
+
+#[cfg(feature = "specfile")]
+use {
+    crate::util::{eprint_err, ERRCODE},
+    notify_debouncer_mini::{
+        new_debouncer,
+        notify::{FsEventWatcher, RecursiveMode},
+        DebounceEventResult, Debouncer,
+    },
+};
 
 /// The entry-point for using `flexi_logger`.
 ///
@@ -802,10 +808,8 @@ impl Logger {
         self,
         specfile: P,
     ) -> Result<LoggerHandle, FlexiLoggerError> {
-        // Make logging work, before caring for the specfile
-        let (boxed_logger, handle) = self.build()?;
+        let (boxed_logger, handle) = self.build_with_specfile(specfile)?;
         log::set_boxed_logger(boxed_logger)?;
-        subscribe_to_specfile(specfile, handle.clone())?;
         Ok(handle)
     }
 
@@ -823,26 +827,80 @@ impl Logger {
         self,
         specfile: P,
     ) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
-        let (boxed_log, handle) = self.build()?;
-        subscribe_to_specfile(specfile, handle.clone())?;
+        let (boxed_log, mut handle) = self.build()?;
+
+        let specfile = specfile.as_ref();
+        synchronize_subscriber_with_specfile(&mut handle.writers_handle, specfile)?;
+
+        #[cfg(feature = "specfile")]
+        {
+            handle.o_specfile_watcher = Some(create_specfile_watcher(
+                specfile,
+                handle.writers_handle.clone(),
+            )?);
+        }
+
         Ok((boxed_log, handle))
     }
 }
 
-#[cfg(feature = "specfile_without_notification")]
-pub(crate) fn subscribe_to_specfile<P: AsRef<Path>, S: LogSpecSubscriber>(
-    specfile: P,
+// Reread the specfile when it was updated
+#[cfg(feature = "specfile")]
+pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
+    specfile: &Path,
     mut subscriber: S,
-) -> Result<(), FlexiLoggerError> {
-    let specfile = specfile.as_ref();
-    synchronize_subscriber_with_specfile(&mut subscriber, specfile)?;
+) -> Result<Debouncer<FsEventWatcher>, FlexiLoggerError> {
+    let specfile = specfile
+        .canonicalize()
+        .map_err(FlexiLoggerError::SpecfileIo)?;
+    let clone = specfile.clone();
+    let parent = clone.parent().unwrap(/*cannot fail*/);
 
-    #[cfg(feature = "specfile")]
-    crate::threads::start_specfile_watcher_thread(specfile, subscriber)?;
-    Ok(())
+    let mut debouncer = new_debouncer(
+        std::time::Duration::from_millis(1000),
+        None,
+        move |res: DebounceEventResult| match res {
+            Ok(events) => events.iter().for_each(|e| {
+                if e.path
+                    .canonicalize()
+                    .map(|x| x == specfile)
+                    .unwrap_or(false)
+                {
+                    log_spec_string_from_file(&specfile)
+                        .map_err(FlexiLoggerError::SpecfileIo)
+                        .and_then(|s| LogSpecification::from_toml(&s))
+                        .and_then(|spec| subscriber.set_new_spec(spec))
+                        .map_err(|e| {
+                            eprint_err(
+                                ERRCODE::LogSpecFile,
+                                "continuing with previous log specification, because \
+                                            rereading the log specification file failed",
+                                &e,
+                            );
+                        })
+                        .ok();
+                }
+            }),
+            Err(errors) => errors.iter().for_each(|e| {
+                eprint_err(
+                    ERRCODE::LogSpecFile,
+                    "error while watching the specfile",
+                    &e,
+                );
+            }),
+        },
+    )
+    .unwrap();
+
+    debouncer
+        .watcher()
+        .watch(parent, RecursiveMode::NonRecursive)
+        .unwrap();
+
+    Ok(debouncer)
 }
 
-// If the specfile exists, read the file and update the log_spec from it;
+// If the specfile exists, read the file and update the subscriber's logspec from it;
 // otherwise try to create the file, with the current spec as content, under the specified name.
 #[cfg(feature = "specfile_without_notification")]
 pub(crate) fn synchronize_subscriber_with_specfile<S: LogSpecSubscriber>(

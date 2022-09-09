@@ -224,7 +224,7 @@ impl FileLogWriterBuilder {
     pub fn try_build_with_handle(
         self,
     ) -> Result<(ArcFileLogWriter, FileLogWriterHandle), FlexiLoggerError> {
-        Ok(ArcFileLogWriter::new(FileLogWriter::new(
+        Ok(ArcFileLogWriter::new_with_handle(FileLogWriter::new(
             self.try_build_state()?,
             self.max_log_level,
             self.format,
@@ -334,10 +334,9 @@ impl FileLogWriterBuilder {
 /// A shareable `FileLogWriter` with a handle.
 pub struct ArcFileLogWriter(Arc<FileLogWriter>);
 impl ArcFileLogWriter {
-    pub(crate) fn new(flw: FileLogWriter) -> (Self, FileLogWriterHandle) {
+    pub(crate) fn new_with_handle(flw: FileLogWriter) -> (Self, FileLogWriterHandle) {
         let a_flw = Arc::new(flw);
-        let handle = FileLogWriterHandle(a_flw.clone());
-        (Self(a_flw), handle)
+        (Self(Arc::clone(&a_flw)), FileLogWriterHandle(a_flw))
     }
 }
 impl Clone for ArcFileLogWriter {

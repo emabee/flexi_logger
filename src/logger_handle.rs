@@ -1,3 +1,6 @@
+#[cfg(feature = "specfile")]
+use notify_debouncer_mini::{notify::FsEventWatcher, Debouncer};
+
 use crate::primary_writer::PrimaryWriter;
 use crate::util::{eprint_err, ERRCODE};
 use crate::writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter};
@@ -80,14 +83,11 @@ use std::sync::{Arc, RwLock};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone)]
 pub struct LoggerHandle {
-    spec: Arc<RwLock<LogSpecification>>,
-    spec_stack: Vec<LogSpecification>,
-    primary_writer: Arc<PrimaryWriter>,
-    other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
+    pub(crate) writers_handle: WritersHandle,
+    #[cfg(feature = "specfile")]
+    pub(crate) o_specfile_watcher: Option<Debouncer<FsEventWatcher>>,
 }
-
 impl LoggerHandle {
     pub(crate) fn new(
         spec: Arc<RwLock<LogSpecification>>,
@@ -95,31 +95,29 @@ impl LoggerHandle {
         other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     ) -> Self {
         Self {
-            spec,
-            spec_stack: Vec::default(),
-            primary_writer,
-            other_writers,
+            writers_handle: WritersHandle {
+                spec,
+                spec_stack: Vec::default(),
+                primary_writer,
+                other_writers,
+            },
+            #[cfg(feature = "specfile")]
+            o_specfile_watcher: None,
         }
     }
 
     //
-    pub(crate) fn reconfigure(&self, mut max_level: log::LevelFilter) {
-        for w in self.other_writers.as_ref().values() {
-            max_level = std::cmp::max(max_level, w.max_log_level());
-        }
-        log::set_max_level(max_level);
+    pub(crate) fn reconfigure(&self, max_level: log::LevelFilter) {
+        self.writers_handle.reconfigure(max_level);
     }
 
     /// Replaces the active `LogSpecification`.
     #[allow(clippy::missing_panics_doc)]
-    pub fn set_new_spec(&mut self, new_spec: LogSpecification) {
-        let max_level = new_spec.max_level();
-        self.spec
-            .write()
+    pub fn set_new_spec(&self, new_spec: LogSpecification) {
+        self.writers_handle
+            .set_new_spec(new_spec)
             .map_err(|e| eprint_err(ERRCODE::Poison, "rwlock on log spec is poisoned", &e))
-            .unwrap(/*ok*/)
-            .update_from(new_spec);
-        self.reconfigure(max_level);
+            .ok();
     }
 
     /// Tries to replace the active `LogSpecification` with the result from parsing the given String.
@@ -135,8 +133,9 @@ impl LoggerHandle {
     /// Replaces the active `LogSpecification` and pushes the previous one to a Stack.
     #[allow(clippy::missing_panics_doc)]
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
-        self.spec_stack
-            .push(self.spec.read().unwrap(/* catch and expose error? */).clone());
+        self.writers_handle
+            .spec_stack
+            .push(self.writers_handle.spec.read().unwrap(/* catch and expose error? */).clone());
         self.set_new_spec(new_spec);
     }
 
@@ -150,8 +149,9 @@ impl LoggerHandle {
         &mut self,
         new_spec: S,
     ) -> Result<(), FlexiLoggerError> {
-        self.spec_stack.push(
-            self.spec
+        self.writers_handle.spec_stack.push(
+            self.writers_handle
+                .spec
                 .read()
                 .map_err(|_| FlexiLoggerError::Poison)?
                 .clone(),
@@ -162,15 +162,15 @@ impl LoggerHandle {
 
     /// Reverts to the previous `LogSpecification`, if any.
     pub fn pop_temp_spec(&mut self) {
-        if let Some(previous_spec) = self.spec_stack.pop() {
+        if let Some(previous_spec) = self.writers_handle.spec_stack.pop() {
             self.set_new_spec(previous_spec);
         }
     }
 
     /// Flush all writers.
     pub fn flush(&self) {
-        self.primary_writer.flush().ok();
-        for writer in self.other_writers.values() {
+        self.writers_handle.primary_writer.flush().ok();
+        for writer in self.writers_handle.other_writers.values() {
             writer.flush().ok();
         }
     }
@@ -195,7 +195,7 @@ impl LoggerHandle {
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
     pub fn reset_flw(&self, flwb: &FileLogWriterBuilder) -> Result<(), FlexiLoggerError> {
-        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
             mw.reset_file_log_writer(flwb)
         } else {
             Err(FlexiLoggerError::NoFileLogger)
@@ -210,7 +210,7 @@ impl LoggerHandle {
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
     pub fn flw_config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
-        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
             mw.flw_config()
         } else {
             Err(FlexiLoggerError::NoFileLogger)
@@ -240,7 +240,7 @@ impl LoggerHandle {
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
     pub fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
-        if let PrimaryWriter::Multi(ref mw) = &*self.primary_writer {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
             mw.reopen_outputfile()
         } else {
             Err(FlexiLoggerError::NoFileLogger)
@@ -259,8 +259,8 @@ impl LoggerHandle {
     ///
     /// See also [`writers::LogWriter::shutdown`](crate::writers::LogWriter::shutdown).
     pub fn shutdown(&self) {
-        self.primary_writer.shutdown();
-        for writer in self.other_writers.values() {
+        self.writers_handle.primary_writer.shutdown();
+        for writer in self.writers_handle.other_writers.values() {
             writer.shutdown();
         }
     }
@@ -268,11 +268,36 @@ impl LoggerHandle {
     // Allows checking the logs written so far to the writer
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        self.primary_writer.validate_logs(expected);
+        self.writers_handle.primary_writer.validate_logs(expected);
     }
 }
 
-impl Drop for LoggerHandle {
+#[derive(Clone)]
+pub(crate) struct WritersHandle {
+    spec: Arc<RwLock<LogSpecification>>,
+    spec_stack: Vec<LogSpecification>,
+    primary_writer: Arc<PrimaryWriter>,
+    other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
+}
+impl WritersHandle {
+    fn set_new_spec(&self, new_spec: LogSpecification) -> Result<(), FlexiLoggerError> {
+        let max_level = new_spec.max_level();
+        self.spec
+            .write()
+            .map_err(|_| FlexiLoggerError::Poison)?
+            .update_from(new_spec);
+        self.reconfigure(max_level);
+        Ok(())
+    }
+
+    pub(crate) fn reconfigure(&self, mut max_level: log::LevelFilter) {
+        for w in self.other_writers.as_ref().values() {
+            max_level = std::cmp::max(max_level, w.max_log_level());
+        }
+        log::set_max_level(max_level);
+    }
+}
+impl Drop for WritersHandle {
     fn drop(&mut self) {
         self.primary_writer.shutdown();
         for writer in self.other_writers.values() {
@@ -295,15 +320,9 @@ pub trait LogSpecSubscriber: 'static + Send {
     fn initial_spec(&self) -> Result<LogSpecification, FlexiLoggerError>;
 }
 #[cfg(feature = "specfile_without_notification")]
-impl LogSpecSubscriber for LoggerHandle {
+impl LogSpecSubscriber for WritersHandle {
     fn set_new_spec(&mut self, new_spec: LogSpecification) -> Result<(), FlexiLoggerError> {
-        let max_level = new_spec.max_level();
-        self.spec
-            .write()
-            .map_err(|_| FlexiLoggerError::Poison)?
-            .update_from(new_spec);
-        self.reconfigure(max_level);
-        Ok(())
+        WritersHandle::set_new_spec(self, new_spec)
     }
 
     fn initial_spec(&self) -> Result<LogSpecification, FlexiLoggerError> {

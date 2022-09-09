@@ -91,7 +91,7 @@ fn utc_offset_with_time() -> UtcOffset {
     match OffsetDateTime::now_local() {
         Ok(ts) => ts.offset(),
         Err(_) => {
-            eprintln!("flexi_logger-test has to work with UTC rather than with local time",);
+            eprintln!("flexi_logger-test works with UTC rather than with local time",);
             UtcOffset::UTC
         }
     }
