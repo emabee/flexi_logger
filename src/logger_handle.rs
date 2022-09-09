@@ -1,5 +1,5 @@
 #[cfg(feature = "specfile")]
-use notify_debouncer_mini::{notify::FsEventWatcher, Debouncer};
+use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
 
 use crate::primary_writer::PrimaryWriter;
 use crate::util::{eprint_err, ERRCODE};
@@ -86,7 +86,7 @@ use std::sync::{Arc, RwLock};
 pub struct LoggerHandle {
     pub(crate) writers_handle: WritersHandle,
     #[cfg(feature = "specfile")]
-    pub(crate) o_specfile_watcher: Option<Debouncer<FsEventWatcher>>,
+    pub(crate) o_specfile_watcher: Option<Debouncer<RecommendedWatcher>>,
 }
 impl LoggerHandle {
     pub(crate) fn new(

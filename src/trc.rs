@@ -69,7 +69,7 @@ use crate::{
     writers::{FileLogWriterBuilder, FileLogWriterHandle},
 };
 use crate::{FlexiLoggerError, LogSpecification};
-use notify_debouncer_mini::{notify::FsEventWatcher, Debouncer};
+use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -86,7 +86,7 @@ pub fn subscribe_to_specfile<P: AsRef<Path>>(
     specfile: P,
     reloader: Box<dyn Fn(LogSpecification) + Send + Sync>,
     initial_logspec: LogSpecification,
-) -> Result<Option<Debouncer<FsEventWatcher>>, FlexiLoggerError> {
+) -> Result<Option<Debouncer<RecommendedWatcher>>, FlexiLoggerError> {
     let specfile = specfile.as_ref();
     let mut subscriber = TraceLogSpecSubscriber::new(reloader, initial_logspec);
     synchronize_subscriber_with_specfile(&mut subscriber, specfile)?;
@@ -138,7 +138,7 @@ impl LogSpecSubscriber for TraceLogSpecSubscriber {
 }
 
 /// Rereads the specfile if it was updated and forwards the update to `tracing`'s filter.
-pub struct SpecFileNotifier(Option<Debouncer<FsEventWatcher>>);
+pub struct SpecFileNotifier(Option<Debouncer<RecommendedWatcher>>);
 
 /// Set up tracing to write into the specified `FileLogWriter`,
 /// and to use the (optionally) specified specfile.

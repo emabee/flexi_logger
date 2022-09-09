@@ -28,7 +28,7 @@ use {
     crate::util::{eprint_err, ERRCODE},
     notify_debouncer_mini::{
         new_debouncer,
-        notify::{FsEventWatcher, RecursiveMode},
+        notify::{RecommendedWatcher, RecursiveMode},
         DebounceEventResult, Debouncer,
     },
 };
@@ -849,7 +849,7 @@ impl Logger {
 pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
     specfile: &Path,
     mut subscriber: S,
-) -> Result<Debouncer<FsEventWatcher>, FlexiLoggerError> {
+) -> Result<Debouncer<RecommendedWatcher>, FlexiLoggerError> {
     let specfile = specfile
         .canonicalize()
         .map_err(FlexiLoggerError::SpecfileIo)?;
