@@ -133,9 +133,9 @@
 //! **Note** that with all write modes
 //! except [`WriteMode::Direct`](crate::WriteMode::Direct) (which is the default)
 //! you should keep the [`LoggerHandle`](crate::LoggerHandle) alive
-//! up to the very end of your program,
-//! because it will, in its Drop implementation, flush all writers
-//! to ensure that all buffered log lines are flushed before the program terminates,
+//! up to the very end of your program, because it will, when its last instance is dropped
+//! (in case you use `LoggerHandle::clone()` you can have multiple instances), flush all writers
+//! to ensure that all buffered log lines are written before the program terminates,
 //! and then it calls their shutdown method.
 //!
 //! ## Influence the location and name of the log file

@@ -84,7 +84,6 @@ impl DeferredNow {
     ///
     /// Panics if called too late, i.e., if [`DeferredNow::now`] was already called before on
     /// any instance of `DeferredNow`.
-    #[allow(clippy::significant_drop_in_scrutinee)]
     pub fn force_utc() {
         let mut guard = FORCE_UTC.lock().unwrap();
         match *guard {

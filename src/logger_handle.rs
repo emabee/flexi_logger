@@ -8,13 +8,13 @@ use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-/// Shuts down the logger when dropped, and allows reconfiguring the logger programmatically.
+/// Shuts down the logger when its last instance is dropped
+/// (in case you use `LoggerHandle::clone()` you can have multiple instances),
+/// and allows reconfiguring the logger programmatically.
 ///
 /// A `LoggerHandle` is returned from `Logger::start()` and from `Logger::start_with_specfile()`.
-/// When the logger handle is dropped, then it shuts down the Logger!
-/// This matters if you use one of `Logger::log_to_file`, `Logger::log_to_writer`, or
-/// `Logger::log_to_file_and_writer`. It is then important to keep the logger handle alive
-/// until the very end of your program!
+/// Keep it alive until the very end of your program if you use one of
+/// `Logger::log_to_file`, `Logger::log_to_writer`, or `Logger::log_to_file_and_writer`.
 ///
 /// `LoggerHandle` offers methods to modify the log specification programmatically,
 /// to flush() the logger explicitly, and even to reconfigure the used `FileLogWriter` --
@@ -83,10 +83,11 @@ use std::sync::{Arc, RwLock};
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct LoggerHandle {
     pub(crate) writers_handle: WritersHandle,
     #[cfg(feature = "specfile")]
-    pub(crate) o_specfile_watcher: Option<Debouncer<RecommendedWatcher>>,
+    pub(crate) ao_specfile_watcher: Option<Arc<Debouncer<RecommendedWatcher>>>,
 }
 impl LoggerHandle {
     pub(crate) fn new(
@@ -102,7 +103,7 @@ impl LoggerHandle {
                 other_writers,
             },
             #[cfg(feature = "specfile")]
-            o_specfile_watcher: None,
+            ao_specfile_watcher: None,
         }
     }
 

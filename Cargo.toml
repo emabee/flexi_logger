@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.23.2"
+version = "0.23.3"
 authors = ["emabee <meinolf.block@sap.com>"]
 categories = ["development-tools::debugging"]
 description = """
@@ -20,7 +20,7 @@ rust-version = "1.59.0"
 [lib]
 doctest = false
 
-# docs.rs-specific configuration
+## docs.rs-specific configuration
 [package.metadata.docs.rs]
 # document all features
 all-features = true

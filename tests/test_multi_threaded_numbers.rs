@@ -47,8 +47,8 @@ fn multi_threaded() {
              verify the log"
         );
 
-        let logger = std::sync::Arc::new(logger);
-        #[allow(clippy::redundant_clone)] // clippy ignores the Drop implementation :-(
+        // clippy ignores the Drop implementation of the inner log handle :-(
+        #[allow(clippy::redundant_clone)]
         let logger2 = logger.clone();
         let worker_handles = start_worker_threads(NO_OF_THREADS);
         let new_spec = LogSpecification::parse("trace").unwrap();
@@ -59,7 +59,6 @@ fn multi_threaded() {
                 0
             })
             .unwrap();
-
         wait_for_workers_to_close(worker_handles);
     }
     verify_logs(&directory.display().to_string());

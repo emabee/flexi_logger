@@ -394,7 +394,6 @@ enum SyslogConnector {
 
 impl Write for SyslogConnector {
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        #[allow(clippy::match_same_arms)]
         match *self {
             #[cfg(target_family = "unix")]
             Self::Datagram(ref ud) => {
@@ -417,7 +416,6 @@ impl Write for SyslogConnector {
         }
     }
 
-    #[allow(clippy::match_same_arms)]
     fn flush(&mut self) -> IoResult<()> {
         match *self {
             #[cfg(target_family = "unix")]

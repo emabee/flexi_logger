@@ -150,7 +150,6 @@ pub struct SpecFileNotifier(Option<Debouncer<RecommendedWatcher>>);
 /// # Errors
 ///
 /// Various variants of `FlexiLoggerError` can occur.
-#[allow(clippy::missing_panics_doc)]
 pub fn setup_tracing(
     initial_logspec: LogSpecification,
     o_specfile: Option<&PathBuf>,

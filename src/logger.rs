@@ -834,10 +834,10 @@ impl Logger {
 
         #[cfg(feature = "specfile")]
         {
-            handle.o_specfile_watcher = Some(create_specfile_watcher(
+            handle.ao_specfile_watcher = Some(Arc::new(create_specfile_watcher(
                 specfile,
                 handle.writers_handle.clone(),
-            )?);
+            )?));
         }
 
         Ok((boxed_log, handle))

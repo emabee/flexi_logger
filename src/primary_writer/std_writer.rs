@@ -206,9 +206,10 @@ impl LogWriter for StdWriter {
         }
     }
 
-    #[allow(unused_variables)]
+    #[cfg(not(test))]
+    fn validate_logs(&self, _expected: &[(&'static str, &'static str, &'static str)]) {}
+    #[cfg(test)]
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
-        #[cfg(test)]
         {
             use std::io::BufRead;
             let write_cursor = self.validation_buffer.lock().unwrap();

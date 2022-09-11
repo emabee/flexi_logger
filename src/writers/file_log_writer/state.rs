@@ -489,7 +489,6 @@ fn open_log_file(
     config: &FileLogWriterConfig,
     with_rotation: bool,
 ) -> Result<(Box<dyn Write + Send>, OffsetDateTime, PathBuf), std::io::Error> {
-    #[allow(clippy::unnecessary_lazy_evaluations)] // fix requires rustc 1.62
     let path = config
         .file_spec
         .as_pathbuf(with_rotation.then(|| CURRENT_INFIX));

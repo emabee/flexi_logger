@@ -3,8 +3,6 @@
 #![deny(missing_docs)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![allow(clippy::unused_self)]
-#![allow(clippy::needless_doctest_main)]
 //! A flexible and easy-to-use logger that writes logs to stderr and/or to files
 //! or other output streams.
 //!

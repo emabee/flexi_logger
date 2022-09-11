@@ -194,7 +194,6 @@ impl WriteMode {
         }
     }
     pub(crate) fn buffersize(&self) -> Option<usize> {
-        #[allow(clippy::match_same_arms)]
         match self.inner() {
             EffectiveWriteMode::Direct => None,
             EffectiveWriteMode::BufferAndFlushWith(bufsize, _)
@@ -209,7 +208,6 @@ impl WriteMode {
         }
     }
     pub(crate) fn get_flush_interval(&self) -> Duration {
-        #[allow(clippy::match_same_arms)]
         match self {
             Self::Direct | Self::BufferDontFlush | Self::BufferDontFlushWith(_) => {
                 Duration::from_secs(0)

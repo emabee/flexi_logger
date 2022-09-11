@@ -31,13 +31,12 @@ pub fn default_format(
     )
 }
 
-#[allow(clippy::doc_markdown)]
 /// A colored version of the logline-formatter `default_format`
 /// that produces log lines like <br>
-/// <code><span style="color:red">ERROR</span> &#91;my_prog::some_submodule&#93; <span
+/// <code><span style="color:red">ERROR</span> &#91;`my_prog::some_submodule`&#93; <span
 /// style="color:red">File not found</span></code>
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method `[style](crate::style)` if you want to influence coloring.
 ///
 /// # Errors
 ///
