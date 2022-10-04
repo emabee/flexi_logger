@@ -3,13 +3,9 @@ use crate::DeferredNow;
 use ansi_term::{Color, Style};
 use log::Record;
 use std::thread;
-use time::{format_description::FormatItem, macros::format_description};
 
-/// Precompiled version of the time stamp format that is used by the provided format functions.
-pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &[FormatItem<'static>] = format_description!(
-    "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
-        [offset_hour sign:mandatory]:[offset_minute]"
-);
+/// Time stamp format that is used by the provided format functions.
+pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
 
 /// A logline-formatter that produces log lines like <br>
 /// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
@@ -100,7 +96,7 @@ pub fn colored_opt_format(
     write!(
         w,
         "[{}] {} [{}:{}] {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK)),
+        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
@@ -152,7 +148,7 @@ pub fn colored_detailed_format(
     write!(
         w,
         "[{}] {} [{}] {}:{}: {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK)),
+        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(record.level().to_string()),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
@@ -205,7 +201,7 @@ pub fn colored_with_thread(
     write!(
         w,
         "[{}] T[{:?}] {} [{}:{}] {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK)),
+        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
@@ -271,8 +267,8 @@ struct Palette {
 impl Palette {
     fn default() -> Palette {
         Palette {
-            error: Style::default().fg(Color::Fixed(196)).bold(),
-            warn: Style::default().fg(Color::Fixed(208)).bold(),
+            error: Style::default().fg(Color::Fixed(196)),
+            warn: Style::default().fg(Color::Fixed(208)),
             info: Style::default(),
             debug: Style::default().fg(Color::Fixed(27)),
             trace: Style::default().fg(Color::Fixed(8)),
@@ -399,3 +395,39 @@ pub type FormatFunction = fn(
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error>;
+
+#[cfg(test)]
+mod test {
+    use crate::DeferredNow;
+
+    #[test]
+    fn test_opt_format() {
+        let mut buf = Vec::<u8>::new();
+        let w = &mut buf;
+        let mut now = DeferredNow::new();
+
+        let record = log::Record::builder()
+            .file(Some("a"))
+            .line(Some(1))
+            .args(format_args!("test message"))
+            .build();
+
+        super::opt_format(w, &mut now, &record).unwrap();
+        // [2016-01-13 15:25:01.640870 +01:00]
+        assert_eq!(buf[0], b'[');
+        assert_eq!(buf[5], b'-');
+        assert_eq!(buf[8], b'-');
+        assert_eq!(buf[11], b' ');
+        assert_eq!(buf[14], b':');
+        assert_eq!(buf[17], b':');
+        assert_eq!(buf[20], b'.');
+        assert_eq!(buf[27], b' ');
+        assert_eq!(buf[28], b'+');
+        assert_eq!(buf[31], b':');
+        assert_eq!(buf[34], b']');
+
+        let s = String::from_utf8(buf[35..].to_vec()).unwrap();
+        assert_eq!(s.as_str(), " INFO [a:1] test message");
+        println!("s: {}", s);
+    }
+}

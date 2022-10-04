@@ -168,10 +168,10 @@ impl Drop for FileLogWriter {
 #[cfg(test)]
 mod test {
     use crate::{writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
+    use chrono::Local;
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
-    use time::{format_description::FormatItem, macros::format_description};
 
     const DIRECTORY: &str = r"log_files/rotate";
     const ONE: &str = "ONE";
@@ -184,18 +184,13 @@ mod test {
     const EIGHT: &str = "EIGHT";
     const NINE: &str = "NINE";
 
-    const FMT_DASHES_U_DASHES: &[FormatItem<'static>] =
-        format_description!("[year]-[month]-[day]_[hour]-[minute]-[second]");
+    const FMT_DASHES_U_DASHES: &str = "%Y-%m-%d_%H-%M-%S";
 
     #[test]
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let mut ts = "false-numbers-".to_string();
-        ts.push_str(
-            &DeferredNow::now_local()
-                .format(FMT_DASHES_U_DASHES)
-                .unwrap(),
-        );
+        let ts =
+            String::from("false-numbers-") + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -233,12 +228,8 @@ mod test {
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let mut ts = "true-numbers-".to_string();
-        ts.push_str(
-            &DeferredNow::now_local()
-                .format(FMT_DASHES_U_DASHES)
-                .unwrap(),
-        );
+        let ts =
+            String::from("true-numbers-") + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -286,12 +277,8 @@ mod test {
     #[test]
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let mut ts = "false-timestamps-".to_string();
-        ts.push_str(
-            &DeferredNow::now_local()
-                .format(FMT_DASHES_U_DASHES)
-                .unwrap(),
-        );
+        let ts_discr = String::from("false-timestamps-")
+            + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -300,37 +287,36 @@ mod test {
         );
         let naming = Naming::Timestamps;
 
-        // ensure we start with -/-/-
-        assert!(list_rotated_files(&basename, &ts).is_empty());
-        assert!(not_exists("CURRENT", &ts));
+        println!("{} ensure we start with -/-/-", chrono::Local::now());
+        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        assert!(not_exists("CURRENT", &ts_discr));
 
-        // ensure this produces -/-/ONE
-        write_loglines(false, naming, &ts, &[ONE]);
-        assert!(list_rotated_files(&basename, &ts).is_empty());
-        assert!(contains("CURRENT", &ts, ONE));
-
-        std::thread::sleep(Duration::from_secs(2));
-        // ensure this produces ONE/-/TWO
-        write_loglines(false, naming, &ts, &[TWO]);
-        assert_eq!(list_rotated_files(&basename, &ts).len(), 1);
-        assert!(contains("CURRENT", &ts, TWO));
+        println!("{} ensure this produces -/-/ONE", chrono::Local::now());
+        write_loglines(false, naming, &ts_discr, &[ONE]);
+        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        assert!(contains("CURRENT", &ts_discr, ONE));
 
         std::thread::sleep(Duration::from_secs(2));
-        // ensure this produces ONE/TWO/THREE
-        write_loglines(false, naming, &ts, &[THREE]);
-        assert_eq!(list_rotated_files(&basename, &ts).len(), 2);
-        assert!(contains("CURRENT", &ts, THREE));
+        println!("{} ensure this produces ONE/-/TWO", chrono::Local::now());
+        write_loglines(false, naming, &ts_discr, &[TWO]);
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 1);
+        assert!(contains("CURRENT", &ts_discr, TWO));
+
+        std::thread::sleep(Duration::from_secs(2));
+        println!(
+            "{} ensure this produces ONE/TWO/THREE",
+            chrono::Local::now()
+        );
+        write_loglines(false, naming, &ts_discr, &[THREE]);
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 2);
+        assert!(contains("CURRENT", &ts_discr, THREE));
     }
 
     #[test]
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
-        let mut ts = "true-timestamps-".to_string();
-        ts.push_str(
-            &DeferredNow::now_local()
-                .format(FMT_DASHES_U_DASHES)
-                .unwrap(),
-        );
+        let ts = String::from("true-timestamps-")
+            + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())

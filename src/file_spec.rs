@@ -1,7 +1,6 @@
 use crate::{DeferredNow, FlexiLoggerError};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use time::{format_description::FormatItem, macros::format_description};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -241,8 +240,7 @@ impl FileSpec {
     }
 }
 
-const TS_USCORE_DASHES_USCORE_DASHES: &[FormatItem<'static>] =
-    format_description!("_[year]-[month]-[day]_[hour]-[minute]-[second]");
+const TS_USCORE_DASHES_USCORE_DASHES: &str = "_%Y-%m-%d_%H-%M-%S";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum TimestampCfg {
@@ -253,12 +251,11 @@ enum TimestampCfg {
 impl TimestampCfg {
     fn get_timestamp(&self) -> Option<String> {
         match self {
-            Self::Default | Self::Yes => {
-                Some(
-                    DeferredNow::now_local()
-                    .format(TS_USCORE_DASHES_USCORE_DASHES).unwrap(/*ok*/),
-                )
-            }
+            Self::Default | Self::Yes => Some(
+                DeferredNow::new()
+                    .format(TS_USCORE_DASHES_USCORE_DASHES)
+                    .to_string(),
+            ),
             Self::No => None,
         }
     }
@@ -266,9 +263,21 @@ impl TimestampCfg {
 
 #[cfg(test)]
 mod test {
-    use super::FileSpec;
+    use super::{FileSpec, TimestampCfg};
     use std::path::{Path, PathBuf};
-    use time::{format_description, PrimitiveDateTime};
+
+    #[test]
+    fn test_timstamp_cfg() {
+        let ts = TimestampCfg::Yes;
+        let s = ts.get_timestamp().unwrap(/* OK */);
+        let bytes = s.into_bytes();
+        assert_eq!(bytes[0], b'_');
+        assert_eq!(bytes[5], b'-');
+        assert_eq!(bytes[8], b'-');
+        assert_eq!(bytes[11], b'_');
+        assert_eq!(bytes[14], b'-');
+        assert_eq!(bytes[17], b'-');
+    }
 
     #[test]
     fn test_default() {
@@ -307,14 +316,7 @@ mod test {
             assert_eq!(stem.as_bytes()[progname.len()], b'_');
             let s_ts = &stem[progname.len() + 1..];
             assert!(
-                PrimitiveDateTime::parse(
-                    s_ts,
-                    &format_description::parse(
-                    "[year]-[month]-[day]_[hour]-[minute]-[second]"
-                )
-                .unwrap(/*ok*/)
-                )
-                .is_ok(),
+                chrono::NaiveDateTime::parse_from_str(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
                 "s_ts: \"{}\"",
                 s_ts
             );

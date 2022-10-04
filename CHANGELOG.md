@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - unpublished
+
+Revert back to using `chrono`, since `chrono` is now fortunately maintained again and the timezone
+handling is fixed (largely reverting the changes done for [0.19.6]).
+
 ## [0.23.3] - 2022-09-11
 
 Re-introduce `LoggerHandle::clone()`.
@@ -240,8 +245,10 @@ Improve color handling
 - introduce AdaptiveFormat for a clearer API
 - Support using feature `atty` without provided coloring
 - Extend example `colors` to provide insight in how AdaptiveFormat works
-- Remove the deprecated method `Logger::do_not_log()`; use `log_target()` with `LogTarget::DevNull` instead.
-- Remove deprecated method `Logger::o_log_to_file()`; use  `log_target()` instead. The clearer convenience method `Logger::log_to_file()` is still available.
+- Remove the deprecated method `Logger::do_not_log()`;
+  use `log_target()` with `LogTarget::DevNull` instead.
+- Remove deprecated method `Logger::o_log_to_file()`; use  `log_target()` instead.
+  The clearer convenience method `Logger::log_to_file()` is still available.
 
 Improve the compression feature. Solves [issue-65](https://github.com/emabee/flexi_logger/issues/65).
 

@@ -17,7 +17,7 @@ and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
-flexi_logger = "0.23"
+flexi_logger = "0.24"
 log = "0.4"
 ```
 
@@ -53,8 +53,10 @@ There are many configuration options to e.g.
 See
 
 * the documentation of module
-  [code_examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html) for a bunch of examples,
-* the [API documentation](https://docs.rs/flexi_logger/latest/flexi_logger) for a complete reference.
+  [code_examples](https://docs.rs/flexi_logger/latest/flexi_logger/code_examples/index.html)
+  for a bunch of examples,
+* the [API documentation](https://docs.rs/flexi_logger/latest/flexi_logger)
+  for a complete reference.
 
 ## Minimal rust version
 
@@ -66,7 +68,7 @@ Make use of the non-default features by specifying them in your `Cargo.toml`, e.
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.23", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.24", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -74,7 +76,7 @@ or, to get the smallest footprint (and no colors), switch off even the default f
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.23", default_features = false }
+flexi_logger = { version = "0.24", default_features = false }
 log = "0.4"
 ```
 
@@ -100,7 +102,9 @@ The default feature `colors` simplifies this by doing three things:
 * it activates the optional dependency to `atty` to being able to switch off
   coloring if the output is not sent to a terminal but e.g. piped to another program.
 
-**<span style="color:red">C</span><span style="color:blue">o</span><span style="color:green">l</span><span style="color:orange">o</span><span style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
+**<span style="color:red">C</span><span style="color:blue">o</span><span
+style="color:green">l</span><span style="color:orange">o</span><span
+style="color:magenta">r</span><span style="color:darkturquoise">s</span>**,
 or styles in general, are a matter of taste, and no choice will fit every need.
 So you can override the default formatting and coloring in various ways.
 
@@ -154,31 +158,6 @@ Adds the ability to filter logs by text, but also adds a dependency on the regex
 ### **`trc`**
 
 An experimental feature that allows using `flexi_logger` functionality with `tracing`.
-
-### **`use_chrono_for_offset`**
-
-The advisory [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159) hits both
-the `chrono` and the `time` crate.
-Since `time` is striving for a solution, while `chrono` appears to be unmaintained,
-`flexi_logger` switched from `chrono` to `time`.
-However, `time`'s "strategy" to solve the advisory is overly puristic:
-it refuses to obtain the UTC offset on unix platforms, if the program is multi-threaded
-or running on a unix version other than `linux`.
-
-`flexi_logger` tries to solve this dilemma by obtaining the UTC offset only once,
-during initialization, when most programs are still single-threaded.
-`time` should then be able to provide the correct offset on linux.
-
-If this does not work, activate feature `use_chrono_for_offset`, which
-
-* re-introduces the dependency to `chrono`
-* uses `chrono` to determine the UTC offset
-* makes your program again affected by
-  [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159),
-  which in many cases seems acceptable.
-
-Note that this feature will be removed as soon as `time` allows obtaining the UTC offset
-again on all platforms.
 
 ## Versions
 

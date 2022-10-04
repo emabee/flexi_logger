@@ -4,8 +4,9 @@ use super::{
 };
 use crate::{
     util::{eprint_err, ERRCODE},
-    Age, Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, Naming,
+    Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
 };
+use chrono::{DateTime, Datelike, Local, Timelike};
 #[cfg(feature = "external_rotation")]
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::cmp::max;
@@ -23,8 +24,6 @@ use std::{
         Arc,
     },
 };
-use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
-
 const CURRENT_INFIX: &str = "_rCURRENT";
 fn number_infix(idx: u32) -> String {
     format!("_r{:0>5}", idx)
@@ -65,7 +64,7 @@ struct CleanupThreadHandle {
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
-    created_at: OffsetDateTime,
+    created_at: DateTime<Local>,
     cleanup: Cleanup,
     o_cleanup_thread_handle: Option<CleanupThreadHandle>,
 }
@@ -75,7 +74,7 @@ impl RotationState {
     }
 
     fn age_rotation_necessary(&self, age: Age) -> bool {
-        let now = DeferredNow::now_local();
+        let now = Local::now();
         match age {
             Age::Day => {
                 self.created_at.year() != now.year()
@@ -485,10 +484,11 @@ fn validate_logs_in_file(
     );
 }
 
+#[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &FileLogWriterConfig,
     with_rotation: bool,
-) -> Result<(Box<dyn Write + Send>, OffsetDateTime, PathBuf), std::io::Error> {
+) -> Result<(Box<dyn Write + Send>, DateTime<Local>, PathBuf), std::io::Error> {
     let path = config
         .file_spec
         .as_pathbuf(with_rotation.then(|| CURRENT_INFIX));
@@ -630,7 +630,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
 // Cleaning up can leave some restart-files with higher numbers; if we still are in the same
 // second, we need to continue with the restart-incrementing.
 fn rotate_output_file_to_date(
-    creation_date: &OffsetDateTime,
+    creation_date: &DateTime<Local>,
     config: &FileLogWriterConfig,
 ) -> Result<(), std::io::Error> {
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
@@ -656,22 +656,16 @@ fn rotate_output_file_to_date(
 fn determine_new_name_for_rotate_output_file_to_date(
     file_spec: &FileSpec,
     use_utc: bool,
-    creation_date: &OffsetDateTime,
+    creation_date: &DateTime<Local>,
 ) -> PathBuf {
-    const INFIX_DATE: &[FormatItem<'static>] =
-        format_description!("_r[year]-[month]-[day]_[hour]-[minute]-[second]");
-    let infix_date_string = {
-        // use utc if configured
-        let mut infix_date: OffsetDateTime = *creation_date;
-        if use_utc {
-            let (h, m, s) = creation_date.offset().as_hms();
-            if h != 0 || m != 0 || s != 0 {
-                infix_date -=
-                    time::Duration::seconds(i64::from(s) + i64::from(m) * 60 + i64::from(h) * 3600);
-            };
-        }
-        infix_date.format(INFIX_DATE).unwrap()
-    };
+    const INFIX_DATE: &str = "_r%Y-%m-%d_%H-%M-%S";
+    let infix_date_string = if use_utc {
+        (*creation_date).naive_utc().format(INFIX_DATE)
+    } else {
+        (*creation_date).format(INFIX_DATE)
+    }
+    .to_string();
+
     let mut rotated_path = file_spec.as_pathbuf(Some(&infix_date_string));
     // Search for rotated_path as is and for restart-siblings;
     // if any exists, find highest restart and add 1, else continue without restart
@@ -740,7 +734,7 @@ fn rotate_output_file_to_idx(
 }
 
 // See documentation of Criterion::Age.
-fn get_creation_date(path: &Path) -> OffsetDateTime {
+fn get_creation_date(path: &Path) -> DateTime<Local> {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     // On unix, we know that try_get_creation_date() returns an error.
     if cfg!(any(target_os = "windows", target_family = "unix")) {
@@ -755,11 +749,11 @@ fn get_creation_date(path: &Path) -> OffsetDateTime {
     }
 }
 
-fn get_fake_creation_date() -> OffsetDateTime {
-    DeferredNow::now_local()
+fn get_fake_creation_date() -> DateTime<Local> {
+    Local::now()
 }
 
-fn try_get_creation_date(path: &Path) -> Result<OffsetDateTime, FlexiLoggerError> {
+fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
 

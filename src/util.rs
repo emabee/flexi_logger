@@ -29,8 +29,6 @@ pub(crate) enum ERRCODE {
     Poison,
     #[cfg(target_family = "unix")]
     Symlink,
-    #[cfg(not(feature = "use_chrono_for_offset"))]
-    Time,
     WriterSpec,
 }
 impl ERRCODE {
@@ -47,8 +45,6 @@ impl ERRCODE {
             Self::Poison => "poison",
             #[cfg(target_family = "unix")]
             Self::Symlink => "symlink",
-            #[cfg(not(feature = "use_chrono_for_offset"))]
-            Self::Time => "time",
             Self::WriterSpec => "writerspec",
         }
     }

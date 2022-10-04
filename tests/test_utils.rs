@@ -1,9 +1,7 @@
 #![allow(dead_code)]
 
-#[cfg(feature = "use_chrono_for_offset")]
-use chrono::{Local, Offset};
+use chrono::{DateTime, Local};
 use std::path::PathBuf;
-use time::{format_description::FormatItem, macros::format_description, OffsetDateTime, UtcOffset};
 
 const CTRL_INDEX: &str = "CTRL_INDEX";
 
@@ -13,14 +11,13 @@ pub fn file(filename: &str) -> PathBuf {
     f
 }
 
-const TS: &[FormatItem<'static>] =
-    format_description!("[year]-[month]-[day]_[hour]-[minute]-[second]");
+const TS: &str = "%Y-%m-%d_%H-%M-%S";
 
 pub fn dir() -> PathBuf {
     let mut d = PathBuf::new();
     d.push("log_files");
     add_prog_name(&mut d);
-    d.push(now_local().format(TS).unwrap());
+    d.push(now_local().format(TS).to_string());
     d
 }
 pub fn add_prog_name(pb: &mut PathBuf) {
@@ -67,42 +64,12 @@ pub fn dispatch(count: u8) -> Option<u8> {
     }
 }
 
-// Due to https://rustsec.org/advisories/RUSTSEC-2020-0159
-// we obtain the offset only once and keep it here
-lazy_static::lazy_static! {
-    static ref OFFSET: UtcOffset = utc_offset();
-}
-
-fn utc_offset() -> UtcOffset {
-    #[cfg(feature = "use_chrono_for_offset")]
-    return utc_offset_with_chrono();
-
-    #[allow(unreachable_code)]
-    utc_offset_with_time()
-}
-
-#[cfg(feature = "use_chrono_for_offset")]
-fn utc_offset_with_chrono() -> UtcOffset {
-    let chrono_offset_seconds = Local::now().offset().fix().local_minus_utc();
-    UtcOffset::from_whole_seconds(chrono_offset_seconds).unwrap(/* ok */)
-}
-
-fn utc_offset_with_time() -> UtcOffset {
-    match OffsetDateTime::now_local() {
-        Ok(ts) => ts.offset(),
-        Err(_) => {
-            eprintln!("flexi_logger-test works with UTC rather than with local time",);
-            UtcOffset::UTC
-        }
-    }
-}
-
 #[must_use]
-pub fn now_local() -> OffsetDateTime {
-    OffsetDateTime::now_utc().to_offset(*OFFSET)
+pub fn now_local() -> DateTime<Local> {
+    Local::now()
 }
 
-pub struct Stopwatch(OffsetDateTime);
+pub struct Stopwatch(DateTime<Local>);
 impl Default for Stopwatch {
     fn default() -> Self {
         Stopwatch(now_local())
@@ -112,7 +79,7 @@ impl Drop for Stopwatch {
     fn drop(&mut self) {
         log::info!(
             "Task executed in {} ms.",
-            (now_local() - self.0).whole_milliseconds()
+            (now_local() - self.0).num_milliseconds()
         );
     }
 }

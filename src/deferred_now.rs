@@ -1,21 +1,18 @@
-#[cfg(not(feature = "use_chrono_for_offset"))]
-use crate::util::{eprint_err, ERRCODE};
-#[cfg(feature = "use_chrono_for_offset")]
-use chrono::{Local, Offset};
-
-use std::sync::{Arc, Mutex};
+use chrono::{
+    format::{DelayedFormat, StrftimeItems},
+    DateTime, Local, TimeZone, Utc,
+};
 #[cfg(feature = "syslog_writer")]
-use time::Month;
-use time::{formatting::Formattable, OffsetDateTime, UtcOffset};
+use chrono::{Datelike, Timelike};
+use std::sync::{Arc, Mutex};
 
 /// Deferred timestamp creation.
 ///
 /// Is used to ensure that a log record that is sent to multiple outputs
 /// (in maybe different formats) always uses the same timestamp.
 #[derive(Debug, Default)]
-pub struct DeferredNow(Option<OffsetDateTime>);
-
-impl DeferredNow {
+pub struct DeferredNow(Option<DateTime<Local>>);
+impl<'a> DeferredNow {
     /// Constructs a new instance, but does not generate the timestamp.
     #[must_use]
     pub fn new() -> Self {
@@ -25,22 +22,27 @@ impl DeferredNow {
     /// Retrieve the timestamp.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
-    pub fn now(&mut self) -> &OffsetDateTime {
-        self.0.get_or_insert_with(Self::now_local)
+    pub fn now(&'a mut self) -> &'a DateTime<Local> {
+        self.0.get_or_insert_with(Local::now)
     }
 
-    /// Convert into a formatted String.
+    /// Produces a preformatted object suitable for printing.
     ///
     /// # Panics
     ///
     /// Panics if `fmt` has an inappropriate value.
-    pub fn format(&mut self, fmt: &(impl Formattable + ?Sized)) -> String {
-        self.now().format(fmt).unwrap(/* ok */)
+    pub fn format<'b>(&'a mut self, fmt: &'b str) -> DelayedFormat<StrftimeItems<'b>> {
+        if use_utc() {
+            Utc.from_utc_datetime(&self.now().naive_utc()).format(fmt)
+        } else {
+            self.now().format(fmt)
+        }
     }
 
+    // The format described in RFC 3339; example: 1985-04-12T23:20:50.523Z
     #[cfg(feature = "syslog_writer")]
-    pub(crate) fn format_rfc3339(&mut self) -> String {
-        self.format(&time::format_description::well_known::Rfc3339)
+    pub(crate) fn format_rfc3339(&mut self) -> DelayedFormat<StrftimeItems<'_>> {
+        self.format("%Y-%m-%dT%H:%M:%S%.3fZ")
     }
 
     // format_rfc3164: Mmm dd hh:mm:ss, where
@@ -51,26 +53,29 @@ impl DeferredNow {
     #[cfg(feature = "syslog_writer")]
     pub(crate) fn format_rfc3164(&mut self) -> String {
         let now = self.now();
+        let date = now.date();
+        let time = now.time();
         format!(
             "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
-            mmm = match now.month() {
-                Month::January => "Jan",
-                Month::February => "Feb",
-                Month::March => "Mar",
-                Month::April => "Apr",
-                Month::May => "May",
-                Month::June => "Jun",
-                Month::July => "Jul",
-                Month::August => "Aug",
-                Month::September => "Sep",
-                Month::October => "Oct",
-                Month::November => "Nov",
-                Month::December => "Dec",
+            mmm = match date.month() {
+                1 => "Jan",
+                2 => "Feb",
+                3 => "Mar",
+                4 => "Apr",
+                5 => "May",
+                6 => "Jun",
+                7 => "Jul",
+                8 => "Aug",
+                9 => "Sep",
+                10 => "Oct",
+                11 => "Nov",
+                12 => "Dec",
+                _ => unreachable!(),
             },
-            dd = now.day(),
-            hh = now.hour(),
-            mm = now.minute(),
-            ss = now.second()
+            dd = date.day(),
+            hh = time.hour(),
+            mm = time.minute(),
+            ss = time.second()
         )
     }
 
@@ -97,68 +102,28 @@ impl DeferredNow {
         }
     }
 
-    // Get the current timestamp, usually in local time.
-    //
-    // This method retrieves the timezone offset only once and caches it then.
-    // This is to mitigate the issue of the `time` crate
-    // (see their [CHANGELOG](https://github.com/time-rs/time/blob/main/CHANGELOG.md#035-2021-11-12))
-    // that determining the offset is not safely working on linux,
-    // and is not even tried there if the program is multi-threaded, or on other Unix-like systems.
-    //
-    // The method is called a first time during the initialization of `flexi_logger`,
-    // and when the initialization is done while the program is single-threaded,
-    // this should produce the right time offset in the trace output on linux.
-    // On Windows and Mac there are no such limitations.
-    //
-    // If `Logger::use_utc()` is used, then this method will always return a UTC timestamp.
-    #[doc(hidden)]
-    #[must_use]
-    pub fn now_local() -> OffsetDateTime {
-        OffsetDateTime::now_utc().to_offset(*OFFSET)
-    }
+    // // Get the current timestamp, usually in local time.
+    // #[doc(hidden)]
+    // #[must_use]
+    // pub fn now_local() -> DateTime<Local> {
+    //     Local::now()
+    // }
 }
 
-// Due to https://rustsec.org/advisories/RUSTSEC-2020-0159
-// we obtain the offset only once and keep it here
-lazy_static::lazy_static! {
-    static ref OFFSET: UtcOffset = {
-        let mut force_utc_guard = FORCE_UTC.lock().unwrap();
-        if let Some(true) = *force_utc_guard { UtcOffset::UTC } else {
-            if force_utc_guard.is_none() {
-                *force_utc_guard = Some(false);
-            }
-
-            #[cfg(feature = "use_chrono_for_offset")]
-            {
-                let chrono_offset_seconds = Local::now().offset().fix().local_minus_utc();
-                UtcOffset::from_whole_seconds(chrono_offset_seconds).unwrap(/* ok */)
-            }
-            #[cfg(not(feature = "use_chrono_for_offset"))]
-            {
-                match OffsetDateTime::now_local() {
-                    Ok(ts) => {ts.offset()},
-                    Err(e) => {
-                        eprint_err(
-                            ERRCODE::Time,
-                            "flexi_logger works with UTC rather than with local time",
-                            &e,
-                        );
-                        UtcOffset::UTC
-                    }
-                }
-            }
-        }
-    };
-}
-
-// now_local() takes the offset from the lazy_static OFFSET, and this should be cheap.
-// At the same time we want to influence the value in OFFSET based on whether Logger::use_utc()
-// is used.
-// Logger::use_utc() thus modifies the (expensive) lazy_static FORCE_UTC, and then the (cheap)
-// lazy_static OFFSET is filled in the first invocation of now_local().
 lazy_static::lazy_static! {
     static ref FORCE_UTC: Arc<Mutex<Option<bool>>> =
     Arc::new(Mutex::new(None));
+}
+fn use_utc() -> bool {
+    let mut force_utc_guard = FORCE_UTC.lock().unwrap();
+    if let Some(true) = *force_utc_guard {
+        true
+    } else {
+        if force_utc_guard.is_none() {
+            *force_utc_guard = Some(false);
+        }
+        false
+    }
 }
 
 #[cfg(test)]
@@ -188,5 +153,20 @@ mod test {
 
         let mut deferred_now = super::DeferredNow::new();
         println!("rfc3164: {}", deferred_now.format_rfc3164());
+    }
+
+    #[test]
+    #[cfg(feature = "syslog_writer")]
+    fn test_format_rfc3339() {
+        // The format described in RFC 3339; example: 1985-04-12T23:20:50.52Z
+        let s = super::DeferredNow::new().format_rfc3339().to_string();
+        let bytes = s.into_bytes();
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
+        assert_eq!(bytes[10], b'T');
+        assert_eq!(bytes[13], b':');
+        assert_eq!(bytes[16], b':');
+        assert_eq!(bytes[19], b'.');
+        assert_eq!(bytes[23], b'Z');
     }
 }

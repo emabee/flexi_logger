@@ -1,0 +1,11 @@
+{
+    "MD013": {
+        "line_length": 100,
+        "heading_line_length": 300
+    },
+    "MD033": {
+        "allowed_elements": [
+            "span"
+        ]
+    }
+}

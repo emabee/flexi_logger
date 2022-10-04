@@ -2,10 +2,11 @@ mod test_utils;
 
 #[cfg(feature = "compress")]
 mod d {
+    use chrono::{Local, NaiveDateTime};
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-        Record, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+        Record, WriteMode,
     };
     use glob::glob;
     use log::*;
@@ -15,7 +16,6 @@ mod d {
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::thread::{self, JoinHandle};
-    use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -28,7 +28,7 @@ mod d {
         // we use a special log line format that starts with a special string so that it is easier to
         // verify that all log lines are written correctly
 
-        let start = super::test_utils::now_local();
+        let start = Local::now();
         let directory = super::test_utils::dir();
         let end = {
             let logger = Logger::try_with_str("debug")
@@ -62,10 +62,10 @@ mod d {
             logger.set_new_spec(new_spec);
 
             wait_for_workers_to_close(worker_handles);
-            super::test_utils::now_local()
+            Local::now()
         };
-        let delta1 = (end - start).whole_milliseconds();
-        let delta2 = (super::test_utils::now_local() - end).whole_milliseconds();
+        let delta1 = end.signed_duration_since(start).num_milliseconds();
+        let delta2 = Local::now().signed_duration_since(end);
         println!(
             "Task executed with {} threads in {} ms, \
              program added {} ms to finish writing logs.",
@@ -125,7 +125,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
+            now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
             thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),
@@ -192,14 +192,11 @@ mod d {
             Box::new(BufReader::new(File::open(p).unwrap()))
         };
 
-        const TS: &[FormatItem<'static>] = format_description!(
-            "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6] \
-                [offset_hour sign:mandatory]:[offset_minute]"
-        );
+        const TS: &str = "%Y-%m-%d %H:%M:%S.%.6f %:z";
         for line in buf_reader.lines() {
             let line = line.unwrap();
             //9 fraction digits, should be 6
-            if let Ok(ts) = OffsetDateTime::parse(&line[7..40], &TS) {
+            if let Ok(ts) = NaiveDateTime::parse_from_str(&line[7..40], TS) {
                 let n = match &line[45..46].parse::<usize>() {
                     Ok(n) => *n,
                     Err(_) => continue,
@@ -209,7 +206,7 @@ mod d {
                     *counters
                         .total
                         .1
-                        .entry((ts - bts).whole_microseconds())
+                        .entry((ts - bts).num_microseconds().unwrap())
                         .or_insert(1) += 1;
                 }
                 counters.total.0 = Some(ts);
@@ -217,7 +214,7 @@ mod d {
                 if let Some(bts) = counters.threads[n].0 {
                     *counters.threads[n]
                         .1
-                        .entry((ts - bts).whole_microseconds())
+                        .entry((ts - bts).num_microseconds().unwrap())
                         .or_insert(1) += 1;
                 }
                 counters.threads[n].0 = Some(ts);
@@ -225,7 +222,7 @@ mod d {
         }
     }
 
-    fn write_csv(directory: &str, name: &str, data: &BTreeMap<i128, usize>) {
+    fn write_csv(directory: &str, name: &str, data: &BTreeMap<i64, usize>) {
         let mut path = PathBuf::from(directory);
         path.push(name);
         let mut file = std::io::BufWriter::new(
@@ -242,7 +239,7 @@ mod d {
     }
 
     struct Counters {
-        total: (Option<OffsetDateTime>, BTreeMap<i128, usize>),
-        threads: [(Option<OffsetDateTime>, BTreeMap<i128, usize>); 5],
+        total: (Option<NaiveDateTime>, BTreeMap<i64, usize>),
+        threads: [(Option<NaiveDateTime>, BTreeMap<i64, usize>); 5],
     }
 }
