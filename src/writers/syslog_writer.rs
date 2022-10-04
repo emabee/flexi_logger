@@ -407,7 +407,8 @@ impl Write for SyslogConnector {
             }
             Self::Tcp(ref mut w) => {
                 // todo: reconnect if conn is broken
-                w.write(buf)
+                let n = w.write(buf)?;
+                Ok(w.write(b"\n")? + n)
             }
             Self::Udp(ref socket) => {
                 // ??
