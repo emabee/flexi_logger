@@ -1,8 +1,9 @@
 use crate::DeferredNow;
-#[cfg(feature = "colors")]
-use ansi_term::{Color, Style};
 use log::Record;
 use std::thread;
+use termcolor::WriteColor;
+#[cfg(feature = "colors")]
+use termcolor::{Color, ColorSpec};
 
 /// Time stamp format that is used by the provided format functions.
 pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
@@ -14,7 +15,7 @@ pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
 ///
 /// See `std::write`
 pub fn default_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -27,12 +28,23 @@ pub fn default_format(
     )
 }
 
+struct Colored(log::Level);
+impl Colored {
+    fn write<M: std::fmt::Display>(&self, w: &mut dyn WriteColor, m: M) -> std::io::Result<()> {
+        let color_spec = color_spec(self.0);
+        w.set_color(&color_spec)?;
+        write!(w, "{}", m)?;
+        w.reset()?;
+        Ok(())
+    }
+}
+
 /// A colored version of the logline-formatter `default_format`
 /// that produces log lines like <br>
 /// <code><span style="color:red">ERROR</span> &#91;`my_prog::some_submodule`&#93; <span
 /// style="color:red">File not found</span></code>
 ///
-/// See method `[style](crate::style)` if you want to influence coloring.
+/// See method [`color_spec`](crate::color_spec) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -40,18 +52,17 @@ pub fn default_format(
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_default_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
-    let level = record.level();
-    write!(
-        w,
-        "{} [{}] {}",
-        style(level).paint(level.to_string()),
-        record.module_path().unwrap_or("<unnamed>"),
-        style(level).paint(record.args().to_string())
-    )
+    let colored = Colored(record.level());
+
+    colored.write(w, record.level())?;
+    write!(w, " [{}] ", record.module_path().unwrap_or("<unnamed>"),)?;
+    colored.write(w, record.args())?;
+
+    Ok(())
 }
 
 /// A logline-formatter that produces log lines with timestamp and file location, like
@@ -63,7 +74,7 @@ pub fn colored_default_format(
 ///
 /// See `std::write`
 pub fn opt_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -80,7 +91,7 @@ pub fn opt_format(
 
 /// A colored version of the logline-formatter `opt_format`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`color_spec`](crate::color_spec) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -88,20 +99,25 @@ pub fn opt_format(
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_opt_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
-    let level = record.level();
+    let colored = Colored(record.level());
+
+    write!(w, "[")?;
+    colored.write(w, now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK))?;
+    write!(w, "] ",)?;
+    colored.write(w, record.level())?;
     write!(
         w,
-        "[{}] {} [{}:{}] {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
-        style(level).paint(level.to_string()),
+        " [{}:{}] ",
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
-    )
+    )?;
+    colored.write(w, record.args())?;
+
+    Ok(())
 }
 
 /// A logline-formatter that produces log lines like
@@ -114,7 +130,7 @@ pub fn colored_opt_format(
 ///
 /// See `std::write`
 pub fn detailed_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -132,7 +148,7 @@ pub fn detailed_format(
 
 /// A colored version of the logline-formatter `detailed_format`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`color_spec`](crate::color_spec) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -140,21 +156,26 @@ pub fn detailed_format(
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_detailed_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
-    let level = record.level();
+    let colored = Colored(record.level());
+
+    write!(w, "[")?;
+    colored.write(w, now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK))?;
+    write!(w, "] ",)?;
+    colored.write(w, record.level())?;
     write!(
         w,
-        "[{}] {} [{}] {}:{}: {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
-        style(level).paint(record.level().to_string()),
+        " [{}] {}:{}: ",
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
-    )
+    )?;
+    colored.write(w, &record.args())?;
+
+    Ok(())
 }
 
 /// A logline-formatter that produces log lines like
@@ -167,7 +188,7 @@ pub fn colored_detailed_format(
 ///
 /// See `std::write`
 pub fn with_thread(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
@@ -185,7 +206,7 @@ pub fn with_thread(
 
 /// A colored version of the logline-formatter `with_thread`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`color_spec`](crate::color_spec) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -193,21 +214,27 @@ pub fn with_thread(
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 pub fn colored_with_thread(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
-    let level = record.level();
+    let colored = Colored(record.level());
+
+    write!(w, "[")?;
+    colored.write(w, now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK))?;
+    write!(w, "] T[",)?;
+    colored.write(w, thread::current().name().unwrap_or("<unnamed>"))?;
+    write!(w, "] ",)?;
+    colored.write(w, record.level())?;
     write!(
         w,
-        "[{}] T[{:?}] {} [{}:{}] {}",
-        style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
-        style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
-        style(level).paint(level.to_string()),
+        " [{}:{}]",
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
-    )
+    )?;
+    colored.write(w, record.args())?;
+
+    Ok(())
 }
 
 /// Helper function that is used in the provided coloring format functions to apply
@@ -219,14 +246,14 @@ pub fn colored_with_thread(
 #[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
 #[must_use]
-pub fn style(level: log::Level) -> Style {
+pub fn color_spec(level: log::Level) -> ColorSpec {
     let palette = &*(PALETTE.read().unwrap());
     match level {
-        log::Level::Error => palette.error,
-        log::Level::Warn => palette.warn,
-        log::Level::Info => palette.info,
-        log::Level::Debug => palette.debug,
-        log::Level::Trace => palette.trace,
+        log::Level::Error => palette.error.clone(),
+        log::Level::Warn => palette.warn.clone(),
+        log::Level::Info => palette.info.clone(),
+        log::Level::Debug => palette.debug.clone(),
+        log::Level::Trace => palette.trace.clone(),
     }
 }
 
@@ -257,45 +284,61 @@ pub(crate) fn set_palette(input: &Option<String>) -> Result<(), std::num::ParseI
 #[cfg(feature = "colors")]
 #[derive(Debug)]
 struct Palette {
-    pub error: Style,
-    pub warn: Style,
-    pub info: Style,
-    pub debug: Style,
-    pub trace: Style,
+    pub error: ColorSpec,
+    pub warn: ColorSpec,
+    pub info: ColorSpec,
+    pub debug: ColorSpec,
+    pub trace: ColorSpec,
 }
 #[cfg(feature = "colors")]
 impl Palette {
     fn default() -> Palette {
+        let mut error = ColorSpec::new();
+        error.set_fg(Some(Color::Ansi256(196))).set_bold(true);
+
+        let mut warn = ColorSpec::new();
+        warn.set_fg(Some(Color::Ansi256(208))).set_bold(true);
+
+        let info = ColorSpec::new();
+
+        let mut debug = ColorSpec::new();
+        debug.set_fg(Some(Color::Ansi256(27)));
+
+        let mut trace = ColorSpec::new();
+        trace.set_fg(Some(Color::Ansi256(8)));
+
         Palette {
-            error: Style::default().fg(Color::Fixed(196)),
-            warn: Style::default().fg(Color::Fixed(208)),
-            info: Style::default(),
-            debug: Style::default().fg(Color::Fixed(27)),
-            trace: Style::default().fg(Color::Fixed(8)),
+            error,
+            warn,
+            info,
+            debug,
+            trace,
         }
     }
 
     fn from(palette_string: &str) -> Result<Palette, std::num::ParseIntError> {
         let mut items = palette_string.split(';');
         Ok(Palette {
-            error: parse_style(items.next().unwrap_or("196").trim())?,
-            warn: parse_style(items.next().unwrap_or("208").trim())?,
-            info: parse_style(items.next().unwrap_or("-").trim())?,
-            debug: parse_style(items.next().unwrap_or("27").trim())?,
-            trace: parse_style(items.next().unwrap_or("8").trim())?,
+            error: parse_color_spec(items.next().unwrap_or("196").trim())?,
+            warn: parse_color_spec(items.next().unwrap_or("208").trim())?,
+            info: parse_color_spec(items.next().unwrap_or("-").trim())?,
+            debug: parse_color_spec(items.next().unwrap_or("27").trim())?,
+            trace: parse_color_spec(items.next().unwrap_or("8").trim())?,
         })
     }
 }
 
 #[cfg(feature = "colors")]
-fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
+fn parse_color_spec(input: &str) -> Result<ColorSpec, std::num::ParseIntError> {
     Ok(if input == "-" {
-        Style::new()
+        ColorSpec::new()
     } else {
+        let mut cs = ColorSpec::new();
         match input.strip_prefix('b') {
-            None => Style::new().fg(Color::Fixed(input.parse()?)),
-            Some(s) => Style::new().bold().fg(Color::Fixed(s.parse()?)),
-        }
+            None => cs.set_fg(Some(Color::Ansi256(input.parse()?))),
+            Some(s) => cs.set_bold(true).set_fg(Some(Color::Ansi256(s.parse()?))),
+        };
+        cs
     })
 }
 
@@ -390,44 +433,14 @@ impl AdaptiveFormat {
 ///
 /// - `record`: the log line's content and metadata, as provided by the log crate's macros.
 ///
+// pub type FormatFunction = fn(
+//     write: &mut dyn std::io::Write,
+//     now: &mut DeferredNow,
+//     record: &Record,
+// ) -> Result<(), std::io::Error>;
+
 pub type FormatFunction = fn(
-    write: &mut dyn std::io::Write,
+    write: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error>;
-
-#[cfg(test)]
-mod test {
-    use crate::DeferredNow;
-
-    #[test]
-    fn test_opt_format() {
-        let mut buf = Vec::<u8>::new();
-        let w = &mut buf;
-        let mut now = DeferredNow::new();
-
-        let record = log::Record::builder()
-            .file(Some("a"))
-            .line(Some(1))
-            .args(format_args!("test message"))
-            .build();
-
-        super::opt_format(w, &mut now, &record).unwrap();
-        // [2016-01-13 15:25:01.640870 +01:00]
-        assert_eq!(buf[0], b'[');
-        assert_eq!(buf[5], b'-');
-        assert_eq!(buf[8], b'-');
-        assert_eq!(buf[11], b' ');
-        assert_eq!(buf[14], b':');
-        assert_eq!(buf[17], b':');
-        assert_eq!(buf[20], b'.');
-        assert_eq!(buf[27], b' ');
-        assert_eq!(buf[28], b'+');
-        assert_eq!(buf[31], b':');
-        assert_eq!(buf[34], b']');
-
-        let s = String::from_utf8(buf[35..].to_vec()).unwrap();
-        assert_eq!(s.as_str(), " INFO [a:1] test message");
-        println!("s: {}", s);
-    }
-}

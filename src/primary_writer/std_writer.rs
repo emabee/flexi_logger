@@ -3,6 +3,7 @@ use {
     crate::util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
     crossbeam_channel::{self, SendError, Sender},
     crossbeam_queue::ArrayQueue,
+    std::thread::JoinHandle,
 };
 
 use {
@@ -14,23 +15,21 @@ use {
     },
     log::Record,
     std::io::{BufWriter, Write},
+    std::sync::Mutex,
 };
 
 #[cfg(test)]
 use std::io::Cursor;
 
 #[cfg(any(feature = "async", test))]
-use std::sync::Arc;
-use std::sync::Mutex;
-#[cfg(feature = "async")]
-use std::thread::JoinHandle;
+use {std::sync::Arc, termcolor::Buffer};
 
 // `StdWriter` writes logs to stdout or stderr.
 pub(crate) struct StdWriter {
     format: FormatFunction,
     writer: InnerStdWriter,
     #[cfg(test)]
-    validation_buffer: Arc<Mutex<Cursor<Vec<u8>>>>,
+    validation_buffer: Arc<Mutex<Buffer>>,
 }
 enum InnerStdWriter {
     Unbuffered(StdStream),
@@ -41,28 +40,29 @@ enum InnerStdWriter {
 #[cfg(feature = "async")]
 #[derive(Debug)]
 struct AsyncHandle {
-    sender: Sender<Vec<u8>>,
+    sender: Sender<Buffer>,
     mo_thread_handle: Mutex<Option<JoinHandle<()>>>,
-    a_pool: Arc<ArrayQueue<Vec<u8>>>,
-    msg_capa: usize,
+    a_pool: Arc<ArrayQueue<Buffer>>,
+    _msg_capa: usize,
 }
 #[cfg(feature = "async")]
+#[allow(clippy::used_underscore_binding)]
 impl AsyncHandle {
     fn new(
         stdstream: StdStream,
         _bufsize: usize,
         pool_capa: usize,
-        msg_capa: usize,
-        #[cfg(test)] validation_buffer: &Arc<Mutex<Cursor<Vec<u8>>>>,
+        _msg_capa: usize,
+        #[cfg(test)] validation_buffer: &Arc<Mutex<Buffer>>,
     ) -> Self {
-        let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<Buffer>();
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
 
         let mo_thread_handle = crate::threads::start_async_stdwriter(
             stdstream,
             receiver,
             Arc::clone(&a_pool),
-            msg_capa,
+            _msg_capa,
             #[cfg(test)]
             Arc::clone(validation_buffer),
         );
@@ -71,17 +71,15 @@ impl AsyncHandle {
             sender,
             mo_thread_handle,
             a_pool,
-            msg_capa,
+            _msg_capa,
         }
     }
 
-    fn pop_buffer(&self) -> Vec<u8> {
-        self.a_pool
-            .pop()
-            .unwrap_or_else(|| Vec::with_capacity(self.msg_capa))
+    fn pop_buffer(&self) -> Buffer {
+        self.a_pool.pop().unwrap_or_else(Buffer::ansi)
     }
 
-    fn send(&self, buffer: Vec<u8>) -> Result<(), SendError<Vec<u8>>> {
+    fn send(&self, buffer: Buffer) -> Result<(), SendError<Buffer>> {
         self.sender.send(buffer)
     }
 }
@@ -93,7 +91,7 @@ impl StdWriter {
         write_mode: &WriteMode,
     ) -> Self {
         #[cfg(test)]
-        let validation_buffer = Arc::new(Mutex::new(Cursor::new(Vec::<u8>::new())));
+        let validation_buffer = Arc::new(Mutex::new(Buffer::ansi()));
 
         let writer = match write_mode.inner() {
             EffectiveWriteMode::Direct => InnerStdWriter::Unbuffered(stdstream),
@@ -187,7 +185,7 @@ impl LogWriter for StdWriter {
             #[cfg(feature = "async")]
             InnerStdWriter::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                buffer.extend(ASYNC_FLUSH);
+                buffer.write_all(ASYNC_FLUSH)?;
                 handle.send(buffer).ok();
                 Ok(())
             }
@@ -198,7 +196,7 @@ impl LogWriter for StdWriter {
         #[cfg(feature = "async")]
         if let InnerStdWriter::Async(handle) = &self.writer {
             let mut buffer = handle.pop_buffer();
-            buffer.extend(ASYNC_SHUTDOWN);
+            buffer.write_all(ASYNC_SHUTDOWN).ok();
             handle.send(buffer).ok();
             if let Ok(ref mut o_th) = handle.mo_thread_handle.lock() {
                 o_th.take().and_then(|th| th.join().ok());
@@ -213,7 +211,7 @@ impl LogWriter for StdWriter {
         {
             use std::io::BufRead;
             let write_cursor = self.validation_buffer.lock().unwrap();
-            let mut reader = std::io::BufReader::new(Cursor::new(write_cursor.get_ref()));
+            let mut reader = std::io::BufReader::new(Cursor::new((*write_cursor).as_slice()));
             let mut buf = String::new();
             for tuple in expected {
                 buf.clear();

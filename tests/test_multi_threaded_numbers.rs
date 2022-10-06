@@ -12,6 +12,7 @@ use std::{
     ops::Add,
     thread::JoinHandle,
 };
+use termcolor::WriteColor;
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -104,7 +105,7 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
 }
 
 pub fn test_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     now: &mut DeferredNow,
     record: &Record,
 ) -> std::io::Result<()> {

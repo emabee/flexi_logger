@@ -10,6 +10,7 @@ mod d {
     use log::*;
     use std::ops::Add;
     use std::thread::{self, JoinHandle};
+    use termcolor::WriteColor;
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -96,7 +97,7 @@ mod d {
     }
 
     pub fn test_format(
-        w: &mut dyn std::io::Write,
+        w: &mut dyn WriteColor,
         now: &mut DeferredNow,
         record: &Record,
     ) -> std::io::Result<()> {

@@ -5,9 +5,8 @@ use std::cell::RefCell;
 use std::io::Write;
 use std::path::Path;
 use std::sync::RwLock;
+use termcolor::Buffer;
 
-#[cfg(test)]
-use std::io::Cursor;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 
@@ -120,10 +119,10 @@ pub(crate) fn io_err(s: &'static str) -> std::io::Error {
 // Thread-local buffer
 pub(crate) fn buffer_with<F>(f: F)
 where
-    F: FnOnce(&RefCell<Vec<u8>>),
+    F: FnOnce(&RefCell<Buffer>),
 {
     thread_local! {
-        static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(200));
+        static BUFFER: RefCell<Buffer> = RefCell::new(Buffer::ansi());
     }
     BUFFER.with(f);
 }
@@ -134,7 +133,7 @@ pub(crate) fn write_buffered(
     now: &mut DeferredNow,
     record: &Record,
     w: &mut dyn Write,
-    #[cfg(test)] o_validation_buffer: Option<&Arc<Mutex<Cursor<Vec<u8>>>>>,
+    #[cfg(test)] o_validation_buffer: Option<&Arc<Mutex<Buffer>>>,
 ) -> Result<(), std::io::Error> {
     let mut result: Result<(), std::io::Error> = Ok(());
 
@@ -146,14 +145,14 @@ pub(crate) fn write_buffered(
                 .write_all(b"\n")
                 .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
 
-            result = w.write_all(&buffer).map_err(|e| {
+            result = w.write_all(buffer.as_slice()).map_err(|e| {
                 eprint_err(ERRCODE::Write, "writing failed", &e);
                 e
             });
 
             #[cfg(test)]
             if let Some(valbuf) = o_validation_buffer {
-                valbuf.lock().unwrap().write_all(&buffer).ok();
+                valbuf.lock().unwrap().write_all(buffer.as_slice()).ok();
             }
             buffer.clear();
         }
@@ -162,21 +161,21 @@ pub(crate) fn write_buffered(
             // (e.g. log calls in Debug or Display implementations)
             // we print the inner calls, in chronological order, before finally the
             // outer most message is printed
-            let mut tmp_buf = Vec::<u8>::with_capacity(200);
+            let mut tmp_buf = Buffer::ansi();
             (format_function)(&mut tmp_buf, now, record)
                 .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
             tmp_buf
                 .write_all(b"\n")
                 .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
 
-            result = w.write_all(&tmp_buf).map_err(|e| {
+            result = w.write_all(tmp_buf.as_slice()).map_err(|e| {
                 eprint_err(ERRCODE::Write, "writing failed", &e);
                 e
             });
 
             #[cfg(test)]
             if let Some(valbuf) = o_validation_buffer {
-                valbuf.lock().unwrap().write_all(&tmp_buf).ok();
+                valbuf.lock().unwrap().write_all(tmp_buf.as_slice()).ok();
             }
         }
     });

@@ -347,7 +347,7 @@ impl Logger {
         self
     }
 
-    /// Sets the color palette for function [`style`](crate::style), which is used in the
+    /// Sets the color palette for function [`color_spec`](crate::color_spec), which is used in the
     /// provided coloring format functions.
     ///
     /// The palette given here overrides the default palette.

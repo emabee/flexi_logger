@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unpublished
+
+Switch from the obviously unmaintained `ansi_term` to `termcolor`.
+
+- comes with significant change of the `FormatFunction` type
+- and writing format functions becomes uglier
+
 ## [0.24.0] - unpublished
 
 Revert back to using `chrono`, since `chrono` is now fortunately maintained again and the timezone

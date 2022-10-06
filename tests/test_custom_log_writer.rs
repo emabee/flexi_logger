@@ -4,6 +4,7 @@ use flexi_logger::writers::LogWriter;
 use flexi_logger::{default_format, DeferredNow, FormatFunction, Logger};
 use log::*;
 use std::sync::Mutex;
+use termcolor::{Buffer, WriteColor};
 
 const COUNT: u8 = 2;
 
@@ -19,14 +20,14 @@ fn work(value: u8) {
     match value {
         0 => {
             logger = logger.log_to_writer(Box::new(CustomWriter {
-                data: Mutex::new(Vec::new()),
+                data: Mutex::new(Buffer::ansi()),
                 format: default_format,
                 mode: 0,
             }));
         }
         1 => {
             logger = logger.log_to_writer(Box::new(CustomWriter {
-                data: Mutex::new(Vec::new()),
+                data: Mutex::new(Buffer::ansi()),
                 format: default_format,
                 mode: 1,
             }));
@@ -56,7 +57,7 @@ fn work(value: u8) {
 }
 
 pub struct CustomWriter {
-    data: Mutex<Vec<u8>>,
+    data: Mutex<Buffer>,
     format: FormatFunction,
     mode: u8,
 }
@@ -99,14 +100,14 @@ impl LogWriter for CustomWriter {
             }
         };
         assert_eq!(
-            String::from_utf8_lossy(&data),
+            String::from_utf8_lossy(data.as_slice()),
             String::from_utf8_lossy(&expected_data)
         );
     }
 }
 
 fn custom_format(
-    writer: &mut dyn std::io::Write,
+    writer: &mut dyn WriteColor,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {

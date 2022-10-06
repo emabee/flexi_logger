@@ -17,6 +17,8 @@ use {
     crate::util::{eprint_err, eprint_msg, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
     crossbeam_channel::{self, Sender as CrossbeamSender},
     crossbeam_queue::ArrayQueue,
+    std::io::Write,
+    termcolor::Buffer,
 };
 
 const CLEANER: &str = "flexi_logger-fs-cleanup";
@@ -69,10 +71,10 @@ pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: st
 #[cfg(feature = "async")]
 pub(super) fn start_async_fs_writer(
     am_state: Arc<Mutex<State>>,
-    message_capa: usize,
-    a_pool: Arc<ArrayQueue<Vec<u8>>>,
-) -> (CrossbeamSender<Vec<u8>>, Mutex<Option<JoinHandle<()>>>) {
-    let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
+    _message_capa: usize,
+    a_pool: Arc<ArrayQueue<Buffer>>,
+) -> (CrossbeamSender<Buffer>, Mutex<Option<JoinHandle<()>>>) {
+    let (sender, receiver) = crossbeam_channel::unbounded::<Buffer>();
     (
         sender,
         Mutex::new(Some(
@@ -83,7 +85,7 @@ pub(super) fn start_async_fs_writer(
                         Err(_) => break,
                         Ok(mut message) => {
                             let mut state = am_state.lock().unwrap(/* ok */);
-                            match message.as_ref() {
+                            match message.as_slice() {
                                 ASYNC_FLUSH => {
                                     state.flush().unwrap_or_else(|e| {
                                         eprint_err(ERRCODE::Flush, "flushing failed", &e);
@@ -99,10 +101,10 @@ pub(super) fn start_async_fs_writer(
                                     });
                                 }
                             }
-                            if message.capacity() <= message_capa {
-                                message.clear();
-                                a_pool.push(message).ok();
-                            }
+                            // if message.capacity() <= message_capa {
+                            message.clear();
+                            a_pool.push(message).ok();
+                            // }
                         }
                     }
                 })
@@ -113,7 +115,7 @@ pub(super) fn start_async_fs_writer(
 
 #[cfg(feature = "async")]
 pub(super) fn start_async_fs_flusher(
-    async_writer: CrossbeamSender<Vec<u8>>,
+    async_writer: CrossbeamSender<Buffer>,
     flush_interval: std::time::Duration,
 ) {
     let builder = std::thread::Builder::new().name(ASYNC_FLUSHER.to_string());
@@ -129,7 +131,11 @@ pub(super) fn start_async_fs_flusher(
                     break;
                 }
 
-                async_writer.send(ASYNC_FLUSH.to_vec()).ok();
+                async_writer.send({
+                    let mut buf = Buffer::ansi();
+                    buf.write_all(ASYNC_FLUSH).ok();
+                    buf
+                }).ok();
             }
         })
         .unwrap(/* yes, let's panic if the thread can't be spawned */);

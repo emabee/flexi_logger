@@ -7,8 +7,6 @@ use crate::{
     Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
-#[cfg(feature = "external_rotation")]
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::cmp::max;
 use std::fs::{remove_file, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -16,14 +14,19 @@ use std::iter::Chain;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::vec::IntoIter;
+use termcolor::Buffer;
 #[cfg(feature = "external_rotation")]
-use std::{
-    ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
+use {
+    notify::{watcher, DebouncedEvent, RecursiveMode, Watcher},
+    std::{
+        ops::Deref,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
     },
 };
+
 const CURRENT_INFIX: &str = "_rCURRENT";
 fn number_infix(idx: u32) -> String {
     format!("_r{:0>5}", idx)
@@ -317,7 +320,7 @@ impl State {
         Ok(())
     }
 
-    pub(super) fn write_buffer(&mut self, buf: &[u8]) -> std::io::Result<()> {
+    pub(super) fn write_buffer(&mut self, buf: &Buffer) -> std::io::Result<()> {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize()?;
         }
@@ -332,7 +335,7 @@ impl State {
             });
 
         if let Inner::Active(ref mut o_rotation_state, ref mut log_file, ref _path) = self.inner {
-            log_file.write_all(buf)?;
+            log_file.write_all(buf.as_slice())?;
             if let Some(ref mut rotation_state) = o_rotation_state {
                 if let RollState::Size(_, ref mut current_size)
                 | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state

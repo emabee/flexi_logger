@@ -1,15 +1,18 @@
 use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::State};
 use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
-#[cfg(feature = "async")]
-use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
+
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+use termcolor::Buffer;
 #[cfg(feature = "async")]
-use std::thread::JoinHandle;
-#[cfg(feature = "async")]
-use {crossbeam_channel::Sender, crossbeam_queue::ArrayQueue};
+use {
+    crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN},
+    crossbeam_channel::Sender,
+    crossbeam_queue::ArrayQueue,
+    std::thread::JoinHandle,
+};
 
 #[derive(Debug)]
 pub(super) enum StateHandle {
@@ -53,9 +56,9 @@ impl std::fmt::Debug for SyncHandle {
 #[cfg(feature = "async")]
 pub(super) struct AsyncHandle {
     am_state: Arc<Mutex<State>>,
-    sender: Sender<Vec<u8>>,
+    sender: Sender<Buffer>,
     mo_thread_handle: Mutex<Option<JoinHandle<()>>>,
-    a_pool: Arc<ArrayQueue<Vec<u8>>>,
+    a_pool: Arc<ArrayQueue<Buffer>>,
     message_capa: usize,
     format_function: FormatFunction,
     line_ending: &'static [u8],
@@ -107,10 +110,8 @@ impl AsyncHandle {
         self.sender.send(buffer).map_err(|_e| io_err("Send"))
     }
 
-    fn pop_buffer(&self) -> Vec<u8> {
-        self.a_pool
-            .pop()
-            .unwrap_or_else(|| Vec::with_capacity(self.message_capa))
+    fn pop_buffer(&self) -> Buffer {
+        self.a_pool.pop().unwrap_or_else(Buffer::ansi)
     }
 }
 
@@ -174,13 +175,23 @@ impl StateHandle {
             StateHandle::Sync(handle) => {
                 let mut state_guard = handle.am_state.lock().map_err(|_e| io_err("Poison"))?;
                 let state = &mut *state_guard;
-                state.write_buffer(buffer).map(|_| buffer.len())
+                state
+                    .write_buffer(&{
+                        let mut buf = Buffer::ansi();
+                        buf.write_all(buffer)?;
+                        buf
+                    })
+                    .map(|_| buffer.len())
             }
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 handle
                     .sender
-                    .send(buffer.to_owned())
+                    .send({
+                        let mut buf = Buffer::ansi();
+                        buf.write_all(buffer)?;
+                        buf
+                    })
                     .map_err(|_e| io_err("Send"))?;
                 Ok(buffer.len())
             }
@@ -213,7 +224,7 @@ impl StateHandle {
                         // (e.g. log calls in Debug or Display implementations)
                         // we print the inner calls, in chronological order, before finally the
                         // outer most message is printed
-                        let mut tmp_buf = Vec::<u8>::with_capacity(200);
+                        let mut tmp_buf = Buffer::ansi();
                         (handle.format_function)(&mut tmp_buf, now, record).unwrap_or_else(|e| {
                             eprint_err(ERRCODE::Format, "formatting failed", &e);
                         });
@@ -248,7 +259,7 @@ impl StateHandle {
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                buffer.extend(ASYNC_FLUSH);
+                buffer.write_all(ASYNC_FLUSH)?;
                 handle.sender.send(buffer).ok();
             }
         }
@@ -310,7 +321,7 @@ impl StateHandle {
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
-                buffer.extend(ASYNC_SHUTDOWN);
+                buffer.write_all(ASYNC_SHUTDOWN).ok();
                 handle.sender.send(buffer).ok();
                 if let Ok(ref mut o_th) = handle.mo_thread_handle.lock() {
                     o_th.take().and_then(|th| th.join().ok());

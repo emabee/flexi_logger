@@ -4,11 +4,18 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
-        use ansi_term::Color;
         use atty::Stream::{Stderr, Stdout};
+        use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
+        let mut stdout = StandardStream::stdout(ColorChoice::AlwaysAnsi);
+        let mut color_spec = ColorSpec::new();
 
         for i in 0..=255 {
-            println!("{}: {}", i, Color::Fixed(i).paint(i.to_string()));
+            print!("{}: ", i);
+            color_spec.set_fg(Some(Color::Ansi256(i)));
+            stdout.set_color(&color_spec).ok();
+            println!("{}", i);
+            stdout.reset().ok();
         }
 
         println!();
@@ -42,49 +49,35 @@ fn main() {
             println!("Unsupported windows console detected, coloring will likely not work");
         }
 
-        println!(
-            "\n{}",
-            Color::Fixed(196)
-                .bold()
-                .paint("err! output (red) with default palette")
-        );
-        println!(
-            "{}",
-            Color::Fixed(208)
-                .bold()
-                .paint("warn! output (yellow) with default palette")
-        );
+        color_spec.set_fg(Some(Color::Ansi256(196))).set_bold(true);
+        stdout.set_color(&color_spec).ok();
+        println!("\n{}", "err! output (red) with default palette");
+        color_spec.set_fg(Some(Color::Ansi256(208))).set_bold(true);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "warn! output (yellow) with default palette");
+        stdout.reset().ok();
         println!("info! output (normal) with default palette");
-        println!(
-            "{}",
-            Color::Fixed(7).paint("debug! output (normal) with default palette")
-        );
-        println!(
-            "{}",
-            Color::Fixed(8).paint("trace! output (grey) with default palette")
-        );
+        color_spec.set_fg(Some(Color::Ansi256(27))).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "debug! output (normal) with default palette");
+        color_spec.set_fg(Some(Color::Ansi256(8))).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "trace! output (grey) with default palette");
 
-        println!(
-            "\n{}",
-            Color::Red
-                .bold()
-                .paint("err! output (red) with env_logger-palette")
-        );
-        println!(
-            "{}",
-            Color::Yellow.paint("warn! output (yellow) with env_logger-palette")
-        );
-        println!(
-            "{}",
-            Color::Green.paint("info! output (green) with env_logger-palette")
-        );
-        println!(
-            "{}",
-            Color::Blue.paint("debug! output (blue) with env_logger-palette")
-        );
-        println!(
-            "{}",
-            Color::Cyan.paint("trace! output (cyan) with env_logger-palette")
-        );
+        color_spec.set_fg(Some(Color::Red)).set_bold(true);
+        stdout.set_color(&color_spec).ok();
+        println!("\n{}", "err! output (red) with env_logger-palette");
+        color_spec.set_fg(Some(Color::Yellow)).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "warn! output (yellow) with env_logger-palette");
+        color_spec.set_fg(Some(Color::Green)).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "info! output (green) with env_logger-palette");
+        color_spec.set_fg(Some(Color::Blue)).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "debug! output (blue) with env_logger-palette");
+        color_spec.set_fg(Some(Color::Cyan)).set_bold(false);
+        stdout.set_color(&color_spec).ok();
+        println!("{}", "trace! output (cyan) with env_logger-palette");
     }
 }

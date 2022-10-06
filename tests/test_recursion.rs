@@ -6,6 +6,7 @@ use flexi_logger::{colored_detailed_format, AdaptiveFormat};
 use flexi_logger::{detailed_format, Duplicate, FileSpec, Logger};
 use log::*;
 use std::sync::atomic::AtomicU32;
+use termcolor::WriteColor;
 
 #[test]
 fn test_recursion() {
@@ -53,22 +54,25 @@ impl std::fmt::Display for Dummy {
 
 #[cfg(feature = "colors")]
 pub fn my_colored_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
-    let style = ansi_term::Style::new().fg(ansi_term::Color::Fixed(165));
-    write!(
-        w,
-        "{} [{}] {}",
-        style.paint(level.to_string()),
-        record.module_path().unwrap_or("<unnamed>"),
-        style.paint(record.args().to_string())
-    )
+    let mut style = termcolor::ColorSpec::new();
+    style.set_fg(Some(termcolor::Color::Ansi256(165)));
+
+    w.set_color(&style)?;
+    write!(w, "{}", level)?;
+    w.reset()?;
+    write!(w, " [{}] ", record.module_path().unwrap_or("<unnamed>"),)?;
+    w.set_color(&style)?;
+    write!(w, "{}", record.args())?;
+    w.reset()?;
+    Ok(())
 }
 pub fn my_format(
-    w: &mut dyn std::io::Write,
+    w: &mut dyn WriteColor,
     _now: &mut DeferredNow,
     record: &Record,
 ) -> Result<(), std::io::Error> {

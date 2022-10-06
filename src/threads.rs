@@ -19,6 +19,7 @@ use {
     crossbeam_channel::Receiver as CrossbeamReceiver,
     crossbeam_queue::ArrayQueue,
     std::{sync::Mutex, thread::JoinHandle},
+    termcolor::Buffer,
 };
 
 // no clue why we get a warning if this allow is omitted; if we omit the use, we get an error
@@ -56,10 +57,10 @@ pub(crate) fn start_flusher_thread(
 #[cfg(feature = "async")]
 pub(crate) fn start_async_stdwriter(
     mut std_stream: StdStream,
-    receiver: CrossbeamReceiver<std::vec::Vec<u8>>,
-    t_pool: Arc<ArrayQueue<Vec<u8>>>,
-    msg_capa: usize,
-    #[cfg(test)] t_validation_buffer: Arc<Mutex<std::io::Cursor<Vec<u8>>>>,
+    receiver: CrossbeamReceiver<Buffer>,
+    t_pool: Arc<ArrayQueue<Buffer>>,
+    _msg_capa: usize,
+    #[cfg(test)] t_validation_buffer: Arc<Mutex<Buffer>>,
 ) -> Mutex<Option<JoinHandle<()>>> {
     Mutex::new(Some(
         ThreadBuilder::new()
@@ -71,7 +72,7 @@ pub(crate) fn start_async_stdwriter(
                     match receiver.recv() {
                         Err(_) => break,
                         Ok(mut message) => {
-                            match message.as_ref() {
+                            match message.as_slice() {
                                 ASYNC_FLUSH => {
                                     std_stream
                                         .deref_mut()
@@ -86,20 +87,20 @@ pub(crate) fn start_async_stdwriter(
                                 _ => {
                                     std_stream
                                         .deref_mut()
-                                        .write_all(&message)
+                                        .write_all(message.as_slice())
                                         .unwrap_or_else(
                                             |e| eprint_err(ERRCODE::Write,"writing failed", &e)
                                         );
                                     #[cfg(test)]
                                     if let Ok(mut guard) = t_validation_buffer.lock() {
-                                        (*guard).write_all(&message).ok();
+                                        (*guard).write_all(message.as_slice()).ok();
                                     }
                                 }
                             }
-                            if message.capacity() <= msg_capa {
+                            // if message.capacity() <= msg_capa {
                                 message.clear();
                                 t_pool.push(message).ok();
-                            }
+                            // }
                         }
                     }
                 }
