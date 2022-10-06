@@ -737,7 +737,7 @@ fn rotate_output_file_to_idx(
 fn get_creation_date(path: &Path) -> DateTime<Local> {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     if cfg!(target_os = "windows") {
-        try_get_modification_date(path).unwrap_or_else(|_| get_current_date())
+        get_current_date()
     } else {
         // On all others of the many platforms, we give the real creation date a try,
         // and fall back if it is not available.
