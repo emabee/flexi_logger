@@ -7,8 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.24.0] - unpublished
 
-Revert back to using `chrono`, since `chrono` is now fortunately maintained again and the timezone
-handling is fixed (largely reverting the changes done for [0.19.6]).
+Revert back to using `chrono`, since `chrono` is now fortunately maintained again and its timezone
+handling is fixed meanwhile (largely reverting the changes done for [0.19.6];
+version bump since this affects the API, e.g. in `DeferredNow`).
+
+Improve the logic that handles the issue described again in
+[issue-122](https://github.com/emabee/flexi_logger/issues/122).
 
 ## [0.23.3] - 2022-09-11
 

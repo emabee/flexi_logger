@@ -736,25 +736,27 @@ fn rotate_output_file_to_idx(
 // See documentation of Criterion::Age.
 fn get_creation_date(path: &Path) -> DateTime<Local> {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
-    // On unix, we know that try_get_creation_date() returns an error.
-    if cfg!(any(target_os = "windows", target_family = "unix")) {
-        get_fake_creation_date()
+    if cfg!(target_os = "windows") {
+        try_get_modification_date(path).unwrap_or_else(|_| get_current_date())
     } else {
         // On all others of the many platforms, we give the real creation date a try,
-        // and fall back to the fake if it is not available.
-        match try_get_creation_date(path) {
-            Ok(d) => d,
-            Err(_e) => get_fake_creation_date(),
-        }
+        // and fall back if it is not available.
+        try_get_creation_date(path)
+            .or_else(|_| try_get_modification_date(path))
+            .unwrap_or_else(|_| get_current_date())
     }
-}
-
-fn get_fake_creation_date() -> DateTime<Local> {
-    Local::now()
 }
 
 fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
+}
+fn try_get_modification_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
+    let md = std::fs::metadata(path)?;
+    let d = md.created().or_else(|_| md.modified())?;
+    Ok(d.into())
+}
+fn get_current_date() -> DateTime<Local> {
+    Local::now()
 }
 
 mod platform {

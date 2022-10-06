@@ -23,8 +23,9 @@ pub enum Criterion {
     /// for different reasons.
     ///
     /// To minimize the impact on age-based file-rotation,
-    /// `flexi_logger` uses on Windows and unix its initialization time
-    /// rather than the real file property
+    /// `flexi_logger` uses on Windows, and on all other platforms where the creation date
+    /// of a file is not available (like on Unix), the last modification date
+    /// (or, if this is also not available, the current time stamp)
     /// as the created_at-info of an rCURRENT file that already exists, and the
     /// current timestamp when file rotation happens during further execution.
     /// Consequently, a left-over rCURRENT file from a previous program run will look newer
@@ -41,11 +42,6 @@ pub enum Criterion {
     /// first one that ever was created - rotation by time would completely fail.
     ///
     /// <a name="ref-1">\[1\]</a> [https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
-    ///
-    /// #### Issue on unix
-    ///
-    /// `std::fs::metadata.created()` returns `Err`, because unix does not maintain a
-    /// created-at-timestamp.
     ///
     Age(Age),
     /// Rotate the file when it has either become older than the specified age, or when it has
