@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.24.0] - unpublished
+## [0.24.0] - 2022-10-06
 
 Revert back to using `chrono`, since `chrono` is now fortunately maintained again and its timezone
 handling is fixed meanwhile (largely reverting the changes done for [0.19.6];

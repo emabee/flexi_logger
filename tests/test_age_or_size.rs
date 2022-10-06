@@ -63,12 +63,6 @@ fn write_log_lines() {
 
     // and do the final rotation:
     trace!("{}", 'o');
-
-    // trace!("{}",'p');
-    // trace!("{}",'q');
-    // trace!("{}",'r');
-    // trace!("{}",'s');
-    // trace!("{}",'t');
 }
 
 fn verify_logs(directory: &Path) {
