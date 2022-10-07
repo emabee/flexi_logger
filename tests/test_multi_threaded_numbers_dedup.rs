@@ -27,8 +27,9 @@ fn multi_threaded() {
     test_utils::wait_for_start_of_second();
     let directory = test_utils::dir();
     {
+        let _logger;
         let _stopwatch = test_utils::Stopwatch::default();
-        let _logger = Logger::try_with_str("debug")
+        _logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(
                 FileSpec::default()
@@ -300,7 +301,7 @@ fn verify_logs(directory: &str) {
             buffer.clear();
         }
     }
-    assert_eq!(line_count, 25);
+    assert_eq!(line_count, 27);
     println!(
         "Found {} log lines from {} threads in {} files",
         line_count, NO_OF_THREADS, no_of_log_files
