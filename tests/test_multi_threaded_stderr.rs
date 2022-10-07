@@ -9,6 +9,7 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
 
 #[test]
 fn multi_threaded() {
+    test_utils::wait_for_start_of_second();
     let _logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_stderr()

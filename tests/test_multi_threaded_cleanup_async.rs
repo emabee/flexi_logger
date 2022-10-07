@@ -17,16 +17,19 @@ mod d {
     use std::path::{Path, PathBuf};
     use std::thread::{self, JoinHandle};
 
+    use crate::test_utils;
+
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
     const ROTATE_OVER_SIZE: u64 = 600_000;
     const NO_OF_LOG_FILES: usize = 2;
     const NO_OF_GZ_FILES: usize = 5;
 
+    // we use a special log line format that starts with a special string so that it is easier to
+    // verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
-        // we use a special log line format that starts with a special string so that it is easier to
-        // verify that all log lines are written correctly
+        test_utils::wait_for_start_of_second();
 
         let start = Local::now();
         let directory = super::test_utils::dir();

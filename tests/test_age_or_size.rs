@@ -11,12 +11,16 @@ use std::path::Path;
 #[test]
 fn test_age_or_size() {
     let directory = test_utils::dir();
+
+    test_utils::wait_for_start_of_second();
+
     Logger::try_with_str("trace")
         .unwrap()
+        .format_for_files(flexi_logger::detailed_format)
         .log_to_file(FileSpec::default().directory(&directory))
         .duplicate_to_stderr(Duplicate::Info)
         .rotate(
-            Criterion::AgeOrSize(Age::Second, 75),
+            Criterion::AgeOrSize(Age::Second, 265),
             Naming::Numbers,
             Cleanup::Never,
         )

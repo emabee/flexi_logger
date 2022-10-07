@@ -21,6 +21,7 @@ mod d {
     // so that it is easier to verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
+        super::test_utils::wait_for_start_of_second();
         let directory = super::test_utils::dir();
         {
             let _stopwatch = super::test_utils::Stopwatch::default();

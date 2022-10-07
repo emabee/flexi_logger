@@ -20,10 +20,11 @@ const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
 const ROTATE_OVER_SIZE: u64 = 800_000;
 
+// we use a special log line format that starts with a special string so that it is easier to
+// verify that all log lines are written correctly
 #[test]
 fn multi_threaded() {
-    // we use a special log line format that starts with a special string so that it is easier to
-    // verify that all log lines are written correctly
+    test_utils::wait_for_start_of_second();
     let directory = test_utils::dir();
     {
         let _stopwatch = test_utils::Stopwatch::default();

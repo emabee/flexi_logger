@@ -83,3 +83,25 @@ impl Drop for Stopwatch {
         );
     }
 }
+
+pub fn wait_for_start_of_second() {
+    loop {
+        let ms = Local::now().timestamp_subsec_millis();
+        if ms < 50 {
+            break;
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis((1010_u32 - ms).into()));
+        }
+    }
+}
+
+pub fn wait_for_end_of_second() {
+    loop {
+        let ms = Local::now().timestamp_subsec_millis();
+        if ms > 980 {
+            break;
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis((990_u32 - ms).into()));
+        }
+    }
+}
