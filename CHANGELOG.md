@@ -8,10 +8,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.24.0] - 2022-10-06
 
 Revert back to using `chrono`, since `chrono` is now fortunately maintained again and its timezone
-handling is fixed meanwhile (largely reverting the changes done for [0.19.6];
-version bump since this affects the API, e.g. in `DeferredNow`).
+handling is fixed meanwhile
 
-Improve the logic that handles the issue described again in
+- this change largely reverts the changes done for [0.19.6]
+- a version bump is necessary since this affects the API, e.g. in `DeferredNow`
+- the feature `use_chrono_for_offset` became obsolete and is removed
+
+On linux and Mac, improve the logic that handles the issue described again in
 [issue-122](https://github.com/emabee/flexi_logger/issues/122).
 
 ## [0.23.3] - 2022-09-11
