@@ -68,9 +68,12 @@ fn multi_threaded() {
 // Starts given number of worker threads and lets each execute `do_work`
 fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
-    trace!("Starting {} worker threads", no_of_workers);
+    trace!(
+        "(should not appear) Starting {} worker threads",
+        no_of_workers
+    );
     for thread_number in 0..no_of_workers {
-        trace!("Starting thread {}", thread_number);
+        trace!("(should not appear) Starting thread {}", thread_number);
         worker_handles.push(
             std::thread::Builder::new()
                 .name(thread_number.to_string())
@@ -81,13 +84,18 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
                 .unwrap(),
         );
     }
-    trace!("All {} worker threads started.", worker_handles.len());
+    trace!(
+        "(should not appear) All {} worker threads started.",
+        worker_handles.len()
+    );
     worker_handles
 }
 
 fn do_work(thread_number: usize) {
-    trace!("({})     Thread started working", thread_number);
-    trace!("ERROR_IF_PRINTED");
+    trace!(
+        "(should not appear) ({})     Thread started working",
+        thread_number
+    );
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("({})  writing out line number {}", thread_number, idx);
     }
@@ -141,7 +149,7 @@ fn verify_logs(directory: &str) {
         let mut reader = BufReader::new(f);
         let mut buffer = String::new();
         while reader.read_line(&mut buffer).unwrap() > 0 {
-            if buffer.starts_with("XXXXX") {
+            if buffer.starts_with("XXXXX") && !buffer.contains("should not appear") {
                 line_count += 1;
             } else {
                 panic!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer);
