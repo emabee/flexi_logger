@@ -1,6 +1,6 @@
 use chrono::{
     format::{DelayedFormat, StrftimeItems},
-    DateTime, Local, TimeZone, Utc,
+    DateTime, Local, Utc,
 };
 #[cfg(feature = "syslog_writer")]
 use chrono::{Datelike, Timelike};
@@ -19,11 +19,18 @@ impl<'a> DeferredNow {
         Self(None)
     }
 
-    /// Retrieve the timestamp.
+    /// Retrieve the timestamp for local time zone.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
     pub fn now(&'a mut self) -> &'a DateTime<Local> {
         self.0.get_or_insert_with(Local::now)
+    }
+
+    /// Retrieve the UTC timestamp.
+    ///
+    /// Requires mutability because the first caller will generate the timestamp.
+    pub fn now_utc_owned(&'a mut self) -> DateTime<Utc> {
+        (*self.now()).into()
     }
 
     /// Produces a preformatted object suitable for printing.
@@ -33,7 +40,7 @@ impl<'a> DeferredNow {
     /// Panics if `fmt` has an inappropriate value.
     pub fn format<'b>(&'a mut self, fmt: &'b str) -> DelayedFormat<StrftimeItems<'b>> {
         if use_utc() {
-            Utc.from_utc_datetime(&self.now().naive_utc()).format(fmt)
+            self.now_utc_owned().format(fmt)
         } else {
             self.now().format(fmt)
         }
@@ -52,9 +59,14 @@ impl<'a> DeferredNow {
     // mm, ss= "00" ... "59"
     #[cfg(feature = "syslog_writer")]
     pub(crate) fn format_rfc3164(&mut self) -> String {
-        let now = self.now();
-        let date = now.date();
-        let time = now.time();
+        let (date, time) = if use_utc() {
+            let now = self.now_utc_owned();
+            (now.date_naive(), now.time())
+        } else {
+            let now = self.now();
+            (now.date_naive(), now.time())
+        };
+
         format!(
             "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
             mmm = match date.month() {
