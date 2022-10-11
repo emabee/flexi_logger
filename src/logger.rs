@@ -25,7 +25,7 @@ use {crate::logger_handle::LogSpecSubscriber, std::io::Read, std::path::Path};
 
 #[cfg(feature = "specfile")]
 use {
-    crate::util::{eprint_err, ERRCODE},
+    crate::util::{eprint_err, ErrorCode},
     notify_debouncer_mini::{
         new_debouncer,
         notify::{RecommendedWatcher, RecursiveMode},
@@ -872,7 +872,7 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
                         .and_then(|spec| subscriber.set_new_spec(spec))
                         .map_err(|e| {
                             eprint_err(
-                                ERRCODE::LogSpecFile,
+                                ErrorCode::LogSpecFile,
                                 "continuing with previous log specification, because \
                                             rereading the log specification file failed",
                                 &e,
@@ -883,7 +883,7 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
             }),
             Err(errors) => errors.iter().for_each(|e| {
                 eprint_err(
-                    ERRCODE::LogSpecFile,
+                    ErrorCode::LogSpecFile,
                     "error while watching the specfile",
                     &e,
                 );

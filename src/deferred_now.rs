@@ -144,10 +144,10 @@ mod test {
     fn test_deferred_now() {
         let mut deferred_now = super::DeferredNow::new();
         let once = deferred_now.now().to_string();
-        println!("This should be the current timestamp: {}", once);
+        println!("This should be the current timestamp: {once}");
         std::thread::sleep(std::time::Duration::from_millis(300));
         let again = deferred_now.now().to_string();
-        println!("This must be the same timestamp:      {}", again);
+        println!("This must be the same timestamp:      {again}");
         assert_eq!(once, again);
     }
 

@@ -1,6 +1,6 @@
 #[cfg(feature = "async")]
 use {
-    crate::util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
+    crate::util::{eprint_err, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
     crossbeam_channel::{self, SendError, Sender},
     crossbeam_queue::ArrayQueue,
 };
@@ -163,10 +163,10 @@ impl LogWriter for StdWriter {
             InnerStdWriter::Async(handle) => {
                 let mut buffer = handle.pop_buffer();
                 (self.format)(&mut buffer, now, record)
-                    .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
+                    .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
                 buffer
                     .write_all(b"\n")
-                    .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                    .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
                 handle.send(buffer).map_err(|_e| io_err("Send"))?;
                 Ok(())
             }

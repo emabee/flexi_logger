@@ -1,5 +1,5 @@
 use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::State};
-use crate::util::{buffer_with, eprint_err, io_err, ERRCODE};
+use crate::util::{buffer_with, eprint_err, io_err, ErrorCode};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
@@ -97,11 +97,11 @@ impl AsyncHandle {
     fn write(&self, now: &mut DeferredNow, record: &Record) -> Result<(), std::io::Error> {
         let mut buffer = self.pop_buffer();
         (self.format_function)(&mut buffer, now, record).map_err(|e| {
-            eprint_err(ERRCODE::Format, "formatting failed", &e);
+            eprint_err(ErrorCode::Format, "formatting failed", &e);
             e
         })?;
         buffer.write_all(self.line_ending).map_err(|e| {
-            eprint_err(ERRCODE::Write, "writing failed", &e);
+            eprint_err(ErrorCode::Write, "writing failed", &e);
             e
         })?;
         self.sender.send(buffer).map_err(|_e| io_err("Send"))
@@ -195,17 +195,17 @@ impl StateHandle {
                 buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
                     Ok(mut buffer) => {
                         (handle.format_function)(&mut *buffer, now, record).unwrap_or_else(|e| {
-                            eprint_err(ERRCODE::Format, "formatting failed", &e);
+                            eprint_err(ErrorCode::Format, "formatting failed", &e);
                         });
                         buffer
                             .write_all(handle.line_ending)
-                            .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                            .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
                         handle
                             .am_state
                             .lock()
                             .expect("state_handle.am_state is poisoned")
                             .write_buffer(&buffer)
-                            .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                            .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
                         buffer.clear();
                     }
                     Err(_e) => {
@@ -215,7 +215,7 @@ impl StateHandle {
                         // outer most message is printed
                         let mut tmp_buf = Vec::<u8>::with_capacity(200);
                         (handle.format_function)(&mut tmp_buf, now, record).unwrap_or_else(|e| {
-                            eprint_err(ERRCODE::Format, "formatting failed", &e);
+                            eprint_err(ErrorCode::Format, "formatting failed", &e);
                         });
                         let mut state_guard = handle
                             .am_state
@@ -224,10 +224,10 @@ impl StateHandle {
                         let state = &mut *state_guard;
                         tmp_buf
                             .write_all(state.config().line_ending)
-                            .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                            .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
                         state
                             .write_buffer(&tmp_buf)
-                            .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                            .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
                     }
                 });
             }

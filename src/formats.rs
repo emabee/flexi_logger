@@ -428,6 +428,6 @@ mod test {
 
         let s = String::from_utf8(buf[35..].to_vec()).unwrap();
         assert_eq!(s.as_str(), " INFO [a:1] test message");
-        println!("s: {}", s);
+        println!("s: {s}");
     }
 }

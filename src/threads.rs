@@ -14,7 +14,7 @@ use {
 use {
     crate::{
         primary_writer::std_stream::StdStream,
-        util::{eprint_err, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
+        util::{eprint_err, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
     },
     crossbeam_channel::Receiver as CrossbeamReceiver,
     crossbeam_queue::ArrayQueue,
@@ -77,7 +77,7 @@ pub(crate) fn start_async_stdwriter(
                                         .deref_mut()
                                         .flush()
                                         .unwrap_or_else(
-                                            |e| eprint_err(ERRCODE::Flush, "flushing failed", &e)
+                                            |e| eprint_err(ErrorCode::Flush, "flushing failed", &e)
                                         );
                                 }
                                 ASYNC_SHUTDOWN => {
@@ -88,7 +88,7 @@ pub(crate) fn start_async_stdwriter(
                                         .deref_mut()
                                         .write_all(&message)
                                         .unwrap_or_else(
-                                            |e| eprint_err(ERRCODE::Write,"writing failed", &e)
+                                            |e| eprint_err(ErrorCode::Write,"writing failed", &e)
                                         );
                                     #[cfg(test)]
                                     if let Ok(mut guard) = t_validation_buffer.lock() {

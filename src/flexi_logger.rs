@@ -1,7 +1,7 @@
 use crate::{
     filter::LogLineFilter,
     primary_writer::PrimaryWriter,
-    util::{eprint_err, eprint_msg, ERRCODE},
+    util::{eprint_err, eprint_msg, ErrorCode},
     writers::LogWriter,
     DeferredNow, LogSpecification,
 };
@@ -39,7 +39,7 @@ impl FlexiLogger {
     fn primary_enabled(&self, level: log::Level, module: &str) -> bool {
         self.log_specification
             .read()
-            .map_err(|e| eprint_err(ERRCODE::Poison, "rwlock on log spec is poisoned", &e))
+            .map_err(|e| eprint_err(ErrorCode::Poison, "rwlock on log spec is poisoned", &e))
             .unwrap()
             .enabled(level, module)
     }
@@ -63,7 +63,9 @@ impl log::Log for FlexiLogger {
             for t in targets {
                 if t != "_Default" {
                     match self.other_writers.get(t) {
-                        None => eprint_msg(ERRCODE::WriterSpec, &format!("bad writer spec: {}", t)),
+                        None => {
+                            eprint_msg(ErrorCode::WriterSpec, &format!("bad writer spec: {t}"));
+                        }
                         Some(writer) => {
                             if level < writer.max_log_level() {
                                 return true;
@@ -89,12 +91,14 @@ impl log::Log for FlexiLogger {
                     use_default = true;
                 } else {
                     match self.other_writers.get(t) {
-                        None => eprint_msg(ERRCODE::WriterSpec, &format!("bad writer spec: {}", t)),
+                        None => {
+                            eprint_msg(ErrorCode::WriterSpec, &format!("bad writer spec: {t}"));
+                        }
                         Some(writer) => {
                             writer.write(&mut now, record).unwrap_or_else(|e| {
                                 eprint_err(
-                                    ERRCODE::Write,
-                                    &format!("writing log line to custom writer \"{}\" failed", t),
+                                    ErrorCode::Write,
+                                    &format!("writing log line to custom writer \"{t}\" failed"),
                                     &e,
                                 );
                             });
@@ -136,17 +140,17 @@ impl log::Log for FlexiLogger {
             self.primary_writer.write(&mut now, record)
         }
         .unwrap_or_else(|e| {
-            eprint_err(ERRCODE::Write, "writing log line failed", &e);
+            eprint_err(ErrorCode::Write, "writing log line failed", &e);
         });
     }
 
     fn flush(&self) {
         self.primary_writer.flush().unwrap_or_else(|e| {
-            eprint_err(ERRCODE::Flush, "flushing primary writer failed", &e);
+            eprint_err(ErrorCode::Flush, "flushing primary writer failed", &e);
         });
         for writer in self.other_writers.values() {
             writer.flush().unwrap_or_else(|e| {
-                eprint_err(ERRCODE::Flush, "flushing custom writer failed", &e);
+                eprint_err(ErrorCode::Flush, "flushing custom writer failed", &e);
             });
         }
     }

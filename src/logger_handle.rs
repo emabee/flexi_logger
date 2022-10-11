@@ -2,7 +2,7 @@
 use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
 
 use crate::primary_writer::PrimaryWriter;
-use crate::util::{eprint_err, ERRCODE};
+use crate::util::{eprint_err, ErrorCode};
 use crate::writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter};
 use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
@@ -117,7 +117,7 @@ impl LoggerHandle {
     pub fn set_new_spec(&self, new_spec: LogSpecification) {
         self.writers_handle
             .set_new_spec(new_spec)
-            .map_err(|e| eprint_err(ERRCODE::Poison, "rwlock on log spec is poisoned", &e))
+            .map_err(|e| eprint_err(ErrorCode::Poison, "rwlock on log spec is poisoned", &e))
             .ok();
     }
 

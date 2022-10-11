@@ -381,7 +381,7 @@ mod test {
                 flw.write(
                     &mut DeferredNow::new(),
                     &log::Record::builder()
-                        .args(format_args!("{}", i))
+                        .args(format_args!("{i}"))
                         .level(log::Level::Error)
                         .target("myApp")
                         .file(Some("server.rs"))
@@ -458,7 +458,7 @@ mod test {
         )
         .unwrap();
 
-        println!("FileLogWriter {:?}", flw);
+        println!("FileLogWriter {flw:?}");
 
         flw.reset(
             &super::FileLogWriter::builder(
@@ -486,7 +486,7 @@ mod test {
                 .build(),
         )
         .unwrap();
-        println!("FileLogWriter {:?}", flw);
+        println!("FileLogWriter {flw:?}");
 
         assert!(flw
             .reset(
@@ -543,7 +543,7 @@ mod test {
             flw.write(
                 &mut DeferredNow::new(),
                 &log::Record::builder()
-                    .args(format_args!("{}", text))
+                    .args(format_args!("{text}"))
                     .level(log::Level::Error)
                     .target("myApp")
                     .file(Some("server.rs"))

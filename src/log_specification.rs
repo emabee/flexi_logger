@@ -124,7 +124,7 @@ impl LogSpecification {
         let filter = parts.next();
         if parts.next().is_some() {
             push_err(
-                &format!("invalid log spec '{}' (too many '/'s), ignoring it", spec),
+                &format!("invalid log spec '{spec}' (too many '/'s), ignoring it"),
                 &mut parse_errs,
             );
             return parse_err(parse_errs, Self::off());
@@ -174,7 +174,7 @@ impl LogSpecification {
                     }
                     _ => {
                         push_err(
-                            &format!("invalid part in log spec '{}', ignoring it", s),
+                            &format!("invalid part in log spec '{s}', ignoring it"),
                             &mut parse_errs,
                         );
                         continue;
@@ -191,7 +191,7 @@ impl LogSpecification {
         let textfilter = filter.and_then(|filter| match Regex::new(filter) {
             Ok(re) => Some(Box::new(re)),
             Err(e) => {
-                push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
+                push_err(&format!("invalid regex filter - {e}"), &mut parse_errs);
                 None
             }
         });
@@ -281,7 +281,7 @@ impl LogSpecification {
             Some(s) => match Regex::new(&s) {
                 Ok(re) => Some(Box::new(re)),
                 Err(e) => {
-                    push_err(&format!("invalid regex filter - {}", e), &mut parse_errs);
+                    push_err(&format!("invalid regex filter - {e}"), &mut parse_errs);
                     None
                 }
             },

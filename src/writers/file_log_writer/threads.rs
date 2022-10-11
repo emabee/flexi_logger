@@ -14,7 +14,7 @@ use {
 
 #[cfg(feature = "async")]
 use {
-    crate::util::{eprint_err, eprint_msg, ASYNC_FLUSH, ASYNC_SHUTDOWN, ERRCODE},
+    crate::util::{eprint_err, eprint_msg, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
     crossbeam_channel::{self, Sender as CrossbeamSender},
     crossbeam_queue::ArrayQueue,
 };
@@ -86,7 +86,7 @@ pub(super) fn start_async_fs_writer(
                             match message.as_ref() {
                                 ASYNC_FLUSH => {
                                     state.flush().unwrap_or_else(|e| {
-                                        eprint_err(ERRCODE::Flush, "flushing failed", &e);
+                                        eprint_err(ErrorCode::Flush, "flushing failed", &e);
                                     });
                                 }
                                 ASYNC_SHUTDOWN => {
@@ -95,7 +95,7 @@ pub(super) fn start_async_fs_writer(
                                 }
                                 _ => {
                                     state.write_buffer(&message).unwrap_or_else(|e| {
-                                        eprint_err(ERRCODE::Write, "writing failed", &e);
+                                        eprint_err(ErrorCode::Write, "writing failed", &e);
                                     });
                                 }
                             }
@@ -125,7 +125,7 @@ pub(super) fn start_async_fs_flusher(
                 if let Err(std::sync::mpsc::RecvTimeoutError::Disconnected) =
                     rx.recv_timeout(flush_interval)
                 {
-                    eprint_msg(ERRCODE::Flush, "Flushing unexpectedly stopped working");
+                    eprint_msg(ErrorCode::Flush, "Flushing unexpectedly stopped working");
                     break;
                 }
 

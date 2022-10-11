@@ -17,7 +17,7 @@ pub(crate) const ASYNC_FLUSH: &[u8] = b"F";
 pub(crate) const ASYNC_SHUTDOWN: &[u8] = b"S";
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum ERRCODE {
+pub(crate) enum ErrorCode {
     Write,
     Flush,
     Format,
@@ -31,7 +31,7 @@ pub(crate) enum ERRCODE {
     Symlink,
     WriterSpec,
 }
-impl ERRCODE {
+impl ErrorCode {
     fn as_index(self) -> &'static str {
         match self {
             Self::Write => "write",
@@ -50,25 +50,25 @@ impl ERRCODE {
     }
 }
 
-pub(crate) fn eprint_err(errcode: ERRCODE, msg: &str, err: &dyn std::error::Error) {
+pub(crate) fn eprint_err(error_code: ErrorCode, msg: &str, err: &dyn std::error::Error) {
     let s = format!(
         "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err:?}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         err = err,
-        code = errcode,
-        code_lc = errcode.as_index(),
+        code = error_code,
+        code_lc = error_code.as_index(),
     );
     try_to_write(&s);
 }
 
-pub(crate) fn eprint_msg(errcode: ERRCODE, msg: &str) {
+pub(crate) fn eprint_msg(error_code: ErrorCode, msg: &str) {
     let s = format!(
         "[flexi_logger][ERRCODE::{code:?}] {msg}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
-        code = errcode,
-        code_lc = errcode.as_index(),
+        code = error_code,
+        code_lc = error_code.as_index(),
     );
     try_to_write(&s);
 }
@@ -83,7 +83,7 @@ pub(crate) fn set_error_channel(channel: ErrorChannel) {
             *guard = channel;
         }
         Err(e) => {
-            eprint_err(ERRCODE::Poison, "Error channel cannot be set", &e);
+            eprint_err(ErrorCode::Poison, "Error channel cannot be set", &e);
         }
     }
 }
@@ -91,14 +91,14 @@ pub(crate) fn set_error_channel(channel: ErrorChannel) {
 fn try_to_write(s: &str) {
     match &*(ERROR_CHANNEL.read().unwrap()) {
         ErrorChannel::StdErr => {
-            eprintln!("{}", s);
+            eprintln!("{s}");
         }
         ErrorChannel::StdOut => {
-            println!("{}", s);
+            println!("{s}");
         }
         ErrorChannel::File(path) => try_to_write_to_file(s, path).unwrap_or_else(|e| {
-            eprintln!("{}", s);
-            eprintln!("Can't open error output file, caused by: {}", e);
+            eprintln!("{s}");
+            eprintln!("Can't open error output file, caused by: {e}");
         }),
         ErrorChannel::DevNull => {}
     }
@@ -109,7 +109,7 @@ fn try_to_write_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
         .create(true)
         .append(true)
         .open(path)?;
-    writeln!(file, "{}", s)?;
+    writeln!(file, "{s}")?;
     file.flush()
 }
 
@@ -141,13 +141,13 @@ pub(crate) fn write_buffered(
     buffer_with(|tl_buf| match tl_buf.try_borrow_mut() {
         Ok(mut buffer) => {
             (format_function)(&mut *buffer, now, record)
-                .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
+                .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
             buffer
                 .write_all(b"\n")
-                .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
 
             result = w.write_all(&buffer).map_err(|e| {
-                eprint_err(ERRCODE::Write, "writing failed", &e);
+                eprint_err(ErrorCode::Write, "writing failed", &e);
                 e
             });
 
@@ -164,13 +164,13 @@ pub(crate) fn write_buffered(
             // outer most message is printed
             let mut tmp_buf = Vec::<u8>::with_capacity(200);
             (format_function)(&mut tmp_buf, now, record)
-                .unwrap_or_else(|e| eprint_err(ERRCODE::Format, "formatting failed", &e));
+                .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
             tmp_buf
                 .write_all(b"\n")
-                .unwrap_or_else(|e| eprint_err(ERRCODE::Write, "writing failed", &e));
+                .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
 
             result = w.write_all(&tmp_buf).map_err(|e| {
-                eprint_err(ERRCODE::Write, "writing failed", &e);
+                eprint_err(ErrorCode::Write, "writing failed", &e);
                 e
             });
 

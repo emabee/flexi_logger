@@ -3,7 +3,7 @@ use super::{
     threads::{start_cleanup_thread, MessageToCleanupThread},
 };
 use crate::{
-    util::{eprint_err, ERRCODE},
+    util::{eprint_err, ErrorCode},
     Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
@@ -26,7 +26,7 @@ use std::{
 };
 const CURRENT_INFIX: &str = "_rCURRENT";
 fn number_infix(idx: u32) -> String {
-    format!("_r{:0>5}", idx)
+    format!("_r{idx:0>5}")
 }
 
 //  Describes the latest existing numbered log file.
@@ -164,9 +164,9 @@ enum Inner {
 impl std::fmt::Debug for Inner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            Self::Initial(o_rot, b) => f.write_fmt(format_args!("Initial({:?}, {}) ", o_rot, b)),
+            Self::Initial(o_rot, b) => f.write_fmt(format_args!("Initial({o_rot:?}, {b}) ")),
             Self::Active(o_rot, _, _) => {
-                f.write_fmt(format_args!("Active({:?}, <some-writer>) ", o_rot,))
+                f.write_fmt(format_args!("Active({o_rot:?}, <some-writer>) "))
             }
         }
     }
@@ -328,7 +328,7 @@ impl State {
         // rotate if necessary
         self.mount_next_linewriter_if_necessary()
             .unwrap_or_else(|e| {
-                eprint_err(ERRCODE::LogFile, "can't open file", &e);
+                eprint_err(ErrorCode::LogFile, "can't open file", &e);
             });
 
         if let Inner::Active(ref mut o_rotation_state, ref mut log_file, ref _path) = self.inner {
@@ -698,7 +698,7 @@ fn determine_new_name_for_rotate_output_file_to_date(
             rotated_path = file_spec.as_pathbuf(Some(
                 &infix_date_string
                     .clone()
-                    .add(&format!(".restart-{:04}", number)),
+                    .add(&format!(".restart-{number:04}")),
             ));
             number += 1;
         }
@@ -761,7 +761,7 @@ fn get_current_date() -> DateTime<Local> {
 
 mod platform {
     #[cfg(target_family = "unix")]
-    use crate::util::{eprint_err, ERRCODE};
+    use crate::util::{eprint_err, ErrorCode};
     use std::path::Path;
 
     pub fn create_symlink_if_possible(link: &Path, path: &Path) {
@@ -773,13 +773,13 @@ mod platform {
         if std::fs::symlink_metadata(link).is_ok() {
             // remove old symlink before creating a new one
             if let Err(e) = std::fs::remove_file(link) {
-                eprint_err(ERRCODE::Symlink, "cannot delete symlink to log file", &e);
+                eprint_err(ErrorCode::Symlink, "cannot delete symlink to log file", &e);
             }
         }
 
         // create new symlink
         if let Err(e) = std::os::unix::fs::symlink(logfile, link) {
-            eprint_err(ERRCODE::Symlink, "cannot create symlink to logfile", &e);
+            eprint_err(ErrorCode::Symlink, "cannot create symlink to logfile", &e);
         }
     }
 
