@@ -868,7 +868,7 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
                 {
                     log_spec_string_from_file(&specfile)
                         .map_err(FlexiLoggerError::SpecfileIo)
-                        .and_then(|s| LogSpecification::from_toml(&s))
+                        .and_then(LogSpecification::from_toml)
                         .and_then(|spec| subscriber.set_new_spec(spec))
                         .map_err(|e| {
                             eprint_err(
@@ -921,7 +921,7 @@ pub(crate) fn synchronize_subscriber_with_specfile<S: LogSpecSubscriber>(
 
     if Path::is_file(specfile) {
         let s = log_spec_string_from_file(specfile).map_err(FlexiLoggerError::SpecfileIo)?;
-        subscriber.set_new_spec(LogSpecification::from_toml(&s)?)?;
+        subscriber.set_new_spec(LogSpecification::from_toml(s)?)?;
     } else {
         if let Some(specfolder) = specfile.parent() {
             std::fs::DirBuilder::new()

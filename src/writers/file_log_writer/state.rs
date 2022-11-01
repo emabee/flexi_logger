@@ -640,7 +640,7 @@ fn rotate_output_file_to_date(
         creation_date,
     );
 
-    match std::fs::rename(&current_path, &rotated_path) {
+    match std::fs::rename(current_path, rotated_path) {
         Ok(()) => Ok(()),
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {

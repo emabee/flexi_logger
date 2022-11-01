@@ -217,7 +217,7 @@ impl LogSpecification {
     /// [`FlexiLoggerError::Parse`] if the input is malformed.
     pub fn env() -> Result<Self, FlexiLoggerError> {
         match env::var("RUST_LOG") {
-            Ok(spec) => Self::parse(&spec),
+            Ok(spec) => Self::parse(spec),
             Err(..) => Ok(Self::off()),
         }
     }
@@ -231,7 +231,7 @@ impl LogSpecification {
     pub fn env_or_parse<S: AsRef<str>>(given_spec: S) -> Result<Self, FlexiLoggerError> {
         env::var("RUST_LOG")
             .map_err(|_e| FlexiLoggerError::Poison /*wrong, but only dummy*/)
-            .and_then(|value| Self::parse(&value))
+            .and_then(Self::parse)
             .or_else(|_| Self::parse(given_spec.as_ref()))
     }
 

@@ -22,7 +22,7 @@ fn work(value: u8) {
 
     let mut logger = Logger::try_with_str("info")
         .unwrap()
-        .log_to_file(FileSpec::default().directory(&test_utils::dir()));
+        .log_to_file(FileSpec::default().directory(test_utils::dir()));
 
     {
         logger = logger.write_mode(WriteMode::Async);

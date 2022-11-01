@@ -64,7 +64,7 @@ fn work(value: u8) {
         for i in 0..100 {
             if i % 25 == 20 {
                 let target_path = target_filespec.as_pathbuf(Some(&i.to_string()));
-                match std::fs::rename(file_path.clone(), &target_path.clone()) {
+                match std::fs::rename(file_path.clone(), target_path.clone()) {
                     Ok(()) => {
                         println!("Renamed the log file {:?} to {:?}", file_path, &target_path);
                         logger.reopen_outputfile().unwrap();

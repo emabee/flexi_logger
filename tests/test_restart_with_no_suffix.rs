@@ -16,7 +16,7 @@ fn test_write_modes() {
 fn work(value: u8) {
     let directory = test_utils::dir();
     let file_spec = FileSpec::default()
-        .directory(&directory)
+        .directory(directory)
         .o_suffix(match value {
             0 => None,
             1 => Some("log".to_string()),
