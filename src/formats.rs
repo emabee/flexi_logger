@@ -1,7 +1,7 @@
 use crate::DeferredNow;
-#[cfg(feature = "colors")]
-use ansi_term::{Color, Style};
 use log::Record;
+#[cfg(feature = "colors")]
+use nu_ansi_term::{Color, Style};
 use std::thread;
 
 /// Time stamp format that is used by the provided format functions.

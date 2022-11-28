@@ -4,8 +4,8 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
-        use ansi_term::Color;
         use atty::Stream::{Stderr, Stdout};
+        use nu_ansi_term::Color;
 
         for i in 0..=255 {
             println!("{}: {}", i, Color::Fixed(i).paint(i.to_string()));
@@ -38,7 +38,7 @@ fn main() {
         }
 
         #[cfg(target_os = "windows")]
-        if ansi_term::enable_ansi_support().is_err() {
+        if nu_ansi_term::enable_ansi_support().is_err() {
             println!("Unsupported windows console detected, coloring will likely not work");
         }
 

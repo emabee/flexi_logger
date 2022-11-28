@@ -57,11 +57,13 @@
 //!
 //! By default, logs are written to `stderr`.
 //! With one of
-//! [`Logger::log_to_stdout`](crate::Logger::log_to_stdout),
-//! [`Logger::log_to_file`](crate::Logger::log_to_file),
-//! [`Logger::log_to_writer`](crate::Logger::log_to_writer),
-//! [`Logger::log_to_file_and_writer`](crate::Logger::log_to_file_and_writer),
-//! or [`Logger::do_not_log`](crate::Logger::do_not_log),
+//!
+//! - [`Logger::log_to_stdout`](crate::Logger::log_to_stdout),
+//! - [`Logger::log_to_file`](crate::Logger::log_to_file),
+//! - [`Logger::log_to_writer`](crate::Logger::log_to_writer),
+//! - [`Logger::log_to_file_and_writer`](crate::Logger::log_to_file_and_writer),
+//! - or [`Logger::do_not_log`](crate::Logger::do_not_log),
+//!
 //! you can send the logs to other destinations, or write them not at all.
 //!
 //! When writing to files or to a writer,

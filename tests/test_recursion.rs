@@ -58,7 +58,7 @@ pub fn my_colored_format(
     record: &Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
-    let style = ansi_term::Style::new().fg(ansi_term::Color::Fixed(165));
+    let style = nu_ansi_term::Style::new().fg(nu_ansi_term::Color::Fixed(165));
     write!(
         w,
         "{} [{}] {}",
