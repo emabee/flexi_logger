@@ -17,7 +17,7 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
 // we use a special log line format that starts with a special string so that it is easier to
 // verify that all log lines are written correctly
 #[test]
-fn multi_threaded() {
+fn test_multi_threaded_dates() {
     test_utils::wait_for_start_of_second();
 
     let directory = test_utils::dir();
@@ -74,10 +74,15 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 fn do_work(thread_number: usize) {
     trace!("({})     Thread started working", thread_number);
     trace!("ERROR_IF_PRINTED");
-    for idx in 0..NO_OF_LOGLINES_PER_THREAD {
+    for idx in 0..500 {
         debug!("({})  writing out line number {}", thread_number, idx);
     }
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // this sleep triggers a yield, hopefully allowing all threads to start before the main thread
+    // changes the log specification
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    for idx in 500..NO_OF_LOGLINES_PER_THREAD {
+        debug!("({})  writing out line number {}", thread_number, idx);
+    }
     trace!("MUST_BE_PRINTED");
 }
 
@@ -137,7 +142,7 @@ fn verify_logs(directory: &str) {
     }
     assert_eq!(
         line_count,
-        NO_OF_THREADS * NO_OF_LOGLINES_PER_THREAD + 3 + NO_OF_THREADS
+        NO_OF_THREADS * (NO_OF_LOGLINES_PER_THREAD + 1) + 3
     );
     println!(
         "Found {} log lines from {} threads in {} files",
