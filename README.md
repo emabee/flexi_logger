@@ -95,7 +95,7 @@ by implementing and using your own coloring format function.
 
 The default feature `colors` simplifies this by doing three things:
 
-* it activates the optional dependency to `ansi_term` and
+* it activates the optional dependency to `nu_ansi_term` and
 * provides additional colored pendants to the existing uncolored format functions
 * it uses `colored_default_format()` for the output to stderr,
   and the non-colored `default_format()` for the output to files
@@ -109,7 +109,7 @@ or styles in general, are a matter of taste, and no choice will fit every need.
 So you can override the default formatting and coloring in various ways.
 
 With switching off the default features and choosing feature `atty` explicitly
-(see [usage](#usage)) you can remove the ansi_term-based coloring
+(see [usage](#usage)) you can remove the `nu_ansi_term`-based coloring
 but keep the capability to switch off your own coloring.
 
 ### **`compress`**

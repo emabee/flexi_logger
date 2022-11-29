@@ -27,7 +27,7 @@ fn main() {
     //         }
 
     //         for i in 0..=255 {
-    //             print!("{}: {}", i, ansi_term::Color::Fixed(i).paint(i.to_string()));
+    //             print!("{}: {}", i, nu_ansi_term::Color::Fixed(i).paint(i.to_string()));
     //             println!("{}: {}", i, i.to_string().color(color_from_ansi_code(i)));
     //         }
 
@@ -58,7 +58,7 @@ fn main() {
     //         }
 
     //         #[cfg(target_os = "windows")]
-    //         if ansi_term::enable_ansi_support().is_err() {
+    //         if nu_ansi_term::enable_ansi_support().is_err() {
     //             println!("Unsupported windows console detected, coloring will likely not work");
     //         }
 

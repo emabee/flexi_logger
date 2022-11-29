@@ -122,7 +122,7 @@ impl Logger {
         #[cfg(feature = "colors")]
         #[cfg(windows)]
         {
-            ansi_term::enable_ansi_support().ok();
+            nu_ansi_term::enable_ansi_support().ok();
         }
 
         Self {
