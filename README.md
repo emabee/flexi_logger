@@ -147,7 +147,7 @@ For that reason the feature is not active by default.
 Pretty much like `specfile`, except that updates to the file are being ignored.
 See [here](https://github.com/emabee/flexi_logger/issues/59) for more details.
 
-### **`syslog`**
+### **`syslog_writer`**
 
 Adds `SyslogWriter`, a `LogWriter` implementation that sends log entries to the syslog.
 
