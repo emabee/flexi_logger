@@ -80,7 +80,7 @@ fn work(value: u8) {
 
     let handle = logger
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -103,7 +103,7 @@ mod platform {
     #[cfg(target_family = "unix")]
     pub fn check_link(link_name: &str) {
         match std::fs::symlink_metadata(link_name) {
-            Err(e) => panic!("error with symlink: {}", e),
+            Err(e) => panic!("error with symlink: {e}"),
             Ok(metadata) => assert!(metadata.file_type().is_symlink(), "not a symlink"),
         }
     }

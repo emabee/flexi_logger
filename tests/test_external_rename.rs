@@ -53,7 +53,7 @@ fn work(value: u8) {
     {
         let logger = logger
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
         // write some log lines to initialize the file
         info!("XXX 1 AAA");
@@ -71,8 +71,7 @@ fn work(value: u8) {
                     }
                     Err(e) => {
                         panic!(
-                            "Cannot rename log file {:?} to {:?} due to {:?}",
-                            file_path, target_path, e
+                            "Cannot rename log file {file_path:?} to {target_path:?} due to {e:?}",
                         )
                     }
                 }

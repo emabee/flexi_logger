@@ -44,7 +44,7 @@ fn work(value: u8) {
 
     let logger = logger
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     // write some log lines to initialize the file
     info!("XXX 1 AAA");
@@ -59,17 +59,11 @@ fn work(value: u8) {
             let lines = count_lines(&file_path);
             match std::fs::remove_file(file_path.clone()) {
                 Ok(()) => {
-                    println!(
-                        "Removed the log file {:?}, which had {} lines",
-                        file_path, lines
-                    );
+                    println!("Removed the log file {file_path:?}, which had {lines} lines");
                     logger.reopen_outputfile().unwrap();
                 }
                 Err(e) => {
-                    panic!(
-                        "Cannot remove log file {:?}, i = {}, reason {:?}",
-                        file_path, i, e
-                    )
+                    panic!("Cannot remove log file {file_path:?}, i = {i}, reason {e:?}")
                 }
             }
         }

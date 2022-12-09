@@ -41,7 +41,7 @@ mod d {
                 )
                 .use_utc()
                 .start()
-                .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+                .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
             info!(
                 "create a huge number of log lines with a considerable number of threads, \
              verify the log"
@@ -91,7 +91,7 @@ mod d {
         for worker_handle in worker_handles {
             worker_handle
                 .join()
-                .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
+                .unwrap_or_else(|e| panic!("Joining worker thread failed: {e:?}"));
         }
         trace!("All worker threads joined.");
     }
@@ -128,18 +128,18 @@ mod d {
             .add("_r[0-9][0-9]*.");
 
         let log_pattern = fn_pattern.clone().add("log");
-        println!("log_pattern = {}", log_pattern);
+        println!("log_pattern = {log_pattern}");
         let no_of_log_files = glob(&log_pattern)
             .unwrap()
             .map(Result::unwrap)
-            .inspect(|p| println!("found: {:?}", p))
+            .inspect(|p| println!("found: {p:?}"))
             .count();
 
         let gz_pattern = fn_pattern.add("gz");
         let no_of_gz_files = glob(&gz_pattern)
             .unwrap()
             .map(Result::unwrap)
-            .inspect(|p| println!("found: {:?}", p))
+            .inspect(|p| println!("found: {p:?}"))
             .count();
 
         assert_eq!(no_of_log_files, NO_OF_LOG_FILES);

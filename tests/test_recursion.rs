@@ -25,7 +25,7 @@ fn test_recursion() {
         logger.adaptive_format_for_stdout(AdaptiveFormat::Custom(my_format, my_colored_format));
     logger
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed because: {e}"));
 
     let dummy = Dummy();
 

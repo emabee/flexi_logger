@@ -25,7 +25,7 @@ mod a {
             )
             .format(detailed_format)
             .start_with_specfile(&specfile)
-            .unwrap_or_else(|e| panic!("Logger initialization failed because: {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed because: {e}"));
 
         assert!(specfile.exists());
 

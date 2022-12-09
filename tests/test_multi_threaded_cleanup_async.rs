@@ -53,7 +53,7 @@ mod d {
                     Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
                 )
                 .start()
-                .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+                .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
             info!(
                 "create a huge number of log lines with a considerable number of threads, \
              verify the log"
@@ -70,9 +70,8 @@ mod d {
         let delta1 = end.signed_duration_since(start).num_milliseconds();
         let delta2 = Local::now().signed_duration_since(end);
         println!(
-            "Task executed with {} threads in {} ms, \
-             program added {} ms to finish writing logs.",
-            NO_OF_THREADS, delta1, delta2
+            "Task executed with {NO_OF_THREADS} threads in {delta1} ms, \
+             program added {delta2} ms to finish writing logs.",
         );
 
         verify_logs(&directory.display().to_string());
@@ -115,7 +114,7 @@ mod d {
         for worker_handle in worker_handles {
             worker_handle
                 .join()
-                .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
+                .unwrap_or_else(|e| panic!("Joining worker thread failed: {e:?}"));
         }
         trace!("All worker threads joined.");
     }
@@ -237,7 +236,7 @@ mod d {
                 .unwrap(),
         );
         for (interval, count) in data {
-            writeln!(file, "{:?};{};", interval, count).unwrap();
+            writeln!(file, "{interval:?};{count};").unwrap();
         }
     }
 

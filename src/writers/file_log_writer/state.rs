@@ -477,11 +477,7 @@ fn validate_logs_in_file(
     reader
         .read_line(&mut buf)
         .expect("validate_logs: can't read file");
-    assert!(
-        buf.is_empty(),
-        "Found more log lines than expected: {} ",
-        buf
-    );
+    assert!(buf.is_empty(), "Found more log lines than expected: {buf} ");
 }
 
 #[allow(clippy::type_complexity)]

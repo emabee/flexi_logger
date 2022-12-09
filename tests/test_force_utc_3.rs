@@ -9,7 +9,7 @@ fn test_force_utc_3() {
     let _ = Logger::try_with_str("info")
         .unwrap()
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     DeferredNow::force_utc();
     info!("must be printed");
 }

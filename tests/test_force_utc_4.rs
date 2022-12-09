@@ -19,7 +19,7 @@ fn test_force_utc_4() {
                 .suppress_timestamp(),
         )
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     info!("must be printed");
     let now = Local::now();
@@ -36,7 +36,7 @@ fn test_force_utc_4() {
         // local TZ is different from UTC -> verify that UTC was written to the file
         let now_local = now.naive_local();
         let diff = (now_local - d).num_seconds();
-        println!("d: {}, now_local: {}, diff: {}", d, now_local, diff);
+        println!("d: {d}, now_local: {now_local}, diff: {diff}");
         assert!(diff >= 10);
     }
 }

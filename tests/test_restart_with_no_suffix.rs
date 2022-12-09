@@ -30,7 +30,7 @@ fn work(value: u8) {
         .log_to_file(file_spec)
         .rotate(Criterion::Size(100), Naming::Timestamps, Cleanup::Never)
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     for _ in 0..100 {
         error!("This is an error message");

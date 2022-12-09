@@ -39,7 +39,7 @@ mod test {
             .print_message()
             .add_writer("Syslog", boxed_syslog_writer)
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
         // Explicitly send logs to different loggers
         error!(target : "{Syslog}", "This is a syslog-relevant error message");

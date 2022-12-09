@@ -21,7 +21,7 @@ fn test_default_file_and_writer() {
             .log_to_file_and_writer(file_spec_foo, Box::new(bar_writer))
             .format(detailed_format)
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
         error!("This is an error message");
         warn!("This is a warning");

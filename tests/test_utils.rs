@@ -58,7 +58,7 @@ pub fn dispatch(count: u8) -> Option<u8> {
             None
         }
         Ok(value) => {
-            println!("executor {}", value);
+            println!("executor {value}");
             Some(value.parse().unwrap())
         }
     }

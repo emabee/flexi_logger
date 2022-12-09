@@ -17,7 +17,7 @@ fn test_mods() {
     )
     .use_windows_line_ending()
     .start()
-    .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+    .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     error!("This is an error message");
     warn!("This is a warning");

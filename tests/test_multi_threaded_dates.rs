@@ -36,7 +36,7 @@ fn test_multi_threaded_dates() {
                 Cleanup::Never,
             )
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
         info!("create many log lines with a considerable number of threads, verify the log");
 
@@ -90,7 +90,7 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
     for worker_handle in worker_handles {
         worker_handle
             .join()
-            .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
+            .unwrap_or_else(|e| panic!("Joining worker thread failed: {e:?}"));
     }
     trace!("All worker threads joined.");
 }
@@ -116,18 +116,15 @@ fn verify_logs(directory: &str) {
     // read all files
     let pattern = String::from(directory).add("/*");
     let globresults = match glob(&pattern) {
-        Err(e) => panic!(
-            "Is this ({}) really a directory? Listing failed with {}",
-            pattern, e
-        ),
+        Err(e) => panic!("Is this ({pattern}) really a directory? Listing failed with {e}",),
         Ok(globresults) => globresults,
     };
     let mut no_of_log_files = 0;
     let mut line_count = 0_usize;
     for globresult in globresults {
-        let pathbuf = globresult.unwrap_or_else(|e| panic!("Ups - error occured: {}", e));
+        let pathbuf = globresult.unwrap_or_else(|e| panic!("Ups - error occured: {e}"));
         let f = File::open(&pathbuf)
-            .unwrap_or_else(|e| panic!("Cannot open file {:?} due to {}", pathbuf, e));
+            .unwrap_or_else(|e| panic!("Cannot open file {pathbuf:?} due to {e}"));
         no_of_log_files += 1;
         let mut reader = BufReader::new(f);
         let mut buffer = String::new();
@@ -135,7 +132,7 @@ fn verify_logs(directory: &str) {
             if buffer.starts_with("XXXXX") {
                 line_count += 1;
             } else {
-                panic!("irregular line in log file {:?}: \"{}\"", pathbuf, buffer);
+                panic!("irregular line in log file {pathbuf:?}: \"{buffer}\"");
             }
             buffer.clear();
         }
@@ -145,7 +142,6 @@ fn verify_logs(directory: &str) {
         NO_OF_THREADS * (NO_OF_LOGLINES_PER_THREAD + 1) + 3
     );
     println!(
-        "Found {} log lines from {} threads in {} files",
-        line_count, NO_OF_THREADS, no_of_log_files
+        "Found {line_count} log lines from {NO_OF_THREADS} threads in {no_of_log_files} files",
     );
 }

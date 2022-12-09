@@ -18,7 +18,7 @@ fn multi_threaded() {
             std::time::Duration::from_millis(600),
         ))
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     info!("create a huge number of log lines with a considerable number of threads");
     for i in 0..50 {
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -64,7 +64,7 @@ fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
     for worker_handle in worker_handles {
         worker_handle
             .join()
-            .unwrap_or_else(|e| panic!("Joining worker thread failed: {:?}", e));
+            .unwrap_or_else(|e| panic!("Joining worker thread failed: {e:?}"));
     }
     trace!("All worker threads joined.");
 }

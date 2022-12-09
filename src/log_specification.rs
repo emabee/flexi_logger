@@ -470,10 +470,7 @@ fn contains_whitespace(s: &str, parse_errs: &mut String) -> bool {
     let result = s.chars().any(char::is_whitespace);
     if result {
         push_err(
-            &format!(
-                "ignoring invalid part in log spec '{}' (contains a whitespace)",
-                s
-            ),
+            &format!("ignoring invalid part in log spec '{s}' (contains a whitespace)"),
             parse_errs,
         );
     }

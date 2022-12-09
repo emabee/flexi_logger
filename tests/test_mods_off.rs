@@ -14,7 +14,7 @@ fn test_mods_off() {
                 .directory(self::test_utils::dir()),
         )
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     error!("This is an error message");
     warn!("This is a warning");

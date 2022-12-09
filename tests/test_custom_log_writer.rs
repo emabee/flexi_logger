@@ -36,7 +36,7 @@ fn work(value: u8) {
     }
     let handle = logger
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     error!("This is an error message");
     warn!("This is a warning");
@@ -85,13 +85,13 @@ impl LogWriter for CustomWriter {
             0 => expected
                 .iter()
                 .fold(Vec::new(), |mut acc, (level, module, message)| {
-                    acc.extend(format!("{} [{}] {}", level, module, message).bytes());
+                    acc.extend(format!("{level} [{module}] {message}").bytes());
                     acc
                 }),
             1 => expected
                 .iter()
                 .fold(Vec::new(), |mut acc, (level, _module, message)| {
-                    acc.extend(format!("{}: {}", level, message).bytes());
+                    acc.extend(format!("{level}: {message}").bytes());
                     acc
                 }),
             COUNT..=u8::MAX => {

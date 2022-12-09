@@ -122,7 +122,7 @@ fn work(value: u8) {
         }
     };
 
-    let handle = logger.start().unwrap_or_else(|e| panic!("{}, {:?}", e, e));
+    let handle = logger.start().unwrap_or_else(|e| panic!("{e}, {e:?}"));
 
     error!("This is an error message");
     warn!("This is a warning");

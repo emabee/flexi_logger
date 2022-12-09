@@ -13,7 +13,7 @@ fn test_reconfigure_methods() {
                 .directory(self::test_utils::dir()),
         )
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     test_parse_new_spec(&mut logger);
     test_push_new_spec(&mut logger);

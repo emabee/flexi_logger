@@ -85,7 +85,7 @@ impl LogLineFilter for DedupWriter {
                         .line(Some(line!()))
                         .module_path_static(Some("flexi_logger"))
                         .target("flexi_logger")
-                        .args(format_args!("last record was skipped {} times", skipped))
+                        .args(format_args!("last record was skipped {skipped} times"))
                         .build(),
                 )?;
                 // Log new record

@@ -307,9 +307,7 @@ mod test {
             .to_string();
         assert!(
             stem.starts_with(&progname),
-            "stem: {:?}, progname: {:?}",
-            stem,
-            progname
+            "stem: {stem:?}, progname: {progname:?}",
         );
         if with_timestamp {
             // followed by _ and timestamp
@@ -317,16 +315,13 @@ mod test {
             let s_ts = &stem[progname.len() + 1..];
             assert!(
                 chrono::NaiveDateTime::parse_from_str(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
-                "s_ts: \"{}\"",
-                s_ts
+                "s_ts: \"{s_ts}\"",
             );
         } else {
             assert_eq!(
                 stem.as_bytes().len(),
                 progname.len(),
-                "stem: {:?}, progname: {:?}",
-                stem,
-                progname
+                "stem: {stem:?}, progname: {progname:?}",
             );
         }
 

@@ -7,7 +7,7 @@ fn test_mods() {
         .unwrap()
         .log_to_stdout()
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     error!("This is an error message");
     warn!("This is a warning");

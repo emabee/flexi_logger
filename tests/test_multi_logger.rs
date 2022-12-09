@@ -31,7 +31,7 @@ fn test() {
         .add_writer("Sec", sec_writer)
         .add_writer("Alert", alert_logger())
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     // Explicitly send logs to different loggers
     error!(target : "{Sec}", "This is a security-relevant error message");

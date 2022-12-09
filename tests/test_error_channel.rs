@@ -50,7 +50,7 @@ fn work(value: u8) {
         // start logger, and force its immediate drop
         let _logger_handle = logger
             .start()
-            .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     }
 
     error!("This is an error message");

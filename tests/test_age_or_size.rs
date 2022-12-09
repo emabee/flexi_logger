@@ -25,7 +25,7 @@ fn test_age_or_size() {
             Cleanup::Never,
         )
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     // info!("test correct rotation by age or size");
 
     write_log_lines();
@@ -75,26 +75,23 @@ fn verify_logs(directory: &Path) {
     // read all files
     let pattern = directory.display().to_string().add("/*");
     let globresults = match glob(&pattern) {
-        Err(e) => panic!(
-            "Is this ({}) really a directory? Listing failed with {}",
-            pattern, e
-        ),
+        Err(e) => panic!("Is this ({pattern}) really a directory? Listing failed with {e}",),
         Ok(globresults) => globresults,
     };
     let mut no_of_log_files = 0;
     let mut total_line_count = 0_usize;
     for (index, globresult) in globresults.into_iter().enumerate() {
         let mut line_count = 0_usize;
-        let pathbuf = globresult.unwrap_or_else(|e| panic!("Ups - error occured: {}", e));
+        let pathbuf = globresult.unwrap_or_else(|e| panic!("Ups - error occured: {e}"));
         let f = File::open(&pathbuf)
-            .unwrap_or_else(|e| panic!("Cannot open file {:?} due to {}", pathbuf, e));
+            .unwrap_or_else(|e| panic!("Cannot open file {pathbuf:?} due to {e}"));
         no_of_log_files += 1;
         let mut reader = BufReader::new(f);
         let mut buffer = String::new();
         while reader.read_line(&mut buffer).unwrap() > 0 {
             line_count += 1;
         }
-        println!("file {:?}:\n{}", pathbuf, buffer);
+        println!("file {pathbuf:?}:\n{buffer}");
         if line_count != expected_line_counts[index] {
             error_detected = true;
         }
@@ -102,11 +99,11 @@ fn verify_logs(directory: &Path) {
     }
 
     if no_of_log_files != 8 {
-        println!("wrong file count: {} instead of 8", no_of_log_files);
+        println!("wrong file count: {no_of_log_files} instead of 8");
         error_detected = true;
     }
     if total_line_count != 16 {
-        println!("wrong line count: {} instead of 16", total_line_count);
+        println!("wrong line count: {total_line_count} instead of 16");
         error_detected = true;
     };
 

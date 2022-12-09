@@ -16,7 +16,7 @@ fn b20_initialize_logger(_: &mut Bencher) {
         .unwrap()
         .log_to_file(FileSpec::default().directory("log_files"))
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 }
 
 #[bench]

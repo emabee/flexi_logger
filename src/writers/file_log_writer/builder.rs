@@ -26,8 +26,8 @@ pub struct FileLogWriterBuilder {
 
 /// Methods for influencing the behavior of the [`FileLogWriter`].
 impl FileLogWriterBuilder {
-    pub(crate) fn new(file_spec: FileSpec) -> FileLogWriterBuilder {
-        FileLogWriterBuilder {
+    pub(crate) fn new(file_spec: FileSpec) -> Self {
+        Self {
             o_rotation_config: None,
             cfg_print_message: false,
             file_spec,
@@ -152,6 +152,15 @@ impl FileLogWriterBuilder {
     #[must_use]
     pub fn append(mut self) -> Self {
         self.cfg_append = true;
+        self
+    }
+
+    /// Set the maximum log level.
+    ///
+    /// The default is `log::LevelFilter::Trace`, i.e., all log levels are written.
+    #[must_use]
+    pub fn max_level(mut self, max_log_level: log::LevelFilter) -> Self {
+        self.max_log_level = max_log_level;
         self
     }
 

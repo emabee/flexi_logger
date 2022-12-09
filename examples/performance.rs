@@ -36,7 +36,7 @@ fn main() {
         // With format
         let start = Instant::now();
         for s in &structs {
-            log::info!("{}", format!("{}", s));
+            log::info!("{}", format!("{s}"));
         }
         eprintln!("with format: {:?}", start.elapsed()); // 2-7ms
     }
