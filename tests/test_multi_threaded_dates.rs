@@ -74,13 +74,12 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 fn do_work(thread_number: usize) {
     trace!("({})     Thread started working", thread_number);
     trace!("ERROR_IF_PRINTED");
-    for idx in 0..500 {
-        debug!("({})  writing out line number {}", thread_number, idx);
-    }
-    // this sleep triggers a yield, hopefully allowing all threads to start before the main thread
-    // changes the log specification
-    std::thread::sleep(std::time::Duration::from_millis(200));
-    for idx in 500..NO_OF_LOGLINES_PER_THREAD {
+    for idx in 0..NO_OF_LOGLINES_PER_THREAD {
+        if idx == 500 {
+            // this sleep triggers a yield, hopefully allowing all threads to start before the main thread
+            // changes the log specification
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
         debug!("({})  writing out line number {}", thread_number, idx);
     }
     trace!("MUST_BE_PRINTED");

@@ -86,7 +86,9 @@ Adds an additional write mode that decouples `flexi_logger`'s I/O from your appl
 Works with `log_to_stdout()`, `log_to_stderr()`, and `log_to_file()`.
 See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
 
-Adds a dependency to [`crossbeam`](https://docs.rs/crossbeam/0.8.1/crossbeam/index.html).
+Adds dependencies to
+[`crossbeam-channel`](https://docs.rs/crossbeam-channel/latest/crossbeam_channel/)
+and [`crossbeam-queue`](https://docs.rs/crossbeam-queue/latest/crossbeam_queue/).
 
 ### **`colors`** (*default feature*)
 
