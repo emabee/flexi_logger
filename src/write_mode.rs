@@ -9,11 +9,13 @@ pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 /// Default size of the message pool;
 /// a higher value could further reduce allocations during log file rotation and cleanup.
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub const DEFAULT_POOL_CAPA: usize = 50;
 
 /// Default capacity for the message buffers;
 /// a higher value reduces allocations when longer log lines are used.
 #[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub const DEFAULT_MESSAGE_CAPA: usize = 200;
 
 /// Describes whether the log output should be written synchronously or asynchronously,

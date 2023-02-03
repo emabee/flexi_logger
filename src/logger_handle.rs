@@ -309,6 +309,7 @@ impl Drop for WritersHandle {
 
 /// Trait that allows to register for changes to the log specification.
 #[cfg(feature = "specfile_without_notification")]
+#[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
 pub trait LogSpecSubscriber: 'static + Send {
     /// Apply a new `LogSpecification`.
     ///

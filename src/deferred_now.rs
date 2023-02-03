@@ -46,10 +46,11 @@ impl<'a> DeferredNow {
         }
     }
 
-    // The format described in RFC 3339; example: 1985-04-12T23:20:50.523Z
-    #[cfg(feature = "syslog_writer")]
-    pub(crate) fn format_rfc3339(&mut self) -> DelayedFormat<StrftimeItems<'_>> {
-        self.format("%Y-%m-%dT%H:%M:%S%.3fZ")
+    /// Produces a preformatted object suitable for printing.
+    ///
+    /// The format described in RFC 3339 is used. Example: 1985-04-12T23:20:50.523Z
+    pub fn format_rfc3339(&mut self) -> DelayedFormat<StrftimeItems<'_>> {
+        self.format("%Y-%m-%dT%H:%M:%S%.3f%Z")
     }
 
     // format_rfc3164: Mmm dd hh:mm:ss, where
@@ -172,13 +173,14 @@ mod test {
     fn test_format_rfc3339() {
         // The format described in RFC 3339; example: 1985-04-12T23:20:50.52Z
         let s = super::DeferredNow::new().format_rfc3339().to_string();
-        let bytes = s.into_bytes();
-        assert_eq!(bytes[4], b'-');
-        assert_eq!(bytes[7], b'-');
-        assert_eq!(bytes[10], b'T');
-        assert_eq!(bytes[13], b':');
-        assert_eq!(bytes[16], b':');
-        assert_eq!(bytes[19], b'.');
-        assert_eq!(bytes[23], b'Z');
+        let bytes = s.clone().into_bytes();
+        assert_eq!(bytes[4], b'-', "s = {s}");
+        assert_eq!(bytes[7], b'-', "s = {s}");
+        assert_eq!(bytes[10], b'T', "s = {s}");
+        assert_eq!(bytes[13], b':', "s = {s}");
+        assert_eq!(bytes[16], b':', "s = {s}");
+        assert_eq!(bytes[19], b'.', "s = {s}");
+        assert_eq!(bytes[23], b'+', "s = {s}");
+        assert_eq!(bytes[26], b':', "s = {s}");
     }
 }

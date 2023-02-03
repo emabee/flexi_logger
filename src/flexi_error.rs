@@ -37,21 +37,25 @@ pub enum FlexiLoggerError {
     /// Filesystem notifications for the specfile could not be set up.
     #[error("Filesystem notifications for the specfile or the log file could not be set up")]
     #[cfg(feature = "notify")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "notify")))]
     Notify(#[from] notify::Error),
 
     /// Parsing the configured logspec toml-file failed.
     #[error("Parsing the configured logspec toml-file failed")]
     #[cfg(feature = "specfile_without_notification")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     SpecfileToml(#[from] toml::de::Error),
 
     /// Specfile cannot be accessed or created.
     #[error("Specfile cannot be accessed or created")]
     #[cfg(feature = "specfile_without_notification")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     SpecfileIo(std::io::Error),
 
     /// Specfile has an unsupported extension.
     #[error("Specfile has an unsupported extension")]
     #[cfg(feature = "specfile_without_notification")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     SpecfileExtension(&'static str),
 
     /// Invalid level filter.
@@ -85,6 +89,7 @@ pub enum FlexiLoggerError {
 
     ///
     #[cfg(feature = "trc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "trc")))]
     #[error("Tracing initialization failed")]
     TracingSetup(#[from] tracing::subscriber::SetGlobalDefaultError),
 }

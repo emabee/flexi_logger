@@ -593,7 +593,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     for (index, file) in list_of_log_and_compressed_files(file_spec).enumerate() {
         if index >= log_limit + compress_limit {
             // delete (log or log.gz)
-            std::fs::remove_file(&file)?;
+            std::fs::remove_file(file)?;
         } else if index >= log_limit {
             #[cfg(feature = "compress")]
             {

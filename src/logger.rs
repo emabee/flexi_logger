@@ -802,7 +802,7 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
-    #[cfg_attr(docsrs, doc(cfg(feature = "specfile_without_notification")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     #[cfg(feature = "specfile_without_notification")]
     pub fn start_with_specfile<P: AsRef<Path>>(
         self,
@@ -822,6 +822,7 @@ impl Logger {
     /// # Errors
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     #[cfg(feature = "specfile_without_notification")]
     pub fn build_with_specfile<P: AsRef<Path>>(
         self,

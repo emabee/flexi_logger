@@ -17,7 +17,7 @@ and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
-flexi_logger = "0.24"
+flexi_logger = "0.25"
 log = "0.4"
 ```
 
@@ -68,7 +68,7 @@ Make use of the non-default features by specifying them in your `Cargo.toml`, e.
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.24", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.25", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -76,7 +76,7 @@ or, to get the smallest footprint (and no colors), switch off even the default f
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.24", default_features = false }
+flexi_logger = { version = "0.25", default_features = false }
 log = "0.4"
 ```
 

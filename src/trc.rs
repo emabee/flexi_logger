@@ -82,6 +82,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 ///
 /// Several variants of [`FlexiLoggerError`] can occur.
 #[cfg(feature = "specfile_without_notification")]
+#[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
 pub fn subscribe_to_specfile<P: AsRef<Path>>(
     specfile: P,
     reloader: Box<dyn Fn(LogSpecification) + Send + Sync>,

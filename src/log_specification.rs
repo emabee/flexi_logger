@@ -249,6 +249,7 @@ impl LogSpecification {
     ///
     /// [`FlexiLoggerError::Parse`] if the input is malformed.
     #[cfg(feature = "specfile_without_notification")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     pub fn from_toml<S: AsRef<str>>(s: S) -> Result<Self, FlexiLoggerError> {
         #[derive(Clone, Debug, serde_derive::Deserialize)]
         struct LogSpecFileFormat {
@@ -307,6 +308,7 @@ impl LogSpecification {
     ///
     /// [`FlexiLoggerError::SpecfileIo`] if writing fails.
     #[cfg(feature = "specfile_without_notification")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "specfile")))]
     pub fn to_toml(&self, w: &mut dyn std::io::Write) -> Result<(), FlexiLoggerError> {
         self.to_toml_impl(w).map_err(FlexiLoggerError::SpecfileIo)
     }
@@ -609,6 +611,7 @@ impl LogSpecBuilder {
     ///
     /// This method is only avaible if the dafault feature `textfilter` is not switched off.
     #[cfg(feature = "textfilter")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "textfilter")))]
     #[must_use]
     pub fn build_with_textfilter(&self, tf: Option<Regex>) -> LogSpecification {
         LogSpecification {

@@ -102,9 +102,11 @@ pub(crate) mod file_log_writer;
 mod log_writer;
 
 #[cfg(feature = "syslog_writer")]
+#[cfg_attr(docsrs, doc(cfg(feature = "syslog_writer")))]
 mod syslog_writer;
 
 #[cfg(feature = "syslog_writer")]
+#[cfg_attr(docsrs, doc(cfg(feature = "syslog_writer")))]
 pub use self::syslog_writer::{
     LevelToSyslogSeverity, Syslog, SyslogFacility, SyslogSeverity, SyslogWriter,
 };
