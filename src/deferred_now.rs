@@ -1,6 +1,6 @@
 use chrono::{
     format::{DelayedFormat, StrftimeItems},
-    DateTime, Local, Utc,
+    DateTime, Local, SecondsFormat, Utc,
 };
 #[cfg(feature = "syslog_writer")]
 use chrono::{Datelike, Timelike};
@@ -17,6 +17,12 @@ impl<'a> DeferredNow {
     #[must_use]
     pub fn new() -> Self {
         Self(None)
+    }
+
+    #[allow(dead_code)]
+    #[must_use]
+    pub(crate) fn new_from_datetime(dt: DateTime<Local>) -> Self {
+        Self(Some(dt))
     }
 
     /// Retrieve the timestamp for local time zone.
@@ -46,11 +52,18 @@ impl<'a> DeferredNow {
         }
     }
 
-    /// Produces a preformatted object suitable for printing.
+    /// Prints itself in a format compliant with RFC 3339.
     ///
-    /// The format described in RFC 3339 is used. Example: 1985-04-12T23:20:50.523Z
-    pub fn format_rfc3339(&mut self) -> DelayedFormat<StrftimeItems<'_>> {
-        self.format("%Y-%m-%dT%H:%M:%S%.3f%Z")
+    /// Example: 2021-04-29T13:14:15.678+01:00
+    ///
+    /// We do not use the Z variant of RFC 3339, because it is often misinterpreted.
+    pub fn format_rfc3339(&mut self) -> String {
+        if use_utc() {
+            self.now_utc_owned()
+                .to_rfc3339_opts(SecondsFormat::Millis, false)
+        } else {
+            self.now().to_rfc3339_opts(SecondsFormat::Millis, false)
+        }
     }
 
     // format_rfc3164: Mmm dd hh:mm:ss, where
@@ -115,12 +128,11 @@ impl<'a> DeferredNow {
         }
     }
 
-    // // Get the current timestamp, usually in local time.
-    // #[doc(hidden)]
-    // #[must_use]
-    // pub fn now_local() -> DateTime<Local> {
-    //     Local::now()
-    // }
+    #[allow(dead_code)]
+    pub(crate) fn set_force_utc(b: bool) {
+        let mut guard = FORCE_UTC.lock().unwrap();
+        *guard = Some(b);
+    }
 }
 
 lazy_static::lazy_static! {
@@ -141,46 +153,91 @@ fn use_utc() -> bool {
 
 #[cfg(test)]
 mod test {
+    use crate::DeferredNow;
+    use chrono::{
+        DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat, TimeZone, Utc,
+    };
+
     #[test]
-    fn test_deferred_now() {
+    fn test_timestamp_taken_only_once() {
         let mut deferred_now = super::DeferredNow::new();
-        let once = deferred_now.now().to_string();
-        println!("This should be the current timestamp: {once}");
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        let again = deferred_now.now().to_string();
-        println!("This must be the same timestamp:      {again}");
+        let once = *deferred_now.now();
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        let again = *deferred_now.now();
         assert_eq!(once, again);
+        println!("Now: {}", deferred_now.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
+        println!("Now: {}", once.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
+        println!("Now: {}", again.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
     }
 
-    #[cfg(feature = "syslog_writer")]
-    #[test]
-    fn test_format_rfc3164() {
-        // println!(
-        //     "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
-        //     mmm = "Jan",
-        //     dd = 1,
-        //     hh = 2,
-        //     mm = 3,
-        //     ss = 4
-        // );
-
-        let mut deferred_now = super::DeferredNow::new();
-        println!("rfc3164: {}", deferred_now.format_rfc3164());
+    fn utc_and_offset_timestamps() -> (DateTime<Utc>, DateTime<FixedOffset>) {
+        let naive_datetime = NaiveDateTime::new(
+            NaiveDate::from_ymd_opt(2021, 4, 29).unwrap(),
+            NaiveTime::from_hms_milli_opt(13, 14, 15, 678).unwrap(),
+        );
+        (
+            Utc.from_local_datetime(&naive_datetime).unwrap(),
+            FixedOffset::east_opt(3600)
+                .unwrap()
+                .from_local_datetime(&naive_datetime)
+                .unwrap(),
+        )
+    }
+    fn get_deferred_nows() -> (DeferredNow, DeferredNow) {
+        let (ts_utc, ts_plus1) = utc_and_offset_timestamps();
+        (
+            DeferredNow::new_from_datetime(ts_utc.into()),
+            DeferredNow::new_from_datetime(ts_plus1.into()),
+        )
     }
 
     #[test]
-    #[cfg(feature = "syslog_writer")]
-    fn test_format_rfc3339() {
-        // The format described in RFC 3339; example: 1985-04-12T23:20:50.52Z
-        let s = super::DeferredNow::new().format_rfc3339().to_string();
-        let bytes = s.clone().into_bytes();
-        assert_eq!(bytes[4], b'-', "s = {s}");
-        assert_eq!(bytes[7], b'-', "s = {s}");
-        assert_eq!(bytes[10], b'T', "s = {s}");
-        assert_eq!(bytes[13], b':', "s = {s}");
-        assert_eq!(bytes[16], b':', "s = {s}");
-        assert_eq!(bytes[19], b'.', "s = {s}");
-        assert_eq!(bytes[23], b'+', "s = {s}");
-        assert_eq!(bytes[26], b':', "s = {s}");
+    fn test_chrono_rfc3339() {
+        let (ts_utc, ts_plus1) = utc_and_offset_timestamps();
+
+        assert_eq!(
+            ts_utc.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "2021-04-29T13:14:15.678Z",
+        );
+        assert_eq!(
+            ts_plus1.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "2021-04-29T13:14:15.678+01:00",
+        );
+
+        assert_eq!(
+            ts_utc.to_rfc3339_opts(SecondsFormat::Millis, false),
+            "2021-04-29T13:14:15.678+00:00",
+        );
+        assert_eq!(
+            ts_plus1.to_rfc3339_opts(SecondsFormat::Millis, false),
+            "2021-04-29T13:14:15.678+01:00",
+        );
+    }
+
+    #[test]
+    fn test_formats() {
+        #[cfg(feature = "syslog_writer")]
+        {
+            log::info!("test rfc3164");
+            super::DeferredNow::set_force_utc(false);
+            let (mut dn1, mut dn2) = get_deferred_nows();
+            assert_eq!("Apr 29 15:14:15", &dn1.format_rfc3164());
+            assert_eq!("Apr 29 14:14:15", &dn2.format_rfc3164());
+        }
+
+        log::info!("test rfc3339");
+        {
+            // with local timestamps, offsets ≠ 0 are printed (except in Greenwich time zone):
+            super::DeferredNow::set_force_utc(false);
+            let (mut dn1, mut dn2) = get_deferred_nows();
+            log::info!("2021-04-29T15:14:15.678+02:00, {}", &dn1.format_rfc3339());
+            log::info!("2021-04-29T14:14:15.678+02:00, {}", &dn2.format_rfc3339());
+
+            // with utc, the timestamps are normalized to offset 0
+            super::DeferredNow::set_force_utc(true);
+            let (mut dn1, mut dn2) = get_deferred_nows();
+            assert_eq!("2021-04-29T13:14:15.678+00:00", &dn1.format_rfc3339());
+            assert_eq!("2021-04-29T12:14:15.678+00:00", &dn2.format_rfc3339());
+        }
     }
 }

@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.1] - 2023-02-06
+
+Use chrono's support for rfc3339. Improve tests for `DeferredNow`.
+
 ## [0.25.0] - 2023-02-03
 
 Fix issues #132 and #133.
