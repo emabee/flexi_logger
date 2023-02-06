@@ -219,10 +219,10 @@ mod test {
         #[cfg(feature = "syslog_writer")]
         {
             log::info!("test rfc3164");
-            super::DeferredNow::set_force_utc(false);
+            super::DeferredNow::set_force_utc(true);
             let (mut dn1, mut dn2) = get_deferred_nows();
-            assert_eq!("Apr 29 15:14:15", &dn1.format_rfc3164());
-            assert_eq!("Apr 29 14:14:15", &dn2.format_rfc3164());
+            assert_eq!("Apr 29 13:14:15", &dn1.format_rfc3164());
+            assert_eq!("Apr 29 12:14:15", &dn2.format_rfc3164());
         }
 
         log::info!("test rfc3339");
