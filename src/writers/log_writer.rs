@@ -33,7 +33,7 @@ pub trait LogWriter: Sync + Send {
     ///
     /// The default implementation is a no-op.
     fn format(&mut self, format: FormatFunction) {
-        let _ = format;
+        _ = format;
     }
 
     /// Cleanup open resources, if necessary.
