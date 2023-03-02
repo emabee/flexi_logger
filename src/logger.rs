@@ -17,8 +17,10 @@ use std::{
     time::Duration,
 };
 
-#[cfg(feature = "atty")]
+#[cfg(feature = "is-terminal")]
 use crate::formats::AdaptiveFormat;
+#[cfg(feature = "is-terminal")]
+use is_terminal::IsTerminal;
 
 #[cfg(feature = "specfile_without_notification")]
 use {crate::logger_handle::LogSpecSubscriber, std::io::Read, std::path::Path};
@@ -133,17 +135,21 @@ impl Logger {
             format_for_file: default_format,
 
             #[cfg(feature = "colors")]
-            format_for_stdout: AdaptiveFormat::Default.format_function(if cfg!(feature = "atty") {
-                atty::is(atty::Stream::Stdout)
-            } else {
-                false
-            }),
+            format_for_stdout: AdaptiveFormat::Default.format_function(
+                if cfg!(feature = "is-terminal") {
+                    std::io::stdout().is_terminal()
+                } else {
+                    false
+                },
+            ),
             #[cfg(feature = "colors")]
-            format_for_stderr: AdaptiveFormat::Default.format_function(if cfg!(feature = "atty") {
-                atty::is(atty::Stream::Stderr)
-            } else {
-                false
-            }),
+            format_for_stderr: AdaptiveFormat::Default.format_function(
+                if cfg!(feature = "is-terminal") {
+                    std::io::stderr().is_terminal()
+                } else {
+                    false
+                },
+            ),
 
             #[cfg(not(feature = "colors"))]
             format_for_stdout: default_format,
@@ -306,11 +312,11 @@ impl Logger {
     /// Coloring is used if `stderr` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
-    #[cfg(feature = "atty")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
+    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        self.format_for_stderr = adaptive_format.format_function(atty::is(atty::Stream::Stderr));
+        self.format_for_stderr = adaptive_format.format_function(std::io::stderr().is_terminal());
         self
     }
 
@@ -328,11 +334,11 @@ impl Logger {
     /// Coloring is used if `stdout` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
-    #[cfg(feature = "atty")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
+    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
-        self.format_for_stdout = adaptive_format.format_function(atty::is(atty::Stream::Stdout));
+        self.format_for_stdout = adaptive_format.format_function(std::io::stdout().is_terminal());
         self
     }
 

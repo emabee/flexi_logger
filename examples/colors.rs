@@ -4,7 +4,7 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
-        use atty::Stream::{Stderr, Stdout};
+        use is_terminal::IsTerminal;
         use nu_ansi_term::Color;
 
         for i in 0..=255 {
@@ -13,7 +13,7 @@ fn main() {
 
         println!();
 
-        if atty::is(Stdout) {
+        if std::io::stdout().is_terminal() {
             println!(
                 "Stdout is considered a tty - \
                  flexi_logger::AdaptiveFormat will use colors",
@@ -25,7 +25,7 @@ fn main() {
             );
         }
 
-        if atty::is(Stderr) {
+        if std::io::stderr().is_terminal() {
             println!(
                 "Stderr is considered a tty - \
                  flexi_logger::AdaptiveFormat will use colors",

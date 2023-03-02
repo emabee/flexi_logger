@@ -227,10 +227,10 @@
 //! by providing one of the variants of [`AdaptiveFormat`](crate::AdaptiveFormat) to the respective
 //! format method, e.g.
 //! ```rust
-//! # #[cfg(feature = "atty")]
+//! # #[cfg(feature = "is-terminal")]
 //! # use flexi_logger::AdaptiveFormat;
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # #[cfg(feature = "atty")]
+//! # #[cfg(feature = "is-terminal")]
 //! # {
 //!       flexi_logger::Logger::try_with_str("info")?
 //!           .adaptive_format_for_stderr(AdaptiveFormat::Detailed);
@@ -244,7 +244,7 @@
 //! `flexi_logger` initializes by default equivalently to this:
 //!
 //! ```rust
-//! # #[cfg(feature = "atty")]
+//! # #[cfg(feature = "is-terminal")]
 //! # mod example {
 //! # use flexi_logger::{Logger,AdaptiveFormat,default_format, FileSpec};
 //! # use log::{debug, error, info, trace, warn};

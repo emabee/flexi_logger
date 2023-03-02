@@ -306,8 +306,8 @@ fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
 ///
 /// This is helpful if the output is sometimes piped into other programs, which usually
 /// do not expect color control byte sequences.
-#[cfg_attr(docsrs, doc(cfg(feature = "atty")))]
-#[cfg(feature = "atty")]
+#[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
+#[cfg(feature = "is-terminal")]
 #[derive(Clone, Copy)]
 pub enum AdaptiveFormat {
     /// Chooses between [`default_format`](crate::default_format)
@@ -338,7 +338,7 @@ pub enum AdaptiveFormat {
     Custom(FormatFunction, FormatFunction),
 }
 
-#[cfg(feature = "atty")]
+#[cfg(feature = "is-terminal")]
 impl AdaptiveFormat {
     #[must_use]
     pub(crate) fn format_function(self, is_tty: bool) -> FormatFunction {

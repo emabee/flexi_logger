@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.2] - 2023-03-02
+
+Replace dependency `atty` with `is-terminal`, due to
+[RUSTSEC-2021-0145](https://rustsec.org/advisories/RUSTSEC-2021-0145).
+
 ## [0.25.1] - 2023-02-06
 
 Use chrono's support for rfc3339. Improve tests for `DeferredNow`.
