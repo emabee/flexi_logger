@@ -148,8 +148,8 @@ impl LogWriter for StdWriter {
                     Some(&self.validation_buffer),
                 )
             }
-            InnerStdWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().map_err(|_e| io_err("Poison"))?;
+            InnerStdWriter::Buffered(m_w) => {
+                let mut w = m_w.lock().map_err(|_e| io_err("Poison"))?;
                 write_buffered(
                     self.format,
                     now,
@@ -180,8 +180,8 @@ impl LogWriter for StdWriter {
                 let mut w = stdstream.lock();
                 w.flush()
             }
-            InnerStdWriter::Buffered(mbuf_w) => {
-                let mut w = mbuf_w.lock().map_err(|_e| io_err("Poison"))?;
+            InnerStdWriter::Buffered(m_w) => {
+                let mut w = m_w.lock().map_err(|_e| io_err("Poison"))?;
                 w.flush()
             }
             #[cfg(feature = "async")]

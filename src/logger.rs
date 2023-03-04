@@ -685,14 +685,23 @@ impl Logger {
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
-                PrimaryWriter::stdout(self.format_for_stdout, self.flwb.get_write_mode())
+                if let WriteMode::SupportCapture = self.flwb.get_write_mode() {
+                    PrimaryWriter::test(true, self.format_for_stdout)
+                } else {
+                    PrimaryWriter::stdout(self.format_for_stdout, self.flwb.get_write_mode())
+                }
             }
             LogTarget::StdErr => {
-                PrimaryWriter::stderr(self.format_for_stderr, self.flwb.get_write_mode())
+                if let WriteMode::SupportCapture = self.flwb.get_write_mode() {
+                    PrimaryWriter::test(false, self.format_for_stderr)
+                } else {
+                    PrimaryWriter::stderr(self.format_for_stderr, self.flwb.get_write_mode())
+                }
             }
             LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
                 self.duplicate_out,
+                WriteMode::SupportCapture == *self.flwb.get_write_mode(),
                 self.format_for_stderr,
                 self.format_for_stdout,
                 if use_file {

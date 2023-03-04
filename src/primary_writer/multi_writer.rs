@@ -1,7 +1,9 @@
-use crate::logger::Duplicate;
-use crate::util::write_buffered;
-use crate::writers::{FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, LogWriter};
-use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
+use crate::{
+    logger::Duplicate,
+    util::{eprint_err, write_buffered, ErrorCode},
+    writers::{FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
+    {DeferredNow, FlexiLoggerError, FormatFunction},
+};
 use log::Record;
 use std::io::Write;
 
@@ -10,6 +12,7 @@ use std::io::Write;
 pub(crate) struct MultiWriter {
     duplicate_stderr: Duplicate,
     duplicate_stdout: Duplicate,
+    support_capture: bool,
     format_for_stderr: FormatFunction,
     format_for_stdout: FormatFunction,
     o_file_writer: Option<Box<FileLogWriter>>,
@@ -20,6 +23,7 @@ impl MultiWriter {
     pub(crate) fn new(
         duplicate_stderr: Duplicate,
         duplicate_stdout: Duplicate,
+        support_capture: bool,
         format_for_stderr: FormatFunction,
         format_for_stdout: FormatFunction,
         o_file_writer: Option<Box<FileLogWriter>>,
@@ -28,6 +32,7 @@ impl MultiWriter {
         MultiWriter {
             duplicate_stderr,
             duplicate_stdout,
+            support_capture,
             format_for_stderr,
             format_for_stdout,
             o_file_writer,
@@ -75,14 +80,21 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(
-                self.format_for_stderr,
-                now,
-                record,
-                &mut std::io::stderr(),
-                #[cfg(test)]
-                None,
-            )?;
+            if self.support_capture {
+                let mut tmp_buf = Vec::<u8>::with_capacity(200);
+                (self.format_for_stderr)(&mut tmp_buf, now, record)
+                    .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
+                eprintln!("{}", String::from_utf8_lossy(&tmp_buf));
+            } else {
+                write_buffered(
+                    self.format_for_stderr,
+                    now,
+                    record,
+                    &mut std::io::stderr(),
+                    #[cfg(test)]
+                    None,
+                )?;
+            }
         }
 
         if match self.duplicate_stdout {
@@ -93,14 +105,21 @@ impl LogWriter for MultiWriter {
             Duplicate::Trace | Duplicate::All => true,
             Duplicate::None => false,
         } {
-            write_buffered(
-                self.format_for_stdout,
-                now,
-                record,
-                &mut std::io::stdout(),
-                #[cfg(test)]
-                None,
-            )?;
+            if self.support_capture {
+                let mut tmp_buf = Vec::<u8>::with_capacity(200);
+                (self.format_for_stdout)(&mut tmp_buf, now, record)
+                    .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
+                println!("{}", String::from_utf8_lossy(&tmp_buf));
+            } else {
+                write_buffered(
+                    self.format_for_stdout,
+                    now,
+                    record,
+                    &mut std::io::stdout(),
+                    #[cfg(test)]
+                    None,
+                )?;
+            }
         }
 
         if let Some(ref writer) = self.o_file_writer {

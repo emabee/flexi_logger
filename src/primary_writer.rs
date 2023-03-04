@@ -1,8 +1,12 @@
 mod multi_writer;
 pub(crate) mod std_stream;
 mod std_writer;
+mod test_writer;
 
-use self::{multi_writer::MultiWriter, std_stream::StdStream, std_writer::StdWriter};
+use self::{
+    multi_writer::MultiWriter, std_stream::StdStream, std_writer::StdWriter,
+    test_writer::TestWriter,
+};
 use crate::{
     filter::LogLineWriter,
     logger::Duplicate,
@@ -13,15 +17,18 @@ use log::Record;
 
 // Writes either to stdout, or to stderr,
 // or to a file (with optional duplication to stderr or stdout),
-// or to nowhere (with optional "duplication" to stderr or stdout).
+// or to nowhere (with optional "duplication" to stderr or stdout),
+// or in simplified form using println! to stdout to enable capturing in tests.
 pub(crate) enum PrimaryWriter {
     Std(StdWriter),
     Multi(MultiWriter),
+    Test(TestWriter),
 }
 impl PrimaryWriter {
     pub fn multi(
         duplicate_stderr: Duplicate,
         duplicate_stdout: Duplicate,
+        support_capture: bool,
         format_for_stderr: FormatFunction,
         format_for_stdout: FormatFunction,
         o_file_writer: Option<Box<FileLogWriter>>,
@@ -30,6 +37,7 @@ impl PrimaryWriter {
         Self::Multi(MultiWriter::new(
             duplicate_stderr,
             duplicate_stdout,
+            support_capture,
             format_for_stderr,
             format_for_stdout,
             o_file_writer,
@@ -52,11 +60,16 @@ impl PrimaryWriter {
         ))
     }
 
+    pub fn test(stdout: bool, format: FormatFunction) -> Self {
+        Self::Test(TestWriter::new(stdout, format))
+    }
+
     // Write out a log line.
     pub fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match *self {
             Self::Std(ref w) => w.write(now, record),
             Self::Multi(ref w) => w.write(now, record),
+            Self::Test(ref w) => w.write(now, record),
         }
     }
 
@@ -65,6 +78,7 @@ impl PrimaryWriter {
         match *self {
             Self::Std(ref w) => w.flush(),
             Self::Multi(ref w) => w.flush(),
+            Self::Test(ref w) => w.flush(),
         }
     }
 
@@ -77,6 +91,9 @@ impl PrimaryWriter {
             Self::Multi(writer) => {
                 writer.validate_logs(expected);
             }
+            Self::Test(writer) => {
+                writer.validate_logs(expected);
+            }
         }
     }
 
@@ -87,6 +104,9 @@ impl PrimaryWriter {
                 writer.shutdown();
             }
             Self::Multi(writer) => {
+                writer.shutdown();
+            }
+            Self::Test(writer) => {
                 writer.shutdown();
             }
         }

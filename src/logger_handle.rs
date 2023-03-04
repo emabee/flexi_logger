@@ -8,43 +8,47 @@ use crate::{FlexiLoggerError, LogSpecification};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-/// Shuts down the logger when its last instance is dropped
-/// (in case you use `LoggerHandle::clone()` you can have multiple instances),
-/// and allows reconfiguring the logger programmatically.
+/// Allows reconfiguring the logger while the program is running, and
+/// **shuts down the logger when it is dropped**.
 ///
 /// A `LoggerHandle` is returned from `Logger::start()` and from `Logger::start_with_specfile()`.
-/// Keep it alive until the very end of your program if you use one of
-/// `Logger::log_to_file`, `Logger::log_to_writer`, or `Logger::log_to_file_and_writer`.
+///
+/// Keep it alive until the very end of your program, because it shuts down the logger when
+/// its dropped!
+/// (This is only relevant if you use one of
+/// `Logger::log_to_file`, `Logger::log_to_writer`, or `Logger::log_to_file_and_writer`, or
+/// a buffering or asynchronous [`WriteMode`](crate::WriteMode)).
 ///
 /// `LoggerHandle` offers methods to modify the log specification programmatically,
-/// to flush() the logger explicitly, and even to reconfigure the used `FileLogWriter` --
+/// to flush() the logger explicitly, and to reconfigure the used `FileLogWriter` --
 /// if one is used.
 ///
 /// # Examples
 ///
-/// Since dropping the `LoggerHandle` has no effect if you use
-/// `Logger::log_to_stderr` (which is the default) or `Logger::log_to_stdout`.
-/// you can then safely ignore the return value of `Logger::start()`:
+/// In more trivial configurations, dropping the `LoggerHandle` has no effect and then
+/// you can safely ignore the return value of `Logger::start()`:
 ///
 /// ```rust
-/// # use flexi_logger::Logger;
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     Logger::try_with_str("info")?
-///         .start()?;
-///     // ...
-/// # Ok(())
-/// # }
+/// use flexi_logger::Logger;
+/// use std::error::Error;
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     Logger::try_with_str("info")?.start()?;
+///     // do work
+///     Ok(())
+/// }
 /// ```
 ///
-/// When logging to a file or another writer, keep the `LoggerHandle` alive until the program ends:
+/// When logging to a file or another writer,
+/// and/or if you use a buffering or asynchronous [`WriteMode`](crate::WriteMode),
+/// keep the `LoggerHandle` alive until the program ends:
 ///
 /// ```rust
 /// use flexi_logger::{FileSpec, Logger};
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// use std::error::Error;
+/// fn main() -> Result<(), Box<dyn Error>> {
 ///     let _logger = Logger::try_with_str("info")?
 ///         .log_to_file(FileSpec::default())
 ///         .start()?;
-///
 ///     // do work
 ///     Ok(())
 /// }
@@ -54,10 +58,10 @@ use std::sync::{Arc, RwLock};
 /// anywhere in your code:
 ///
 /// ```rust
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let mut logger = flexi_logger::Logger::try_with_str("info")?
-///         .start()
-///         .unwrap();
+/// # use flexi_logger::Logger;
+/// # use std::error::Error;
+/// # fn main() -> Result<(), Box<dyn Error>> {
+///     let logger = Logger::try_with_str("info")?.start()?;
 ///     // ...
 ///     logger.parse_new_spec("warn");
 ///     // ...
@@ -70,16 +74,17 @@ use std::sync::{Arc, RwLock};
 /// it allows switching back to the previous spec:
 ///
 /// ```rust
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// #    let mut logger = flexi_logger::Logger::try_with_str("info")?
-/// #        .start()?;
-/// logger.parse_and_push_temp_spec("trace");
-/// // ...
-/// // critical calls
-/// // ...
-/// logger.pop_temp_spec();
-/// // Continue with the log spec you had before.
-/// // ...
+/// # use flexi_logger::Logger;
+/// # use std::error::Error;
+/// # fn main() -> Result<(), Box<dyn Error>> {
+///     let mut logger = Logger::try_with_str("info")?.start()?;
+///     logger.parse_and_push_temp_spec("trace");
+///     // ...
+///     // critical calls
+///     // ...
+///     logger.pop_temp_spec();
+///     // Continue with the log spec you had before.
+///     // ...
 /// # Ok(())
 /// # }
 /// ```
@@ -126,7 +131,7 @@ impl LoggerHandle {
     /// # Errors
     ///
     /// [`FlexiLoggerError::Parse`] if the input is malformed.
-    pub fn parse_new_spec(&mut self, spec: &str) -> Result<(), FlexiLoggerError> {
+    pub fn parse_new_spec(&self, spec: &str) -> Result<(), FlexiLoggerError> {
         self.set_new_spec(LogSpecification::parse(spec)?);
         Ok(())
     }

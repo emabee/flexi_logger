@@ -19,7 +19,7 @@ mod macros {
 fn test() {
     // more complex just to support validation:
     let (sec_writer, sec_handle) = SecWriter::new();
-    let mut logger = Logger::try_with_str("info, fantasy = trace")
+    let logger = Logger::try_with_str("info, fantasy = trace")
         .unwrap()
         .format(detailed_format)
         .print_message()

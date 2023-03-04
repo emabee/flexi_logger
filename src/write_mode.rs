@@ -59,6 +59,12 @@ pub enum WriteMode {
     /// This allows seeing new log lines in real time, and does not need additional threads.
     Direct,
 
+    /// Do not buffer and support `cargo test`'s capture.
+    ///
+    /// Much like `Direct`, just a bit slower, and allows
+    /// `cargo test` to capture log output and print it only for failing tests.
+    SupportCapture,
+
     /// Same as `BufferAndFlushWith` with default capacity ([`DEFAULT_BUFFER_CAPACITY`])
     /// and default interval ([`DEFAULT_FLUSH_INTERVAL`]).
     BufferAndFlush,
@@ -134,7 +140,7 @@ pub(crate) enum EffectiveWriteMode {
 impl WriteMode {
     pub(crate) fn inner(&self) -> EffectiveWriteMode {
         match *self {
-            Self::Direct => EffectiveWriteMode::Direct,
+            Self::Direct | Self::SupportCapture => EffectiveWriteMode::Direct,
             Self::BufferDontFlush => {
                 EffectiveWriteMode::BufferDontFlushWith(DEFAULT_BUFFER_CAPACITY)
             }
@@ -171,7 +177,10 @@ impl WriteMode {
     }
     pub(crate) fn without_flushing(&self) -> WriteMode {
         match self {
-            Self::Direct | Self::BufferDontFlush | Self::BufferDontFlushWith(_) => *self,
+            Self::Direct
+            | Self::SupportCapture
+            | Self::BufferDontFlush
+            | Self::BufferDontFlushWith(_) => *self,
             Self::BufferAndFlush => Self::BufferDontFlush,
             Self::BufferAndFlushWith(bufsize, _) => Self::BufferDontFlushWith(*bufsize),
             #[cfg(feature = "async")]
@@ -211,9 +220,10 @@ impl WriteMode {
     }
     pub(crate) fn get_flush_interval(&self) -> Duration {
         match self {
-            Self::Direct | Self::BufferDontFlush | Self::BufferDontFlushWith(_) => {
-                Duration::from_secs(0)
-            }
+            Self::Direct
+            | Self::SupportCapture
+            | Self::BufferDontFlush
+            | Self::BufferDontFlushWith(_) => Duration::from_secs(0),
             Self::BufferAndFlush => DEFAULT_FLUSH_INTERVAL,
             #[cfg(feature = "async")]
             Self::Async => DEFAULT_FLUSH_INTERVAL,
