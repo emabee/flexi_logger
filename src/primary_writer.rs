@@ -11,9 +11,10 @@ use crate::{
     filter::LogLineWriter,
     logger::Duplicate,
     writers::{FileLogWriter, LogWriter},
-    {DeferredNow, FormatFunction, WriteMode},
+    DeferredNow, FlexiLoggerError, FormatFunction, WriteMode,
 };
 use log::Record;
+use std::path::PathBuf;
 
 // Writes either to stdout, or to stderr,
 // or to a file (with optional duplication to stderr or stdout),
@@ -109,6 +110,13 @@ impl PrimaryWriter {
             Self::Test(writer) => {
                 writer.shutdown();
             }
+        }
+    }
+
+    pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        match self {
+            Self::Multi(multi_writer) => multi_writer.existing_log_files(),
+            _ => Ok(Vec::new()),
         }
     }
 }

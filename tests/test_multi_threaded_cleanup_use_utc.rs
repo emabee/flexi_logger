@@ -53,6 +53,12 @@ mod d {
             logger.set_new_spec(new_spec);
 
             wait_for_workers_to_close(worker_handles);
+
+            let log_files = logger.existing_log_files().unwrap();
+            assert_eq!(log_files.len(), NO_OF_LOG_FILES + NO_OF_GZ_FILES + 1);
+            for f in log_files {
+                debug!("Existing log file: {f:?}");
+            }
         }
         verify_logs(&directory.display().to_string());
     }

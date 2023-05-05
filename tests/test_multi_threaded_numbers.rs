@@ -62,6 +62,13 @@ fn multi_threaded() {
             })
             .unwrap();
         wait_for_workers_to_close(worker_handles);
+
+        let log_files = logger.existing_log_files().unwrap();
+        assert_eq!(log_files.len(), 17);
+        logger.parse_new_spec("info").unwrap();
+        for f in log_files {
+            trace!("Existing log file: {f:?}");
+        }
     }
     verify_logs(&directory.display().to_string());
 }

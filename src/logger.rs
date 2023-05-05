@@ -556,9 +556,10 @@ impl Logger {
 /// so under normal circumstances no single message shuld appear.
 ///
 /// By default these error messages are printed to `stderr`.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum ErrorChannel {
     /// Write `flexi_logger`'s own error messages to `stderr`.
+    #[default]
     StdErr,
     /// Write `flexi_logger`'s own error messages to `stdout`.
     StdOut,
@@ -566,11 +567,6 @@ pub enum ErrorChannel {
     File(PathBuf),
     /// Don't write `flexi_logger`'s own error messages.
     DevNull,
-}
-impl Default for ErrorChannel {
-    fn default() -> Self {
-        ErrorChannel::StdErr
-    }
 }
 
 /// Alternative set of methods to control the behavior of the Logger.

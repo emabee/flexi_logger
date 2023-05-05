@@ -5,7 +5,7 @@ use crate::{
     {DeferredNow, FlexiLoggerError, FormatFunction},
 };
 use log::Record;
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 
 // The `MultiWriter` writes logs to a FileLogWriter and/or another Writer,
 // and can duplicate messages to stderr or stdout.
@@ -58,6 +58,13 @@ impl MultiWriter {
             .map_or(Err(FlexiLoggerError::NoFileLogger), |flw| {
                 flw.reopen_outputfile()
             })
+    }
+    pub(crate) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        if let Some(fw) = self.o_file_writer.as_ref() {
+            fw.existing_log_files()
+        } else {
+            Ok(Vec::new())
+        }
     }
 }
 

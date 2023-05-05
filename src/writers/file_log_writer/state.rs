@@ -403,6 +403,13 @@ impl State {
         Ok(())
     }
 
+    pub fn existing_log_files(&self) -> Vec<PathBuf> {
+        let mut list: Vec<PathBuf> =
+            list_of_log_and_compressed_files(&self.config.file_spec).collect();
+        list.push(self.config.file_spec.as_pathbuf(Some(CURRENT_INFIX)));
+        list
+    }
+
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");
@@ -487,7 +494,7 @@ fn open_log_file(
 ) -> Result<(Box<dyn Write + Send>, DateTime<Local>, PathBuf), std::io::Error> {
     let path = config
         .file_spec
-        .as_pathbuf(with_rotation.then(|| CURRENT_INFIX));
+        .as_pathbuf(with_rotation.then_some(CURRENT_INFIX));
 
     if config.print_message {
         println!("Log is written to {}", &path.display());

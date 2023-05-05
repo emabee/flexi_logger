@@ -1,12 +1,17 @@
 #[cfg(feature = "specfile")]
 use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
 
-use crate::primary_writer::PrimaryWriter;
-use crate::util::{eprint_err, ErrorCode};
-use crate::writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter};
-use crate::{FlexiLoggerError, LogSpecification};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use crate::{
+    primary_writer::PrimaryWriter,
+    util::{eprint_err, ErrorCode},
+    writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
+    {FlexiLoggerError, LogSpecification},
+};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
 
 /// Allows reconfiguring the logger while the program is running, and
 /// **shuts down the logger when it is dropped**.
@@ -269,6 +274,20 @@ impl LoggerHandle {
         for writer in self.writers_handle.other_writers.values() {
             writer.shutdown();
         }
+    }
+
+    /// Returns the list of existing log files according to the current `FileSpec`.
+    ///
+    /// The list includes the current log file and the compressed files, if they exist.
+    /// The list is empty if the logger is not configured for writing to files.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        let mut log_files = self.writers_handle.primary_writer.existing_log_files()?;
+        log_files.sort();
+        Ok(log_files)
     }
 
     // Allows checking the logs written so far to the writer

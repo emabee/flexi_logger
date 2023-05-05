@@ -4,10 +4,13 @@ use crate::util::{buffer_with, eprint_err, io_err, ErrorCode};
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
-use std::io::Write;
-use std::sync::{Arc, Mutex};
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
+use std::{
+    io::Write,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 #[cfg(feature = "async")]
 use {crossbeam_channel::Sender, crossbeam_queue::ArrayQueue};
 
@@ -287,6 +290,17 @@ impl StateHandle {
         .map_err(|_| FlexiLoggerError::Poison)?;
 
         Ok(state.config().clone())
+    }
+
+    pub(super) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        let state = match self {
+            StateHandle::Sync(handle) => handle.am_state.lock(),
+            #[cfg(feature = "async")]
+            StateHandle::Async(handle) => handle.am_state.lock(),
+        }
+        .map_err(|_| FlexiLoggerError::Poison)?;
+
+        Ok(state.existing_log_files())
     }
 
     pub(super) fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {

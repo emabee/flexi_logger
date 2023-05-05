@@ -132,6 +132,18 @@ impl FileLogWriter {
     pub fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
         self.state_handle.reopen_outputfile()
     }
+
+    /// Returns the list of existing log files according to the current `FileSpec`.
+    ///
+    /// The list includes the current log file and the compressed files, if they exist.
+    /// The list is empty if the logger is not configured for writing to files.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        self.state_handle.existing_log_files()
+    }
 }
 
 impl LogWriter for FileLogWriter {
