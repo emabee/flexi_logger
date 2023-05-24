@@ -173,7 +173,7 @@ pub fn with_thread(
 ) -> Result<(), std::io::Error> {
     write!(
         w,
-        "[{}] T[{:?}] {} [{}:{}] {}",
+        "[{}] T[{}] {} [{}:{}] {}",
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
@@ -200,7 +200,7 @@ pub fn colored_with_thread(
     let level = record.level();
     write!(
         w,
-        "[{}] T[{:?}] {} [{}:{}] {}",
+        "[{}] T[{}] {} [{}:{}] {}",
         style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
         style(level).paint(level.to_string()),
