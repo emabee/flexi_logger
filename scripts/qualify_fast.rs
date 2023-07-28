@@ -1,3 +1,4 @@
+#!/usr/bin/env rust-script
 //! ```cargo
 //! [dependencies]
 //! yansi = "0.5"
@@ -54,5 +55,7 @@ fn main() {
     run_command!("cargo", "doc", "--all-features", "--no-deps", "--open");
 
     // say goodbye
-    println!("\n> fast qualification is done :-)  Looks like you're ready to do the full qualification?");
+    println!(
+        "\n> fast qualification is done :-)  Looks like you're ready to do the full qualification?"
+    );
 }

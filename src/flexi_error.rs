@@ -10,6 +10,10 @@ pub enum FlexiLoggerError {
     #[error("Chosen reset not possible")]
     Reset,
 
+    /// Method not possible because duplication is not possible.
+    #[error("Method not possible because duplication is not possible")]
+    NoDuplication,
+
     /// Method not possible because no file logger is configured.
     #[error("Method not possible because no file logger is configured")]
     NoFileLogger,

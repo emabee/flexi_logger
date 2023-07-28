@@ -193,7 +193,28 @@ With [`Logger::format`](crate::Logger::format)
 you set the format for all used output channels of `flexi_logger`.
 
 `flexi_logger` provides a couple of format functions, and you can also create and use your own,
-e.g. by copying and modifying one of the provided format functions.
+e.g. by copying and modifying one of the provided format functions (see [formats.rs](https://github.com/emabee/flexi_logger/blob/master/src/formats.rs)).
+
+Here's an example that you could create somewhere in your code.
+It also illustrates the signature the format function must have.
+
+```rust,ignore
+pub fn my_own_format(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let level = record.level();
+    write!(
+        w,
+        "{} [Thread {}] Severity {}, Message: {}",
+        now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
+        thread::current().name().unwrap_or("<unnamed>"),
+        record.level(),
+        &record.args()
+    )
+}
+```
 
 Depending on the configuration, `flexi_logger` can write logs to multiple channels
 (stdout, stderr, files, or additional writers)

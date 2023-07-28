@@ -1,3 +1,4 @@
+#!/usr/bin/env rust-script
 //! ```cargo
 //! [dependencies]
 //! yansi = "0.5"

@@ -966,19 +966,33 @@ pub(crate) fn log_spec_string_from_file<P: AsRef<Path>>(
 #[derive(Debug, Clone, Copy)]
 pub enum Duplicate {
     /// No messages are duplicated.
-    None,
+    None = 0,
     /// Only error messages are duplicated.
-    Error,
+    Error = 1,
     /// Error and warn messages are duplicated.
-    Warn,
+    Warn = 2,
     /// Error, warn, and info messages are duplicated.
-    Info,
+    Info = 3,
     /// Error, warn, info, and debug messages are duplicated.
-    Debug,
+    Debug = 4,
     /// All messages are duplicated.
-    Trace,
+    Trace = 5,
     /// All messages are duplicated.
-    All,
+    All = 6,
+}
+impl From<u8> for Duplicate {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => Duplicate::None,
+            1 => Duplicate::Error,
+            2 => Duplicate::Warn,
+            3 => Duplicate::Info,
+            4 => Duplicate::Debug,
+            5 => Duplicate::Trace,
+            6 => Duplicate::All,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl From<LevelFilter> for Duplicate {

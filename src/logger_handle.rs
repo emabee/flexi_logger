@@ -5,7 +5,7 @@ use crate::{
     primary_writer::PrimaryWriter,
     util::{eprint_err, ErrorCode},
     writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
-    {FlexiLoggerError, LogSpecification},
+    Duplicate, FlexiLoggerError, LogSpecification,
 };
 use std::{
     collections::HashMap,
@@ -288,6 +288,36 @@ impl LoggerHandle {
         let mut log_files = self.writers_handle.primary_writer.existing_log_files()?;
         log_files.sort();
         Ok(log_files)
+    }
+
+    /// Allows re-configuring duplication to stderr.
+    ///
+    ///  # Errors
+    ///  
+    ///  `FlexiLoggerError::NoDuplication`
+    ///   if `FlexiLogger` was initialized without duplication support
+    pub fn adapt_duplication_to_stderr(&mut self, dup: Duplicate) -> Result<(), FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
+            mw.adapt_duplication_to_stderr(dup);
+            Ok(())
+        } else {
+            Err(FlexiLoggerError::NoFileLogger)
+        }
+    }
+
+    /// Allows re-configuring duplication to stdout.
+    ///
+    ///  # Errors
+    ///  
+    ///  `FlexiLoggerError::NoDuplication`
+    ///   if `FlexiLogger` was initialized without duplication support
+    pub fn adapt_duplication_to_stdout(&mut self, dup: Duplicate) -> Result<(), FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
+            mw.adapt_duplication_to_stdout(dup);
+            Ok(())
+        } else {
+            Err(FlexiLoggerError::NoFileLogger)
+        }
     }
 
     // Allows checking the logs written so far to the writer

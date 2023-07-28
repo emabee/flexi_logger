@@ -15,12 +15,12 @@ fn test_reconfigure_methods() {
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
-    test_parse_new_spec(&mut logger);
+    test_parse_new_spec(&logger);
     test_push_new_spec(&mut logger);
-    validate_logs(&mut logger);
+    validate_logs(&logger);
 }
 
-fn test_parse_new_spec(logger: &mut LoggerHandle) {
+fn test_parse_new_spec(logger: &LoggerHandle) {
     error!("1-error message");
     warn!("1-warning");
     info!("1-info message");
@@ -83,7 +83,7 @@ fn test_push_new_spec(logger: &mut LoggerHandle) {
     logger.pop_temp_spec(); // should be a no-op
 }
 
-fn validate_logs(logger: &mut LoggerHandle) {
+fn validate_logs(logger: &LoggerHandle) {
     logger.validate_logs(&[
         ("ERROR", "test_reconfigure_methods", "1-error"),
         ("WARN", "test_reconfigure_methods", "1-warning"),

@@ -5,13 +5,17 @@ use crate::{
     {DeferredNow, FlexiLoggerError, FormatFunction},
 };
 use log::Record;
-use std::{io::Write, path::PathBuf};
+use std::{
+    io::Write,
+    path::PathBuf,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
 // The `MultiWriter` writes logs to a FileLogWriter and/or another Writer,
 // and can duplicate messages to stderr or stdout.
 pub(crate) struct MultiWriter {
-    duplicate_stderr: Duplicate,
-    duplicate_stdout: Duplicate,
+    duplicate_stderr: AtomicU8,
+    duplicate_stdout: AtomicU8,
     support_capture: bool,
     format_for_stderr: FormatFunction,
     format_for_stdout: FormatFunction,
@@ -30,8 +34,8 @@ impl MultiWriter {
         o_other_writer: Option<Box<dyn LogWriter>>,
     ) -> Self {
         MultiWriter {
-            duplicate_stderr,
-            duplicate_stdout,
+            duplicate_stderr: AtomicU8::new(duplicate_stderr as u8),
+            duplicate_stdout: AtomicU8::new(duplicate_stdout as u8),
             support_capture,
             format_for_stderr,
             format_for_stdout,
@@ -66,6 +70,21 @@ impl MultiWriter {
             Ok(Vec::new())
         }
     }
+
+    pub(crate) fn adapt_duplication_to_stderr(&self, dup: Duplicate) {
+        self.duplicate_stderr.store(dup as u8, Ordering::Relaxed);
+    }
+
+    pub(crate) fn adapt_duplication_to_stdout(&self, dup: Duplicate) {
+        self.duplicate_stdout.store(dup as u8, Ordering::Relaxed);
+    }
+
+    fn duplication_to_stderr(&self) -> Duplicate {
+        Duplicate::from(self.duplicate_stderr.load(Ordering::Relaxed))
+    }
+    fn duplication_to_stdout(&self) -> Duplicate {
+        Duplicate::from(self.duplicate_stdout.load(Ordering::Relaxed))
+    }
 }
 
 impl LogWriter for MultiWriter {
@@ -79,7 +98,7 @@ impl LogWriter for MultiWriter {
     }
 
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        if match self.duplicate_stderr {
+        if match self.duplication_to_stderr() {
             Duplicate::Error => record.level() == log::Level::Error,
             Duplicate::Warn => record.level() <= log::Level::Warn,
             Duplicate::Info => record.level() <= log::Level::Info,
@@ -104,7 +123,7 @@ impl LogWriter for MultiWriter {
             }
         }
 
-        if match self.duplicate_stdout {
+        if match self.duplication_to_stdout() {
             Duplicate::Error => record.level() == log::Level::Error,
             Duplicate::Warn => record.level() <= log::Level::Warn,
             Duplicate::Info => record.level() <= log::Level::Info,
@@ -163,10 +182,10 @@ impl LogWriter for MultiWriter {
             writer.flush()?;
         }
 
-        if !matches!(self.duplicate_stderr, Duplicate::None) {
+        if !matches!(self.duplication_to_stderr(), Duplicate::None) {
             std::io::stderr().flush()?;
         }
-        if !matches!(self.duplicate_stdout, Duplicate::None) {
+        if !matches!(self.duplication_to_stdout(), Duplicate::None) {
             std::io::stdout().flush()?;
         }
         Ok(())

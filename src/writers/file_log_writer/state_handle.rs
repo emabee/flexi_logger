@@ -49,7 +49,7 @@ impl std::fmt::Debug for SyncHandle {
             .field("am_state", &self.am_state)
             .field("format", &"<..>")
             .field("line_ending", &self.line_ending)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -128,7 +128,7 @@ impl std::fmt::Debug for AsyncHandle {
             .field("message_capa", &self.message_capa)
             .field("format", &"<..>")
             .field("line_ending", &self.line_ending)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
