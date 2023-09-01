@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2023-08-30
+
+Re-open output also for other writers (fixes #143).
+
+Rename method to re-open output from LoggerHandle (leads to version bump).
+
+Use `dep:` in Cargo.toml for references to most dependencies, in order to avoid implicit "features".
+
+Fix #145 (minor internal optimization).
+
 ## [0.25.6] - 2023-07-28
 
 Add methods

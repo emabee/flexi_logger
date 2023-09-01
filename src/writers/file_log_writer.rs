@@ -45,7 +45,6 @@ impl FileLogWriter {
 
             #[cfg(feature = "async")]
             EffectiveWriteMode::AsyncWith {
-                bufsize: _,
                 pool_capa,
                 message_capa,
                 flush_interval: _,
@@ -160,6 +159,10 @@ impl LogWriter for FileLogWriter {
     #[inline]
     fn max_log_level(&self) -> log::LevelFilter {
         self.max_log_level
+    }
+
+    fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
+        self.reopen_outputfile()
     }
 
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
@@ -380,7 +383,6 @@ mod test {
 
             #[cfg(feature = "async")]
             let flwb = flwb.write_mode(WriteMode::AsyncWith {
-                bufsize: 5,
                 pool_capa: 5,
                 message_capa: 400,
                 flush_interval: Duration::from_secs(0),
@@ -437,7 +439,6 @@ mod test {
         let write_mode = WriteMode::BufferDontFlushWith(4);
         #[cfg(feature = "async")]
         let write_mode = WriteMode::AsyncWith {
-            bufsize: 6,
             pool_capa: 7,
             message_capa: 8,
             flush_interval: Duration::from_secs(0),

@@ -60,7 +60,7 @@ fn work(value: u8) {
             match std::fs::remove_file(file_path.clone()) {
                 Ok(()) => {
                     println!("Removed the log file {file_path:?}, which had {lines} lines");
-                    logger.reopen_outputfile().unwrap();
+                    logger.reopen_output().unwrap();
                 }
                 Err(e) => {
                     panic!("Cannot remove log file {file_path:?}, i = {i}, reason {e:?}")

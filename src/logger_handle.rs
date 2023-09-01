@@ -238,6 +238,9 @@ impl LoggerHandle {
     /// such actions by calling this method. Otherwise `flexi_logger` will not stop
     /// writing to the renamed or even deleted file!
     ///
+    /// In more complex configurations, i.e. when more than one output stream is written to,
+    /// all of them will be attempted to be re-opened; only the first error will be reported.
+    ///
     /// # Example
     ///
     /// `logrotate` e.g. can be configured to send a `SIGHUP` signal to your program. You need to
@@ -247,15 +250,25 @@ impl LoggerHandle {
     ///
     /// # Errors
     ///
-    /// `FlexiLoggerError::NoFileLogger` if no file log writer is configured.
-    ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
-    pub fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
-        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
-            mw.reopen_outputfile()
+    ///
+    /// Other variants of `FlexiLoggerError`, depending on the used writers.
+    pub fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
+        let mut result = if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer
+        {
+            mw.reopen_output()
         } else {
-            Err(FlexiLoggerError::NoFileLogger)
+            Ok(())
+        };
+
+        for blw in self.writers_handle.other_writers.values() {
+            let result2 = blw.reopen_output();
+            if result.is_ok() && result2.is_err() {
+                result = result2;
+            }
         }
+
+        result
     }
 
     /// Shutdown all participating writers.

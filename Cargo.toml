@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.25.6"
+version = "0.26.0"
 authors = ["emabee <meinolf.block@sap.com>"]
 categories = ["development-tools::debugging"]
 description = """
@@ -29,15 +29,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["colors", "textfilter"]
-async = ["crossbeam-channel", "crossbeam-queue"]
-colors = ["nu-ansi-term", "is-terminal"]
-compress = ["flate2"]
+async = ["dep:crossbeam-channel", "dep:crossbeam-queue"]
+colors = ["dep:nu-ansi-term", "is-terminal"]
+compress = ["dep:flate2"]
 dont_minimize_extra_stacks = []
-specfile = ["specfile_without_notification", "notify-debouncer-mini"]
-specfile_without_notification = ["serde", "toml", "serde_derive"]
-syslog_writer = ["libc", "hostname"]
-textfilter = ["regex"]
-trc = ["async", "specfile", "tracing", "tracing-subscriber"]
+specfile = ["specfile_without_notification", "dep:notify-debouncer-mini"]
+specfile_without_notification = ["dep:serde", "dep:toml", "dep:serde_derive"]
+syslog_writer = ["dep:libc", "dep:hostname"]
+textfilter = ["dep:regex"]
+trc = ["async", "specfile", "dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
 is-terminal = { version = "0.4", optional = true }
@@ -56,10 +56,10 @@ serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 thiserror = "1.0"
 toml = { version = "0.7", optional = true }
+tracing = { version = "0.1.36", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = [
     "env-filter",
 ] }
-tracing = { version = "0.1.36", optional = true }
 
 [target.'cfg(linux)'.dependencies]
 libc = { version = "^0.2.50", optional = true }

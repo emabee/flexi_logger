@@ -1,4 +1,4 @@
-use crate::{DeferredNow, FormatFunction};
+use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 
 /// Writes to a single log output stream.
@@ -38,6 +38,19 @@ pub trait LogWriter: Sync + Send {
 
     /// Cleanup open resources, if necessary.
     fn shutdown(&self) {}
+
+    /// Re-open the current output, if meaningful.
+    ///
+    /// This method is called from
+    /// [`LoggerHandle::reopen_output`](crate::LoggerHandle::reopen_output)
+    /// for all registered additional writers.
+    ///
+    /// # Errors
+    ///
+    /// Depend on registered writers.
+    fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
+        Ok(())
+    }
 
     // Takes a vec with three patterns per line that represent the log line,
     // compares the written log with the expected lines,

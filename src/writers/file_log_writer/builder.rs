@@ -251,7 +251,6 @@ impl FileLogWriterBuilder {
 
         #[cfg(feature = "async")]
         let cleanup_in_background_thread = if let WriteMode::AsyncWith {
-            bufsize: _,
             pool_capa: _,
             message_capa: _,
             flush_interval: _,

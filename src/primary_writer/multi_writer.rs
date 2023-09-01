@@ -56,12 +56,20 @@ impl MultiWriter {
             .as_ref()
             .map_or(Err(FlexiLoggerError::NoFileLogger), |flw| flw.config())
     }
-    pub(crate) fn reopen_outputfile(&self) -> Result<(), FlexiLoggerError> {
-        self.o_file_writer
-            .as_ref()
-            .map_or(Err(FlexiLoggerError::NoFileLogger), |flw| {
-                flw.reopen_outputfile()
-            })
+    pub(crate) fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
+        match (&self.o_file_writer, &self.o_other_writer) {
+            (None, None) => Ok(()),
+            (Some(ref w), None) => w.reopen_outputfile(),
+            (None, Some(w)) => w.reopen_output(),
+            (Some(w1), Some(w2)) => {
+                let r1 = w1.reopen_outputfile();
+                let r2 = w2.reopen_output();
+                match (r1, r2) {
+                    (Ok(()), Ok(())) => Ok(()),
+                    (Err(e), _) | (Ok(()), Err(e)) => Err(e),
+                }
+            }
+        }
     }
     pub(crate) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
         if let Some(fw) = self.o_file_writer.as_ref() {

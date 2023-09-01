@@ -96,13 +96,42 @@ impl LogSpecification {
         Self::default()
     }
 
-    /// Returns a `LogSpecification` where the global tracelevel is set to info.
+    /// Returns a `LogSpecification` where the global tracelevel is set to `LevelFilter::Error`.
+    #[must_use]
+    pub fn error() -> Self {
+        Self::new_with(LevelFilter::Error)
+    }
+
+    /// Returns a `LogSpecification` where the global tracelevel is set to `LevelFilter::Warn`.
+    #[must_use]
+    pub fn warn() -> Self {
+        Self::new_with(LevelFilter::Warn)
+    }
+
+    /// Returns a `LogSpecification` where the global tracelevel is set to `LevelFilter::Info`.
     #[must_use]
     pub fn info() -> Self {
+        Self::new_with(LevelFilter::Info)
+    }
+
+    /// Returns a `LogSpecification` where the global tracelevel is set to `LevelFilter::Debug`.
+    #[must_use]
+    pub fn debug() -> Self {
+        Self::new_with(LevelFilter::Debug)
+    }
+
+    /// Returns a `LogSpecification` where the global tracelevel is set to `LevelFilter::Trace`.
+    #[must_use]
+    pub fn trace() -> Self {
+        Self::new_with(LevelFilter::Trace)
+    }
+
+    #[must_use]
+    fn new_with(level_filter: LevelFilter) -> Self {
         Self {
             module_filters: vec![ModuleFilter {
                 module_name: None,
-                level_filter: LevelFilter::Info,
+                level_filter,
             }],
             #[cfg(feature = "textfilter")]
             textfilter: None,

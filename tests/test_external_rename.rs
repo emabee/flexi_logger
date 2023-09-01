@@ -67,7 +67,7 @@ fn work(value: u8) {
                 match std::fs::rename(file_path.clone(), target_path.clone()) {
                     Ok(()) => {
                         println!("Renamed the log file {:?} to {:?}", file_path, &target_path);
-                        logger.reopen_outputfile().unwrap();
+                        logger.reopen_output().unwrap();
                     }
                     Err(e) => {
                         panic!(

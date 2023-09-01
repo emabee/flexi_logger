@@ -50,7 +50,6 @@ struct AsyncHandle {
 impl AsyncHandle {
     fn new(
         stdstream: StdStream,
-        _bufsize: usize,
         pool_capa: usize,
         msg_capa: usize,
         #[cfg(test)] validation_buffer: &Arc<Mutex<Cursor<Vec<u8>>>>,
@@ -105,7 +104,6 @@ impl StdWriter {
             }
             #[cfg(feature = "async")]
             EffectiveWriteMode::AsyncWith {
-                bufsize,
                 pool_capa,
                 message_capa,
                 flush_interval,
@@ -117,7 +115,6 @@ impl StdWriter {
                 );
                 InnerStdWriter::Async(AsyncHandle::new(
                     stdstream,
-                    bufsize,
                     pool_capa,
                     message_capa,
                     #[cfg(test)]

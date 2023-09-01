@@ -104,8 +104,6 @@ pub enum WriteMode {
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[cfg(feature = "async")]
     AsyncWith {
-        /// Size of the output buffer for the file.
-        bufsize: usize,
         /// Capacity of the pool for the message buffers.
         pool_capa: usize,
         /// Capacity of an individual message buffer.
@@ -123,8 +121,6 @@ pub(crate) enum EffectiveWriteMode {
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[cfg(feature = "async")]
     AsyncWith {
-        /// Size of the output buffer for the file.
-        bufsize: usize,
         /// Capacity of the pool for the message buffers.
         pool_capa: usize,
         /// Capacity of an individual message buffer.
@@ -156,19 +152,16 @@ impl WriteMode {
             }
             #[cfg(feature = "async")]
             Self::Async => EffectiveWriteMode::AsyncWith {
-                bufsize: DEFAULT_BUFFER_CAPACITY,
                 pool_capa: DEFAULT_POOL_CAPA,
                 message_capa: DEFAULT_MESSAGE_CAPA,
                 flush_interval: DEFAULT_FLUSH_INTERVAL,
             },
             #[cfg(feature = "async")]
             Self::AsyncWith {
-                bufsize,
                 pool_capa,
                 message_capa,
                 flush_interval,
             } => EffectiveWriteMode::AsyncWith {
-                bufsize,
                 pool_capa,
                 message_capa,
                 flush_interval,
@@ -185,19 +178,16 @@ impl WriteMode {
             Self::BufferAndFlushWith(bufsize, _) => Self::BufferDontFlushWith(*bufsize),
             #[cfg(feature = "async")]
             Self::Async => Self::AsyncWith {
-                bufsize: DEFAULT_BUFFER_CAPACITY,
                 pool_capa: DEFAULT_POOL_CAPA,
                 message_capa: DEFAULT_MESSAGE_CAPA,
                 flush_interval: Duration::from_secs(0),
             },
             #[cfg(feature = "async")]
             Self::AsyncWith {
-                bufsize,
                 pool_capa,
                 message_capa,
                 flush_interval: _,
             } => Self::AsyncWith {
-                bufsize: *bufsize,
                 pool_capa: *pool_capa,
                 message_capa: *message_capa,
                 flush_interval: Duration::from_secs(0),
@@ -211,11 +201,10 @@ impl WriteMode {
             | EffectiveWriteMode::BufferDontFlushWith(bufsize) => Some(bufsize),
             #[cfg(feature = "async")]
             EffectiveWriteMode::AsyncWith {
-                bufsize,
                 pool_capa: _,
                 message_capa: _,
                 flush_interval: _,
-            } => Some(bufsize),
+            } => None,
         }
     }
     pub(crate) fn get_flush_interval(&self) -> Duration {
@@ -230,7 +219,6 @@ impl WriteMode {
             Self::BufferAndFlushWith(_, flush_interval) => *flush_interval,
             #[cfg(feature = "async")]
             Self::AsyncWith {
-                bufsize: _,
                 pool_capa: _,
                 message_capa: _,
                 flush_interval,

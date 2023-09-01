@@ -16,13 +16,15 @@ use crate::{
 use log::Record;
 use std::path::PathBuf;
 
-// Writes either to stdout, or to stderr,
-// or to a file (with optional duplication to stderr or stdout),
-// or to nowhere (with optional "duplication" to stderr or stdout),
-// or in simplified form using println! to stdout to enable capturing in tests.
+// Primary writer
+//
+// all normal logging goes here
 pub(crate) enum PrimaryWriter {
+    // Writes to stdout or to stderr
     Std(StdWriter),
+    // Writes to a file or to nowhere, with optional "duplication" to stderr or stdout
     Multi(MultiWriter),
+    // Writes using println! to stdout, to enable capturing in tests
     Test(TestWriter),
 }
 impl PrimaryWriter {
