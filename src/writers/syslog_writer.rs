@@ -403,7 +403,8 @@ impl Write for SyslogConnector {
             #[cfg(target_family = "unix")]
             Self::Stream(ref mut w) => {
                 // todo: reconnect if conn is broken
-                w.write(buf).and_then(|sz| w.write_all(&[0; 1]).map(|_| sz))
+                w.write(buf)
+                    .and_then(|sz| w.write_all(&[0; 1]).map(|()| sz))
             }
             Self::Tcp(ref mut w) => {
                 // todo: reconnect if conn is broken

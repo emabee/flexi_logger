@@ -177,7 +177,7 @@ impl StateHandle {
             StateHandle::Sync(handle) => {
                 let mut state_guard = handle.am_state.lock().map_err(|_e| io_err("Poison"))?;
                 let state = &mut *state_guard;
-                state.write_buffer(buffer).map(|_| buffer.len())
+                state.write_buffer(buffer).map(|()| buffer.len())
             }
             #[cfg(feature = "async")]
             StateHandle::Async(handle) => {
