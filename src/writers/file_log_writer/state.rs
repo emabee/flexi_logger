@@ -413,6 +413,10 @@ impl State {
         list
     }
 
+    pub fn rotated_log_files(&self) -> Vec<PathBuf> {
+        list_of_log_and_compressed_files(&self.config.file_spec).collect()
+    }
+
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");

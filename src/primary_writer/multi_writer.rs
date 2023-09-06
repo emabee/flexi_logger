@@ -93,6 +93,13 @@ impl MultiWriter {
             Ok(Vec::new())
         }
     }
+    pub(crate) fn rotated_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        if let Some(fw) = self.o_file_writer.as_ref() {
+            fw.rotated_log_files()
+        } else {
+            Ok(Vec::new())
+        }
+    }
 
     pub(crate) fn adapt_duplication_to_stderr(&self, dup: Duplicate) {
         self.duplicate_stderr.store(dup as u8, Ordering::Relaxed);

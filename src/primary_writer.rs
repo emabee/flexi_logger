@@ -121,6 +121,13 @@ impl PrimaryWriter {
             _ => Ok(Vec::new()),
         }
     }
+
+    pub fn rotated_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        match self {
+            Self::Multi(multi_writer) => multi_writer.rotated_log_files(),
+            _ => Ok(Vec::new()),
+        }
+    }
 }
 
 impl LogLineWriter for PrimaryWriter {

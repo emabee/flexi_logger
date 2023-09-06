@@ -325,6 +325,20 @@ impl LoggerHandle {
         Ok(log_files)
     }
 
+    /// Returns the list of rotated log files according to the current `FileSpec`.
+    ///
+    /// The list does not include the current log file.
+    /// The list is empty if the logger is not configured for writing to files.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn rotated_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        let mut log_files = self.writers_handle.primary_writer.rotated_log_files()?;
+        log_files.sort();
+        Ok(log_files)
+    }
+
     /// Allows re-configuring duplication to stderr.
     ///
     ///  # Errors

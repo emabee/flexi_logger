@@ -151,6 +151,18 @@ impl FileLogWriter {
     pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
         self.state_handle.existing_log_files()
     }
+
+    /// Returns the list of rotated log files according to the current `FileSpec`.
+    ///
+    /// The list does not include the current log file.
+    /// The list is empty if the logger is not configured for writing to files.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn rotated_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        self.state_handle.rotated_log_files()
+    }
 }
 
 impl LogWriter for FileLogWriter {

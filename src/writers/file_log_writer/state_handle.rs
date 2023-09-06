@@ -313,6 +313,17 @@ impl StateHandle {
         Ok(state.existing_log_files())
     }
 
+    pub(super) fn rotated_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        let state = match self {
+            StateHandle::Sync(handle) => handle.am_state.lock(),
+            #[cfg(feature = "async")]
+            StateHandle::Async(handle) => handle.am_state.lock(),
+        }
+        .map_err(|_| FlexiLoggerError::Poison)?;
+
+        Ok(state.rotated_log_files())
+    }
+
     pub(super) fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),
