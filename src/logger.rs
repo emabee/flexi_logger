@@ -464,18 +464,6 @@ impl Logger {
         self
     }
 
-    /// Tries to make the logger react cooperatively if external tools rename or delete the log file.
-    #[deprecated(
-        since = "0.22.2",
-        note = "Use LoggerHandle::reopen_outputfile() instead"
-    )]
-    #[must_use]
-    #[cfg(feature = "external_rotation")]
-    pub fn watch_external_rotations(mut self) -> Self {
-        self.flwb = self.flwb.watch_external_rotations();
-        self
-    }
-
     /// Makes the logger use UTC timestamps rather than local timestamps.
     #[must_use]
     pub fn use_utc(mut self) -> Self {

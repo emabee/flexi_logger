@@ -7,8 +7,6 @@ use crate::{
     Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
-#[cfg(feature = "external_rotation")]
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::cmp::max;
 use std::fs::{remove_file, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -16,14 +14,6 @@ use std::iter::Chain;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::vec::IntoIter;
-#[cfg(feature = "external_rotation")]
-use std::{
-    ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
 const CURRENT_INFIX: &str = "_rCURRENT";
 fn number_infix(idx: u32) -> String {
     format!("_r{idx:0>5}")
@@ -177,8 +167,6 @@ impl std::fmt::Debug for Inner {
 pub(super) struct State {
     config: FileLogWriterConfig,
     inner: Inner,
-    #[cfg(feature = "external_rotation")]
-    external_rotation: Arc<AtomicBool>,
 }
 impl State {
     pub(super) fn new(
@@ -189,8 +177,6 @@ impl State {
         Self {
             config,
             inner: Inner::Initial(o_rotation_config, cleanup_in_background_thread),
-            #[cfg(feature = "external_rotation")]
-            external_rotation,
         }
     }
 
@@ -322,9 +308,6 @@ impl State {
             self.initialize()?;
         }
 
-        #[cfg(feature = "external_rotation")]
-        self.react_on_external_rotation()?;
-
         // rotate if necessary
         self.mount_next_linewriter_if_necessary()
             .unwrap_or_else(|e| {
@@ -362,23 +345,6 @@ impl State {
             }
         };
         self.config.file_spec.as_pathbuf(o_infix)
-    }
-
-    // check if the currently used output file does still exist, and if not, then create and open it
-    #[cfg(feature = "external_rotation")]
-    fn react_on_external_rotation(&mut self) -> Result<(), std::io::Error> {
-        if self
-            .external_rotation
-            .deref()
-            .swap(false, Ordering::Relaxed)
-        {
-            if let Inner::Active(_, ref mut file, ref p_path) = self.inner {
-                if std::fs::metadata(p_path).is_err() {
-                    *file = Box::new(OpenOptions::new().create(true).append(true).open(&p_path)?);
-                }
-            }
-        }
-        Ok(())
     }
 
     pub fn reopen_outputfile(&mut self) -> Result<(), std::io::Error> {

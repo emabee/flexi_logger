@@ -19,8 +19,6 @@ pub struct FileLogWriterBuilder {
     o_rotation_config: Option<RotationConfig>,
     max_log_level: log::LevelFilter,
     cleanup_in_background_thread: bool,
-    #[cfg(feature = "external_rotation")]
-    external_rotate_watcher: bool,
     use_utc: bool,
 }
 
@@ -38,8 +36,6 @@ impl FileLogWriterBuilder {
             format: default_format,
             max_log_level: log::LevelFilter::Trace,
             cleanup_in_background_thread: true,
-            #[cfg(feature = "external_rotation")]
-            external_rotate_watcher: false,
             use_utc: false,
         }
     }
@@ -77,24 +73,6 @@ impl FileLogWriterBuilder {
     #[must_use]
     pub fn cleanup_in_background_thread(mut self, use_background_thread: bool) -> Self {
         self.cleanup_in_background_thread = use_background_thread;
-        self
-    }
-
-    /// Makes the `FileLogWriter` react cooperatively if external tools rename or delete
-    /// the log file.
-    ///
-    /// The `FileLogWriter` expects that nobody interacts with the log file,
-    /// and it offers capabilities to rotate, compress, and clean up log files.
-    ///
-    /// Alternatively, tools like linux' `logrotate` can be used to rotate, compress or remove
-    /// log files. But renaming or deleting the current output file e.g. will not stop
-    /// `FileLogWriter` from writing to the now renamed or even deleted file!
-    /// You should use this method to make it watch for OS events that affect its outputfile
-    /// and react with closing its current output stream and recreating its configured output file.
-    #[must_use]
-    #[cfg(feature = "external_rotation")]
-    pub fn watch_external_rotations(mut self) -> Self {
-        self.external_rotate_watcher = true;
         self
     }
 
@@ -263,9 +241,6 @@ impl FileLogWriterBuilder {
         #[cfg(not(feature = "async"))]
         let cleanup_in_background_thread = self.cleanup_in_background_thread;
 
-        #[cfg(feature = "external_rotation")]
-        let external_rotate_watcher = self.external_rotate_watcher;
-
         Ok(State::new(
             FileLogWriterConfig {
                 print_message: self.cfg_print_message,
@@ -278,8 +253,6 @@ impl FileLogWriterBuilder {
             },
             self.o_rotation_config.as_ref().map(Clone::clone),
             cleanup_in_background_thread,
-            #[cfg(feature = "external_rotation")]
-            external_rotate_watcher,
         ))
     }
 }
