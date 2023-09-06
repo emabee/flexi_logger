@@ -186,6 +186,28 @@ impl LoggerHandle {
         }
     }
 
+    /// Rotate all writers.
+    ///
+    /// # Errors
+    /// IO errors
+    pub fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        let mut result = if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer
+        {
+            mw.rotate()
+        } else {
+            Ok(())
+        };
+
+        for blw in self.writers_handle.other_writers.values() {
+            let result2 = blw.rotate();
+            if result.is_ok() && result2.is_err() {
+                result = result2;
+            }
+        }
+
+        result
+    }
+
     /// Replaces parts of the configuration of the file log writer.
     ///
     /// Note that neither the write mode nor the format function can be reset and

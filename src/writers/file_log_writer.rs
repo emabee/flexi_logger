@@ -132,6 +132,14 @@ impl FileLogWriter {
         self.state_handle.reopen_outputfile()
     }
 
+    /// Rotate the current log file if possible.
+    ///
+    /// # Errors
+    /// IO errors
+    pub fn rotate_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        self.state_handle.rotate_outputfile()
+    }
+
     /// Returns the list of existing log files according to the current `FileSpec`.
     ///
     /// The list includes the current log file and the compressed files, if they exist.
@@ -163,6 +171,10 @@ impl LogWriter for FileLogWriter {
 
     fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
         self.reopen_outputfile()
+    }
+
+    fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        self.rotate_outputfile()
     }
 
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {

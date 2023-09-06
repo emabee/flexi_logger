@@ -281,6 +281,16 @@ impl StateHandle {
         Ok(state.reopen_outputfile()?)
     }
 
+    pub(super) fn rotate_outputfile(&self) -> Result<(), FlexiLoggerError> {
+        let mut state = match self {
+            StateHandle::Sync(handle) => handle.am_state.lock(),
+            #[cfg(feature = "async")]
+            StateHandle::Async(handle) => handle.am_state.lock(),
+        }
+        .map_err(|_| FlexiLoggerError::Poison)?;
+        state.rotate_outputfile()
+    }
+
     pub(crate) fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {
         let state = match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),

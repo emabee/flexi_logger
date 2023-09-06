@@ -283,10 +283,10 @@ impl State {
     // On overflow, an existing `_rCURRENT` file is renamed to the next numbered file,
     // before writing into `_rCURRENT` goes on.
     #[inline]
-    fn mount_next_linewriter_if_necessary(&mut self) -> Result<(), FlexiLoggerError> {
+    fn mount_next_linewriter(&mut self, skip_check: bool) -> Result<(), FlexiLoggerError> {
         if let Inner::Active(Some(ref mut rotation_state), ref mut file, ref mut path) = self.inner
         {
-            if rotation_state.rotation_necessary() {
+            if skip_check || rotation_state.rotation_necessary() {
                 match rotation_state.naming_state {
                     NamingState::CreatedAt => {
                         rotate_output_file_to_date(&rotation_state.created_at, &self.config)?;
@@ -326,10 +326,9 @@ impl State {
         self.react_on_external_rotation()?;
 
         // rotate if necessary
-        self.mount_next_linewriter_if_necessary()
-            .unwrap_or_else(|e| {
-                eprint_err(ErrorCode::LogFile, "can't open file", &e);
-            });
+        self.mount_next_linewriter(false).unwrap_or_else(|e| {
+            eprint_err(ErrorCode::LogFile, "can't open file", &e);
+        });
 
         if let Inner::Active(ref mut o_rotation_state, ref mut log_file, ref _path) = self.inner {
             log_file.write_all(buf)?;
@@ -401,6 +400,10 @@ impl State {
             }
         }
         Ok(())
+    }
+
+    pub fn rotate_outputfile(&mut self) -> Result<(), FlexiLoggerError> {
+        self.mount_next_linewriter(true)
     }
 
     pub fn existing_log_files(&self) -> Vec<PathBuf> {

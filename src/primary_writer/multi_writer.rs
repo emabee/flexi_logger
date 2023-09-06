@@ -71,6 +71,21 @@ impl MultiWriter {
             }
         }
     }
+    pub(crate) fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        match (&self.o_file_writer, &self.o_other_writer) {
+            (None, None) => Ok(()),
+            (Some(ref w), None) => w.rotate_outputfile(),
+            (None, Some(w)) => w.rotate(),
+            (Some(w1), Some(w2)) => {
+                let r1 = w1.rotate_outputfile();
+                let r2 = w2.rotate();
+                match (r1, r2) {
+                    (Ok(()), Ok(())) => Ok(()),
+                    (Err(e), _) | (Ok(()), Err(e)) => Err(e),
+                }
+            }
+        }
+    }
     pub(crate) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
         if let Some(fw) = self.o_file_writer.as_ref() {
             fw.existing_log_files()
