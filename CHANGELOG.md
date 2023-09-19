@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.1] - 2023-09-19
+
+Introduce new naming variants that work without `_rCURRENT` files: `Naming::TimestampsDirect`
+and `Naming::NumbersDirect` (fixes #127).
+
+Improve documentation of filename handling.
+
+Introduce `LoggerHandle.trigger_rotation()` (fixes #147).
+
 ## [0.26.0] - 2023-08-30
 
 Re-open output also for other writers (fixes #143).

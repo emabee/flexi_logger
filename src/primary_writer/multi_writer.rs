@@ -93,6 +93,16 @@ impl MultiWriter {
     fn duplication_to_stdout(&self) -> Duplicate {
         Duplicate::from(self.duplicate_stdout.load(Ordering::Relaxed))
     }
+
+    pub(crate) fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
+        if let Some(ref w) = &self.o_file_writer {
+            w.trigger_rotation()?;
+        }
+        // if let Some(w) = &self.o_other_writer {
+        //     w.trigger_rotation(); // todo is not (yet?) part of trait LogWriter
+        // }
+        Ok(())
+    }
 }
 
 impl LogWriter for MultiWriter {

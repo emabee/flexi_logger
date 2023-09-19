@@ -71,17 +71,47 @@ pub enum Age {
 
 /// The naming convention for rotated log files.
 ///
-/// With file rotation, the logs are written to a file with infix `_rCURRENT`.
-/// When rotation happens, the CURRENT log file will be renamed to a file with
-/// another infix of the form `"_r..."`. `Naming` defines which other infix will be used.
+/// Common rule for all variants is that the names of the current output file
+/// and the rotated log files only differ in the infix.
+///
+/// See [`Logger::log_to_file`](crate::Logger::log_to_file)
+/// for a description of how the filename is built, including the infix.
+///
+/// See the variants for how the infix is used by them.
 ///
 /// Used in [`Logger::rotate`](crate::Logger::rotate).
 #[derive(Copy, Clone, Debug)]
 pub enum Naming {
-    /// File rotation rotates to files with a timestamp-infix, like `"r2020-01-27_14-41-08"`.
+    /// Logs are written to a file with infix `_rCURRENT`.
+    ///
+    /// File rotation renames this file to a name with a timestamp-infix
+    /// like `"_r2023-01-27_14-41-08"`, logging continues with a fresh file with infix `_rCURRENT`.
+    ///
+    /// If multiple rotations happen within the same second, extended infixes are used like
+    /// `"_r2023-01-27_14-41-08.restart-0001"`.
     Timestamps,
-    /// File rotation rotates to files with a number-infix.
+
+    /// Logs are written to a file with a timestamp-infix,
+    /// like `"_r2023-01-27_14-41-08"`.
+    ///
+    /// File rotation switches over to the next file.
+    ///
+    /// If multiple rotations happen within the same second, extended infixes are used like
+    /// `"_r2023-01-27_14-41-08.restart-0001"`.
+    TimestampsDirect,
+
+    /// Logs are written to a file with infix `_rCURRENT`.
+    ///
+    /// File rotation renames this file to a name with a number-infix
+    /// like `"_r00000"`, `"_r00001"`, etc.,
+    /// logging continues with a fresh file with infix `_rCURRENT`.
     Numbers,
+
+    /// Logs are written to a file with a number-infix,
+    /// like `"_r00000"`, `"_r00001"`, etc.
+    ///
+    /// File rotation switches over to the next file.
+    NumbersDirect,
 }
 /// Defines the strategy for handling older log files.
 ///

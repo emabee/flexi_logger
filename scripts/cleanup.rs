@@ -22,7 +22,6 @@ fn main() {
         "./log_files/**/*.log",
         "./log_files/**/*.seclog",
         "./log_files/**/*.toml",
-        "./log_files/**/*.zip",
         "./server/**/*.toml",
     ] {
         for globresult in glob::glob(pattern).unwrap() {

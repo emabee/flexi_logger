@@ -1,150 +1,212 @@
-use super::{
-    config::{FileLogWriterConfig, RotationConfig},
-    threads::{start_cleanup_thread, MessageToCleanupThread},
-};
+mod list_and_cleanup;
+mod numbers;
+mod timestamps;
+
+use super::config::{FileLogWriterConfig, RotationConfig};
 use crate::{
     util::{eprint_err, ErrorCode},
-    Age, Cleanup, Criterion, FileSpec, FlexiLoggerError, Naming,
+    Age, Cleanup, Criterion, FlexiLoggerError, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
-use std::cmp::max;
-use std::fs::{remove_file, File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::iter::Chain;
-use std::ops::Add;
-use std::path::{Path, PathBuf};
-use std::vec::IntoIter;
+use std::{
+    fs::{remove_file, File, OpenOptions},
+    io::{BufRead, BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    thread::JoinHandle,
+};
+
+#[cfg(feature = "async")]
+const ASYNC_FLUSHER: &str = "flexi_logger-fs-async_flusher";
+
+#[cfg(feature = "async")]
+use {
+    crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN},
+    crossbeam_channel::{self, Sender as CrossbeamSender},
+    crossbeam_queue::ArrayQueue,
+};
+
+#[cfg(feature = "async")]
+const ASYNC_WRITER: &str = "flexi_logger-fs-async_writer";
+
 const CURRENT_INFIX: &str = "_rCURRENT";
-fn number_infix(idx: u32) -> String {
-    format!("_r{idx:0>5}")
-}
 
-//  Describes the latest existing numbered log file.
-#[derive(Clone, Copy, Debug)]
-enum IdxState {
-    // We rotate to numbered files, and no rotated numbered file exists yet
-    Start,
-    // highest index of rotated numbered files
-    Idx(u32),
-}
-
-// Created_at is needed both for
-//      is_rotation_necessary() -> if Criterion::Age -> NamingState::CreatedAt
-//      and rotate_to_date()    -> if Naming::Timestamps -> RollState::Age
 #[derive(Debug)]
 enum NamingState {
-    CreatedAt,
-    IdxState(IdxState),
+    // contains the timestamp to which we will rotate
+    TimestampsRCurrent(DateTime<Local>),
+
+    // contains the timestamp of the current output file (read from its name)
+    TimestampsDirect(DateTime<Local>),
+
+    // contains the index to which we will rotate
+    NumbersRCurrent(u32),
+
+    // contains the index of the current output file
+    NumbersDirect(u32),
 }
 
 #[derive(Debug)]
 enum RollState {
-    Size(u64, u64), // max_size, current_size
-    Age(Age),
-    AgeOrSize(Age, u64, u64), // age, max_size, current_size
+    Size {
+        max_size: u64,
+        current_size: u64,
+    },
+    Age {
+        age: Age,
+        created_at: DateTime<Local>,
+    },
+    AgeOrSize {
+        age: Age,
+        created_at: DateTime<Local>,
+        max_size: u64,
+        current_size: u64,
+    },
+}
+impl RollState {
+    fn new(criterion: Criterion, append: bool, path: &Path) -> Result<RollState, std::io::Error> {
+        let current_size = if append {
+            std::fs::metadata(path)?.len()
+        } else {
+            0
+        };
+        let created_at = get_creation_date(path);
+
+        Ok(match criterion {
+            Criterion::Age(age) => RollState::Age { age, created_at },
+            Criterion::Size(max_size) => RollState::Size {
+                max_size,
+                current_size,
+            },
+            Criterion::AgeOrSize(age, max_size) => RollState::AgeOrSize {
+                age,
+                created_at,
+                max_size,
+                current_size,
+            },
+        })
+    }
+
+    fn rotation_necessary(&self) -> bool {
+        match &self {
+            RollState::Size {
+                max_size,
+                current_size,
+            } => Self::size_rotation_necessary(*max_size, *current_size),
+            RollState::Age { age, created_at } => Self::age_rotation_necessary(*age, created_at),
+            RollState::AgeOrSize {
+                age,
+                created_at,
+                max_size,
+                current_size,
+            } => {
+                Self::size_rotation_necessary(*max_size, *current_size)
+                    || Self::age_rotation_necessary(*age, created_at)
+            }
+        }
+    }
+
+    fn size_rotation_necessary(max_size: u64, current_size: u64) -> bool {
+        current_size > max_size
+    }
+
+    fn age_rotation_necessary(age: Age, created_at: &DateTime<Local>) -> bool {
+        let now = Local::now();
+        match age {
+            Age::Day => {
+                created_at.year() != now.year()
+                    || created_at.month() != now.month()
+                    || created_at.day() != now.day()
+            }
+            Age::Hour => {
+                created_at.year() != now.year()
+                    || created_at.month() != now.month()
+                    || created_at.day() != now.day()
+                    || created_at.hour() != now.hour()
+            }
+            Age::Minute => {
+                created_at.year() != now.year()
+                    || created_at.month() != now.month()
+                    || created_at.day() != now.day()
+                    || created_at.hour() != now.hour()
+                    || created_at.minute() != now.minute()
+            }
+            Age::Second => {
+                created_at.year() != now.year()
+                    || created_at.month() != now.month()
+                    || created_at.day() != now.day()
+                    || created_at.hour() != now.hour()
+                    || created_at.minute() != now.minute()
+                    || created_at.second() != now.second()
+            }
+        }
+    }
+
+    fn reset_size_and_date(&mut self, path: &Path) {
+        match self {
+            RollState::Size {
+                max_size: _,
+                current_size,
+            } => {
+                *current_size = 0;
+            }
+            RollState::Age { age: _, created_at } => {
+                *created_at = get_creation_date(path);
+            }
+            RollState::AgeOrSize {
+                age: _,
+                created_at,
+                max_size: _,
+                current_size,
+            } => {
+                *created_at = get_creation_date(path);
+                *current_size = 0;
+            }
+        }
+    }
+
+    fn increase_size(&mut self, add: u64) {
+        if let RollState::Size {
+            max_size: _,
+            ref mut current_size,
+        }
+        | RollState::AgeOrSize {
+            age: _,
+            created_at: _,
+            max_size: _,
+            ref mut current_size,
+        } = *self
+        {
+            *current_size += add;
+        }
+    }
 }
 
 #[derive(Debug)]
 struct CleanupThreadHandle {
-    sender: std::sync::mpsc::Sender<MessageToCleanupThread>,
-    join_handle: std::thread::JoinHandle<()>,
+    sender: std::sync::mpsc::Sender<list_and_cleanup::MessageToCleanupThread>,
+    join_handle: JoinHandle<()>,
 }
 
 #[derive(Debug)]
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
-    created_at: DateTime<Local>,
     cleanup: Cleanup,
     o_cleanup_thread_handle: Option<CleanupThreadHandle>,
 }
 impl RotationState {
-    fn size_rotation_necessary(max_size: u64, current_size: u64) -> bool {
-        current_size > max_size
-    }
-
-    fn age_rotation_necessary(&self, age: Age) -> bool {
-        let now = Local::now();
-        match age {
-            Age::Day => {
-                self.created_at.year() != now.year()
-                    || self.created_at.month() != now.month()
-                    || self.created_at.day() != now.day()
-            }
-            Age::Hour => {
-                self.created_at.year() != now.year()
-                    || self.created_at.month() != now.month()
-                    || self.created_at.day() != now.day()
-                    || self.created_at.hour() != now.hour()
-            }
-            Age::Minute => {
-                self.created_at.year() != now.year()
-                    || self.created_at.month() != now.month()
-                    || self.created_at.day() != now.day()
-                    || self.created_at.hour() != now.hour()
-                    || self.created_at.minute() != now.minute()
-            }
-            Age::Second => {
-                self.created_at.year() != now.year()
-                    || self.created_at.month() != now.month()
-                    || self.created_at.day() != now.day()
-                    || self.created_at.hour() != now.hour()
-                    || self.created_at.minute() != now.minute()
-                    || self.created_at.second() != now.second()
-            }
-        }
-    }
-
-    fn rotation_necessary(&self) -> bool {
-        match &self.roll_state {
-            RollState::Size(max_size, current_size) => {
-                Self::size_rotation_necessary(*max_size, *current_size)
-            }
-            RollState::Age(age) => self.age_rotation_necessary(*age),
-            RollState::AgeOrSize(age, max_size, current_size) => {
-                Self::size_rotation_necessary(*max_size, *current_size)
-                    || self.age_rotation_necessary(*age)
-            }
-        }
-    }
-
     fn shutdown(&mut self) {
         // this sets o_cleanup_thread_handle in self.state.o_rotation_state to None:
         let o_cleanup_thread_handle = self.o_cleanup_thread_handle.take();
         if let Some(cleanup_thread_handle) = o_cleanup_thread_handle {
             cleanup_thread_handle
                 .sender
-                .send(MessageToCleanupThread::Die)
+                .send(list_and_cleanup::MessageToCleanupThread::Die)
                 .ok();
             cleanup_thread_handle.join_handle.join().ok();
         }
     }
-}
-
-fn try_roll_state_from_criterion(
-    criterion: Criterion,
-    config: &FileLogWriterConfig,
-    p_path: &Path,
-) -> Result<RollState, std::io::Error> {
-    Ok(match criterion {
-        Criterion::Age(age) => RollState::Age(age),
-        Criterion::Size(size) => {
-            let written_bytes = if config.append {
-                std::fs::metadata(p_path)?.len()
-            } else {
-                0
-            };
-            RollState::Size(size, written_bytes)
-        } // max_size, current_size
-        Criterion::AgeOrSize(age, size) => {
-            let written_bytes = if config.append {
-                std::fs::metadata(p_path)?.len()
-            } else {
-                0
-            };
-            RollState::AgeOrSize(age, size, written_bytes)
-        } // age, max_size, current_size
-    })
 }
 
 enum Inner {
@@ -184,68 +246,90 @@ impl State {
         if let Inner::Initial(o_rotation_config, cleanup_in_background_thread) = &self.inner {
             match o_rotation_config {
                 None => {
-                    let (log_file, _created_at, p_path) = open_log_file(&self.config, false)?;
-                    self.inner = Inner::Active(None, log_file, p_path);
+                    // no rotation
+                    let (write, path) = open_log_file(&self.config, None)?;
+                    self.inner = Inner::Active(None, write, path);
                 }
                 Some(rotate_config) => {
-                    // first rotate, then open the log file
-                    let naming_state = match rotate_config.naming {
-                        Naming::Timestamps => {
-                            if !self.config.append {
-                                rotate_output_file_to_date(
-                                    &get_creation_date(
-                                        &self.config.file_spec.as_pathbuf(Some(CURRENT_INFIX)),
-                                    ),
-                                    &self.config,
-                                )?;
-                            }
-                            NamingState::CreatedAt
+                    // get NamingState and the infix for the current output file
+                    let (naming_state, infix) = match rotate_config.naming {
+                        Naming::Timestamps => (
+                            NamingState::TimestampsRCurrent(timestamps::rcurrents_creation_date(
+                                &self.config,
+                                None,
+                                !self.config.append,
+                            )?),
+                            CURRENT_INFIX.to_string(),
+                        ),
+                        Naming::TimestampsDirect => {
+                            let ts = timestamps::latest_timestamp_file(
+                                &self.config,
+                                !self.config.append,
+                            );
+                            (
+                                NamingState::TimestampsDirect(ts),
+                                timestamps::ts_infix_from_timestamp(&ts, self.config.use_utc),
+                            )
                         }
-                        Naming::Numbers => {
-                            let mut rotation_state = get_highest_rotate_idx(&self.config.file_spec);
-                            if !self.config.append {
-                                rotation_state =
-                                    rotate_output_file_to_idx(rotation_state, &self.config)?;
-                            }
-                            NamingState::IdxState(rotation_state)
+
+                        Naming::Numbers => (
+                            NamingState::NumbersRCurrent(numbers::index_for_rcurrent(
+                                &self.config,
+                                None,
+                                !self.config.append,
+                            )?),
+                            CURRENT_INFIX.to_string(),
+                        ),
+                        Naming::NumbersDirect => {
+                            let idx = match numbers::get_highest_index(&self.config.file_spec) {
+                                None => 0,
+                                Some(idx) => {
+                                    if self.config.append {
+                                        idx
+                                    } else {
+                                        idx + 1
+                                    }
+                                }
+                            };
+                            (NamingState::NumbersDirect(idx), numbers::number_infix(idx))
                         }
                     };
-                    let (log_file, created_at, p_path) = open_log_file(&self.config, true)?;
+                    let (write, path) = open_log_file(&self.config, Some(&infix))?;
 
-                    let roll_state = try_roll_state_from_criterion(
-                        rotate_config.criterion,
-                        &self.config,
-                        &p_path,
-                    )?;
-                    let mut o_cleanup_thread_handle = None;
-                    if rotate_config.cleanup.do_cleanup() {
-                        remove_or_compress_too_old_logfiles(
+                    let roll_state =
+                        RollState::new(rotate_config.criterion, self.config.append, &path)?;
+
+                    let o_cleanup_thread_handle = if rotate_config.cleanup.do_cleanup() {
+                        list_and_cleanup::remove_or_compress_too_old_logfiles(
                             &None,
                             &rotate_config.cleanup,
                             &self.config.file_spec,
                         )?;
                         if *cleanup_in_background_thread {
-                            let (sender, join_handle) = start_cleanup_thread(
+                            let (sender, join_handle) = list_and_cleanup::start_cleanup_thread(
                                 rotate_config.cleanup,
                                 self.config.file_spec.clone(),
                             )?;
 
-                            o_cleanup_thread_handle = Some(CleanupThreadHandle {
+                            Some(CleanupThreadHandle {
                                 sender,
                                 join_handle,
-                            });
+                            })
+                        } else {
+                            None
                         }
-                    }
+                    } else {
+                        None
+                    };
                     self.inner = Inner::Active(
                         Some(RotationState {
                             naming_state,
                             roll_state,
-                            created_at,
                             cleanup: rotate_config.cleanup,
                             o_cleanup_thread_handle,
                         }),
-                        log_file,
-                        p_path,
+                        write,
+                        path,
                     );
                 }
             }
@@ -269,30 +353,52 @@ impl State {
     // On overflow, an existing `_rCURRENT` file is renamed to the next numbered file,
     // before writing into `_rCURRENT` goes on.
     #[inline]
-    fn mount_next_linewriter_if_necessary(&mut self) -> Result<(), FlexiLoggerError> {
-        if let Inner::Active(Some(ref mut rotation_state), ref mut file, ref mut path) = self.inner
+    pub(super) fn mount_next_linewriter_if_necessary(
+        &mut self,
+        force: bool,
+    ) -> Result<(), FlexiLoggerError> {
+        if let Inner::Active(
+            Some(ref mut rotation_state),
+            ref mut current_write,
+            ref mut current_path,
+        ) = self.inner
         {
-            if rotation_state.rotation_necessary() {
-                match rotation_state.naming_state {
-                    NamingState::CreatedAt => {
-                        rotate_output_file_to_date(&rotation_state.created_at, &self.config)?;
+            if force || rotation_state.roll_state.rotation_necessary() {
+                let infix = match rotation_state.naming_state {
+                    NamingState::TimestampsRCurrent(ref mut created_at) => {
+                        *created_at = timestamps::rcurrents_creation_date(
+                            &self.config,
+                            Some(created_at),
+                            true,
+                        )?;
+                        CURRENT_INFIX.to_string()
                     }
-                    NamingState::IdxState(ref mut idx_state) => {
-                        *idx_state = rotate_output_file_to_idx(*idx_state, &self.config)?;
+                    NamingState::TimestampsDirect(ref mut ts) => {
+                        *ts = Local::now();
+                        timestamps::collision_free_infix_for_rotated_file(
+                            &self.config.file_spec,
+                            self.config.use_utc,
+                            ts,
+                        )
                     }
-                }
+                    NamingState::NumbersRCurrent(ref mut idx_state) => {
+                        *idx_state =
+                            numbers::index_for_rcurrent(&self.config, Some(*idx_state), true)?;
+                        CURRENT_INFIX.to_string()
+                    }
+                    NamingState::NumbersDirect(ref mut idx_state) => {
+                        *idx_state += 1;
+                        numbers::number_infix(*idx_state)
+                    }
+                };
+                let (new_write, new_path) = open_log_file(&self.config, Some(&infix))?;
 
-                let (line_writer, created_at, p_path) = open_log_file(&self.config, true)?;
-                *file = line_writer;
-                *path = p_path;
-                rotation_state.created_at = created_at;
-                if let RollState::Size(_, ref mut current_size)
-                | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state
-                {
-                    *current_size = 0;
-                }
+                *current_write = new_write;
+                *current_path = new_path;
 
-                remove_or_compress_too_old_logfiles(
+                rotation_state.roll_state.reset_size_and_date(current_path);
+
+                list_and_cleanup::remove_or_compress_too_old_logfiles(
                     &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
                     &self.config.file_spec,
@@ -309,42 +415,19 @@ impl State {
         }
 
         // rotate if necessary
-        self.mount_next_linewriter_if_necessary()
+        self.mount_next_linewriter_if_necessary(false)
             .unwrap_or_else(|e| {
                 eprint_err(ErrorCode::LogFile, "can't open file", &e);
             });
 
         if let Inner::Active(ref mut o_rotation_state, ref mut log_file, ref _path) = self.inner {
             log_file.write_all(buf)?;
+
             if let Some(ref mut rotation_state) = o_rotation_state {
-                if let RollState::Size(_, ref mut current_size)
-                | RollState::AgeOrSize(_, _, ref mut current_size) = rotation_state.roll_state
-                {
-                    *current_size += buf.len() as u64;
-                }
+                rotation_state.roll_state.increase_size(buf.len() as u64);
             };
         }
         Ok(())
-    }
-
-    pub fn current_filename(&self) -> PathBuf {
-        let o_infix = match &self.inner {
-            Inner::Initial(o_rotation_config, _) => {
-                if o_rotation_config.is_some() {
-                    Some(CURRENT_INFIX)
-                } else {
-                    None
-                }
-            }
-            Inner::Active(o_rotation_state, _, _) => {
-                if o_rotation_state.is_some() {
-                    Some(CURRENT_INFIX)
-                } else {
-                    None
-                }
-            }
-        };
-        self.config.file_spec.as_pathbuf(o_infix)
     }
 
     pub fn reopen_outputfile(&mut self) -> Result<(), std::io::Error> {
@@ -371,7 +454,8 @@ impl State {
 
     pub fn existing_log_files(&self) -> Vec<PathBuf> {
         let mut list: Vec<PathBuf> =
-            list_of_log_and_compressed_files(&self.config.file_spec).collect();
+            list_and_cleanup::list_of_log_and_compressed_files(&self.config.file_spec).collect();
+        // todo this should only be returned if the file exists:
         list.push(self.config.file_spec.as_pathbuf(Some(CURRENT_INFIX)));
         list
     }
@@ -384,9 +468,8 @@ impl State {
             let rotation_possible = o_rotation_state.is_some();
             let f = File::open(path.clone()).unwrap_or_else(|e| {
                 panic!(
-                    "validate_logs: can't open file {} due to {:?}",
+                    "validate_logs: can't open file {} due to {e:?}",
                     path.display(),
-                    e
                 )
             });
             let mut reader = BufReader::new(f);
@@ -456,11 +539,9 @@ fn validate_logs_in_file(
 #[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &FileLogWriterConfig,
-    with_rotation: bool,
-) -> Result<(Box<dyn Write + Send>, DateTime<Local>, PathBuf), std::io::Error> {
-    let path = config
-        .file_spec
-        .as_pathbuf(with_rotation.then_some(CURRENT_INFIX));
+    o_infix: Option<&str>,
+) -> Result<(Box<dyn Write + Send>, PathBuf), std::io::Error> {
+    let path = config.file_spec.as_pathbuf(o_infix);
 
     if config.print_message {
         println!("Log is written to {}", &path.display());
@@ -481,225 +562,7 @@ fn open_log_file(
     } else {
         Box::new(logfile)
     };
-    Ok((w, get_creation_date(&path), path))
-}
-
-fn get_highest_rotate_idx(file_spec: &FileSpec) -> IdxState {
-    let mut highest_idx = IdxState::Start;
-    for file in list_of_log_and_compressed_files(file_spec) {
-        let filename = file.file_stem().unwrap(/*ok*/).to_string_lossy();
-        let mut it = filename.rsplit("_r");
-        match it.next() {
-            Some(next) => {
-                let idx: u32 = next.parse().unwrap_or(0);
-                highest_idx = match highest_idx {
-                    IdxState::Start => IdxState::Idx(idx),
-                    IdxState::Idx(prev) => IdxState::Idx(max(prev, idx)),
-                };
-            }
-            None => continue, // ignore unexpected files
-        }
-    }
-    highest_idx
-}
-
-#[allow(clippy::type_complexity)]
-fn list_of_log_and_compressed_files(
-    file_spec: &FileSpec,
-) -> Chain<Chain<IntoIter<PathBuf>, IntoIter<PathBuf>>, IntoIter<PathBuf>> {
-    let o_infix = Some("_r[0-9]*");
-
-    let log_pattern = file_spec.as_glob_pattern(o_infix, None);
-    let zip_pattern = file_spec.as_glob_pattern(o_infix, Some("zip"));
-    let gz_pattern = file_spec.as_glob_pattern(o_infix, Some("gz"));
-
-    list_of_files(&log_pattern)
-        .chain(list_of_files(&gz_pattern))
-        .chain(list_of_files(&zip_pattern))
-}
-
-fn list_of_files(pattern: &str) -> std::vec::IntoIter<PathBuf> {
-    let mut log_files: Vec<PathBuf> = glob::glob(pattern)
-        .unwrap(/* failure should be impossible */)
-        .filter_map(Result::ok)
-        .collect();
-    log_files.reverse();
-    log_files.into_iter()
-}
-
-fn remove_or_compress_too_old_logfiles(
-    o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
-    cleanup_config: &Cleanup,
-    file_spec: &FileSpec,
-) -> Result<(), std::io::Error> {
-    o_cleanup_thread_handle.as_ref().map_or_else(
-        || remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec),
-        |cleanup_thread_handle| {
-            cleanup_thread_handle
-                .sender
-                .send(MessageToCleanupThread::Act)
-                .ok();
-            Ok(())
-        },
-    )
-}
-
-pub(crate) fn remove_or_compress_too_old_logfiles_impl(
-    cleanup_config: &Cleanup,
-    file_spec: &FileSpec,
-) -> Result<(), std::io::Error> {
-    let (log_limit, compress_limit) = match *cleanup_config {
-        Cleanup::Never => {
-            return Ok(());
-        }
-        Cleanup::KeepLogFiles(log_limit) => (log_limit, 0),
-
-        #[cfg(feature = "compress")]
-        Cleanup::KeepCompressedFiles(compress_limit) => (0, compress_limit),
-
-        #[cfg(feature = "compress")]
-        Cleanup::KeepLogAndCompressedFiles(log_limit, compress_limit) => {
-            (log_limit, compress_limit)
-        }
-    };
-
-    for (index, file) in list_of_log_and_compressed_files(file_spec).enumerate() {
-        if index >= log_limit + compress_limit {
-            // delete (log or log.gz)
-            std::fs::remove_file(file)?;
-        } else if index >= log_limit {
-            #[cfg(feature = "compress")]
-            {
-                // compress, if not yet compressed
-                if let Some(extension) = file.extension() {
-                    if extension != "gz" {
-                        let mut old_file = File::open(file.clone())?;
-                        let mut compressed_file = file.clone();
-                        compressed_file.set_extension("log.gz");
-                        let mut gz_encoder = flate2::write::GzEncoder::new(
-                            File::create(compressed_file)?,
-                            flate2::Compression::fast(),
-                        );
-                        std::io::copy(&mut old_file, &mut gz_encoder)?;
-                        gz_encoder.finish()?;
-                        std::fs::remove_file(&file)?;
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-// Moves the current file to the timestamp of the CURRENT file's creation date.
-// If the rotation comes very fast, the new timestamp can be equal to the old one.
-// To avoid file collisions, we insert an additional string to the filename (".restart-<number>").
-// The number is incremented in case of repeated collisions.
-// Cleaning up can leave some restart-files with higher numbers; if we still are in the same
-// second, we need to continue with the restart-incrementing.
-fn rotate_output_file_to_date(
-    creation_date: &DateTime<Local>,
-    config: &FileLogWriterConfig,
-) -> Result<(), std::io::Error> {
-    let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
-    let rotated_path = determine_new_name_for_rotate_output_file_to_date(
-        &config.file_spec,
-        config.use_utc,
-        creation_date,
-    );
-
-    match std::fs::rename(current_path, rotated_path) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                // current did not exist, so we had nothing to do
-                Ok(())
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-fn determine_new_name_for_rotate_output_file_to_date(
-    file_spec: &FileSpec,
-    use_utc: bool,
-    creation_date: &DateTime<Local>,
-) -> PathBuf {
-    const INFIX_DATE: &str = "_r%Y-%m-%d_%H-%M-%S";
-    let infix_date_string = if use_utc {
-        (*creation_date).naive_utc().format(INFIX_DATE)
-    } else {
-        (*creation_date).format(INFIX_DATE)
-    }
-    .to_string();
-
-    let mut rotated_path = file_spec.as_pathbuf(Some(&infix_date_string));
-    // Search for rotated_path as is and for restart-siblings;
-    // if any exists, find highest restart and add 1, else continue without restart
-    let mut pattern = rotated_path.clone();
-    if file_spec.o_suffix.is_some() {
-        pattern.set_extension("");
-    }
-    let mut pattern = pattern.to_string_lossy().to_string();
-    pattern.push_str(".restart-*");
-    let mut restart_siblings: Vec<PathBuf> =
-        glob::glob(&pattern).unwrap(/*ok*/).map(Result::unwrap).collect();
-    restart_siblings.sort_unstable();
-    if (*rotated_path).exists() || !restart_siblings.is_empty() {
-        let mut number = if restart_siblings.is_empty() {
-            0
-        } else {
-            rotated_path = restart_siblings.pop().unwrap(/*ok*/);
-            let file_stem_string = if file_spec.o_suffix.is_some() {
-                rotated_path
-                    .file_stem().unwrap(/*ok*/)
-                    .to_string_lossy().to_string()
-            } else {
-                rotated_path.to_string_lossy().to_string()
-            };
-            let index = file_stem_string.find(".restart-").unwrap(/*ok*/);
-            file_stem_string[(index + 9)..].parse::<usize>().unwrap(/*ok*/)
-        };
-
-        while (*rotated_path).exists() {
-            rotated_path = file_spec.as_pathbuf(Some(
-                &infix_date_string
-                    .clone()
-                    .add(&format!(".restart-{number:04}")),
-            ));
-            number += 1;
-        }
-    }
-    rotated_path
-}
-
-// Moves the current file to the name with the next rotate_idx and returns the next rotate_idx.
-// The current file must be closed already.
-fn rotate_output_file_to_idx(
-    idx_state: IdxState,
-    config: &FileLogWriterConfig,
-) -> Result<IdxState, std::io::Error> {
-    let new_idx = match idx_state {
-        IdxState::Start => 0,
-        IdxState::Idx(idx) => idx + 1,
-    };
-
-    match std::fs::rename(
-        config.file_spec.as_pathbuf(Some(CURRENT_INFIX)),
-        config.file_spec.as_pathbuf(Some(&number_infix(new_idx))),
-    ) {
-        Ok(()) => Ok(IdxState::Idx(new_idx)),
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                // current did not exist, so we had nothing to do
-                Ok(idx_state)
-            } else {
-                Err(e)
-            }
-        }
-    }
+    Ok((w, path))
 }
 
 // See documentation of Criterion::Age.
@@ -715,7 +578,6 @@ fn get_creation_date(path: &Path) -> DateTime<Local> {
             .unwrap_or_else(|_| get_current_date())
     }
 }
-
 fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
@@ -726,6 +588,96 @@ fn try_get_modification_date(path: &Path) -> Result<DateTime<Local>, FlexiLogger
 }
 fn get_current_date() -> DateTime<Local> {
     Local::now()
+}
+
+#[cfg(feature = "async")]
+pub(super) fn start_async_fs_writer(
+    am_state: Arc<Mutex<State>>,
+    message_capa: usize,
+    a_pool: Arc<ArrayQueue<Vec<u8>>>,
+) -> (CrossbeamSender<Vec<u8>>, Mutex<Option<JoinHandle<()>>>) {
+    let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
+    (
+        sender,
+        Mutex::new(Some(
+            std::thread::Builder::new()
+                .name(ASYNC_WRITER.to_string())
+                .spawn(move || loop {
+                    match receiver.recv() {
+                        Err(_) => break,
+                        Ok(mut message) => {
+                            let mut state = am_state.lock().unwrap(/* ok */);
+                            match message.as_ref() {
+                                ASYNC_FLUSH => {
+                                    state.flush().unwrap_or_else(|e| {
+                                        eprint_err(ErrorCode::Flush, "flushing failed", &e);
+                                    });
+                                }
+                                ASYNC_SHUTDOWN => {
+                                    state.shutdown();
+                                    break;
+                                }
+                                _ => {
+                                    state.write_buffer(&message).unwrap_or_else(|e| {
+                                        eprint_err(ErrorCode::Write, "writing failed", &e);
+                                    });
+                                }
+                            }
+                            if message.capacity() <= message_capa {
+                                message.clear();
+                                a_pool.push(message).ok();
+                            }
+                        }
+                    }
+                })
+                .expect("Couldn't spawn flexi_logger-async_file_log_writer"),
+        )),
+    )
+}
+
+pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: std::time::Duration) {
+    let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
+    #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+    let builder = builder.stack_size(128);
+    builder.spawn(move || {
+        let (_tx, rx) = std::sync::mpsc::channel::<()>();
+            loop {
+                rx.recv_timeout(flush_interval).ok();
+                (*am_state).lock().map_or_else(
+                    |_e| (),
+                    |mut state| {
+                        state.flush().ok();
+                    },
+                );
+            }
+        })
+        .unwrap(/* yes, let's panic if the thread can't be spawned */);
+}
+
+#[cfg(feature = "async")]
+pub(crate) fn start_async_fs_flusher(
+    async_writer: CrossbeamSender<Vec<u8>>,
+    flush_interval: std::time::Duration,
+) {
+    use crate::util::eprint_msg;
+
+    let builder = std::thread::Builder::new().name(ASYNC_FLUSHER.to_string());
+    #[cfg(not(feature = "dont_minimize_extra_stacks"))]
+    let builder = builder.stack_size(128);
+    builder.spawn(move || {
+            let (_tx, rx) = std::sync::mpsc::channel::<()>();
+            loop {
+                if let Err(std::sync::mpsc::RecvTimeoutError::Disconnected) =
+                    rx.recv_timeout(flush_interval)
+                {
+                    eprint_msg(ErrorCode::Flush, "Flushing unexpectedly stopped working");
+                    break;
+                }
+
+                async_writer.send(ASYNC_FLUSH.to_vec()).ok();
+            }
+        })
+        .unwrap(/* yes, let's panic if the thread can't be spawned */);
 }
 
 mod platform {
@@ -754,4 +706,128 @@ mod platform {
 
     #[cfg(not(target_family = "unix"))]
     fn unix_create_symlink(_: &Path, _: &Path) {}
+}
+
+#[cfg(test)]
+mod test {
+    use chrono::Local;
+
+    use super::list_and_cleanup::list_of_files;
+
+    use crate::{
+        writers::{file_log_writer::config::RotationConfig, FileLogWriterConfig},
+        Cleanup, Criterion, FileSpec, Naming, WriteMode,
+    };
+
+    use super::State;
+
+    fn write_log_entries(file_spec: &FileSpec, timestamps: bool, rcurrent: bool) {
+        {
+            let mut state1 = State::new(
+                get_flw_config(file_spec.clone(), true),
+                Some(get_rotation_config(timestamps, rcurrent)),
+                false,
+            );
+            // write to it to provoke some rotations
+            for _ in 0..17 {
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                state1
+                    .write_buffer(b"hello world hello world hello world hello world\n")
+                    .unwrap();
+            }
+        }
+
+        // restart with a new instance of State with append
+        {
+            let mut state2 = State::new(
+                get_flw_config(file_spec.clone(), true),
+                Some(get_rotation_config(timestamps, rcurrent)),
+                false,
+            );
+            // write to it to provoke some rotations
+            for _ in 0..23 {
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                state2
+                    .write_buffer(b"hello world hello world hello world hello world\n")
+                    .unwrap();
+            }
+        }
+
+        // restart with a new instance of State without append
+        {
+            let mut state3 = State::new(
+                get_flw_config(file_spec.clone(), false),
+                Some(get_rotation_config(timestamps, rcurrent)),
+                false,
+            );
+            // write to it to provoke some rotations
+            for _ in 0..15 {
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                state3
+                    .write_buffer(b"hello world hello world hello world hello world\n")
+                    .unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn test_timestamps_rcurrent() {
+        let dir = format!("log_files/state_unit_tests1-{}", Local::now());
+        std::fs::create_dir_all(dir.clone()).unwrap();
+        let file_spec = FileSpec::default()
+            .directory(dir)
+            .discriminant("ts")
+            .suppress_timestamp();
+
+        write_log_entries(&file_spec, true, true);
+
+        // verify that rCURRENT and the intended number of rotated files exist
+        let pattern = file_spec.as_glob_pattern("_r[0-9]*", Some("log"));
+        assert_eq!(list_of_files(&pattern).count(), 8);
+        let pattern = file_spec.as_glob_pattern("_rCURRENT", Some("log"));
+        assert_eq!(list_of_files(&pattern).count(), 1);
+    }
+
+    #[test]
+    fn test_numbers_rcurrent() {
+        let dir = format!("log_files/state_unit_tests2-{}", Local::now());
+        std::fs::create_dir_all(dir.clone()).unwrap();
+        let file_spec = FileSpec::default()
+            .discriminant("nr")
+            .directory(dir)
+            .suppress_timestamp();
+
+        write_log_entries(&file_spec, false, true);
+
+        // verify that rCURRENT and the intended number of rotated files exist
+        let pattern = file_spec.as_glob_pattern("_r[0-9]*", Some("log"));
+        assert_eq!(list_of_files(&pattern).count(), 8);
+        let pattern = file_spec.as_glob_pattern("_rCURRENT", Some("log"));
+        assert_eq!(list_of_files(&pattern).count(), 1);
+    }
+
+    fn get_flw_config(file_spec: FileSpec, append: bool) -> FileLogWriterConfig {
+        // create an instance of State with Naming::Timestamps and Criterion::Size(200)
+        FileLogWriterConfig {
+            print_message: false,
+            append,
+            write_mode: WriteMode::Direct,
+            file_spec,
+            o_create_symlink: None,
+            line_ending: &[b'\n'],
+            use_utc: true,
+        }
+    }
+
+    fn get_rotation_config(timestamps: bool, _rcurrent: bool) -> RotationConfig {
+        RotationConfig {
+            criterion: Criterion::Size(290),
+            naming: if timestamps {
+                Naming::Timestamps
+            } else {
+                Naming::Numbers
+            },
+            cleanup: Cleanup::Never,
+        }
+    }
 }

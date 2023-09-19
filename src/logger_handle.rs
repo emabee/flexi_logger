@@ -271,6 +271,23 @@ impl LoggerHandle {
         result
     }
 
+    /// Trigger an extra log file rotation.
+    ///
+    /// Does nothing if rotation is not configured.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
+            mw.trigger_rotation()?;
+        }
+        // for blw in self.writers_handle.other_writers.values() {
+        //     let result2 = blw.trigger_rotation(); // todo is not (yet?) part of trait LogWriter
+        // }
+        Ok(())
+    }
+
     /// Shutdown all participating writers.
     ///
     /// This method is supposed to be called at the very end of your program, if

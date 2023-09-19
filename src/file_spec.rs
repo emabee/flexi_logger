@@ -4,17 +4,29 @@ use std::path::{Path, PathBuf};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
-/// ```rust
-/// # use flexi_logger::FileSpec;
-/// assert_eq!(
-///     FileSpec::default()
-///         .directory("/a/b/c")
-///         .basename("foo")
-///         .suppress_timestamp()
-///         .suffix("bar"),
-///     FileSpec::try_from("/a/b/c/foo.bar").unwrap()
-/// );
-/// ```
+/// The filename is built from several partially optional components, using this pattern:
+///
+/// ```<basename>[_<discriminant>][_<date>_<time>][_infix][.<suffix>]```
+///
+/// The default filename pattern without rotation uses the program name as basename,
+/// no discriminant, the timestamp of the program start, and the suffix `.log`,
+/// e.g.
+///
+/// ```myprog_2015-07-08_10-44-11.log```.
+///
+/// This ensures that with every program start a new trace file is written that can easily
+/// be associated with a concrete program run.
+///
+/// When the timestamp is suppressed with [`FileSpec::suppress_timestamp`],
+/// you get a fixed output file.
+/// It is then worth considering whether a new program start should discard
+/// the content of an already existing outputfile or if it should append its new content to it
+/// (see [`Logger::append`](crate::Logger::append)).
+///
+/// With rotation the timestamp is by default suppressed and instead the infix is used.
+/// The infix always starts with "_r". For more details how its precise content can be influenced,
+/// see [`Naming`](crate::Naming).
+///
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FileSpec {
     pub(crate) directory: PathBuf,
@@ -50,6 +62,17 @@ impl FileSpec {
     /// If it exists, it must be a file, not a folder.
     /// If necessary, parent folders will be created.
     ///
+    /// ```rust
+    /// # use flexi_logger::FileSpec;
+    /// assert_eq!(
+    ///     FileSpec::default()
+    ///         .directory("/a/b/c")
+    ///         .basename("foo")
+    ///         .suppress_timestamp()
+    ///         .suffix("bar"),
+    ///     FileSpec::try_from("/a/b/c/foo.bar").unwrap()
+    /// );
+    /// ```
     /// # Errors
     ///
     /// [`FlexiLoggerError::OutputBadFile`] if the given path exists and is a folder.
@@ -177,7 +200,7 @@ impl FileSpec {
         self.directory.clone()
     }
 
-    /// Creates a `PathBuf` to the described log file.
+    /// Derives a `PathBuf` from the spec and the given infix.
     ///
     /// It is composed like this:
     ///  `<directory>/<basename>_<discr>_<timestamp><infix>.<suffix>`
@@ -206,8 +229,8 @@ impl FileSpec {
         p_path
     }
 
-    // <directory>/<basename>_<discr>_<timestamp><infix>.<suffix>
-    pub(crate) fn as_glob_pattern(&self, o_infix: Option<&str>, o_suffix: Option<&str>) -> String {
+    // <directory>/<basename>_<discr>_<timestamp><infix_pattern>.<suffix>
+    pub(crate) fn as_glob_pattern(&self, infix_pattern: &str, o_suffix: Option<&str>) -> String {
         let mut filename = self.basename.clone();
         filename.reserve(50);
 
@@ -218,9 +241,8 @@ impl FileSpec {
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
             filename.push_str(timestamp);
         }
-        if let Some(infix) = o_infix {
-            filename.push_str(infix);
-        };
+        filename.push_str(infix_pattern);
+
         match o_suffix {
             Some(s) => {
                 filename.push('.');

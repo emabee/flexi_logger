@@ -33,7 +33,7 @@ impl SyncHandle {
         let am_state = Arc::new(Mutex::new(state));
 
         if flush_interval.as_secs() != 0 || flush_interval.subsec_nanos() != 0 {
-            super::threads::start_sync_flusher(Arc::clone(&am_state), flush_interval);
+            super::state::start_sync_flusher(Arc::clone(&am_state), flush_interval);
         }
 
         Self {
@@ -76,14 +76,14 @@ impl AsyncHandle {
         let am_state = Arc::new(Mutex::new(state));
         let a_pool = Arc::new(ArrayQueue::new(pool_capa));
 
-        let (sender, mo_thread_handle) = super::threads::start_async_fs_writer(
+        let (sender, mo_thread_handle) = super::state::start_async_fs_writer(
             Arc::clone(&am_state),
             message_capa,
             Arc::clone(&a_pool),
         );
 
         if flush_interval != std::time::Duration::from_secs(0) {
-            super::threads::start_async_fs_flusher(sender.clone(), flush_interval);
+            super::state::start_async_fs_flusher(sender.clone(), flush_interval);
         }
 
         Self {
@@ -152,16 +152,6 @@ impl StateHandle {
             state,
             format_function,
         ))
-    }
-
-    pub(super) fn current_filename(&self) -> std::path::PathBuf {
-        match self {
-            StateHandle::Sync(handle) => handle.am_state.lock(),
-            #[cfg(feature = "async")]
-            StateHandle::Async(handle) => handle.am_state.lock(),
-        }
-        .expect("state_handle.am_state is poisoned")
-        .current_filename()
     }
 
     pub(super) fn format_function(&self) -> FormatFunction {
@@ -279,6 +269,16 @@ impl StateHandle {
         }
         .map_err(|_| FlexiLoggerError::Poison)?;
         Ok(state.reopen_outputfile()?)
+    }
+
+    pub(super) fn force_rotation(&self) -> Result<(), FlexiLoggerError> {
+        let mut state = match self {
+            StateHandle::Sync(handle) => handle.am_state.lock(),
+            #[cfg(feature = "async")]
+            StateHandle::Async(handle) => handle.am_state.lock(),
+        }
+        .map_err(|_| FlexiLoggerError::Poison)?;
+        state.mount_next_linewriter_if_necessary(true)
     }
 
     pub(crate) fn config(&self) -> Result<FileLogWriterConfig, FlexiLoggerError> {

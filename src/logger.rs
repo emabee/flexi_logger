@@ -187,9 +187,7 @@ impl Logger {
 
     /// Log is written to a file.
     ///
-    ///
-    /// The default filename pattern is `<program_name>_<date>_<time>.<suffix>`,
-    ///  e.g. `myprog_2015-07-08_10-44-11.log`.
+    /// See [`FileSpec`] for details about the filename pattern.
     ///
     /// You can duplicate to stdout and stderr, and you can add additional writers.
     #[must_use]
@@ -858,7 +856,7 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
 
     let mut debouncer = new_debouncer(
         std::time::Duration::from_millis(1000),
-        None,
+        None, // <--- goes away with notify-debouncer-mini version 0.4
         move |res: DebounceEventResult| match res {
             Ok(events) => events.iter().for_each(|e| {
                 if e.path
@@ -888,6 +886,11 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
                     &e,
                 );
             }),
+            // Err(e) => eprint_err(
+            //     ErrorCode::LogSpecFile,
+            //     "error while watching the specfile",
+            //     &e,
+            // ),
         },
     )
     .unwrap();

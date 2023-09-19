@@ -7,7 +7,6 @@ mod threads;
 
 pub use self::builder::{ArcFileLogWriter, FileLogWriterBuilder, FileLogWriterHandle};
 pub use self::config::FileLogWriterConfig;
-pub(crate) use self::state::remove_or_compress_too_old_logfiles_impl;
 
 use self::{config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
@@ -70,12 +69,6 @@ impl FileLogWriter {
         self.state_handle.format_function()
     }
 
-    #[must_use]
-    #[doc(hidden)]
-    pub fn current_filename(&self) -> PathBuf {
-        self.state_handle.current_filename()
-    }
-
     pub(crate) fn plain_write(&self, buffer: &[u8]) -> std::result::Result<usize, std::io::Error> {
         self.state_handle.plain_write(buffer)
     }
@@ -132,10 +125,20 @@ impl FileLogWriter {
         self.state_handle.reopen_outputfile()
     }
 
+    /// Trigger an extra log file rotation.
+    ///
+    /// Does nothing if rotation is not configured.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
+        self.state_handle.force_rotation()
+    }
+
     /// Returns the list of existing log files according to the current `FileSpec`.
     ///
     /// The list includes the current log file and the compressed files, if they exist.
-    /// The list is empty if the logger is not configured for writing to files.
     ///
     /// # Errors
     ///
