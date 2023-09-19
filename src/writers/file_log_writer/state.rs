@@ -772,7 +772,7 @@ mod test {
 
     #[test]
     fn test_timestamps_rcurrent() {
-        let dir = format!("log_files/state_unit_tests1-{}", Local::now());
+        let dir = format!("./log_files/state_unit_tests1-{}", Local::now());
         std::fs::create_dir_all(dir.clone()).unwrap();
         let file_spec = FileSpec::default()
             .directory(dir)
@@ -790,7 +790,7 @@ mod test {
 
     #[test]
     fn test_numbers_rcurrent() {
-        let dir = format!("log_files/state_unit_tests2-{}", Local::now());
+        let dir = format!("./log_files/state_unit_tests2-{}", Local::now());
         std::fs::create_dir_all(dir.clone()).unwrap();
         let file_spec = FileSpec::default()
             .discriminant("nr")
