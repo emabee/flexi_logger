@@ -200,6 +200,10 @@ impl FileSpec {
         self.directory.clone()
     }
 
+    pub(crate) fn get_suffix(&self) -> Option<String> {
+        self.o_suffix.clone()
+    }
+
     /// Derives a `PathBuf` from the spec and the given infix.
     ///
     /// It is composed like this:

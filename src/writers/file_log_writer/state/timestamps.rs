@@ -1,4 +1,4 @@
-use super::list_and_cleanup::{list_of_files, INFIX_PATTERN};
+use super::list_and_cleanup::list_of_infix_files;
 use super::{get_creation_date, CURRENT_INFIX};
 use crate::{writers::FileLogWriterConfig, FileSpec};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
@@ -62,10 +62,11 @@ pub(super) fn latest_timestamp_file(config: &FileLogWriterConfig, rotate: bool) 
         Local::now()
     } else {
         // find all file paths that fit the pattern
-        list_of_files(INFIX_PATTERN)
+        list_of_infix_files()
+            .into_iter()
             // retrieve the infix
             .map(|path| ts_infix_from_path(&path, &config.file_spec))
-            // parse infix as date, ignore all files where this fails,
+            // parse infix as date, ignore all infixes where this fails
             .filter_map(|infix| timestamp_from_ts_infix(&infix))
             // take the newest of these dates
             .reduce(|acc, e| if acc > e { acc } else { e })

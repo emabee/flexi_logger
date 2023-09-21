@@ -52,6 +52,19 @@ pub trait LogWriter: Sync + Send {
         Ok(())
     }
 
+    /// Rotate the current output, if meaningful.
+    ///
+    /// This method is called from
+    /// [`LoggerHandle::trigger_rotation`](crate::LoggerHandle::trigger_rotation)
+    /// for all registered additional writers.
+    ///
+    /// # Errors
+    ///
+    /// Depend on registered writers.
+    fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        Ok(())
+    }
+
     // Takes a vec with three patterns per line that represent the log line,
     // compares the written log with the expected lines,
     // and asserts that both are in sync.

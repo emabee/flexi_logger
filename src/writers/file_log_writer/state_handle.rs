@@ -1,7 +1,10 @@
 use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::State};
-use crate::util::{buffer_with, eprint_err, io_err, ErrorCode};
 #[cfg(feature = "async")]
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
+use crate::{
+    util::{buffer_with, eprint_err, io_err, ErrorCode},
+    LogfileSelector,
+};
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
 #[cfg(feature = "async")]
@@ -271,7 +274,7 @@ impl StateHandle {
         Ok(state.reopen_outputfile()?)
     }
 
-    pub(super) fn force_rotation(&self) -> Result<(), FlexiLoggerError> {
+    pub(super) fn rotate(&self) -> Result<(), FlexiLoggerError> {
         let mut state = match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),
             #[cfg(feature = "async")]
@@ -292,7 +295,10 @@ impl StateHandle {
         Ok(state.config().clone())
     }
 
-    pub(super) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+    pub(super) fn existing_log_files(
+        &self,
+        selector: &LogfileSelector,
+    ) -> Result<Vec<PathBuf>, FlexiLoggerError> {
         let state = match self {
             StateHandle::Sync(handle) => handle.am_state.lock(),
             #[cfg(feature = "async")]
@@ -300,7 +306,7 @@ impl StateHandle {
         }
         .map_err(|_| FlexiLoggerError::Poison)?;
 
-        Ok(state.existing_log_files())
+        Ok(state.existing_log_files(selector))
     }
 
     pub(super) fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {

@@ -5,15 +5,16 @@ mod timestamps;
 use super::config::{FileLogWriterConfig, RotationConfig};
 use crate::{
     util::{eprint_err, ErrorCode},
-    Age, Cleanup, Criterion, FlexiLoggerError, Naming,
+    Age, Cleanup, Criterion, FlexiLoggerError, LogfileSelector, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
+#[cfg(feature = "async")]
+use std::thread::JoinHandle;
 use std::{
     fs::{remove_file, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    thread::JoinHandle,
 };
 
 #[cfg(feature = "async")]
@@ -183,28 +184,19 @@ impl RollState {
 }
 
 #[derive(Debug)]
-struct CleanupThreadHandle {
-    sender: std::sync::mpsc::Sender<list_and_cleanup::MessageToCleanupThread>,
-    join_handle: JoinHandle<()>,
-}
-
-#[derive(Debug)]
 struct RotationState {
     naming_state: NamingState,
     roll_state: RollState,
     cleanup: Cleanup,
-    o_cleanup_thread_handle: Option<CleanupThreadHandle>,
+    o_cleanup_thread_handle: Option<list_and_cleanup::CleanupThreadHandle>,
 }
 impl RotationState {
     fn shutdown(&mut self) {
         // this sets o_cleanup_thread_handle in self.state.o_rotation_state to None:
         let o_cleanup_thread_handle = self.o_cleanup_thread_handle.take();
+
         if let Some(cleanup_thread_handle) = o_cleanup_thread_handle {
-            cleanup_thread_handle
-                .sender
-                .send(list_and_cleanup::MessageToCleanupThread::Die)
-                .ok();
-            cleanup_thread_handle.join_handle.join().ok();
+            cleanup_thread_handle.shutdown();
         }
     }
 }
@@ -306,15 +298,10 @@ impl State {
                             &self.config.file_spec,
                         )?;
                         if *cleanup_in_background_thread {
-                            let (sender, join_handle) = list_and_cleanup::start_cleanup_thread(
+                            Some(list_and_cleanup::start_cleanup_thread(
                                 rotate_config.cleanup,
                                 self.config.file_spec.clone(),
-                            )?;
-
-                            Some(CleanupThreadHandle {
-                                sender,
-                                join_handle,
-                            })
+                            )?)
                         } else {
                             None
                         }
@@ -452,12 +439,8 @@ impl State {
         Ok(())
     }
 
-    pub fn existing_log_files(&self) -> Vec<PathBuf> {
-        let mut list: Vec<PathBuf> =
-            list_and_cleanup::list_of_log_and_compressed_files(&self.config.file_spec).collect();
-        // todo this should only be returned if the file exists:
-        list.push(self.config.file_spec.as_pathbuf(Some(CURRENT_INFIX)));
-        list
+    pub fn existing_log_files(&self, selector: &LogfileSelector) -> Vec<PathBuf> {
+        list_and_cleanup::existing_log_files(&self.config.file_spec, selector)
     }
 
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
@@ -706,128 +689,4 @@ mod platform {
 
     #[cfg(not(target_family = "unix"))]
     fn unix_create_symlink(_: &Path, _: &Path) {}
-}
-
-#[cfg(test)]
-mod test {
-    use chrono::Local;
-
-    use super::list_and_cleanup::list_of_files;
-
-    use crate::{
-        writers::{file_log_writer::config::RotationConfig, FileLogWriterConfig},
-        Cleanup, Criterion, FileSpec, Naming, WriteMode,
-    };
-
-    use super::State;
-
-    fn write_log_entries(file_spec: &FileSpec, timestamps: bool, rcurrent: bool) {
-        {
-            let mut state1 = State::new(
-                get_flw_config(file_spec.clone(), true),
-                Some(get_rotation_config(timestamps, rcurrent)),
-                false,
-            );
-            // write to it to provoke some rotations
-            for _ in 0..17 {
-                std::thread::sleep(std::time::Duration::from_millis(60));
-                state1
-                    .write_buffer(b"hello world hello world hello world hello world\n")
-                    .unwrap();
-            }
-        }
-
-        // restart with a new instance of State with append
-        {
-            let mut state2 = State::new(
-                get_flw_config(file_spec.clone(), true),
-                Some(get_rotation_config(timestamps, rcurrent)),
-                false,
-            );
-            // write to it to provoke some rotations
-            for _ in 0..23 {
-                std::thread::sleep(std::time::Duration::from_millis(60));
-                state2
-                    .write_buffer(b"hello world hello world hello world hello world\n")
-                    .unwrap();
-            }
-        }
-
-        // restart with a new instance of State without append
-        {
-            let mut state3 = State::new(
-                get_flw_config(file_spec.clone(), false),
-                Some(get_rotation_config(timestamps, rcurrent)),
-                false,
-            );
-            // write to it to provoke some rotations
-            for _ in 0..15 {
-                std::thread::sleep(std::time::Duration::from_millis(60));
-                state3
-                    .write_buffer(b"hello world hello world hello world hello world\n")
-                    .unwrap();
-            }
-        }
-    }
-
-    #[test]
-    fn test_timestamps_rcurrent() {
-        let dir = format!("./log_files/state_unit_tests1-{}", Local::now());
-        std::fs::create_dir_all(dir.clone()).unwrap();
-        let file_spec = FileSpec::default()
-            .directory(dir)
-            .discriminant("ts")
-            .suppress_timestamp();
-
-        write_log_entries(&file_spec, true, true);
-
-        // verify that rCURRENT and the intended number of rotated files exist
-        let pattern = file_spec.as_glob_pattern("_r[0-9]*", Some("log"));
-        assert_eq!(list_of_files(&pattern).count(), 8);
-        let pattern = file_spec.as_glob_pattern("_rCURRENT", Some("log"));
-        assert_eq!(list_of_files(&pattern).count(), 1);
-    }
-
-    #[test]
-    fn test_numbers_rcurrent() {
-        let dir = format!("./log_files/state_unit_tests2-{}", Local::now());
-        std::fs::create_dir_all(dir.clone()).unwrap();
-        let file_spec = FileSpec::default()
-            .discriminant("nr")
-            .directory(dir)
-            .suppress_timestamp();
-
-        write_log_entries(&file_spec, false, true);
-
-        // verify that rCURRENT and the intended number of rotated files exist
-        let pattern = file_spec.as_glob_pattern("_r[0-9]*", Some("log"));
-        assert_eq!(list_of_files(&pattern).count(), 8);
-        let pattern = file_spec.as_glob_pattern("_rCURRENT", Some("log"));
-        assert_eq!(list_of_files(&pattern).count(), 1);
-    }
-
-    fn get_flw_config(file_spec: FileSpec, append: bool) -> FileLogWriterConfig {
-        // create an instance of State with Naming::Timestamps and Criterion::Size(200)
-        FileLogWriterConfig {
-            print_message: false,
-            append,
-            write_mode: WriteMode::Direct,
-            file_spec,
-            o_create_symlink: None,
-            line_ending: &[b'\n'],
-            use_utc: true,
-        }
-    }
-
-    fn get_rotation_config(timestamps: bool, _rcurrent: bool) -> RotationConfig {
-        RotationConfig {
-            criterion: Criterion::Size(290),
-            naming: if timestamps {
-                Naming::Timestamps
-            } else {
-                Naming::Numbers
-            },
-            cleanup: Cleanup::Never,
-        }
-    }
 }

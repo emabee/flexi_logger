@@ -10,7 +10,8 @@ pub use self::config::FileLogWriterConfig;
 
 use self::{config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
-    writers::LogWriter, DeferredNow, EffectiveWriteMode, FileSpec, FlexiLoggerError, FormatFunction,
+    writers::LogWriter, DeferredNow, EffectiveWriteMode, FileSpec, FlexiLoggerError,
+    FormatFunction, LogfileSelector,
 };
 use log::Record;
 use std::path::PathBuf;
@@ -132,8 +133,10 @@ impl FileLogWriter {
     /// # Errors
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
-    pub fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
-        self.state_handle.force_rotation()
+    ///
+    /// IO errors.
+    pub fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        self.state_handle.rotate()
     }
 
     /// Returns the list of existing log files according to the current `FileSpec`.
@@ -143,8 +146,11 @@ impl FileLogWriter {
     /// # Errors
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
-    pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
-        self.state_handle.existing_log_files()
+    pub fn existing_log_files(
+        &self,
+        selector: &LogfileSelector,
+    ) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        self.state_handle.existing_log_files(selector)
     }
 }
 
@@ -166,6 +172,10 @@ impl LogWriter for FileLogWriter {
 
     fn reopen_output(&self) -> Result<(), FlexiLoggerError> {
         self.reopen_outputfile()
+    }
+
+    fn rotate(&self) -> Result<(), FlexiLoggerError> {
+        self.state_handle.rotate()
     }
 
     fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {

@@ -2,7 +2,7 @@ use crate::{
     logger::Duplicate,
     util::{eprint_err, write_buffered, ErrorCode},
     writers::{FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
-    {DeferredNow, FlexiLoggerError, FormatFunction},
+    LogfileSelector, {DeferredNow, FlexiLoggerError, FormatFunction},
 };
 use log::Record;
 use std::{
@@ -71,9 +71,27 @@ impl MultiWriter {
             }
         }
     }
-    pub(crate) fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+    pub(crate) fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
+        match (&self.o_file_writer, &self.o_other_writer) {
+            (None, None) => Ok(()),
+            (Some(ref w), None) => w.rotate(),
+            (None, Some(w)) => w.rotate(),
+            (Some(w1), Some(w2)) => {
+                let r1 = w1.rotate();
+                let r2 = w2.rotate();
+                match (r1, r2) {
+                    (Ok(()), Ok(())) => Ok(()),
+                    (Err(e), _) | (Ok(()), Err(e)) => Err(e),
+                }
+            }
+        }
+    }
+    pub(crate) fn existing_log_files(
+        &self,
+        selector: &LogfileSelector,
+    ) -> Result<Vec<PathBuf>, FlexiLoggerError> {
         if let Some(fw) = self.o_file_writer.as_ref() {
-            fw.existing_log_files()
+            fw.existing_log_files(selector)
         } else {
             Ok(Vec::new())
         }
@@ -92,16 +110,6 @@ impl MultiWriter {
     }
     fn duplication_to_stdout(&self) -> Duplicate {
         Duplicate::from(self.duplicate_stdout.load(Ordering::Relaxed))
-    }
-
-    pub(crate) fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
-        if let Some(ref w) = &self.o_file_writer {
-            w.trigger_rotation()?;
-        }
-        // if let Some(w) = &self.o_other_writer {
-        //     w.trigger_rotation(); // todo is not (yet?) part of trait LogWriter
-        // }
-        Ok(())
     }
 }
 

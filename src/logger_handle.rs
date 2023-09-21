@@ -278,14 +278,23 @@ impl LoggerHandle {
     /// # Errors
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    ///
+    /// IO errors.
     pub fn trigger_rotation(&self) -> Result<(), FlexiLoggerError> {
-        if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer {
-            mw.trigger_rotation()?;
+        let mut result = if let PrimaryWriter::Multi(ref mw) = &*self.writers_handle.primary_writer
+        {
+            mw.trigger_rotation()
+        } else {
+            Ok(())
+        };
+
+        for blw in self.writers_handle.other_writers.values() {
+            let result2 = blw.rotate();
+            if result.is_ok() && result2.is_err() {
+                result = result2;
+            }
         }
-        // for blw in self.writers_handle.other_writers.values() {
-        //     let result2 = blw.trigger_rotation(); // todo is not (yet?) part of trait LogWriter
-        // }
-        Ok(())
+        result
     }
 
     /// Shutdown all participating writers.
@@ -308,14 +317,21 @@ impl LoggerHandle {
 
     /// Returns the list of existing log files according to the current `FileSpec`.
     ///
-    /// The list includes the current log file and the compressed files, if they exist.
+    /// Depending on the given selector, the list may include the CURRENT log file
+    /// and the compressed files, if they exist.
     /// The list is empty if the logger is not configured for writing to files.
     ///
     /// # Errors
     ///
     /// `FlexiLoggerError::Poison` if some mutex is poisoned.
-    pub fn existing_log_files(&self) -> Result<Vec<PathBuf>, FlexiLoggerError> {
-        let mut log_files = self.writers_handle.primary_writer.existing_log_files()?;
+    pub fn existing_log_files(
+        &self,
+        selector: &LogfileSelector,
+    ) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        let mut log_files = self
+            .writers_handle
+            .primary_writer
+            .existing_log_files(selector)?;
         log_files.sort();
         Ok(log_files)
     }
@@ -354,6 +370,59 @@ impl LoggerHandle {
     #[doc(hidden)]
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         self.writers_handle.primary_writer.validate_logs(expected);
+    }
+}
+
+/// Used in [`LoggerHandle::existing_log_files`].
+///
+/// Example:
+///
+/// ```rust
+/// # use flexi_logger::{LogfileSelector,Logger};
+/// # let logger_handle = Logger::try_with_env().unwrap().start().unwrap();
+/// let all_log_files = logger_handle.existing_log_files(
+///     &LogfileSelector::default()
+///         .with_r_current()
+///         .with_compressed_files()
+/// );
+/// ```
+pub struct LogfileSelector {
+    pub(crate) with_plain_files: bool,
+    pub(crate) with_r_current: bool,
+    pub(crate) with_compressed_files: bool,
+}
+impl Default for LogfileSelector {
+    /// Selects plain log files without the `rCURRENT` file.
+    fn default() -> Self {
+        Self {
+            with_plain_files: true,
+            with_r_current: false,
+            with_compressed_files: false,
+        }
+    }
+}
+impl LogfileSelector {
+    /// Selects no file at all.
+    #[must_use]
+    pub fn none() -> Self {
+        Self {
+            with_plain_files: false,
+            with_r_current: false,
+            with_compressed_files: false,
+        }
+    }
+    /// Selects additionally the `rCURRENT` file.
+    #[must_use]
+    pub fn with_r_current(mut self) -> Self {
+        self.with_r_current = true;
+        self
+    }
+
+    /// Selects additionally the compressed log files.
+    #[must_use]
+    pub fn with_compressed_files(mut self) -> Self {
+        self.with_compressed_files = true;
+        self
     }
 }
 

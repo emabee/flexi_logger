@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2023-09-20
+
+Revise, and modify the signature of, `LoggerHande::existing_log_files()` (version bump).
+
+Extend the trait `LogWriter` with an optional method `rotate`.
+
+Extend impact of `LoggerHande::trigger_rotation()` to all configured writers.
+
 ## [0.26.1] - 2023-09-19
 
 Introduce new naming variants that work without `_rCURRENT` files: `Naming::TimestampsDirect`

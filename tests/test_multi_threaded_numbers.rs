@@ -1,8 +1,8 @@
 mod test_utils;
 
 use flexi_logger::{
-    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming, Record,
-    WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, LogfileSelector,
+    Logger, Naming, Record, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 use glob::glob;
 use log::*;
@@ -63,7 +63,13 @@ fn multi_threaded() {
             .unwrap();
         wait_for_workers_to_close(worker_handles);
 
-        let log_files = logger.existing_log_files().unwrap();
+        let log_files = logger
+            .existing_log_files(
+                &LogfileSelector::default()
+                    .with_compressed_files()
+                    .with_r_current(),
+            )
+            .unwrap();
         assert_eq!(log_files.len(), 17);
         logger.parse_new_spec("info").unwrap();
         for f in log_files {
