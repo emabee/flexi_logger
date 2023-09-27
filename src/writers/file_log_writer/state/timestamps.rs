@@ -35,14 +35,14 @@ pub(super) fn rcurrents_creation_date(
 ) -> Result<DateTime<Local>, std::io::Error> {
     let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
 
-    Ok(if rotate_rcurrent {
+    if rotate_rcurrent {
         let date_for_rotated_file = o_date_for_rotated_file
             .copied()
             .unwrap_or_else(|| get_creation_date(&current_path));
         let rotated_path =
             path_for_rotated_file(&config.file_spec, config.use_utc, &date_for_rotated_file);
 
-        match std::fs::rename(current_path, rotated_path.clone()) {
+        match std::fs::rename(current_path.clone(), rotated_path.clone()) {
             Ok(()) => {}
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::NotFound {
@@ -50,10 +50,8 @@ pub(super) fn rcurrents_creation_date(
                 }
             }
         }
-        get_creation_date(&rotated_path)
-    } else {
-        get_creation_date(&current_path)
-    })
+    }
+    Ok(get_creation_date(&current_path))
 }
 
 // determine the timestamp to which we want to write (file needn't exist)

@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.27.1] - 2023-09-20
+## [0.27.2] - 2023-09-27
+
+Fix wrong timestamp handling for the second rotation (second part of issue #150).
+
+## [0.27.1] - 2023-09-27
 
 Fix issues with sub-second rotations and with cleanup when all logfiles should be compressed
 (issue #150).
