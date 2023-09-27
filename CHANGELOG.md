@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.1] - 2023-09-20
+
+Fix issues with sub-second rotations and with cleanup when all logfiles should be compressed
+(issue #150).
+
 ## [0.27.0] - 2023-09-20
 
 Revise, and modify the signature of, `LoggerHande::existing_log_files()` (version bump).

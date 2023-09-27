@@ -52,9 +52,10 @@ pub(super) fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
+    writes_direct: bool,
 ) -> Result<(), std::io::Error> {
     o_cleanup_thread_handle.as_ref().map_or_else(
-        || remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec),
+        || remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec, writes_direct),
         |cleanup_thread_handle| {
             cleanup_thread_handle
                 .sender
@@ -68,8 +69,9 @@ pub(super) fn remove_or_compress_too_old_logfiles(
 pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
+    writes_direct: bool,
 ) -> Result<(), std::io::Error> {
-    let (log_limit, compress_limit) = match *cleanup_config {
+    let (mut log_limit, compress_limit) = match *cleanup_config {
         Cleanup::Never => {
             return Ok(());
         }
@@ -84,6 +86,11 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
         }
     };
 
+    // we must not clean up the current output file
+    if writes_direct && log_limit == 0 {
+        log_limit = 1;
+    }
+
     for (index, file) in list_of_log_and_compressed_files(file_spec)
         .into_iter()
         .enumerate()
@@ -97,13 +104,23 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
                 // compress, if not yet compressed
                 if let Some(extension) = file.extension() {
                     if extension != "gz" {
-                        let mut old_file = File::open(file.clone())?;
                         let mut compressed_file = file.clone();
-                        compressed_file.set_extension("log.gz");
+                        match compressed_file.extension() {
+                            Some(oss) => {
+                                let mut oss_gz = oss.to_os_string();
+                                oss_gz.push(".gz");
+                                compressed_file.set_extension(oss_gz.as_os_str());
+                            }
+                            None => {
+                                compressed_file.set_extension("gz");
+                            }
+                        }
+
                         let mut gz_encoder = flate2::write::GzEncoder::new(
                             File::create(compressed_file)?,
                             flate2::Compression::fast(),
                         );
+                        let mut old_file = File::open(file.clone())?;
                         std::io::copy(&mut old_file, &mut gz_encoder)?;
                         gz_encoder.finish()?;
                         std::fs::remove_file(&file)?;
@@ -138,6 +155,7 @@ impl CleanupThreadHandle {
 pub(super) fn start_cleanup_thread(
     cleanup: Cleanup,
     file_spec: FileSpec,
+    writes_direct: bool,
 ) -> Result<CleanupThreadHandle, std::io::Error> {
     let (sender, receiver) = std::sync::mpsc::channel();
     let builder = ThreadBuilder::new().name(CLEANER.to_string());
@@ -147,7 +165,7 @@ pub(super) fn start_cleanup_thread(
         sender,
         join_handle: builder.spawn(move || {
             while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
-                remove_or_compress_too_old_logfiles_impl(&cleanup, &file_spec).ok();
+                remove_or_compress_too_old_logfiles_impl(&cleanup, &file_spec, writes_direct).ok();
             }
         })?,
     })

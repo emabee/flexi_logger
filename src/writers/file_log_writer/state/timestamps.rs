@@ -93,8 +93,19 @@ pub(super) fn collision_free_infix_for_rotated_file(
     let infix_date_string = ts_infix_from_timestamp(date_for_rotated_file, use_utc);
 
     let mut new_path = file_spec.as_pathbuf(Some(&infix_date_string));
-    // Search for rotated_path as is and for restart-siblings;
-    // if any exists, find highest restart and add 1, else continue without restart
+    let mut new_path_with_gz = new_path.clone();
+    match new_path.extension() {
+        Some(oss) => {
+            let mut oss_gz = oss.to_os_string();
+            oss_gz.push(".gz");
+            new_path_with_gz.set_extension(oss_gz.as_os_str());
+        }
+        None => {
+            new_path_with_gz.set_extension("gz");
+        }
+    }
+
+    // search for restart-siblings
     let mut pattern = new_path.clone();
     if file_spec.o_suffix.is_some() {
         pattern.set_extension("");
@@ -104,7 +115,9 @@ pub(super) fn collision_free_infix_for_rotated_file(
     let mut restart_siblings =
         glob::glob(&pattern).unwrap(/*ok*/).map(Result::unwrap).collect::<Vec<PathBuf>>();
 
-    if (*new_path).exists() || !restart_siblings.is_empty() {
+    // if collision would occur (new_path or compressed new_path exists already),
+    // find highest restart and add 1, else continue without restart
+    if new_path.exists() || new_path_with_gz.exists() || !restart_siblings.is_empty() {
         let next_number = if restart_siblings.is_empty() {
             0
         } else {
@@ -118,7 +131,7 @@ pub(super) fn collision_free_infix_for_rotated_file(
                 new_path.to_string_lossy().to_string()
             };
             let index = file_stem_string.find(".restart-").unwrap(/*ok*/);
-            file_stem_string[(index + 9)..].parse::<usize>().unwrap(/*ok*/) + 1
+            file_stem_string[(index + 9)..(index + 13)].parse::<usize>().unwrap(/*ok*/) + 1
         };
 
         infix_date_string
@@ -160,9 +173,9 @@ mod test {
             .collect();
 
         assert_eq!(
-            dbg!(now),
+            now,
             // TODO: use mocking to avoid code duplication:
-            // this test is only useful if the path evaluation sis the same as in
+            // this test is only useful if the path evaluation is the same as in
             // super::latest_timestamp_file()
             paths
                 .iter()

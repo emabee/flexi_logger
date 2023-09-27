@@ -46,6 +46,14 @@ enum NamingState {
     // contains the index of the current output file
     NumbersDirect(u32),
 }
+impl NamingState {
+    pub(crate) fn writes_direct(&self) -> bool {
+        matches!(
+            self,
+            NamingState::NumbersDirect(_) | NamingState::TimestampsDirect(_)
+        )
+    }
+}
 
 #[derive(Debug)]
 enum RollState {
@@ -296,11 +304,13 @@ impl State {
                             &None,
                             &rotate_config.cleanup,
                             &self.config.file_spec,
+                            rotate_config.naming.writes_direct(),
                         )?;
                         if *cleanup_in_background_thread {
                             Some(list_and_cleanup::start_cleanup_thread(
                                 rotate_config.cleanup,
                                 self.config.file_spec.clone(),
+                                rotate_config.naming.writes_direct(),
                             )?)
                         } else {
                             None
@@ -389,6 +399,7 @@ impl State {
                     &rotation_state.o_cleanup_thread_handle,
                     &rotation_state.cleanup,
                     &self.config.file_spec,
+                    rotation_state.naming_state.writes_direct(),
                 )?;
             }
         }

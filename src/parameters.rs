@@ -113,6 +113,12 @@ pub enum Naming {
     /// File rotation switches over to the next file.
     NumbersDirect,
 }
+impl Naming {
+    pub(crate) fn writes_direct(self) -> bool {
+        matches!(self, Naming::NumbersDirect | Naming::TimestampsDirect)
+    }
+}
+
 /// Defines the strategy for handling older log files.
 ///
 /// Is used in [`Logger::rotate`](crate::Logger::rotate).

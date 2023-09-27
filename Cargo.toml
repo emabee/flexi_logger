@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.27.0"
+version = "0.27.1"
 authors = ["emabee <meinolf.block@sap.com>"]
 categories = ["development-tools::debugging"]
 description = """
@@ -65,6 +65,8 @@ tracing-subscriber = { version = "0.3", optional = true, features = [
 libc = { version = "^0.2.50", optional = true }
 
 [dev-dependencies]
+either = "1.9"
+flate2 = "1.0"
 serde_derive = "1.0"
 version-sync = "0.9"
 tracing = "0.1.36"
