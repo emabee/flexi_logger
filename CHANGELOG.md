@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.3] - 2023-11-10
+
+Fix [issue #152](https://github.com/emabee/flexi_logger/issues/152).
+
 ## [0.27.2] - 2023-09-27
 
 Fix wrong timestamp handling for the second rotation (second part of issue #150).

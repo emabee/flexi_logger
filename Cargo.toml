@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.27.2"
+version = "0.27.3"
 authors = ["emabee <meinolf.block@sap.com>"]
 categories = ["development-tools::debugging"]
 description = """
@@ -15,7 +15,7 @@ keywords = ["file", "logger"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/emabee/flexi_logger"
-rust-version = "1.66.0"
+rust-version = "1.67.1"
 
 [lib]
 doctest = false

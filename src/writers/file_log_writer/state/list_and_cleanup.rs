@@ -40,7 +40,8 @@ pub(super) fn list_of_infix_files() -> Vec<PathBuf> {
 }
 fn list_of_files(pattern: &str) -> Vec<PathBuf> {
     let mut log_files: Vec<PathBuf> = glob::glob(pattern)
-        .unwrap(/* failure should be impossible */)
+        .unwrap(/* PatternError should be impossible */)
+        // ignore all files with GlobError
         .filter_map(Result::ok)
         .collect();
     log_files.sort_unstable(); // should be no-op, but we don't want to rely on glob doing it

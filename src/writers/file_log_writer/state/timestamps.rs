@@ -110,8 +110,11 @@ pub(super) fn collision_free_infix_for_rotated_file(
     }
     let mut pattern = pattern.to_string_lossy().to_string();
     pattern.push_str(".restart-*");
-    let mut restart_siblings =
-        glob::glob(&pattern).unwrap(/*ok*/).map(Result::unwrap).collect::<Vec<PathBuf>>();
+    let mut restart_siblings = glob::glob(&pattern)
+        .unwrap(/* PatternError should be impossible */)
+        // ignore all files with GlobError
+        .filter_map(Result::ok)
+        .collect::<Vec<PathBuf>>();
 
     // if collision would occur (new_path or compressed new_path exists already),
     // find highest restart and add 1, else continue without restart
