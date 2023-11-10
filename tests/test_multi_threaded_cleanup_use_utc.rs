@@ -39,6 +39,7 @@ mod d {
                     Naming::Timestamps,
                     Cleanup::KeepLogAndCompressedFiles(NO_OF_LOG_FILES, NO_OF_GZ_FILES),
                 )
+                .cleanup_in_background_thread(false)
                 .use_utc()
                 .start()
                 .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
@@ -52,7 +53,7 @@ mod d {
             thread::sleep(std::time::Duration::from_millis(500));
             logger.set_new_spec(new_spec);
 
-            wait_for_workers_to_close(worker_handles);
+            join_all_workers(worker_handles);
 
             let log_files = logger
                 .existing_log_files(
@@ -99,7 +100,7 @@ mod d {
         trace!("MUST_BE_PRINTED");
     }
 
-    fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
+    fn join_all_workers(worker_handles: Vec<JoinHandle<u8>>) {
         for worker_handle in worker_handles {
             worker_handle
                 .join()
@@ -126,7 +127,7 @@ mod d {
     }
 
     fn verify_logs(directory: &str) {
-        // Since the cleanup deleted log files, we just can confirm that the correct number of
+        // Since the cleanup deleted log files, we can only check that the correct number of
         // log files and compressed files exist
 
         let basename = String::from(directory).add("/").add(
