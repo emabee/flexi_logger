@@ -3,7 +3,7 @@ mod test_utils;
 use flexi_logger::{detailed_format, opt_format, Cleanup, Criterion, FileSpec, Logger, Naming};
 use log::*;
 
-const COUNT: u8 = 6;
+const COUNT: u8 = 8;
 
 #[test]
 fn test_write_modes() {
@@ -71,6 +71,21 @@ fn work(value: u8) {
                     .suppress_timestamp()
                     .directory(self::test_utils::dir())
                     .discriminant("foo"),
+            );
+        }
+        6 => {
+            logger = logger.format(opt_format).log_to_file(
+                FileSpec::default()
+                  .directory(self::test_utils::dir())
+                  .no_basename(),
+            );
+        }
+        7 => {
+            logger = logger.format(opt_format).log_to_file(
+                FileSpec::default()
+                  .directory(self::test_utils::dir())
+                  .no_basename()
+                  .discriminant("foo"),
             );
         }
         COUNT..=u8::MAX => {

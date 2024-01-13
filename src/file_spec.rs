@@ -96,6 +96,13 @@ impl FileSpec {
         }
     }
 
+    /// Excludes the basename from the log filename.
+    #[must_use]
+    pub fn no_basename(mut self) -> Self {
+        self.basename = "".into();
+        self
+    }
+
     /// The specified String is used as the basename of the log file name,
     /// instead of the program name. Using a file separator within the argument is discouraged.
     #[must_use]
@@ -214,10 +221,11 @@ impl FileSpec {
         filename.reserve(50);
 
         if let Some(discriminant) = &self.o_discriminant {
-            filename.push('_');
+            if !filename.is_empty() { filename.push('_'); }
             filename.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
+            if !filename.is_empty() { filename.push('_'); }
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
@@ -239,10 +247,11 @@ impl FileSpec {
         filename.reserve(50);
 
         if let Some(discriminant) = &self.o_discriminant {
-            filename.push('_');
+            if !filename.is_empty() { filename.push('_'); }
             filename.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
+            if !filename.is_empty() { filename.push('_'); }
             filename.push_str(timestamp);
         }
         filename.push_str(infix_pattern);
@@ -266,7 +275,7 @@ impl FileSpec {
     }
 }
 
-const TS_USCORE_DASHES_USCORE_DASHES: &str = "_%Y-%m-%d_%H-%M-%S";
+const TS_USCORE_DASHES_USCORE_DASHES: &str = "%Y-%m-%d_%H-%M-%S";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum TimestampCfg {
