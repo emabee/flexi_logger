@@ -77,14 +77,14 @@ fn work(value: u8) {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
                   .directory(self::test_utils::dir())
-                  .no_basename(),
+                  .suppress_basename(),
             );
         }
         7 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
                   .directory(self::test_utils::dir())
-                  .no_basename()
+                  .suppress_basename()
                   .discriminant("foo"),
             );
         }

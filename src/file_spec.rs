@@ -96,9 +96,11 @@ impl FileSpec {
         }
     }
 
-    /// Excludes the basename from the log filename.
+    /// Makes the logger not include a basename into the names of the log files
+    ///
+    /// Equivalent to `basename("")`.
     #[must_use]
-    pub fn no_basename(mut self) -> Self {
+    pub fn suppress_basename(mut self) -> Self {
         self.basename = "".into();
         self
     }
