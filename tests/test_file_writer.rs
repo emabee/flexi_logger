@@ -76,16 +76,16 @@ fn work(value: u8) {
         6 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
-                  .directory(self::test_utils::dir())
-                  .suppress_basename(),
+                    .directory(self::test_utils::dir())
+                    .suppress_basename(),
             );
         }
         7 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
-                  .directory(self::test_utils::dir())
-                  .suppress_basename()
-                  .discriminant("foo"),
+                    .directory(self::test_utils::dir())
+                    .suppress_basename()
+                    .discriminant("foo"),
             );
         }
         COUNT..=u8::MAX => {

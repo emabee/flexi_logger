@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.4] - 2024-01-20
+
+Add ability to omit the basename cleanly, without leading underscore
+([issue #153](https://github.com/emabee/flexi_logger/issues/153),
+kudos to [krystejj](https://github.com/krystejj).
+
 ## [0.27.3] - 2023-11-10
 
 Fix [issue #152](https://github.com/emabee/flexi_logger/issues/152).

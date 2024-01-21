@@ -100,9 +100,8 @@ impl FileSpec {
     ///
     /// Equivalent to `basename("")`.
     #[must_use]
-    pub fn suppress_basename(mut self) -> Self {
-        self.basename = "".into();
-        self
+    pub fn suppress_basename(self) -> Self {
+        self.basename("")
     }
 
     /// The specified String is used as the basename of the log file name,
@@ -223,11 +222,11 @@ impl FileSpec {
         filename.reserve(50);
 
         if let Some(discriminant) = &self.o_discriminant {
-            if !filename.is_empty() { filename.push('_'); }
+            FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            if !filename.is_empty() { filename.push('_'); }
+            FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
@@ -243,17 +242,23 @@ impl FileSpec {
         p_path
     }
 
+    fn separate_with_underscore(filename: &mut String) {
+        if !filename.is_empty() {
+            filename.push('_');
+        }
+    }
+
     // <directory>/<basename>_<discr>_<timestamp><infix_pattern>.<suffix>
     pub(crate) fn as_glob_pattern(&self, infix_pattern: &str, o_suffix: Option<&str>) -> String {
         let mut filename = self.basename.clone();
         filename.reserve(50);
 
         if let Some(discriminant) = &self.o_discriminant {
-            if !filename.is_empty() { filename.push('_'); }
+            FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            if !filename.is_empty() { filename.push('_'); }
+            FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(timestamp);
         }
         filename.push_str(infix_pattern);
@@ -308,12 +313,11 @@ mod test {
         let ts = TimestampCfg::Yes;
         let s = ts.get_timestamp().unwrap(/* OK */);
         let bytes = s.into_bytes();
-        assert_eq!(bytes[0], b'_');
-        assert_eq!(bytes[5], b'-');
-        assert_eq!(bytes[8], b'-');
-        assert_eq!(bytes[11], b'_');
-        assert_eq!(bytes[14], b'-');
-        assert_eq!(bytes[17], b'-');
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
+        assert_eq!(bytes[10], b'_');
+        assert_eq!(bytes[13], b'-');
+        assert_eq!(bytes[16], b'-');
     }
 
     #[test]
@@ -322,13 +326,14 @@ mod test {
         assert_file_spec(&path, &PathBuf::from("."), true, "log");
     }
 
+    // todo: does not support suppress_timestamp & suppress_basename & use discriminant
     fn assert_file_spec(path: &Path, folder: &Path, with_timestamp: bool, suffix: &str) {
         // check folder
         assert_eq!(
             path.parent().unwrap(), // .canonicalize().unwrap()
             folder                  // .canonicalize().unwrap()
         );
-        // check filestem
+        // check file stem
         //  - should start with progname
         let progname = PathBuf::from(std::env::args().next().unwrap())
             .file_stem()
@@ -428,6 +433,7 @@ mod test {
                 .as_pathbuf(None);
             // check folder
             assert_eq!(path.parent().unwrap(), PathBuf::from("/a/b/c"));
+
             // check filestem
             //  - should start with progname
             let stem = path
@@ -465,17 +471,26 @@ mod test {
 
     #[test]
     fn test_discriminant() {
-        {
-            let path = FileSpec::try_from("/a/b/c/d_foo_bar.trc")
-                .unwrap()
-                .directory("/x/y/z")
-                .o_suffix(Some("txt"))
-                .o_discriminant(Some("1234"))
-                .as_pathbuf(None);
-            assert_eq!(
-                path.file_name().unwrap().to_str().unwrap(),
-                "d_foo_bar_1234.txt"
-            );
-        }
+        let path = FileSpec::try_from("/a/b/c/d_foo_bar.trc")
+            .unwrap()
+            .directory("/x/y/z")
+            .o_suffix(Some("txt"))
+            .o_discriminant(Some("1234"))
+            .as_pathbuf(None);
+        assert_eq!(
+            path.file_name().unwrap().to_str().unwrap(),
+            "d_foo_bar_1234.txt"
+        );
+    }
+
+    #[test]
+    fn test_suppress_basename() {
+        let path = FileSpec::try_from("/a/b/c/d_foo_bar.trc")
+            .unwrap()
+            .suppress_basename()
+            .o_suffix(Some("txt"))
+            .o_discriminant(Some("1234"))
+            .as_pathbuf(None);
+        assert_eq!(path.file_name().unwrap().to_str().unwrap(), "1234.txt");
     }
 }
