@@ -138,6 +138,7 @@ impl LogSpecSubscriber for TraceLogSpecSubscriber {
     }
 }
 
+#[allow(dead_code)] // not really appropriate, seems to be a bug in clippy
 /// Rereads the specfile if it was updated and forwards the update to `tracing`'s filter.
 pub struct SpecFileNotifier(Option<Debouncer<RecommendedWatcher>>);
 

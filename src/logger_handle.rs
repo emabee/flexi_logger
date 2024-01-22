@@ -25,7 +25,7 @@ use std::{
 /// a buffering or asynchronous [`WriteMode`](crate::WriteMode)).
 ///
 /// `LoggerHandle` offers methods to modify the log specification programmatically,
-/// to flush() the logger explicitly, and to reconfigure the used `FileLogWriter` --
+/// to flush the logger explicitly, and to reconfigure the used `FileLogWriter` --
 /// if one is used.
 ///
 /// # Examples

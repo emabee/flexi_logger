@@ -248,10 +248,10 @@ impl FileLogWriterBuilder {
                 line_ending: self.cfg_line_ending,
                 write_mode: self.cfg_write_mode,
                 file_spec: self.file_spec.clone(),
-                o_create_symlink: self.cfg_o_create_symlink.as_ref().map(Clone::clone),
+                o_create_symlink: self.cfg_o_create_symlink.clone(),
                 use_utc: self.use_utc,
             },
-            self.o_rotation_config.as_ref().map(Clone::clone),
+            self.o_rotation_config.clone(),
             cleanup_in_background_thread,
         ))
     }

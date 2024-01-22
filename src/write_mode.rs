@@ -117,6 +117,7 @@ pub enum WriteMode {
 
 pub(crate) enum EffectiveWriteMode {
     Direct,
+    #[allow(dead_code)] // introduced due to a bug in clippy, should be removed again
     BufferAndFlushWith(usize, Duration),
     #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
     #[cfg(feature = "async")]
