@@ -4,7 +4,7 @@ use chrono::{
 };
 #[cfg(feature = "syslog_writer")]
 use chrono::{Datelike, Timelike};
-use std::sync::{Arc, Mutex};
+use std::sync::{Mutex, OnceLock};
 
 /// Deferred timestamp creation.
 ///
@@ -116,39 +116,40 @@ impl<'a> DeferredNow {
     /// Panics if called too late, i.e., if [`DeferredNow::now`] was already called before on
     /// any instance of `DeferredNow`.
     pub fn force_utc() {
-        let mut guard = FORCE_UTC.lock().unwrap();
-        match *guard {
+        let mut cfg_force_utc = cfg_force_utc().lock().unwrap();
+        match *cfg_force_utc {
             Some(false) => {
                 panic!("offset is already initialized not to enforce UTC");
             }
             Some(true) => {
                 // is already set, nothing to do
             }
-            None => *guard = Some(true),
+            None => *cfg_force_utc = Some(true),
         }
     }
-
-    #[allow(dead_code)]
-    pub(crate) fn set_force_utc(b: bool) {
-        let mut guard = FORCE_UTC.lock().unwrap();
-        *guard = Some(b);
-    }
 }
 
-lazy_static::lazy_static! {
-    static ref FORCE_UTC: Arc<Mutex<Option<bool>>> =
-    Arc::new(Mutex::new(None));
+fn cfg_force_utc() -> &'static Mutex<Option<bool>> {
+    static CFG_FORCE_UTC: OnceLock<Mutex<Option<bool>>> = OnceLock::new();
+    CFG_FORCE_UTC.get_or_init(|| Mutex::new(None))
 }
+
 fn use_utc() -> bool {
-    let mut force_utc_guard = FORCE_UTC.lock().unwrap();
-    if let Some(true) = *force_utc_guard {
+    let mut cfg_force_utc = cfg_force_utc().lock().unwrap();
+    if let Some(true) = *cfg_force_utc {
         true
     } else {
-        if force_utc_guard.is_none() {
-            *force_utc_guard = Some(false);
+        if cfg_force_utc.is_none() {
+            *cfg_force_utc = Some(false);
         }
         false
     }
+}
+
+#[cfg(test)]
+pub(crate) fn set_force_utc(b: bool) {
+    let mut cfg_force_utc = cfg_force_utc().lock().unwrap();
+    *cfg_force_utc = Some(b);
 }
 
 #[cfg(test)]
@@ -219,7 +220,7 @@ mod test {
         #[cfg(feature = "syslog_writer")]
         {
             log::info!("test rfc3164");
-            super::DeferredNow::set_force_utc(true);
+            super::set_force_utc(true);
             let (mut dn1, mut dn2) = get_deferred_nows();
             assert_eq!("Apr 29 13:14:15", &dn1.format_rfc3164());
             assert_eq!("Apr 29 12:14:15", &dn2.format_rfc3164());
@@ -228,13 +229,13 @@ mod test {
         log::info!("test rfc3339");
         {
             // with local timestamps, offsets ≠ 0 are printed (except in Greenwich time zone):
-            super::DeferredNow::set_force_utc(false);
+            super::set_force_utc(false);
             let (mut dn1, mut dn2) = get_deferred_nows();
             log::info!("2021-04-29T15:14:15.678+02:00, {}", &dn1.format_rfc3339());
             log::info!("2021-04-29T14:14:15.678+02:00, {}", &dn2.format_rfc3339());
 
             // with utc, the timestamps are normalized to offset 0
-            super::DeferredNow::set_force_utc(true);
+            super::set_force_utc(true);
             let (mut dn1, mut dn2) = get_deferred_nows();
             assert_eq!("2021-04-29T13:14:15.678+00:00", &dn1.format_rfc3339());
             assert_eq!("2021-04-29T12:14:15.678+00:00", &dn2.format_rfc3339());

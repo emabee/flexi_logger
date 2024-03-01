@@ -1,10 +1,12 @@
 use crate::logger::ErrorChannel;
 use crate::{DeferredNow, FormatFunction};
 use log::Record;
-use std::cell::RefCell;
-use std::io::Write;
-use std::path::Path;
-use std::sync::RwLock;
+use std::{
+    cell::RefCell,
+    io::Write,
+    path::Path,
+    sync::{OnceLock, RwLock},
+};
 
 #[cfg(test)]
 use std::io::Cursor;
@@ -69,12 +71,13 @@ pub(crate) fn eprint_msg(error_code: ErrorCode, msg: &str) {
     try_to_write(&s);
 }
 
-lazy_static::lazy_static! {
-    pub(crate) static ref ERROR_CHANNEL: RwLock<ErrorChannel> = RwLock::new(ErrorChannel::default());
+fn error_channel() -> &'static RwLock<ErrorChannel> {
+    static ERROR_CHANNEL: OnceLock<RwLock<ErrorChannel>> = OnceLock::new();
+    ERROR_CHANNEL.get_or_init(|| RwLock::new(ErrorChannel::default()))
 }
 
 pub(crate) fn set_error_channel(channel: ErrorChannel) {
-    match ERROR_CHANNEL.write() {
+    match error_channel().write() {
         Ok(mut guard) => {
             *guard = channel;
         }
@@ -85,7 +88,7 @@ pub(crate) fn set_error_channel(channel: ErrorChannel) {
 }
 
 fn try_to_write(s: &str) {
-    match &*(ERROR_CHANNEL.read().unwrap()) {
+    match &*(error_channel().read().unwrap()) {
         ErrorChannel::StdErr => {
             eprintln!("{s}");
         }

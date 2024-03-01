@@ -2,7 +2,10 @@ use crate::DeferredNow;
 use log::Record;
 #[cfg(feature = "colors")]
 use nu_ansi_term::{Color, Style};
-use std::thread;
+use std::{
+    sync::{OnceLock, RwLock},
+    thread,
+};
 
 /// Time stamp format that is used by the provided format functions.
 pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
@@ -220,7 +223,7 @@ pub fn colored_with_thread(
 #[cfg(feature = "colors")]
 #[must_use]
 pub fn style(level: log::Level) -> Style {
-    let palette = &*(PALETTE.read().unwrap());
+    let palette = &*(palette().read().unwrap());
     match level {
         log::Level::Error => palette.error,
         log::Level::Warn => palette.warn,
@@ -231,8 +234,9 @@ pub fn style(level: log::Level) -> Style {
 }
 
 #[cfg(feature = "colors")]
-lazy_static::lazy_static! {
-    static ref PALETTE: std::sync::RwLock<Palette> = std::sync::RwLock::new(Palette::default());
+fn palette() -> &'static RwLock<Palette> {
+    static PALETTE: OnceLock<RwLock<Palette>> = OnceLock::new();
+    PALETTE.get_or_init(|| RwLock::new(Palette::default()))
 }
 
 // Overwrites the default PALETTE value either from the environment, if set,
@@ -240,17 +244,13 @@ lazy_static::lazy_static! {
 // Returns an error if parsing failed.
 #[cfg(feature = "colors")]
 pub(crate) fn set_palette(input: &Option<String>) -> Result<(), std::num::ParseIntError> {
-    match std::env::var_os("FLEXI_LOGGER_PALETTE") {
-        Some(ref env_osstring) => {
-            *(PALETTE.write().unwrap()) = Palette::from(env_osstring.to_string_lossy().as_ref())?;
-        }
+    *(palette().write().unwrap()) = match std::env::var_os("FLEXI_LOGGER_PALETTE") {
+        Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref()),
         None => match input {
-            Some(ref input_string) => {
-                *(PALETTE.write().unwrap()) = Palette::from(input_string)?;
-            }
-            None => {}
+            Some(ref input_string) => Palette::from(input_string),
+            None => return Ok(()),
         },
-    }
+    }?;
     Ok(())
 }
 

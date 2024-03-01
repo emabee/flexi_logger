@@ -45,7 +45,7 @@ mod a {
             std::fs::rename(&specfile, old_name).unwrap();
             let mut file = std::fs::OpenOptions::new()
                 .create(true)
-                .write(true)
+                .append(true)
                 .open(&specfile)
                 .unwrap();
             file.write_all(
