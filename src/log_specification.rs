@@ -3,9 +3,7 @@ use crate::LevelFilter;
 
 #[cfg(feature = "textfilter")]
 use regex::Regex;
-use std::collections::HashMap;
-use std::env;
-use std::fmt::Write;
+use std::{collections::HashMap, env};
 
 ///
 /// Immutable struct that defines which loglines are to be written,
@@ -423,36 +421,31 @@ impl LogSpecification {
     }
 }
 
-impl ToString for LogSpecification {
-    #[must_use]
-    fn to_string(&self) -> String {
-        let mut w = String::new();
+impl std::fmt::Display for LogSpecification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut write_comma = false;
         // Optional: Default log level
         if let Some(last) = self.module_filters.last() {
             if last.module_name.is_none() {
-                write!(w, "{},", last.level_filter.to_string().to_lowercase()).ok();
+                write!(f, "{},", last.level_filter.to_string().to_lowercase())?;
+                write_comma = true;
             }
         }
 
+        // TODO: global_pattern is not modelled into String representation, only into yaml file
         // Optional: specify a regular expression to suppress all messages that don't match
         // w.write_all(b"#global_pattern = 'foo'\n")?;
 
         // Specific log levels per module
         for mf in &self.module_filters {
             if let Some(ref name) = mf.module_name {
-                write!(
-                    w,
-                    "{}={},",
-                    name,
-                    mf.level_filter.to_string().to_lowercase()
-                )
-                .ok();
+                if write_comma {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{name} = {}", mf.level_filter.to_string().to_lowercase())?;
             }
         }
-        match w.strip_suffix(',') {
-            Some(inner) => inner.to_string(),
-            None => w,
-        }
+        Ok(())
     }
 }
 impl std::convert::TryFrom<&str> for LogSpecification {

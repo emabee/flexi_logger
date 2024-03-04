@@ -6,16 +6,18 @@ mod d {
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-        Record, WriteMode,
+        WriteMode,
     };
     use glob::glob;
     use log::*;
-    use std::collections::BTreeMap;
-    use std::fs::File;
-    use std::io::{BufRead, BufReader, Write};
-    use std::ops::Add;
-    use std::path::{Path, PathBuf};
-    use std::thread::{self, JoinHandle};
+    use std::{
+        collections::BTreeMap,
+        fs::File,
+        io::{BufRead, BufReader, Write},
+        ops::Add,
+        path::{Path, PathBuf},
+        thread::{self, JoinHandle},
+    };
 
     use crate::test_utils;
 

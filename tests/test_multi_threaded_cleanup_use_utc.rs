@@ -4,12 +4,14 @@ mod test_utils;
 mod d {
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, LogfileSelector,
-        Logger, Naming, Record, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+        Logger, Naming, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
     };
     use glob::glob;
     use log::*;
-    use std::ops::Add;
-    use std::thread::{self, JoinHandle};
+    use std::{
+        ops::Add,
+        thread::{self, JoinHandle},
+    };
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;

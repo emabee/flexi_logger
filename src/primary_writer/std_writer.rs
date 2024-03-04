@@ -1,7 +1,7 @@
 #[cfg(feature = "async")]
 use {
     crate::util::{eprint_err, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
-    crossbeam_channel::{self, SendError, Sender},
+    crossbeam_channel::{SendError, Sender},
     crossbeam_queue::ArrayQueue,
 };
 

@@ -23,7 +23,7 @@ const ASYNC_FLUSHER: &str = "flexi_logger-fs-async_flusher";
 #[cfg(feature = "async")]
 use {
     crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN},
-    crossbeam_channel::{self, Sender as CrossbeamSender},
+    crossbeam_channel::Sender as CrossbeamSender,
     crossbeam_queue::ArrayQueue,
 };
 

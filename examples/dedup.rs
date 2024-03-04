@@ -3,7 +3,7 @@ use flexi_logger::{
     DeferredNow,
 };
 use log::Record;
-use std::{borrow::ToOwned, cmp::Ordering, num::NonZeroUsize, sync::Mutex};
+use std::{cmp::Ordering, num::NonZeroUsize, sync::Mutex};
 
 fn main() {
     #[cfg(colors)]

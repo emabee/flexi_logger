@@ -2,7 +2,7 @@ mod test_utils;
 
 use flexi_logger::{
     Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-    Record, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+    TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 use glob::glob;
 use log::*;

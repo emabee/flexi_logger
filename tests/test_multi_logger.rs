@@ -1,7 +1,10 @@
 mod test_utils;
 
-use flexi_logger::writers::{FileLogWriter, LogWriter};
-use flexi_logger::{detailed_format, DeferredNow, FileSpec, Logger, Record};
+use flexi_logger::{
+    detailed_format,
+    writers::{FileLogWriter, LogWriter},
+    DeferredNow, FileSpec, Logger,
+};
 use log::*;
 use std::sync::Arc;
 

@@ -157,13 +157,6 @@ pub fn setup_tracing(
     o_specfile: Option<&PathBuf>,
     flwb: FileLogWriterBuilder,
 ) -> Result<(FileLogWriterHandle, SpecFileNotifier), FlexiLoggerError> {
-    struct LogSpecAsFilter(pub LogSpecification);
-    impl From<LogSpecAsFilter> for EnvFilter {
-        fn from(wrapped_logspec: LogSpecAsFilter) -> Self {
-            Self::new(wrapped_logspec.0.to_string())
-        }
-    }
-
     let (file_writer, fw_handle) = flwb.try_build_with_handle()?;
 
     // Set up subscriber that makes use of the file writer, with some hardcoded initial log spec
@@ -191,4 +184,10 @@ pub fn setup_tracing(
     tracing::subscriber::set_global_default(subscriber_builder.finish())?;
 
     Ok((fw_handle, spec_file_notifier))
+}
+struct LogSpecAsFilter(pub LogSpecification);
+impl From<LogSpecAsFilter> for EnvFilter {
+    fn from(wrapped_logspec: LogSpecAsFilter) -> Self {
+        Self::new(wrapped_logspec.0.to_string())
+    }
 }

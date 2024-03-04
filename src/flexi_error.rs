@@ -91,7 +91,7 @@ pub enum FlexiLoggerError {
     #[error("Logger is shut down")]
     Shutdown(#[from] crossbeam_channel::SendError<Vec<u8>>),
 
-    ///
+    /// Tracing initialization failed.
     #[cfg(feature = "trc")]
     #[cfg_attr(docsrs, doc(cfg(feature = "trc")))]
     #[error("Tracing initialization failed")]

@@ -2,7 +2,7 @@ mod test_utils;
 
 use flexi_logger::{
     filter::{LogLineFilter, LogLineWriter},
-    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, Logger, Naming, Record, WriteMode,
+    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, Logger, Naming, WriteMode,
     TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 
