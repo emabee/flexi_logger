@@ -427,7 +427,7 @@ impl std::fmt::Display for LogSpecification {
         // Optional: Default log level
         if let Some(last) = self.module_filters.last() {
             if last.module_name.is_none() {
-                write!(f, "{},", last.level_filter.to_string().to_lowercase())?;
+                write!(f, "{}", last.level_filter.to_string().to_lowercase())?;
                 write_comma = true;
             }
         }
@@ -443,6 +443,7 @@ impl std::fmt::Display for LogSpecification {
                     write!(f, ", ")?;
                 }
                 write!(f, "{name} = {}", mf.level_filter.to_string().to_lowercase())?;
+                write_comma = true;
             }
         }
         Ok(())
@@ -683,8 +684,8 @@ mod tests {
     #[test]
     fn parse_roundtrip() {
         let ss = [
-            "crate1::mod1=error,crate1::mod2=trace,crate2=debug",
-            "debug,crate1::mod2=trace,crate2=error",
+            "crate1::mod1 = error, crate1::mod2 = trace, crate2 = debug",
+            "debug, crate1::mod2 = trace, crate2 = error",
         ];
         for s in &ss {
             let spec = LogSpecification::parse(s).unwrap();
@@ -695,7 +696,8 @@ mod tests {
 
     #[test]
     fn parse_logging_spec_valid() {
-        let spec = LogSpecification::parse("crate1::mod1=error,crate1::mod2,crate2=debug").unwrap();
+        let spec =
+            LogSpecification::parse("crate1::mod1 = error, crate1::mod2, crate2 = debug").unwrap();
         assert_eq!(spec.module_filters().len(), 3);
         assert_eq!(
             spec.module_filters()[0].module_name,

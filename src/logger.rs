@@ -4,7 +4,7 @@ use crate::{
     formats::default_format,
     primary_writer::PrimaryWriter,
     threads::start_flusher_thread,
-    util::set_error_channel,
+    util::{set_error_channel, set_panic_on_error_channel_error},
     writers::{FileLogWriter, FileLogWriterBuilder, LogWriter},
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
@@ -69,6 +69,7 @@ pub struct Logger {
     filter: Option<Box<dyn LogLineFilter + Send + Sync>>,
     error_channel: ErrorChannel,
     use_utc: bool,
+    panic_on_error_channel_error: bool,
 }
 
 enum LogTarget {
@@ -165,6 +166,7 @@ impl Logger {
             filter: None,
             error_channel: ErrorChannel::default(),
             use_utc: false,
+            panic_on_error_channel_error: true,
         }
     }
 }
@@ -525,13 +527,25 @@ impl Logger {
 
     /// Define the output channel for `flexi_logger`'s own error messages.
     ///
-    /// These are only written if `flexi_logger` cannot do what it is supposed to do,
-    /// so under normal circumstances no single message shuld appear.
+    /// These are only written if `flexi_logger` cannot do what it is supposed to do.
+    /// Under normal circumstances no single message should appear.
     ///
     /// By default these error messages are printed to `stderr`.
     #[must_use]
     pub fn error_channel(mut self, error_channel: ErrorChannel) -> Self {
         self.error_channel = error_channel;
+        self
+    }
+
+    /// Decides what `flexi_logger` should do if the error output channel cannot be written to.
+    ///
+    /// By default, it will panic if error messages cannot be written to the chosen
+    /// error output channel.
+    /// Calling this method with `false` will let `flexi_logger` ignore the issue and suppress
+    /// the error messages.
+    #[must_use]
+    pub fn panic_if_error_channel_is_broken(mut self, panic: bool) -> Self {
+        self.panic_on_error_channel_error = panic;
         self
     }
 }
@@ -664,6 +678,7 @@ impl Logger {
         if self.use_utc {
             self.flwb = self.flwb.use_utc();
         }
+        set_panic_on_error_channel_error(self.panic_on_error_channel_error);
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {

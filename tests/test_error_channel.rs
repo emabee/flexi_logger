@@ -67,9 +67,7 @@ fn work(value: u8) {
         let lines = BufReader::new(File::open(err_file).unwrap())
             .lines()
             .count();
-        assert!(
-            lines == 6 // two lines per failing error, warn, or info call
-         || lines == 8 // two more lines if UTC issue applies
-        );
+        // two lines per failing error!, warn!, or info! call:
+        assert_eq!(lines, 6);
     }
 }

@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.27.5-unpublished] - 2024-xx-xx
+## [0.28.0] - 2024-03-16
 
 Detach from `lazy_static`, use `std::sync::OnceLock` instead.
+
+Bump minimal supported rust version to 1.70.
+
+If `flexi_logger` runs into issues itself, it will try to write error messages into the configured
+error output channel. By default, `flexi_logger` panics if writing to the error output channel fails.
+It is now possible to gracefully "swallow" the error messages and continue
+(see [panic_if_error_channel_is_broken](https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.panic_if_error_channel_is_broken)).
+
+The new feature `kv` allows making use of the `kv` feature of `log` together with `flexi_logger`s
+format functions, and adds a dependency to `log/kv_serde`.
+
+The new feature `json` adds a format function `json_format` and dependencies to `serde_json`,
+`serde` and `serde_derive`.
 
 ## [0.27.4] - 2024-01-20
 

@@ -49,26 +49,24 @@ impl ErrorCode {
 }
 
 pub(crate) fn eprint_err(error_code: ErrorCode, msg: &str, err: &dyn std::error::Error) {
-    let s = format!(
+    try_writing_to_error_channel(&format!(
         "[flexi_logger][ERRCODE::{code:?}] {msg}, caused by {err:?}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         err = err,
         code = error_code,
         code_lc = error_code.as_index(),
-    );
-    try_to_write(&s);
+    ));
 }
 
 pub(crate) fn eprint_msg(error_code: ErrorCode, msg: &str) {
-    let s = format!(
+    try_writing_to_error_channel(&format!(
         "[flexi_logger][ERRCODE::{code:?}] {msg}\n    \
          See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#{code_lc}",
         msg = msg,
         code = error_code,
         code_lc = error_code.as_index(),
-    );
-    try_to_write(&s);
+    ));
 }
 
 fn error_channel() -> &'static RwLock<ErrorChannel> {
@@ -76,6 +74,25 @@ fn error_channel() -> &'static RwLock<ErrorChannel> {
     ERROR_CHANNEL.get_or_init(|| RwLock::new(ErrorChannel::default()))
 }
 
+static PANIC_ON_ERROR_ERROR: OnceLock<bool> = OnceLock::new();
+pub(crate) fn set_panic_on_error_channel_error(b: bool) {
+    PANIC_ON_ERROR_ERROR.get_or_init(|| b);
+}
+fn panic_on_error_error() -> bool {
+    *PANIC_ON_ERROR_ERROR.get().unwrap_or(&false)
+}
+fn handle_error_error(result: &Result<(), std::io::Error>) {
+    if result.is_err() {
+        assert!(
+            !panic_on_error_error(),
+            "flexi_logger panics because it ran into an error and cannot inform about it \
+             through its configured error output channel \
+             because the error output channel itself is broken. \n\
+             You can avoid this panic by using 'Logger::panic_if_error_channel_is_broken(false)' \
+             (see https://docs.rs/flexi_logger/latest/flexi_logger/struct.Logger.html#method.panic_if_error_channel_is_broken)."
+        );
+    }
+}
 pub(crate) fn set_error_channel(channel: ErrorChannel) {
     match error_channel().write() {
         Ok(mut guard) => {
@@ -87,23 +104,26 @@ pub(crate) fn set_error_channel(channel: ErrorChannel) {
     }
 }
 
-fn try_to_write(s: &str) {
+fn try_writing_to_error_channel(s: &str) {
     match &*(error_channel().read().unwrap()) {
         ErrorChannel::StdErr => {
-            eprintln!("{s}");
+            handle_error_error(&writeln!(std::io::stderr(), "{s}"));
         }
         ErrorChannel::StdOut => {
-            println!("{s}");
+            handle_error_error(&writeln!(std::io::stdout(), "{s}"));
         }
-        ErrorChannel::File(path) => try_to_write_to_file(s, path).unwrap_or_else(|e| {
-            eprintln!("{s}");
-            eprintln!("Can't open error output file, caused by: {e}");
+        ErrorChannel::File(path) => try_writing_to_file(s, path).unwrap_or_else(|e| {
+            handle_error_error(&writeln!(std::io::stderr(), "{s}"));
+            handle_error_error(&writeln!(
+                std::io::stderr(),
+                "Can't open error output file, caused by: {e}"
+            ));
         }),
         ErrorChannel::DevNull => {}
     }
 }
 
-fn try_to_write_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
+fn try_writing_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)

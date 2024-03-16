@@ -1,17 +1,60 @@
 use crate::DeferredNow;
+#[cfg(feature = "kv")]
+use log::kv::{self, Key, Value, VisitSource};
 use log::Record;
 #[cfg(feature = "colors")]
 use nu_ansi_term::{Color, Style};
-use std::{
-    sync::{OnceLock, RwLock},
-    thread,
-};
+#[cfg(feature = "json")]
+use serde_derive::Serialize;
+#[cfg(feature = "kv")]
+use std::collections::BTreeMap;
+#[cfg(feature = "colors")]
+use std::sync::{OnceLock, RwLock};
+use std::thread;
 
 /// Time stamp format that is used by the provided format functions.
 pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
 
+// Helpers for printing key-value pairs
+#[cfg(feature = "kv")]
+fn write_key_value_pairs(
+    w: &mut dyn std::io::Write,
+    record: &Record<'_>,
+) -> Result<(), std::io::Error> {
+    if record.key_values().count() > 0 {
+        write!(w, "{{")?;
+        let mut kv_stream = KvStream(w, false);
+        record.key_values().visit(&mut kv_stream).ok();
+        write!(w, "}} ")?;
+    }
+    Ok(())
+}
+#[cfg(feature = "kv")]
+struct KvStream<'a>(&'a mut dyn std::io::Write, bool);
+#[cfg(feature = "kv")]
+impl<'kvs, 'a> log::kv::VisitSource<'kvs> for KvStream<'a>
+where
+    'kvs: 'a,
+{
+    fn visit_pair(
+        &mut self,
+        key: log::kv::Key<'kvs>,
+        value: log::kv::Value<'kvs>,
+    ) -> Result<(), log::kv::Error> {
+        if self.1 {
+            write!(self.0, ", ")?;
+        }
+        write!(self.0, "{key}={value:?}")?;
+        self.1 = true;
+        Ok(())
+    }
+}
+
 /// A logline-formatter that produces log lines like <br>
-/// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```
+/// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```,
+/// or
+/// ```INFO [my_prog::some_submodule] {a=17, b="foo"} Task successfully read from conf.json```
+/// if the kv-feature is used.
 ///
 /// # Errors
 ///
@@ -23,11 +66,15 @@ pub fn default_format(
 ) -> Result<(), std::io::Error> {
     write!(
         w,
-        "{} [{}] {}",
+        "{} [{}] ",
         record.level(),
         record.module_path().unwrap_or("<unnamed>"),
-        record.args()
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", record.args())
 }
 
 /// A colored version of the logline-formatter `default_format`
@@ -50,11 +97,15 @@ pub fn colored_default_format(
     let level = record.level();
     write!(
         w,
-        "{} [{}] {}",
+        "{} [{}] ",
         style(level).paint(level.to_string()),
         record.module_path().unwrap_or("<unnamed>"),
-        style(level).paint(record.args().to_string())
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines with timestamp and file location, like
@@ -72,13 +123,17 @@ pub fn opt_format(
 ) -> Result<(), std::io::Error> {
     write!(
         w,
-        "[{}] {} [{}:{}] {}",
+        "[{}] {} [{}:{}] ",
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        &record.args()
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", &record.args())
 }
 
 /// A colored version of the logline-formatter `opt_format`.
@@ -98,13 +153,17 @@ pub fn colored_opt_format(
     let level = record.level();
     write!(
         w,
-        "[{}] {} [{}:{}] {}",
+        "[{}] {} [{}:{}] ",
         style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", style(level).paint(&record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines like
@@ -123,14 +182,18 @@ pub fn detailed_format(
 ) -> Result<(), std::io::Error> {
     write!(
         w,
-        "[{}] {} [{}] {}:{}: {}",
+        "[{}] {} [{}] {}:{}: ",
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         record.level(),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        &record.args()
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", &record.args())
 }
 
 /// A colored version of the logline-formatter `detailed_format`.
@@ -150,14 +213,18 @@ pub fn colored_detailed_format(
     let level = record.level();
     write!(
         w,
-        "[{}] {} [{}] {}:{}: {}",
+        "[{}] {} [{}] {}:{}: ",
         style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(record.level().to_string()),
         record.module_path().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", style(level).paint(&record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines like
@@ -176,14 +243,18 @@ pub fn with_thread(
 ) -> Result<(), std::io::Error> {
     write!(
         w,
-        "[{}] T[{}] {} [{}:{}] {}",
+        "[{}] T[{}] {} [{}:{}] ",
         now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK),
         thread::current().name().unwrap_or("<unnamed>"),
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        &record.args()
-    )
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", &record.args())
 }
 
 /// A colored version of the logline-formatter `with_thread`.
@@ -203,14 +274,92 @@ pub fn colored_with_thread(
     let level = record.level();
     write!(
         w,
-        "[{}] T[{}] {} [{}:{}] {}",
+        "[{}] T[{}] {} [{}:{}] ",
         style(level).paint(now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string()),
         style(level).paint(thread::current().name().unwrap_or("<unnamed>")),
         style(level).paint(level.to_string()),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        style(level).paint(&record.args().to_string())
+    )?;
+
+    #[cfg(feature = "kv")]
+    write_key_value_pairs(w, record)?;
+
+    write!(w, "{}", style(level).paint(&record.args().to_string()))
+}
+
+/// A logline-formatter that produces log lines in json format.
+///
+/// # Errors
+///
+/// See `std::write`
+#[cfg_attr(docsrs, doc(cfg(feature = "json")))]
+#[cfg(feature = "json")]
+pub fn json_format(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let current_thread = thread::current();
+    let logline = LogLine {
+        level: record.level().as_str(),
+        timestamp: now.format(TS_DASHES_BLANK_COLONS_DOT_BLANK).to_string(),
+        thread: current_thread.name(),
+        module_path: record.module_path(),
+        file: record.file(),
+        line: record.line(),
+
+        #[cfg(feature = "kv")]
+        kv: {
+            let key_values = record.key_values();
+            if key_values.count() > 0 {
+                let mut collect = Collect(BTreeMap::new());
+                key_values.visit(&mut collect).ok();
+                Some(collect.0)
+            } else {
+                None
+            }
+        },
+        text: record.args(),
+    };
+
+    write!(
+        w,
+        "{}",
+        serde_json::to_string(&logline)
+            .unwrap_or_else(|e| format!("serde_json::to_string() failed with {e}"))
     )
+}
+
+#[cfg(feature = "json")]
+#[derive(Serialize)]
+struct LogLine<'a> {
+    level: &'a str,
+    timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thread: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module_path: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg(feature = "kv")]
+    kv: Option<BTreeMap<Key<'a>, Value<'a>>>,
+    text: &'a std::fmt::Arguments<'a>,
+}
+
+#[cfg(feature = "kv")]
+struct Collect<'kvs>(BTreeMap<Key<'kvs>, Value<'kvs>>);
+
+#[cfg(feature = "kv")]
+impl<'kvs> VisitSource<'kvs> for Collect<'kvs> {
+    fn visit_pair(&mut self, key: Key<'kvs>, value: Value<'kvs>) -> Result<(), kv::Error> {
+        self.0.insert(key, value);
+
+        Ok(())
+    }
 }
 
 /// Helper function that is used in the provided coloring format functions to apply

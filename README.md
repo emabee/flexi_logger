@@ -17,7 +17,7 @@ and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
-flexi_logger = "0.27"
+flexi_logger = "0.28"
 log = "0.4"
 ```
 
@@ -68,7 +68,7 @@ Make use of the non-default features by specifying them in your `Cargo.toml`, e.
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.27", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.28", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -76,7 +76,7 @@ or, to get the smallest footprint (and no colors), switch off even the default f
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.27", default_features = false }
+flexi_logger = { version = "0.28", default_features = false }
 log = "0.4"
 ```
 
@@ -126,6 +126,24 @@ Normally, `flexi_logger` reduces the stack size of all threads that it might spa
 For usecases where this is not desirable
 (see [here](https://github.com/emabee/flexi_logger/issues/95) for some motivation),
 you can activate this feature.
+
+### **`json`**
+
+Adds an additional format function `json_format` that prints the whole log line in json format,
+like this:
+
+```text
+{"level":"WARN","timestamp":"2024-03-14 10:04:57.299908 +01:00","thread":"XY","module_path":"test_json","file":"src/test_json.rs","line":32,"text":"More foo than bar."}
+```
+
+Also adds a dependency to crate `json`.
+
+### **`kv`**
+
+If you use the `kv` feature of the `log` crate to enrich the log-macro calls with key-value pairs,
+then you should also use the `kv` feature of `flexi_logger`
+so that these key-value pairs are also written by the
+provided [format functions](https://docs.rs/flexi_logger/latest/flexi_logger/#functions).
 
 ### **`specfile`**
 

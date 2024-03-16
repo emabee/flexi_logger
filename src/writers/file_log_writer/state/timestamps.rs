@@ -169,7 +169,7 @@ mod test {
             )
             .unwrap();
         let paths: Vec<PathBuf> = (0..10)
-            .map(|i| now - Duration::seconds(i))
+            .map(|i| now - Duration::try_seconds(i).unwrap())
             .map(|ts| file_spec.as_pathbuf(Some(&super::ts_infix_from_timestamp(&ts, false))))
             .collect();
 

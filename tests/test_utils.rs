@@ -29,7 +29,7 @@ pub fn dir() -> PathBuf {
     d.push(now_local().format(TS).to_string());
     d
 }
-pub fn add_prog_name(pb: &mut PathBuf) {
+fn add_prog_name(pb: &mut PathBuf) {
     let path = PathBuf::from(std::env::args().next().unwrap());
     let filename = path.file_stem().unwrap(/*ok*/).to_string_lossy();
 
