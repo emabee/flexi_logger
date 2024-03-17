@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use flexi_logger::writers::LogWriter;
 use std::{
     io::{Error, ErrorKind},
