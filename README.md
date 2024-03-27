@@ -136,7 +136,7 @@ like this:
 {"level":"WARN","timestamp":"2024-03-14 10:04:57.299908 +01:00","thread":"XY","module_path":"test_json","file":"src/test_json.rs","line":32,"text":"More foo than bar."}
 ```
 
-Also adds a dependency to crate `json`.
+Adds dependencies to `serde`, `serde_derive`, `serde_json`.
 
 ### **`kv`**
 
