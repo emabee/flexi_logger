@@ -163,7 +163,7 @@ pub fn colored_opt_format(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", style(level).paint(&record.args().to_string()))
+    write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines like
@@ -224,7 +224,7 @@ pub fn colored_detailed_format(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", style(level).paint(&record.args().to_string()))
+    write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines like
@@ -285,7 +285,7 @@ pub fn colored_with_thread(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", style(level).paint(&record.args().to_string()))
+    write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
 /// A logline-formatter that produces log lines in json format.
