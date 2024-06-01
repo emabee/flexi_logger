@@ -7,6 +7,7 @@ other output streams, and that can be influenced while the program is running.**
 [![Documentation](https://docs.rs/flexi_logger/badge.svg)](https://docs.rs/flexi_logger)
 [![License](https://img.shields.io/crates/l/flexi_logger.svg)](https://github.com/emabee/flexi_logger)
 [![Build](https://img.shields.io/github/actions/workflow/status/emabee/flexi_logger/ci_test.yml?branch=master)](https://github.com/emabee/flexi_logger/actions?query=workflow%3ACI)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
 ## Usage
 
@@ -21,12 +22,17 @@ flexi_logger = "0.28"
 log = "0.4"
 ```
 
-To get the log simply written to stderr, add to an early place in your main
+To provide the log specification via env variable `RUST_LOG` and get the log written to stderr,
+add to an early place in your main:
 
 ```rust
-use flexi_logger::Logger;
+flexi_logger::init();
+```
 
-Logger::try_with_str("info, my::critical::module=trace")?.start()?;
+Or, to provide a default log spec programmatically, use
+
+```rust
+flexi_logger::Logger::try_with_env_or_str("info, my::critical::module=trace")?.start()?;
 ```
 
 or, to get the log e.g. written with high performance to a file,
@@ -40,7 +46,7 @@ let _logger = Logger::try_with_str("info, my::critical::module=trace")?
     .start()?;
 ```
 
-There are many configuration options to e.g.
+There are many more configuration options to e.g.
 
 * decide whether you want to write your logs to stdout or to a file,
 * configure the path and the filenames of the log files,

@@ -1,12 +1,13 @@
-#[cfg(feature = "specfile")]
-use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
-
 use crate::{
     primary_writer::PrimaryWriter,
     util::{eprint_err, ErrorCode},
     writers::{FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
     Duplicate, FlexiLoggerError, LogSpecification,
 };
+#[cfg(feature = "specfile")]
+use notify_debouncer_mini::{notify::RecommendedWatcher, Debouncer};
+#[cfg(feature = "specfile")]
+use std::sync::Mutex;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -94,10 +95,19 @@ use std::{
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct LoggerHandle {
+pub struct LoggerHandle
+where
+    Self: Send + Sync,
+    // Note: we demand Send and Sync explicitly because we want to be able to move a
+    // `LoggerHandle` between threads.
+    // At least with notify_debouncer_mini version 0.4.1 this would not be given if we omitted
+    // the Mutex (which we don't need otherwise): we'd then get
+    //     `std::sync::mpsc::Sender<notify_debouncer_mini::InnerEvent>` cannot be shared \
+    //     between threads safely
+{
     pub(crate) writers_handle: WritersHandle,
     #[cfg(feature = "specfile")]
-    pub(crate) ao_specfile_watcher: Option<Arc<Debouncer<RecommendedWatcher>>>,
+    pub(crate) oam_specfile_watcher: Option<Arc<Mutex<Debouncer<RecommendedWatcher>>>>,
 }
 impl LoggerHandle {
     pub(crate) fn new(
@@ -113,7 +123,7 @@ impl LoggerHandle {
                 other_writers,
             },
             #[cfg(feature = "specfile")]
-            ao_specfile_watcher: None,
+            oam_specfile_watcher: None,
         }
     }
 

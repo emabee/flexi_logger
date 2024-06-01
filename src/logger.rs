@@ -1,3 +1,5 @@
+#[cfg(feature = "is-terminal")]
+use crate::formats::AdaptiveFormat;
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
@@ -9,22 +11,19 @@ use crate::{
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
 };
+#[cfg(feature = "is-terminal")]
+use is_terminal::IsTerminal;
 use log::LevelFilter;
+#[cfg(feature = "specfile")]
+use std::sync::Mutex;
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{Arc, RwLock},
     time::Duration,
 };
-
-#[cfg(feature = "is-terminal")]
-use crate::formats::AdaptiveFormat;
-#[cfg(feature = "is-terminal")]
-use is_terminal::IsTerminal;
-
 #[cfg(feature = "specfile_without_notification")]
 use {crate::logger_handle::LogSpecSubscriber, std::io::Read, std::path::Path};
-
 #[cfg(feature = "specfile")]
 use {
     crate::util::{eprint_err, ErrorCode},
@@ -847,10 +846,10 @@ impl Logger {
 
         #[cfg(feature = "specfile")]
         {
-            handle.ao_specfile_watcher = Some(Arc::new(create_specfile_watcher(
+            handle.oam_specfile_watcher = Some(Arc::new(Mutex::new(create_specfile_watcher(
                 specfile,
                 handle.writers_handle.clone(),
-            )?));
+            )?)));
         }
 
         Ok((boxed_log, handle))
@@ -871,7 +870,6 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
 
     let mut debouncer = new_debouncer(
         std::time::Duration::from_millis(1000),
-        None, // <--- goes away with notify-debouncer-mini version 0.4
         move |res: DebounceEventResult| match res {
             Ok(events) => events.iter().for_each(|e| {
                 if e.path
@@ -894,18 +892,11 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
                         .ok();
                 }
             }),
-            Err(errors) => errors.iter().for_each(|e| {
-                eprint_err(
-                    ErrorCode::LogSpecFile,
-                    "error while watching the specfile",
-                    &e,
-                );
-            }),
-            // Err(e) => eprint_err(
-            //     ErrorCode::LogSpecFile,
-            //     "error while watching the specfile",
-            //     &e,
-            // ),
+            Err(e) => eprint_err(
+                ErrorCode::LogSpecFile,
+                "error while watching the specfile",
+                &e,
+            ),
         },
     )
     .unwrap();

@@ -20,7 +20,7 @@ fn work(value: u8) {
         .o_suffix(match value {
             0 => None,
             1 => Some("log".to_string()),
-            COUNT..=std::u8::MAX => {
+            COUNT..=u8::MAX => {
                 unreachable!("got unexpected value {}", value)
             }
         });

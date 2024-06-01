@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![forbid(unsafe_code)]
 //! A flexible and easy-to-use logger that writes logs to stderr and/or to files
 //! or other output streams.
 //!
@@ -77,3 +78,30 @@ pub use crate::write_mode::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
+
+/// Shortest form to get started.
+///
+/// `flexi_logger::init();`.
+///
+/// Equivalent to
+/// ```rust
+/// # use flexi_logger::{Logger,LogSpecification};
+///     Logger::try_with_env_or_str("info")
+///        .unwrap_or_else(|_e| Logger::with(LogSpecification::info()))
+///        .log_to_stderr()
+///        .start()
+///        .ok();
+/// ```
+/// that means,
+///
+/// - you configure the log specification via the environment variable `RUST_LOG`,
+///   or use the default log specification (`'info'`)
+/// - logs are directly written to `stderr`, without any buffering, so implicitly dropping the
+///   `LogHandle` (which is returned from `Logger::start()`) is ok.
+pub fn init() {
+    Logger::try_with_env_or_str("info")
+        .unwrap_or_else(|_e| Logger::with(LogSpecification::info()))
+        .log_to_stderr()
+        .start()
+        .ok();
+}

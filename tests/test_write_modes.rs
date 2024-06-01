@@ -117,7 +117,7 @@ fn work(value: u8) {
                 )
                 .write_mode(WriteMode::BufferDontFlush)
         }
-        COUNT..=std::u8::MAX => {
+        COUNT..=u8::MAX => {
             unreachable!("got unexpected value {}", value)
         }
     };

@@ -6,9 +6,9 @@ use log::Record;
 use std::{cmp::Ordering, num::NonZeroUsize, sync::Mutex};
 
 fn main() {
-    #[cfg(colors)]
+    #[cfg(feature = "colors")]
     let format = flexi_logger::colored_detailed_format;
-    #[cfg(not(colors))]
+    #[cfg(not(feature = "colors"))]
     let format = flexi_logger::detailed_format;
 
     flexi_logger::Logger::try_with_str("info")
