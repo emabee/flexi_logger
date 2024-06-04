@@ -40,6 +40,9 @@ enum NamingState {
     // contains the timestamp of the current output file (read from its name)
     TimestampsDirect(DateTime<Local>),
 
+    // contains the custom timestamp of the current output file (read from its name)
+    TimestampsFormat((DateTime<Local>, &'static str, &'static str)),
+
     // contains the index to which we will rotate
     NumbersRCurrent(u32),
 
@@ -258,6 +261,8 @@ impl State {
                                 &self.config,
                                 None,
                                 !self.config.append,
+                                CURRENT_INFIX,
+                                "",
                             )?),
                             CURRENT_INFIX.to_string(),
                         ),
@@ -265,12 +270,28 @@ impl State {
                             let ts = timestamps::latest_timestamp_file(
                                 &self.config,
                                 !self.config.append,
+                                "",
                             );
                             (
                                 NamingState::TimestampsDirect(ts),
-                                timestamps::ts_infix_from_timestamp(&ts, self.config.use_utc),
+                                timestamps::ts_infix_from_timestamp(&ts, self.config.use_utc, ""),
                             )
                         }
+
+                        Naming::TimestampsFormat((infix, f)) => (
+                            NamingState::TimestampsFormat((
+                                timestamps::rcurrents_creation_date(
+                                    &self.config,
+                                    None,
+                                    !self.config.append,
+                                    infix,
+                                    f,
+                                )?,
+                                infix,
+                                f,
+                            )),
+                            infix.to_string(),
+                        ),
 
                         Naming::Numbers => (
                             NamingState::NumbersRCurrent(numbers::index_for_rcurrent(
@@ -367,6 +388,8 @@ impl State {
                             &self.config,
                             Some(created_at),
                             true,
+                            CURRENT_INFIX,
+                            "",
                         )?;
                         CURRENT_INFIX.to_string()
                     }
@@ -376,7 +399,18 @@ impl State {
                             &self.config.file_spec,
                             self.config.use_utc,
                             ts,
+                            "",
                         )
+                    }
+                    NamingState::TimestampsFormat((ref mut created_at, infix, fm)) => {
+                        *created_at = timestamps::rcurrents_creation_date(
+                            &self.config,
+                            Some(created_at),
+                            true,
+                            infix,
+                            fm,
+                        )?;
+                        infix.to_string()
                     }
                     NamingState::NumbersRCurrent(ref mut idx_state) => {
                         *idx_state =

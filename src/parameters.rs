@@ -100,6 +100,16 @@ pub enum Naming {
     /// `"_r2023-01-27_14-41-08.restart-0001"`.
     TimestampsDirect,
 
+    /// Logs are written to a file with a custom infix and timestamp-infix,
+    /// like `("_myCURRENT", "_%Y-%m-%d")` gives "_myCURRENT" and after rotation `"_2023-01-27"`.
+    /// `("", "_%Y-%m-%d")` would skipped any infix on current file.
+    ///
+    /// File rotation switches over to the next file.
+    ///
+    /// If multiple rotations happen within the same second, extended infixes are used like
+    /// `"_2023-01-27.restart-0001"`.
+    TimestampsFormat((&'static str, &'static str)),
+
     /// Logs are written to a file with infix `_rCURRENT`.
     ///
     /// File rotation renames this file to a name with a number-infix

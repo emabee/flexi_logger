@@ -192,7 +192,7 @@ impl FileSpec {
         self
     }
 
-    // If no decison was done yet, decide now whether to include a timestamp
+    // If no decision was done yet, decide now whether to include a timestamp
     // into the names of the log files.
     pub(crate) fn if_default_use_timestamp(&mut self, use_timestamp: bool) {
         if let TimestampCfg::Default = self.timestamp_cfg {
