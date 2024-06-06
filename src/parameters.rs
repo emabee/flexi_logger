@@ -102,6 +102,24 @@ pub enum Naming {
 
     /// Logs are written to a file with infix `_rCURRENT`.
     ///
+    /// File rotation renames this file to a name with a date-infix
+    /// like `"_r2023-01-27"`, logging continues with a fresh file with infix `_rCURRENT`.
+    ///
+    /// If multiple rotations happen within the same day, extended infixes are used like
+    /// `"_r2023-01-27.restart-0001"`.
+    Dates,
+
+    /// Logs are written to a file with a timestamp-infix,
+    /// like `"_r2023-01-27"`.
+    ///
+    /// File rotation switches over to the next file.
+    ///
+    /// If multiple rotations happen within the same day, extended infixes are used like
+    /// `"_r2023-01-27.restart-0001"`.
+    DatesDirect,
+
+    /// Logs are written to a file with infix `_rCURRENT`.
+    ///
     /// File rotation renames this file to a name with a number-infix
     /// like `"_r00000"`, `"_r00001"`, etc.,
     /// logging continues with a fresh file with infix `_rCURRENT`.

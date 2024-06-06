@@ -1,12 +1,12 @@
 use super::list_and_cleanup::list_of_infix_files;
-use super::{get_creation_date, CURRENT_INFIX};
+use super::{get_creation_date, get_creation_timestamp, CURRENT_INFIX};
 use crate::{writers::FileLogWriterConfig, FileSpec};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, TimeZone};
 use std::path::Path;
 use std::{ops::Add, path::PathBuf};
 
 const TS_INFIX_FORMAT: &str = "_r%Y-%m-%d_%H-%M-%S";
-pub(super) fn ts_infix_from_timestamp(ts: &DateTime<Local>, use_utc: bool) -> String {
+pub(super) fn infix_from_timestamp(ts: &DateTime<Local>, use_utc: bool) -> String {
     if use_utc {
         ts.naive_utc().format(TS_INFIX_FORMAT)
     } else {
@@ -14,6 +14,12 @@ pub(super) fn ts_infix_from_timestamp(ts: &DateTime<Local>, use_utc: bool) -> St
     }
     .to_string()
 }
+
+const DATE_INFIX_FORMAT: &str = "_r%Y-%m-%d";
+pub(super) fn infix_from_date(date: NaiveDate) -> String {
+    date.format(DATE_INFIX_FORMAT).to_string()
+}
+
 fn ts_infix_from_path(path: &Path, file_spec: &FileSpec) -> String {
     let idx = file_spec
         .as_pathbuf(Some("_rXXXXX"))
@@ -28,7 +34,7 @@ fn timestamp_from_ts_infix(infix: &str) -> Option<DateTime<Local>> {
         .and_then(|ts| Local.from_local_datetime(&ts).single())
 }
 
-pub(super) fn rcurrents_creation_date(
+pub(super) fn rcurrents_creation_timestamp(
     config: &FileLogWriterConfig,
     o_date_for_rotated_file: Option<&DateTime<Local>>,
     rotate_rcurrent: bool,
@@ -38,9 +44,38 @@ pub(super) fn rcurrents_creation_date(
     if rotate_rcurrent {
         let date_for_rotated_file = o_date_for_rotated_file
             .copied()
+            .unwrap_or_else(|| get_creation_timestamp(&current_path));
+        let rotated_path = path_for_rotated_file_from_timestamp(
+            &config.file_spec,
+            config.use_utc,
+            &date_for_rotated_file,
+        );
+
+        match std::fs::rename(current_path.clone(), rotated_path.clone()) {
+            Ok(()) => {}
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    return Err(e);
+                }
+            }
+        }
+    }
+    Ok(get_creation_timestamp(&current_path))
+}
+
+pub(super) fn rcurrents_creation_date(
+    config: &FileLogWriterConfig,
+    o_date_for_rotated_file: Option<&NaiveDate>,
+    rotate_rcurrent: bool,
+) -> Result<NaiveDate, std::io::Error> {
+    let current_path = config.file_spec.as_pathbuf(Some(CURRENT_INFIX));
+
+    if rotate_rcurrent {
+        let date_for_rotated_file = o_date_for_rotated_file
+            .copied()
             .unwrap_or_else(|| get_creation_date(&current_path));
         let rotated_path =
-            path_for_rotated_file(&config.file_spec, config.use_utc, &date_for_rotated_file);
+            path_for_rotated_file_from_date(&config.file_spec, date_for_rotated_file);
 
         match std::fs::rename(current_path.clone(), rotated_path.clone()) {
             Ok(()) => {}
@@ -73,24 +108,33 @@ pub(super) fn latest_timestamp_file(config: &FileLogWriterConfig, rotate: bool) 
     }
 }
 
-fn path_for_rotated_file(
+fn path_for_rotated_file_from_date(
+    file_spec: &FileSpec,
+    date_for_rotated_file: NaiveDate,
+) -> PathBuf {
+    let infix =
+        collision_free_infix_for_rotated_file(file_spec, &infix_from_date(date_for_rotated_file));
+    file_spec.as_pathbuf(Some(&infix))
+}
+
+fn path_for_rotated_file_from_timestamp(
     file_spec: &FileSpec,
     use_utc: bool,
-    date_for_rotated_file: &DateTime<Local>,
+    timestamp_for_rotated_file: &DateTime<Local>,
 ) -> PathBuf {
-    let infix = collision_free_infix_for_rotated_file(file_spec, use_utc, date_for_rotated_file);
+    let infix = collision_free_infix_for_rotated_file(
+        file_spec,
+        &infix_from_timestamp(timestamp_for_rotated_file, use_utc),
+    );
     file_spec.as_pathbuf(Some(&infix))
 }
 
 // handles collisions by appending ".restart-<number>" to the infix, if necessary
 pub(super) fn collision_free_infix_for_rotated_file(
     file_spec: &FileSpec,
-    use_utc: bool,
-    date_for_rotated_file: &DateTime<Local>,
+    infix_date_string: &str,
 ) -> String {
-    let infix_date_string = ts_infix_from_timestamp(date_for_rotated_file, use_utc);
-
-    let mut new_path = file_spec.as_pathbuf(Some(&infix_date_string));
+    let mut new_path = file_spec.as_pathbuf(Some(infix_date_string));
     let mut new_path_with_gz = new_path.clone();
     match new_path.extension() {
         Some(oss) => {
@@ -136,10 +180,10 @@ pub(super) fn collision_free_infix_for_rotated_file(
         };
 
         infix_date_string
-            .clone()
+            .to_string()
             .add(&format!(".restart-{next_number:04}"))
     } else {
-        infix_date_string
+        infix_date_string.to_string()
     }
 }
 
@@ -170,7 +214,7 @@ mod test {
             .unwrap();
         let paths: Vec<PathBuf> = (0..10)
             .map(|i| now - Duration::try_seconds(i).unwrap())
-            .map(|ts| file_spec.as_pathbuf(Some(&super::ts_infix_from_timestamp(&ts, false))))
+            .map(|ts| file_spec.as_pathbuf(Some(&super::infix_from_timestamp(&ts, false))))
             .collect();
 
         assert_eq!(
