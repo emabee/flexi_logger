@@ -26,10 +26,14 @@ pub enum Criterion {
     /// `flexi_logger` uses on Windows, and on all other platforms where the creation date
     /// of a file is not available (like on Unix), the last modification date
     /// (or, if this is also not available, the current time stamp)
-    /// as the created_at-info of an rCURRENT file that already exists, and the
-    /// current timestamp when file rotation happens during further execution.
+    /// as the created_at-info of an rCURRENT file that already exists when the program is started,
+    /// and the current timestamp when file rotation happens during further execution.
     /// Consequently, a left-over rCURRENT file from a previous program run will look newer
     /// than it is, and will be used longer than it should be.
+    ///
+    /// #### Issue on Linux
+    ///
+    /// Linux does not maintain a created-at property for files, only a last-changed-at property.
     ///
     /// #### Issue on Windows
     ///
@@ -39,7 +43,7 @@ pub enum Criterion {
     ///
     /// If the file property were used by `flexi_logger`,
     /// the rCURRENT file would always appear to be as old as the
-    /// first one that ever was created - rotation by time would completely fail.
+    /// first one that ever was created - rotation by time would fail completely.
     ///
     /// <a name="ref-1">\[1\]</a> [https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to](https://superuser.com/questions/966490/windows-7-what-is-date-created-file-property-referring-to).
     ///
@@ -82,43 +86,84 @@ pub enum Age {
 /// Used in [`Logger::rotate`](crate::Logger::rotate).
 #[derive(Copy, Clone, Debug)]
 pub enum Naming {
-    /// Logs are written to a file with infix `_rCURRENT`.
+    /// Logs are written to a file with infix `rCURRENT`.
     ///
     /// File rotation renames this file to a name with a timestamp-infix
-    /// like `"_r2023-01-27_14-41-08"`, logging continues with a fresh file with infix `_rCURRENT`.
+    /// like `"r2023-01-27_14-41-08"`, logging continues with a fresh file with infix `rCURRENT`.
     ///
     /// If multiple rotations happen within the same second, extended infixes are used like
-    /// `"_r2023-01-27_14-41-08.restart-0001"`.
+    /// `"r2023-01-27_14-41-08.restart-0001"`.
+    ///
+    /// Same as
+    /// ```rust
+    /// # use flexi_logger::Naming;
+    /// # let dummy =
+    /// Naming::TimestampsCustomFormat {
+    ///    current_infix: Some("rCURRENT"),
+    ///     format: "r%Y-%m-%d_%H-%M-%S",
+    /// }
+    /// # ;
+    /// ```
     Timestamps,
 
-    /// Logs are written to a file with a timestamp-infix,
-    /// like `"_r2023-01-27_14-41-08"`.
+    /// Logs are written to a file with a timestamp-infix, like `"r2023-01-27_14-41-08"`.
     ///
     /// File rotation switches over to the next file.
     ///
     /// If multiple rotations happen within the same second, extended infixes are used like
-    /// `"_r2023-01-27_14-41-08.restart-0001"`.
+    /// `"r2023-01-27_14-41-08.restart-0001"`.
+    ///
+    /// Same as
+    /// ```rust
+    /// # use flexi_logger::Naming;
+    /// # let dummy =
+    /// Naming::TimestampsCustomFormat {
+    ///    current_infix: None,
+    ///     format: "r%Y-%m-%d_%H-%M-%S",
+    /// }
+    /// # ;
+    /// ```
     TimestampsDirect,
 
-    /// Logs are written to a file with a custom infix and timestamp-infix,
-    /// like `("_myCURRENT", "_%Y-%m-%d")` gives "_myCURRENT" and after rotation `"_2023-01-27"`.
-    /// `("", "_%Y-%m-%d")` would skipped any infix on current file.
-    ///
-    /// File rotation switches over to the next file.
-    ///
-    /// If multiple rotations happen within the same second, extended infixes are used like
-    /// `"_2023-01-27.restart-0001"`.
-    TimestampsFormat((&'static str, &'static str)),
+    /// Defines the infixes for the file to which the logs are written, and for the rotated files.
+    TimestampsCustomFormat {
+        /// Controls if a special infix is used for the file to which the logs are currently
+        /// written.
+        ///
+        /// If `Some(infix)` is given, then it is taken as static infix for the file
+        /// to which the logs are written.
+        /// File rotation renames this file to a file with a timestamp infix.
+        /// If this file already exists, an extended infix is used like
+        /// `"2024-06-09.restart-0001"`.
+        ///
+        /// If `None` is given, then the logs will be directly written to a file with timestamp infix.
+        /// File rotation only switches over to a new file with a fresh timestamp infix.
+        /// If this file already exists, e.g. because rotation is triggered more frequently
+        /// than the timestamp varies (according to the pattern), then an extended infix is used like
+        /// `"2024-06-09.restart-0001"`.
+        current_infix: Option<&'static str>,
+        /// The format of the timestamp infix.
+        ///
+        /// See <https://docs.rs/chrono/latest/chrono/format/strftime/index.html> for a list of
+        /// supported specifiers.
+        ///
+        /// Examples:
+        ///
+        /// `"%Y-%m-%d"` produces timestamp infixes like `"2024-06-09"`.
+        ///
+        /// `"%Y-%m-%d_%H:%M:%S"` produces timestamp infixes like `"2024-06-09_13:24:35"`.
+        format: &'static str,
+    },
 
-    /// Logs are written to a file with infix `_rCURRENT`.
+    /// Logs are written to a file with infix `rCURRENT`.
     ///
     /// File rotation renames this file to a name with a number-infix
-    /// like `"_r00000"`, `"_r00001"`, etc.,
-    /// logging continues with a fresh file with infix `_rCURRENT`.
+    /// like `"r00000"`, `"r00001"`, etc.,
+    /// logging continues with a fresh file with infix `rCURRENT`.
     Numbers,
 
     /// Logs are written to a file with a number-infix,
-    /// like `"_r00000"`, `"_r00001"`, etc.
+    /// like `"r00000"`, `"r00001"`, etc.
     ///
     /// File rotation switches over to the next file.
     NumbersDirect,
