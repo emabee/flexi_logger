@@ -12,10 +12,11 @@ use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming}
 use glob::glob;
 use log::*;
 
-const COUNT: u8 = 8;
+const COUNT: u8 = 9;
 
 #[test]
 fn test_rotate_naming_variants() {
+    // work(6)
     if let Some(value) = test_utils::dispatch(COUNT) {
         work(value)
     }
@@ -36,8 +37,15 @@ fn work(value: u8) {
 
         4 => test_variant(Naming::Timestamps, Criterion::Age(Age::Second)),
         5 => test_variant(Naming::TimestampsDirect, Criterion::Age(Age::Second)),
-        6 => test_variant(Naming::Numbers, Criterion::Age(Age::Second)),
-        7 => test_variant(Naming::NumbersDirect, Criterion::Age(Age::Second)),
+        6 => test_variant(
+            Naming::TimestampsCustomFormat {
+                current_infix: Some("myCURRENT"),
+                format: "%Y-%m-%d",
+            },
+            Criterion::Age(Age::Second),
+        ),
+        7 => test_variant(Naming::Numbers, Criterion::Age(Age::Second)),
+        8 => test_variant(Naming::NumbersDirect, Criterion::Age(Age::Second)),
         COUNT..=u8::MAX => unreachable!("asAS"),
     }
 }
@@ -58,7 +66,7 @@ fn test_variant(naming: Naming, criterion: Criterion) {
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
     info!(
-        "test correct rotation by {}",
+        "test correct rotation by {} with Naming::{naming:?} ",
         match criterion {
             Criterion::Age(_) => "age",
             Criterion::AgeOrSize(_, _) => "age or size",

@@ -16,6 +16,10 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use timestamps::{
+    collision_free_infix_for_rotated_file, infix_from_timestamp, latest_timestamp_file,
+    rcurrents_creation_timestamp,
+};
 
 #[cfg(feature = "async")]
 const ASYNC_FLUSHER: &str = "flexi_logger-fs-async_flusher";
@@ -34,11 +38,10 @@ const CURRENT_INFIX: &str = "_rCURRENT";
 
 #[derive(Debug)]
 enum NamingState {
-    // contains the timestamp to which we will rotate
-    TimestampsRCurrent(DateTime<Local>),
-
-    // contains the timestamp of the current output file (read from its name)
-    TimestampsDirect(DateTime<Local>),
+    // Contains the timestamp of the current output file (read from its name),
+    // plus the optional current infix (_with_ underscore),
+    // and the format of the timestamp infix (_with_ underscore)
+    Timestamps(DateTime<Local>, Option<String>, InfixFormat),
 
     // contains the index to which we will rotate
     NumbersRCurrent(u32),
@@ -50,8 +53,28 @@ impl NamingState {
     pub(crate) fn writes_direct(&self) -> bool {
         matches!(
             self,
-            NamingState::NumbersDirect(_) | NamingState::TimestampsDirect(_)
+            NamingState::NumbersDirect(_) | NamingState::Timestamps(_, None, _)
         )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) enum InfixFormat {
+    Std,
+    Custom(String),
+}
+impl InfixFormat {
+    const STD_INFIX_FORMAT: &'static str = "_r%Y-%m-%d_%H-%M-%S";
+    pub(super) fn custom(f: &str) -> Self {
+        let mut fmt = "_".to_string();
+        fmt.push_str(f);
+        Self::Custom(fmt)
+    }
+    fn format(&self) -> &str {
+        match self {
+            Self::Std => Self::STD_INFIX_FORMAT,
+            Self::Custom(fmt) => fmt,
+        }
     }
 }
 
@@ -79,7 +102,7 @@ impl RollState {
         } else {
             0
         };
-        let created_at = get_creation_date(path);
+        let created_at = get_creation_timestamp(path);
 
         Ok(match criterion {
             Criterion::Age(age) => RollState::Age { age, created_at },
@@ -160,7 +183,7 @@ impl RollState {
                 *current_size = 0;
             }
             RollState::Age { age: _, created_at } => {
-                *created_at = get_creation_date(path);
+                *created_at = get_creation_timestamp(path);
             }
             RollState::AgeOrSize {
                 age: _,
@@ -168,7 +191,7 @@ impl RollState {
                 max_size: _,
                 current_size,
             } => {
-                *created_at = get_creation_date(path);
+                *created_at = get_creation_timestamp(path);
                 *current_size = 0;
             }
         }
@@ -244,94 +267,128 @@ impl State {
 
     fn initialize(&mut self) -> Result<(), std::io::Error> {
         if let Inner::Initial(o_rotation_config, cleanup_in_background_thread) = &self.inner {
-            match o_rotation_config {
+            self.inner = match o_rotation_config {
                 None => {
                     // no rotation
                     let (write, path) = open_log_file(&self.config, None)?;
-                    self.inner = Inner::Active(None, write, path);
+                    Inner::Active(None, write, path)
                 }
                 Some(rotate_config) => {
-                    // get NamingState and the infix for the current output file
-                    let (naming_state, infix) = match rotate_config.naming {
-                        Naming::Timestamps => (
-                            NamingState::TimestampsRCurrent(timestamps::rcurrents_creation_date(
-                                &self.config,
-                                None,
-                                !self.config.append,
-                            )?),
-                            CURRENT_INFIX.to_string(),
-                        ),
-                        Naming::TimestampsDirect => {
-                            let ts = timestamps::latest_timestamp_file(
-                                &self.config,
-                                !self.config.append,
-                            );
-                            (
-                                NamingState::TimestampsDirect(ts),
-                                timestamps::ts_infix_from_timestamp(&ts, self.config.use_utc),
-                            )
-                        }
-
-                        Naming::Numbers => (
-                            NamingState::NumbersRCurrent(numbers::index_for_rcurrent(
-                                &self.config,
-                                None,
-                                !self.config.append,
-                            )?),
-                            CURRENT_INFIX.to_string(),
-                        ),
-                        Naming::NumbersDirect => {
-                            let idx = match numbers::get_highest_index(&self.config.file_spec) {
-                                None => 0,
-                                Some(idx) => {
-                                    if self.config.append {
-                                        idx
-                                    } else {
-                                        idx + 1
-                                    }
-                                }
-                            };
-                            (NamingState::NumbersDirect(idx), numbers::number_infix(idx))
-                        }
-                    };
-                    let (write, path) = open_log_file(&self.config, Some(&infix))?;
-
-                    let roll_state =
-                        RollState::new(rotate_config.criterion, self.config.append, &path)?;
-
-                    let o_cleanup_thread_handle = if rotate_config.cleanup.do_cleanup() {
-                        list_and_cleanup::remove_or_compress_too_old_logfiles(
-                            &None,
-                            &rotate_config.cleanup,
-                            &self.config.file_spec,
-                            rotate_config.naming.writes_direct(),
-                        )?;
-                        if *cleanup_in_background_thread {
-                            Some(list_and_cleanup::start_cleanup_thread(
-                                rotate_config.cleanup,
-                                self.config.file_spec.clone(),
-                                rotate_config.naming.writes_direct(),
-                            )?)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-                    self.inner = Inner::Active(
-                        Some(RotationState {
-                            naming_state,
-                            roll_state,
-                            cleanup: rotate_config.cleanup,
-                            o_cleanup_thread_handle,
-                        }),
-                        write,
-                        path,
-                    );
+                    self.initialize_with_rotation(rotate_config, *cleanup_in_background_thread)?
                 }
-            }
+            };
         }
         Ok(())
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn initialize_with_rotation(
+        &self,
+        rotate_config: &RotationConfig,
+        cleanup_in_background_thread: bool,
+    ) -> Result<Inner, std::io::Error> {
+        let (naming_state, infix) = match rotate_config.naming {
+            Naming::TimestampsDirect => {
+                let ts =
+                    latest_timestamp_file(&self.config, !self.config.append, &InfixFormat::Std);
+                (
+                    NamingState::Timestamps(ts, None, InfixFormat::Std),
+                    infix_from_timestamp(&ts, self.config.use_utc, &InfixFormat::Std),
+                )
+            }
+            Naming::Timestamps => (
+                NamingState::Timestamps(
+                    rcurrents_creation_timestamp(
+                        &self.config,
+                        CURRENT_INFIX,
+                        !self.config.append,
+                        None,
+                        &InfixFormat::Std,
+                    )?,
+                    Some(CURRENT_INFIX.to_string()),
+                    InfixFormat::Std,
+                ),
+                CURRENT_INFIX.to_string(),
+            ),
+            Naming::TimestampsCustomFormat {
+                current_infix: o_current_token,
+                format: ts_fmt,
+            } => {
+                if let Some(current_token) = o_current_token {
+                    let current_infix = prepend_underscore(current_token);
+                    let naming_state = NamingState::Timestamps(
+                        rcurrents_creation_timestamp(
+                            &self.config,
+                            &current_infix,
+                            !self.config.append,
+                            None,
+                            &InfixFormat::custom(ts_fmt),
+                        )?,
+                        Some(current_infix.clone()),
+                        InfixFormat::custom(ts_fmt),
+                    );
+                    (naming_state, current_infix)
+                } else {
+                    let fmt = InfixFormat::custom(ts_fmt);
+                    let ts = latest_timestamp_file(&self.config, !self.config.append, &fmt);
+                    let naming_state = NamingState::Timestamps(ts, None, fmt.clone());
+                    let infix = infix_from_timestamp(&ts, self.config.use_utc, &fmt);
+                    (naming_state, infix)
+                }
+            }
+            Naming::Numbers => (
+                NamingState::NumbersRCurrent(numbers::index_for_rcurrent(
+                    &self.config,
+                    None,
+                    !self.config.append,
+                )?),
+                CURRENT_INFIX.to_string(),
+            ),
+            Naming::NumbersDirect => {
+                let idx = match numbers::get_highest_index(&self.config.file_spec) {
+                    None => 0,
+                    Some(idx) => {
+                        if self.config.append {
+                            idx
+                        } else {
+                            idx + 1
+                        }
+                    }
+                };
+                (NamingState::NumbersDirect(idx), numbers::number_infix(idx))
+            }
+        };
+        let (write, path) = open_log_file(&self.config, Some(&infix))?;
+        let roll_state = RollState::new(rotate_config.criterion, self.config.append, &path)?;
+        let o_cleanup_thread_handle = if rotate_config.cleanup.do_cleanup() {
+            list_and_cleanup::remove_or_compress_too_old_logfiles(
+                &None,
+                &rotate_config.cleanup,
+                &self.config.file_spec,
+                rotate_config.naming.writes_direct(),
+            )?;
+            if cleanup_in_background_thread {
+                Some(list_and_cleanup::start_cleanup_thread(
+                    rotate_config.cleanup,
+                    self.config.file_spec.clone(),
+                    rotate_config.naming.writes_direct(),
+                )?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Ok(Inner::Active(
+            Some(RotationState {
+                naming_state,
+                roll_state,
+                cleanup: rotate_config.cleanup,
+                o_cleanup_thread_handle,
+            }),
+            write,
+            path,
+        ))
     }
 
     pub fn config(&self) -> &FileLogWriterConfig {
@@ -346,9 +403,6 @@ impl State {
         }
     }
 
-    // With rotation, the logger always writes into a file with infix `_rCURRENT`.
-    // On overflow, an existing `_rCURRENT` file is renamed to the next numbered file,
-    // before writing into `_rCURRENT` goes on.
     #[inline]
     pub(super) fn mount_next_linewriter_if_necessary(
         &mut self,
@@ -362,21 +416,30 @@ impl State {
         {
             if force || rotation_state.roll_state.rotation_necessary() {
                 let infix = match rotation_state.naming_state {
-                    NamingState::TimestampsRCurrent(ref mut created_at) => {
-                        *created_at = timestamps::rcurrents_creation_date(
-                            &self.config,
-                            Some(created_at),
-                            true,
-                        )?;
-                        CURRENT_INFIX.to_string()
-                    }
-                    NamingState::TimestampsDirect(ref mut ts) => {
-                        *ts = Local::now();
-                        timestamps::collision_free_infix_for_rotated_file(
-                            &self.config.file_spec,
-                            self.config.use_utc,
-                            ts,
-                        )
+                    NamingState::Timestamps(ref mut ts, ref o_current_infix, ref fmt) => {
+                        match o_current_infix {
+                            Some(current_infix) => {
+                                *ts = rcurrents_creation_timestamp(
+                                    &self.config,
+                                    current_infix,
+                                    true,
+                                    Some(ts),
+                                    fmt,
+                                )?;
+                                current_infix.clone()
+                            }
+                            None => {
+                                *ts = Local::now();
+                                collision_free_infix_for_rotated_file(
+                                    &self.config.file_spec,
+                                    &infix_from_timestamp(
+                                        ts,
+                                        self.config.use_utc,
+                                        &InfixFormat::Std,
+                                    ),
+                                )
+                            }
+                        }
                     }
                     NamingState::NumbersRCurrent(ref mut idx_state) => {
                         *idx_state =
@@ -483,6 +546,12 @@ impl State {
     }
 }
 
+fn prepend_underscore(infix: &str) -> String {
+    let mut infix_with_underscore = "_".to_string();
+    infix_with_underscore.push_str(infix);
+    infix_with_underscore
+}
+
 fn validate_logs_in_file(
     reader: &mut dyn BufRead,
     path: &Path,
@@ -559,28 +628,27 @@ fn open_log_file(
     Ok((w, path))
 }
 
-// See documentation of Criterion::Age.
-fn get_creation_date(path: &Path) -> DateTime<Local> {
+fn get_creation_timestamp(path: &Path) -> DateTime<Local> {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     if cfg!(target_os = "windows") {
-        get_current_date()
+        get_current_timestamp()
     } else {
         // On all others of the many platforms, we give the real creation date a try,
         // and fall back if it is not available.
-        try_get_creation_date(path)
-            .or_else(|_| try_get_modification_date(path))
-            .unwrap_or_else(|_| get_current_date())
+        try_get_creation_timestamp(path)
+            .or_else(|_| try_get_modification_timestamp(path))
+            .unwrap_or_else(|_| get_current_timestamp())
     }
 }
-fn try_get_creation_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
+fn try_get_creation_timestamp(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     Ok(std::fs::metadata(path)?.created()?.into())
 }
-fn try_get_modification_date(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
+fn try_get_modification_timestamp(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
     let md = std::fs::metadata(path)?;
     let d = md.created().or_else(|_| md.modified())?;
     Ok(d.into())
 }
-fn get_current_date() -> DateTime<Local> {
+fn get_current_timestamp() -> DateTime<Local> {
     Local::now()
 }
 
