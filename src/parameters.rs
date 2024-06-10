@@ -147,11 +147,13 @@ pub enum Naming {
         /// See <https://docs.rs/chrono/latest/chrono/format/strftime/index.html> for a list of
         /// supported specifiers.
         ///
+        /// Make sure you use a format that is compatible to your file system(s).
+        ///
         /// Examples:
         ///
         /// `"%Y-%m-%d"` produces timestamp infixes like `"2024-06-09"`.
         ///
-        /// `"%Y-%m-%d_%H:%M:%S"` produces timestamp infixes like `"2024-06-09_13:24:35"`.
+        /// `"%Y-%m-%d_%H-%M-%S"` produces timestamp infixes like `"2024-06-09_13-24-35"`.
         format: &'static str,
     },
 

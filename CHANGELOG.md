@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.28.2] - 2024-06-01
+## [0.28.3] - 2024-06-10
+
+Add special handling for empty current infix to `Naming::TimestampsCustomFormat`
+([issue #161](https://github.com/emabee/flexi_logger/issues/161)).
+
+## [0.28.2] - 2024-06-09
 
 Add variant `Naming::TimestampsCustomFormat`, kudos to [jb-alvarado](https://github.com/jb-alvarado).
 
@@ -44,12 +49,13 @@ Fix [issue #152](https://github.com/emabee/flexi_logger/issues/152).
 
 ## [0.27.2] - 2023-09-27
 
-Fix wrong timestamp handling for the second rotation (second part of issue #150).
+Fix wrong timestamp handling for the second rotation (second part of
+[issue #150](https://github.com/emabee/flexi_logger/issues/150)).
 
 ## [0.27.1] - 2023-09-27
 
 Fix issues with sub-second rotations and with cleanup when all logfiles should be compressed
-(issue #150).
+([issue #150](https://github.com/emabee/flexi_logger/issues/150)).
 
 ## [0.27.0] - 2023-09-20
 
@@ -62,15 +68,15 @@ Extend impact of `LoggerHande::trigger_rotation()` to all configured writers.
 ## [0.26.1] - 2023-09-19
 
 Introduce new naming variants that work without `_rCURRENT` files: `Naming::TimestampsDirect`
-and `Naming::NumbersDirect` (fixes #127).
+and `Naming::NumbersDirect` (delivers #127).
 
 Improve documentation of filename handling.
 
-Introduce `LoggerHandle.trigger_rotation()` (fixes #147).
+Introduce `LoggerHandle.trigger_rotation()` (delivers #147).
 
 ## [0.26.0] - 2023-08-30
 
-Re-open output also for other writers (fixes #143).
+Re-open output also for other writers (delivers #143).
 
 Rename method to re-open output from LoggerHandle (leads to version bump).
 

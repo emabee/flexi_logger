@@ -12,7 +12,7 @@ use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming}
 use glob::glob;
 use log::*;
 
-const COUNT: u8 = 9;
+const COUNT: u8 = 10;
 
 #[test]
 fn test_rotate_naming_variants() {
@@ -44,9 +44,16 @@ fn work(value: u8) {
             },
             Criterion::Age(Age::Second),
         ),
-        7 => test_variant(Naming::Numbers, Criterion::Age(Age::Second)),
-        8 => test_variant(Naming::NumbersDirect, Criterion::Age(Age::Second)),
-        COUNT..=u8::MAX => unreachable!("asAS"),
+        7 => test_variant(
+            Naming::TimestampsCustomFormat {
+                current_infix: Some(""),
+                format: "%Y-%m-%d_%H-%M-%S",
+            },
+            Criterion::Age(Age::Second),
+        ),
+        8 => test_variant(Naming::Numbers, Criterion::Age(Age::Second)),
+        9 => test_variant(Naming::NumbersDirect, Criterion::Age(Age::Second)),
+        COUNT..=u8::MAX => unreachable!("Wrong dispatch"),
     }
 }
 

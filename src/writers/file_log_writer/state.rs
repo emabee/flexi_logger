@@ -547,9 +547,13 @@ impl State {
 }
 
 fn prepend_underscore(infix: &str) -> String {
-    let mut infix_with_underscore = "_".to_string();
-    infix_with_underscore.push_str(infix);
-    infix_with_underscore
+    if infix.is_empty() {
+        infix.to_string()
+    } else {
+        let mut infix_with_underscore = "_".to_string();
+        infix_with_underscore.push_str(infix);
+        infix_with_underscore
+    }
 }
 
 fn validate_logs_in_file(
