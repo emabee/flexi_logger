@@ -157,7 +157,11 @@ impl FileLogWriter {
 impl LogWriter for FileLogWriter {
     #[inline]
     fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
-        self.state_handle.write(now, record)
+        if record.level() <= self.max_log_level {
+            self.state_handle.write(now, record)
+        } else {
+            Ok(())
+        }
     }
 
     #[inline]
@@ -529,6 +533,49 @@ mod test {
                 .write_mode(WriteMode::Direct),
             )
             .is_err());
+    }
+
+    #[test]
+    fn test_max_log_level() {
+        let spec = FileSpec::default()
+            .directory(DIRECTORY)
+            .discriminant("test_max_log_level-1")
+            .suppress_basename()
+            .suppress_timestamp();
+        let flw = super::FileLogWriter::builder(spec.clone())
+            .max_level(log::LevelFilter::Warn)
+            .write_mode(WriteMode::Direct)
+            .try_build()
+            .unwrap();
+
+        let write_msg = |level, msg| {
+            flw.write(
+                &mut DeferredNow::new(),
+                &log::Record::builder()
+                    .args(format_args!("{}", msg))
+                    .level(level)
+                    .target("test_max_log_level")
+                    .file(Some("server.rs"))
+                    .line(Some(144))
+                    .module_path(Some("server"))
+                    .build(),
+            )
+            .unwrap();
+        };
+
+        write_msg(log::Level::Trace, "trace message");
+        write_msg(log::Level::Debug, "debug message");
+        write_msg(log::Level::Info, "info message");
+        write_msg(log::Level::Warn, "warn message");
+        write_msg(log::Level::Error, "error message");
+
+        let log_contents = std::fs::read_to_string(spec.as_pathbuf(None)).unwrap();
+
+        assert!(!log_contents.contains("trace message"));
+        assert!(!log_contents.contains("debug message"));
+        assert!(!log_contents.contains("info message"));
+        assert!(log_contents.contains("warn message"));
+        assert!(log_contents.contains("error message"));
     }
 
     fn remove(s: &str, discr: &str) {
