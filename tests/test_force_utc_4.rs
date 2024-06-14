@@ -32,11 +32,11 @@ fn test_force_utc_4() {
         s[12..27].parse::<NaiveTime>().unwrap(),
     );
 
-    if now.offset().utc_minus_local() > 100 || now.offset().utc_minus_local() < -100 {
+    if now.offset().utc_minus_local().abs() > 100 {
         // local TZ is different from UTC -> verify that UTC was written to the file
         let now_local = now.naive_local();
         let diff = (now_local - d).num_seconds();
         println!("d: {d}, now_local: {now_local}, diff: {diff}");
-        assert!(diff >= 10);
+        assert!(diff.abs() >= 10);
     }
 }

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.4] - 2024-06-14
+
+Fix [issue #162](https://github.com/emabee/flexi_logger/issues/162)
+(FileLogWriter does not follow its max_level), kudos to [JoeWildfong](https://github.com/JoeWildfong).
+
 ## [0.28.3] - 2024-06-10
 
 Add special handling for empty current infix to `Naming::TimestampsCustomFormat`
@@ -12,7 +17,8 @@ Add special handling for empty current infix to `Naming::TimestampsCustomFormat`
 
 ## [0.28.2] - 2024-06-09
 
-Add variant `Naming::TimestampsCustomFormat`, kudos to [jb-alvarado](https://github.com/jb-alvarado).
+Add variant `Naming::TimestampsCustomFormat` ([issue #158](https://github.com/emabee/flexi_logger/issues/158)),
+kudos to [jb-alvarado](https://github.com/jb-alvarado).
 
 ## [0.28.1] - 2024-06-01
 
