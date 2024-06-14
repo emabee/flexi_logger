@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.4] - 2024-06-13
+
+Fix issue #162 (FileLogWriter does not follow its max_level).
+Kudos to [JoeWildfong](https://github.com/JoeWildfong).
+
 ## [0.28.3] - 2024-06-10
 
 Add special handling for empty current infix to `Naming::TimestampsCustomFormat`
