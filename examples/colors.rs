@@ -4,7 +4,7 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
-        use is_terminal::IsTerminal;
+        use std::io::IsTerminal;
         use nu_ansi_term::Color;
 
         for i in 0..=255 {

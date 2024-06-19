@@ -9,7 +9,7 @@ fn main() {
 
     //     #[cfg(feature = "colors")]
     //     {
-    //         use is_terminal::IsTerminal;;
+    //         use std::io::IsTerminal;;
 
     //         colored::control::set_override(true);
 

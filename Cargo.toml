@@ -30,7 +30,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["colors", "textfilter"]
 async = ["dep:crossbeam-channel", "dep:crossbeam-queue"]
-colors = ["dep:nu-ansi-term", "is-terminal"]
+colors = ["dep:nu-ansi-term"]
 compress = ["dep:flate2"]
 dont_minimize_extra_stacks = []
 json = ["dep:serde_json", "dep:serde", "dep:serde_derive"]
@@ -42,7 +42,6 @@ textfilter = ["dep:regex"]
 trc = ["async", "specfile", "dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
-is-terminal = { version = "0.4", optional = true }
 nu-ansi-term = { version = "0.50", optional = true }
 chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 crossbeam-channel = { version = "0.5", optional = true }

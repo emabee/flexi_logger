@@ -55,7 +55,6 @@ fn main() {
     run_command!("cargo build");
     run_command!("cargo build --no-default-features");
     #[rustfmt::skip]
-    run_command!("cargo build --no-default-features --features=is-terminal");
     run_command!("cargo build --all-features");
     run_command!("cargo build --release");
     run_command!("cargo build --release --all-features");

@@ -1,4 +1,3 @@
-#[cfg(feature = "is-terminal")]
 use crate::formats::AdaptiveFormat;
 use crate::{
     filter::LogLineFilter,
@@ -11,8 +10,8 @@ use crate::{
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
 };
-#[cfg(feature = "is-terminal")]
-use is_terminal::IsTerminal;
+
+use std::io::IsTerminal;
 use log::LevelFilter;
 #[cfg(feature = "specfile")]
 use std::sync::Mutex;
@@ -136,19 +135,11 @@ impl Logger {
 
             #[cfg(feature = "colors")]
             format_for_stdout: AdaptiveFormat::Default.format_function(
-                if cfg!(feature = "is-terminal") {
                     std::io::stdout().is_terminal()
-                } else {
-                    false
-                },
             ),
             #[cfg(feature = "colors")]
             format_for_stderr: AdaptiveFormat::Default.format_function(
-                if cfg!(feature = "is-terminal") {
                     std::io::stderr().is_terminal()
-                } else {
-                    false
-                },
             ),
 
             #[cfg(not(feature = "colors"))]
@@ -311,8 +302,6 @@ impl Logger {
     /// Coloring is used if `stderr` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
-    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stderr = adaptive_format.format_function(std::io::stderr().is_terminal());
@@ -333,8 +322,6 @@ impl Logger {
     /// Coloring is used if `stdout` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
-    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stdout = adaptive_format.format_function(std::io::stdout().is_terminal());
