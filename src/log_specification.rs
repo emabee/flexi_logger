@@ -462,6 +462,19 @@ impl std::convert::TryFrom<&String> for LogSpecification {
     }
 }
 
+impl From<LevelFilter> for LogSpecification {
+    fn from(value: LevelFilter) -> Self {
+        match value {
+            LevelFilter::Error => LogSpecification::error(),
+            LevelFilter::Warn => LogSpecification::warn(),
+            LevelFilter::Info => LogSpecification::info(),
+            LevelFilter::Debug => LogSpecification::debug(),
+            LevelFilter::Trace => LogSpecification::trace(),
+            LevelFilter::Off => LogSpecification::off(),
+        }
+    }
+}
+
 fn push_err(s: &str, parse_errs: &mut String) {
     if !parse_errs.is_empty() {
         parse_errs.push_str("; ");
