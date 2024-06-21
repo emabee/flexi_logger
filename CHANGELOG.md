@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.5] - 2024-06-21
+
+Remove unnecessary dependency to `is-terminal`.
+
+Add impl `From<LevelFilter>` for `LogSpecification`.
+
+Kudos to [Oakchris1955](https://github.com/Oakchris1955).
+
 ## [0.28.4] - 2024-06-14
 
 Fix [issue #162](https://github.com/emabee/flexi_logger/issues/162)

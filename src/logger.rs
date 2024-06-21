@@ -11,12 +11,12 @@ use crate::{
     LoggerHandle, Naming, WriteMode,
 };
 
-use std::io::IsTerminal;
 use log::LevelFilter;
 #[cfg(feature = "specfile")]
 use std::sync::Mutex;
 use std::{
     collections::HashMap,
+    io::IsTerminal,
     path::PathBuf,
     sync::{Arc, RwLock},
     time::Duration,
@@ -80,9 +80,24 @@ enum LogTarget {
 /// loglevel-specification.
 impl Logger {
     /// Creates a Logger that you provide with an explicit [`LogSpecification`].
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use log::LevelFilter;
+    /// use flexi_logger::Logger;
+    /// let logger = Logger::with(LevelFilter::Info).start().unwrap();
+    /// ```
+    ///
+    /// ```rust
+    /// use flexi_logger::{Logger, LogSpecification};
+    /// let logger = Logger::with(
+    ///         LogSpecification::parse("info, critical_mod = trace").unwrap()
+    ///     ).start().unwrap();
+    /// ```
     #[must_use]
-    pub fn with(logspec: LogSpecification) -> Self {
-        Self::from_spec_and_errs(logspec)
+    pub fn with(logspec: impl Into<LogSpecification>) -> Self {
+        Self::from_spec_and_errs(logspec.into())
     }
 
     /// Creates a Logger that reads the [`LogSpecification`] from a `String` or `&str`.
@@ -134,13 +149,11 @@ impl Logger {
             format_for_file: default_format,
 
             #[cfg(feature = "colors")]
-            format_for_stdout: AdaptiveFormat::Default.format_function(
-                    std::io::stdout().is_terminal()
-            ),
+            format_for_stdout: AdaptiveFormat::Default
+                .format_function(std::io::stdout().is_terminal()),
             #[cfg(feature = "colors")]
-            format_for_stderr: AdaptiveFormat::Default.format_function(
-                    std::io::stderr().is_terminal()
-            ),
+            format_for_stderr: AdaptiveFormat::Default
+                .format_function(std::io::stderr().is_terminal()),
 
             #[cfg(not(feature = "colors"))]
             format_for_stdout: default_format,

@@ -36,7 +36,7 @@ and call `start()` immediately:
   # Ok(())}
   ```
 
-- Combine both options:
+- Combine both options, with env having precendence over the given parameter value:
 
   ```rust
   # use flexi_logger::{Logger,FlexiLoggerError};
@@ -45,11 +45,11 @@ and call `start()` immediately:
   # Ok(())}
   ```
 
-or, even shorter, use:
+  or, even shorter, use:
 
-```rust
-flexi_logger::init();
-```
+  ```rust
+  flexi_logger::init();
+  ```
 
 After that, you just use the log-macros from the log crate. Those log lines that match the
 log specification are then written to the default output channel (stderr).

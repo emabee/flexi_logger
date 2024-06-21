@@ -54,7 +54,6 @@ fn main() {
     std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo build");
     run_command!("cargo build --no-default-features");
-    #[rustfmt::skip]
     run_command!("cargo build --all-features");
     run_command!("cargo build --release");
     run_command!("cargo build --release --all-features");
@@ -62,7 +61,6 @@ fn main() {
     // Clippy in important variants
     run_command!("cargo clippy -- -D warnings");
     run_command!("cargo clippy --all-features -- -D warnings");
-    #[rustfmt::skip]
     run_command!("cargo +nightly clippy --all-targets --all-features -- -D warnings");
 
     // Run tests in important variants
@@ -70,12 +68,10 @@ fn main() {
     run_command!("cargo test --release --all-features");
     run_command!("cargo test --no-default-features");
     run_command!("cargo test --release");
-    #[rustfmt::skip]
     run_command!("cargo test --release --features specfile_without_notification");
 
     // doc
     run_command!("cargo +nightly test --all-features --doc");
-    #[rustfmt::skip]
     run_command!("cargo +nightly doc --all-features --no-deps --open");
 
     // check version consistency
