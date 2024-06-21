@@ -4,7 +4,7 @@ use flexi_logger::{DeferredNow, Logger};
 use log::*;
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "offset is already initialized not to enforce UTC")]
 fn test_force_utc_1_panic() {
     let _ = Logger::try_with_str("info")
         .unwrap()
@@ -13,5 +13,5 @@ fn test_force_utc_1_panic() {
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     info!("MUST BE REACHED");
     DeferredNow::force_utc();
-    info!("MUST NOT BE REACHED");
+    assert!(false, "MUST NOT BE REACHED");
 }
