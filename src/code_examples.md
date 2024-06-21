@@ -36,7 +36,7 @@ and call `start()` immediately:
   # Ok(())}
   ```
 
-- Combine both options:
+- Combine both options, with env having precendence over the given parameter value:
 
   ```rust
   # use flexi_logger::{Logger,FlexiLoggerError};
@@ -45,11 +45,11 @@ and call `start()` immediately:
   # Ok(())}
   ```
 
-or, even shorter, use:
+  or, even shorter, use:
 
-```rust
-flexi_logger::init();
-```
+  ```rust
+  flexi_logger::init();
+  ```
 
 After that, you just use the log-macros from the log crate. Those log lines that match the
 log specification are then written to the default output channel (stderr).
@@ -259,10 +259,8 @@ by providing one of the variants of [`AdaptiveFormat`](crate::AdaptiveFormat) to
 format method, e.g.
 
 ```rust
-# #[cfg(feature = "is-terminal")]
 # use flexi_logger::AdaptiveFormat;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-# #[cfg(feature = "is-terminal")]
 # {
       flexi_logger::Logger::try_with_str("info")?
           .adaptive_format_for_stderr(AdaptiveFormat::Detailed);
@@ -276,7 +274,6 @@ format method, e.g.
 `flexi_logger` initializes by default equivalently to this:
 
 ```rust
-# #[cfg(feature = "is-terminal")]
 # mod example {
 # use flexi_logger::{Logger,AdaptiveFormat,default_format, FileSpec};
 # use log::{debug, error, info, trace, warn};

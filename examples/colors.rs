@@ -4,8 +4,8 @@ fn main() {
 
     #[cfg(feature = "colors")]
     {
-        use is_terminal::IsTerminal;
         use nu_ansi_term::Color;
+        use std::io::IsTerminal;
 
         for i in 0..=255 {
             println!("{}: {}", i, Color::Fixed(i).paint(i.to_string()));

@@ -1,4 +1,3 @@
-#[cfg(feature = "is-terminal")]
 use crate::formats::AdaptiveFormat;
 use crate::{
     filter::LogLineFilter,
@@ -11,13 +10,13 @@ use crate::{
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
 };
-#[cfg(feature = "is-terminal")]
-use is_terminal::IsTerminal;
+
 use log::LevelFilter;
 #[cfg(feature = "specfile")]
 use std::sync::Mutex;
 use std::{
     collections::HashMap,
+    io::IsTerminal,
     path::PathBuf,
     sync::{Arc, RwLock},
     time::Duration,
@@ -81,9 +80,24 @@ enum LogTarget {
 /// loglevel-specification.
 impl Logger {
     /// Creates a Logger that you provide with an explicit [`LogSpecification`].
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use log::LevelFilter;
+    /// use flexi_logger::Logger;
+    /// let logger = Logger::with(LevelFilter::Info).start().unwrap();
+    /// ```
+    ///
+    /// ```rust
+    /// use flexi_logger::{Logger, LogSpecification};
+    /// let logger = Logger::with(
+    ///         LogSpecification::parse("info, critical_mod = trace").unwrap()
+    ///     ).start().unwrap();
+    /// ```
     #[must_use]
-    pub fn with(logspec: LogSpecification) -> Self {
-        Self::from_spec_and_errs(logspec)
+    pub fn with(logspec: impl Into<LogSpecification>) -> Self {
+        Self::from_spec_and_errs(logspec.into())
     }
 
     /// Creates a Logger that reads the [`LogSpecification`] from a `String` or `&str`.
@@ -135,21 +149,11 @@ impl Logger {
             format_for_file: default_format,
 
             #[cfg(feature = "colors")]
-            format_for_stdout: AdaptiveFormat::Default.format_function(
-                if cfg!(feature = "is-terminal") {
-                    std::io::stdout().is_terminal()
-                } else {
-                    false
-                },
-            ),
+            format_for_stdout: AdaptiveFormat::Default
+                .format_function(std::io::stdout().is_terminal()),
             #[cfg(feature = "colors")]
-            format_for_stderr: AdaptiveFormat::Default.format_function(
-                if cfg!(feature = "is-terminal") {
-                    std::io::stderr().is_terminal()
-                } else {
-                    false
-                },
-            ),
+            format_for_stderr: AdaptiveFormat::Default
+                .format_function(std::io::stderr().is_terminal()),
 
             #[cfg(not(feature = "colors"))]
             format_for_stdout: default_format,
@@ -311,8 +315,6 @@ impl Logger {
     /// Coloring is used if `stderr` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
-    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stderr(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stderr = adaptive_format.format_function(std::io::stderr().is_terminal());
@@ -333,8 +335,6 @@ impl Logger {
     /// Coloring is used if `stdout` is a tty.
     ///
     /// Regarding the default, see [`Logger::format`].
-    #[cfg_attr(docsrs, doc(cfg(feature = "is-terminal")))]
-    #[cfg(feature = "is-terminal")]
     #[must_use]
     pub fn adaptive_format_for_stdout(mut self, adaptive_format: AdaptiveFormat) -> Self {
         self.format_for_stdout = adaptive_format.format_function(std::io::stdout().is_terminal());
