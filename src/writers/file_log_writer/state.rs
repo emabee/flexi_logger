@@ -236,6 +236,14 @@ enum Inner {
     Initial(Option<RotationConfig>, bool),
     Active(Option<RotationState>, Box<dyn Write + Send>, PathBuf),
 }
+impl Inner {
+    fn uses_rotation(&self) -> bool {
+        match self {
+            Inner::Initial(o_r, _) => o_r.is_some(),
+            Inner::Active(o_r, _, _) => o_r.is_some(),
+        }
+    }
+}
 impl std::fmt::Debug for Inner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
@@ -514,7 +522,11 @@ impl State {
     }
 
     pub fn existing_log_files(&self, selector: &LogfileSelector) -> Vec<PathBuf> {
-        list_and_cleanup::existing_log_files(&self.config.file_spec, selector)
+        list_and_cleanup::existing_log_files(
+            &self.config.file_spec,
+            self.inner.uses_rotation(),
+            selector,
+        )
     }
 
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {

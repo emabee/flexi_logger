@@ -8,22 +8,31 @@ use std::{
 
 const INFIX_PATTERN: &str = "_r[0-9]*";
 
-pub(super) fn existing_log_files(file_spec: &FileSpec, selector: &LogfileSelector) -> Vec<PathBuf> {
+pub(super) fn existing_log_files(
+    file_spec: &FileSpec,
+    use_rotation: bool,
+    selector: &LogfileSelector,
+) -> Vec<PathBuf> {
     let mut result = Vec::new();
-    if selector.with_plain_files {
-        let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, file_spec.get_suffix().as_deref());
-        result.append(&mut list_of_files(&pattern));
-    }
+    if use_rotation {
+        if selector.with_plain_files {
+            let pattern =
+                file_spec.as_glob_pattern(INFIX_PATTERN, file_spec.get_suffix().as_deref());
+            result.append(&mut list_of_files(&pattern));
+        }
 
-    if selector.with_compressed_files {
-        let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, Some("gz"));
-        result.append(&mut list_of_files(&pattern));
-    }
+        if selector.with_compressed_files {
+            let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, Some("gz"));
+            result.append(&mut list_of_files(&pattern));
+        }
 
-    if selector.with_r_current {
-        let pattern =
-            file_spec.as_glob_pattern(super::CURRENT_INFIX, file_spec.get_suffix().as_deref());
-        result.append(&mut list_of_files(&pattern));
+        if selector.with_r_current {
+            let pattern =
+                file_spec.as_glob_pattern(super::CURRENT_INFIX, file_spec.get_suffix().as_deref());
+            result.append(&mut list_of_files(&pattern));
+        }
+    } else {
+        result.push(file_spec.as_pathbuf(None));
     }
     result
 }
@@ -31,6 +40,7 @@ pub(super) fn existing_log_files(file_spec: &FileSpec, selector: &LogfileSelecto
 pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<PathBuf> {
     existing_log_files(
         file_spec,
+        true,
         &LogfileSelector::default().with_compressed_files(),
     )
 }
