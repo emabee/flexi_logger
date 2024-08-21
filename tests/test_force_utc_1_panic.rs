@@ -13,5 +13,5 @@ fn test_force_utc_1_panic() {
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     info!("MUST BE REACHED");
     DeferredNow::force_utc();
-    assert!(false, "MUST NOT BE REACHED");
+    panic!("MUST NOT BE REACHED");
 }

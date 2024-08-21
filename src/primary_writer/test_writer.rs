@@ -53,7 +53,7 @@ impl LogWriter for TestWriter {
                 {
                     let mut cursor = self.validation_buffer.lock().unwrap();
                     cursor.write_all(&buffer).ok();
-                    cursor.write_all(&[b'\n']).ok();
+                    cursor.write_all(b"\n").ok();
                 }
 
                 buffer.clear();
@@ -76,7 +76,7 @@ impl LogWriter for TestWriter {
                 {
                     let mut cursor = self.validation_buffer.lock().unwrap();
                     cursor.write_all(&tmp_buf).ok();
-                    cursor.write_all(&[b'\n']).ok();
+                    cursor.write_all(b"\n").ok();
                 }
             }
         });

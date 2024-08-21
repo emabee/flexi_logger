@@ -13,5 +13,5 @@ fn test_force_utc_3() {
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
     DeferredNow::force_utc();
     info!("must be printed");
-    assert!(false, "we arrived here, everything OK");
+    panic!("we arrived here, everything OK");
 }
