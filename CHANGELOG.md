@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2024-08-25
+
+Revised `SyslogWriter` (-> version bump): introduced builder pattern,
+added a configuration option for the message format
+(resolves [issue #168](https://github.com/emabee/flexi_logger/issues/168), kudos to [krims0n32](https://github.com/krims0n32)).
+
+`LoggerHandle::existing_log_files` now also returns a meaningful result if file rotation is not
+used. Kudos to [drdo](https://github.com/drdo) for
+[discussion 170](https://github.com/emabee/flexi_logger/discussions/170).
+
 ## [0.28.5] - 2024-06-21
 
 Remove unnecessary dependency to `is-terminal`.

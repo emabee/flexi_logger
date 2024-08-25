@@ -381,6 +381,20 @@ impl LoggerHandle {
     pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
         self.writers_handle.primary_writer.validate_logs(expected);
     }
+
+    // Allows checking the logs written so far to the writer
+    #[doc(hidden)]
+    pub fn validate_additional_logs(
+        &self,
+        target: &str,
+        expected: &[(&'static str, &'static str, &'static str)],
+    ) {
+        self.writers_handle
+            .other_writers
+            .get(target)
+            .unwrap(/*fail fast*/)
+            .validate_logs(expected);
+    }
 }
 
 /// Used in [`LoggerHandle::existing_log_files`].

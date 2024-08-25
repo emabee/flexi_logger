@@ -1,39 +1,46 @@
-//! Contains the trait [`LogWriter`] for extending `flexi_logger`
-//! with additional log writers,
-//! and two concrete implementations
-//! for writing to files ([`FileLogWriter`])
-//! or to the syslog ([`SyslogWriter`]).
-//! You can also use your own implementations of [`LogWriter`].
+//! Describes how to extend `flexi_logger` with additional log writers
+//! (implementations of the trait [`LogWriter`]), and contains two ready-to-use log writers,
+//! one for writing to files ([`FileLogWriter`]), one for writing to the syslog ([`SyslogWriter`]).
 //!
-//! Such log writers can be used in two ways:
+//! Log writers can be used in two ways:
 //!
-//! * You can influence to which output stream normal log messages will be written,
-//!   i.e. those from normal log macro calls without explicit target specification.
-//!   By default, the logs are sent to stderr. With one of the methods
+//! * _Default output channel:_ <br>
+//!   You can influence to which output stream normal log messages will be written,
+//!   i.e. those from log macro calls without explicit target specification
+//!   (like in `log::error!("File not found")`).
 //!
+//!   With one of the methods
+//!
+//!   * [`Logger::log_to_stderr`](crate::Logger::log_to_stderr) (default)
 //!   * [`Logger::log_to_stdout`](crate::Logger::log_to_stdout)
 //!   * [`Logger::log_to_file`](crate::Logger::log_to_file)
 //!   * [`Logger::log_to_writer`](crate::Logger::log_to_writer)
 //!   * [`Logger::log_to_file_and_writer`](crate::Logger::log_to_file_and_writer)
 //!   * [`Logger::do_not_log`](crate::Logger::do_not_log)
 //!
-//!   you can specify a different log target. See there for more details.
+//!   you can change the default output channel. The fourth and the fifth of these methods
+//!   take log writers as input. See their documentation for more details.
 //!
-//!   Normal log calls will only be written to the chosen output channel if they match the current
-//!   [log specification](crate::LogSpecification).
+//!   Messages will only be written to the default output channel
+//!   if they match the current [log specification](crate::LogSpecification).
 //!
-//! * You can register additional log writers under a target name with
+//!   <br>
+//!
+//! * _Additional output channels:_ <br>
+//!   You can register additional log writers under a _target name_ with
 //!   [`Logger::add_writer()`](crate::Logger::add_writer), and address these log writers by
-//!   specifying the target name in calls to the
+//!   specifying the _target name_ in calls to the
 //!   [log macros](https://docs.rs/log/latest/log/macro.log.html).
 //!
-//!   A log call with a target value that has the form `{Name1,Name2,...}`, i.e.,
-//!   a comma-separated list of target names, within braces, is not sent to the default logger,
-//!   but to the loggers specified explicitly in the list.
-//!   In such a list you can again specify the default logger with the target name `_Default`.
+//!   The message of a log call with a _target value_ that has the form `{Name1,Name2,...}`, i.e.,
+//!   a comma-separated list of _target names_, within braces, is not sent to the default output
+//!   channel, but to the loggers specified explicitly in the list. In such a list
+//!   you can also specify the default output channel with the built-in target name `_Default`.
 //!
-//!   These log calls will not be affected by the value of `flexi_logger`'s log specification;
-//!   they will always be written, as you might want it for alerts or auditing.
+//!   Log calls that are directed to an additional output channel will not be affected by
+//!   the value of `flexi_logger`'s log specification;
+//!   they will always be handed over to the respective `LogWriter`,
+//!   as you might want it for alerts or auditing.
 //!
 //!   In the following example we define an alert writer, and a macro to facilitate using it
 //!   (and avoid using the explicit target specification in the macro call), and
@@ -103,12 +110,13 @@ mod log_writer;
 
 #[cfg(feature = "syslog_writer")]
 #[cfg_attr(docsrs, doc(cfg(feature = "syslog_writer")))]
-mod syslog_writer;
+mod syslog;
 
 #[cfg(feature = "syslog_writer")]
 #[cfg_attr(docsrs, doc(cfg(feature = "syslog_writer")))]
-pub use self::syslog_writer::{
-    LevelToSyslogSeverity, Syslog, SyslogFacility, SyslogSeverity, SyslogWriter,
+pub use self::syslog::{
+    syslog_default_format, syslog_format_with_thread, LevelToSyslogSeverity, SyslogConnection,
+    SyslogFacility, SyslogLineHeader, SyslogSeverity, SyslogWriter, SyslogWriterBuilder,
 };
 
 pub use self::file_log_writer::{
