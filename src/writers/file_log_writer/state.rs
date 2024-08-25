@@ -425,28 +425,21 @@ impl State {
             if force || rotation_state.roll_state.rotation_necessary() {
                 let infix = match rotation_state.naming_state {
                     NamingState::Timestamps(ref mut ts, ref o_current_infix, ref fmt) => {
-                        match o_current_infix {
-                            Some(current_infix) => {
-                                *ts = rcurrents_creation_timestamp(
-                                    &self.config,
-                                    current_infix,
-                                    true,
-                                    Some(ts),
-                                    fmt,
-                                )?;
-                                current_infix.clone()
-                            }
-                            None => {
-                                *ts = Local::now();
-                                collision_free_infix_for_rotated_file(
-                                    &self.config.file_spec,
-                                    &infix_from_timestamp(
-                                        ts,
-                                        self.config.use_utc,
-                                        &InfixFormat::Std,
-                                    ),
-                                )
-                            }
+                        if let Some(current_infix) = o_current_infix {
+                            *ts = rcurrents_creation_timestamp(
+                                &self.config,
+                                current_infix,
+                                true,
+                                Some(ts),
+                                fmt,
+                            )?;
+                            current_infix.clone()
+                        } else {
+                            *ts = Local::now();
+                            collision_free_infix_for_rotated_file(
+                                &self.config.file_spec,
+                                &infix_from_timestamp(ts, self.config.use_utc, &InfixFormat::Std),
+                            )
                         }
                     }
                     NamingState::NumbersRCurrent(ref mut idx_state) => {
