@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Add;
 use std::thread::JoinHandle;
+use std::sync::{Arc, Mutex, Condvar};
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -38,11 +39,20 @@ fn test_multi_threaded_dates() {
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
+        let mtx_cvar_pair = Arc::new((Mutex::new(0), Condvar::new()));
+
         info!("create many log lines with a considerable number of threads, verify the log");
 
-        let worker_handles = start_worker_threads(NO_OF_THREADS);
+        let worker_handles = start_worker_threads(NO_OF_THREADS, mtx_cvar_pair.clone());
 
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        {
+            let (mtx, cvar) = &*mtx_cvar_pair;
+            let mut started = mtx.lock().unwrap();
+            while *started != NO_OF_THREADS {
+                started = cvar.wait(started).unwrap();
+            }
+        }
+
         logger.set_new_spec(LogSpecification::parse("trace").unwrap());
 
         wait_for_workers_to_close(worker_handles);
@@ -52,16 +62,17 @@ fn test_multi_threaded_dates() {
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
-fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
+fn start_worker_threads(no_of_workers: usize, mtx_cvar_pair: Arc<(Mutex<usize>,Condvar)>) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
     trace!("Starting {} worker threads", no_of_workers);
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
+        let thread_mtx_cvar_pair = mtx_cvar_pair.clone();
         worker_handles.push(
             std::thread::Builder::new()
                 .name(thread_number.to_string())
                 .spawn(move || {
-                    do_work(thread_number);
+                    do_work(thread_number, thread_mtx_cvar_pair);
                     0
                 })
                 .unwrap(),
@@ -71,15 +82,18 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     worker_handles
 }
 
-fn do_work(thread_number: usize) {
+fn do_work(thread_number: usize, mtx_cvar_pair: Arc<(Mutex<usize>,Condvar)>) {
     trace!("({})     Thread started working", thread_number);
     trace!("ERROR_IF_PRINTED");
+
+    {
+        let (mtx, cvar) = &*mtx_cvar_pair;
+        let mut started = mtx.lock().unwrap();
+        *started += 1;
+        cvar.notify_one();
+    }
+
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
-        if idx == 500 {
-            // this sleep triggers a yield, hopefully allowing all threads to start before the main thread
-            // changes the log specification
-            std::thread::sleep(std::time::Duration::from_millis(200));
-        }
         debug!("({})  writing out line number {}", thread_number, idx);
     }
     trace!("MUST_BE_PRINTED");
