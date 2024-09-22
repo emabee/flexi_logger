@@ -10,7 +10,6 @@ It also allows defining additional log streams, e.g. for alert or security messa
 """
 documentation = "https://docs.rs/flexi_logger"
 edition = "2021"
-homepage = "https://crates.io/crates/flexi_logger"
 keywords = ["file", "logger"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -66,6 +65,7 @@ tracing-subscriber = { version = "0.3", optional = true, features = [
 libc = { version = "^0.2.50", optional = true }
 
 [dev-dependencies]
+cond_sync = "0.2"
 either = "1.9"
 flate2 = "1.0"
 serde_derive = "1.0"

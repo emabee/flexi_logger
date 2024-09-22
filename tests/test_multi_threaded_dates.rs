@@ -1,16 +1,18 @@
 mod test_utils;
 
+use cond_sync::{CondSync, Other};
 use flexi_logger::{
     Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
     TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 use glob::glob;
 use log::*;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::ops::Add;
-use std::thread::JoinHandle;
-use std::sync::{Arc, Mutex, Condvar};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    ops::Add,
+    thread::JoinHandle,
+};
 
 const NO_OF_THREADS: usize = 5;
 const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -19,13 +21,10 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
 // verify that all log lines are written correctly
 #[test]
 fn test_multi_threaded_dates() {
-    test_utils::wait_for_start_of_second();
-
     let directory = test_utils::dir();
     {
-        let logger;
         let _stopwatch = test_utils::Stopwatch::default();
-        logger = Logger::try_with_str("debug")
+        let logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(FileSpec::default().directory(&directory))
             .format(test_format)
@@ -39,40 +38,34 @@ fn test_multi_threaded_dates() {
             .start()
             .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
-        let mtx_cvar_pair = Arc::new((Mutex::new(0), Condvar::new()));
-
         info!("create many log lines with a considerable number of threads, verify the log");
 
-        let worker_handles = start_worker_threads(NO_OF_THREADS, mtx_cvar_pair.clone());
-
-        {
-            let (mtx, cvar) = &*mtx_cvar_pair;
-            let mut started = mtx.lock().unwrap();
-            while *started != NO_OF_THREADS {
-                started = cvar.wait(started).unwrap();
-            }
-        }
+        let cond_sync = CondSync::new(0_usize);
+        let worker_handles = start_worker_threads(NO_OF_THREADS, &cond_sync);
+        cond_sync
+            .wait_until(|value| *value == NO_OF_THREADS)
+            .unwrap();
 
         logger.set_new_spec(LogSpecification::parse("trace").unwrap());
 
-        wait_for_workers_to_close(worker_handles);
-    }
+        join_all_workers(worker_handles);
+    } // drop stopwatch
 
     verify_logs(&directory.display().to_string());
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
-fn start_worker_threads(no_of_workers: usize, mtx_cvar_pair: Arc<(Mutex<usize>,Condvar)>) -> Vec<JoinHandle<u8>> {
+fn start_worker_threads(no_of_workers: usize, cond_sync: &CondSync<usize>) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
     trace!("Starting {} worker threads", no_of_workers);
     for thread_number in 0..no_of_workers {
         trace!("Starting thread {}", thread_number);
-        let thread_mtx_cvar_pair = mtx_cvar_pair.clone();
+        let cond_sync_t = cond_sync.clone();
         worker_handles.push(
             std::thread::Builder::new()
                 .name(thread_number.to_string())
                 .spawn(move || {
-                    do_work(thread_number, thread_mtx_cvar_pair);
+                    do_work(thread_number, cond_sync_t);
                     0
                 })
                 .unwrap(),
@@ -82,16 +75,13 @@ fn start_worker_threads(no_of_workers: usize, mtx_cvar_pair: Arc<(Mutex<usize>,C
     worker_handles
 }
 
-fn do_work(thread_number: usize, mtx_cvar_pair: Arc<(Mutex<usize>,Condvar)>) {
+fn do_work(thread_number: usize, cond_sync: CondSync<usize>) {
     trace!("({})     Thread started working", thread_number);
     trace!("ERROR_IF_PRINTED");
 
-    {
-        let (mtx, cvar) = &*mtx_cvar_pair;
-        let mut started = mtx.lock().unwrap();
-        *started += 1;
-        cvar.notify_one();
-    }
+    cond_sync
+        .modify_and_notify(|value| *value += 1, Other::One)
+        .unwrap();
 
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("({})  writing out line number {}", thread_number, idx);
@@ -99,7 +89,7 @@ fn do_work(thread_number: usize, mtx_cvar_pair: Arc<(Mutex<usize>,Condvar)>) {
     trace!("MUST_BE_PRINTED");
 }
 
-fn wait_for_workers_to_close(worker_handles: Vec<JoinHandle<u8>>) {
+fn join_all_workers(worker_handles: Vec<JoinHandle<u8>>) {
     for worker_handle in worker_handles {
         worker_handle
             .join()

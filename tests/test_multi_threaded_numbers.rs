@@ -1,5 +1,6 @@
 mod test_utils;
 
+use cond_sync::{CondSync, Other};
 use flexi_logger::{
     Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, LogfileSelector,
     Logger, Naming, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
@@ -52,12 +53,16 @@ fn multi_threaded() {
         // clippy ignores the Drop implementation of the inner log handle :-(
         #[allow(clippy::redundant_clone)]
         let logger2 = logger.clone();
-        let worker_handles = start_worker_threads(NO_OF_THREADS);
-        let new_spec = LogSpecification::parse("trace").unwrap();
+
+        let cond_sync = CondSync::new(0_usize);
+        let worker_handles = start_worker_threads(NO_OF_THREADS, &cond_sync);
+        cond_sync
+            .wait_until(|value| *value == NO_OF_THREADS)
+            .unwrap();
+
         std::thread::Builder::new()
             .spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                logger2.set_new_spec(new_spec);
+                logger2.set_new_spec(LogSpecification::parse("trace").unwrap());
                 0
             })
             .unwrap();
@@ -80,7 +85,7 @@ fn multi_threaded() {
 }
 
 // Starts given number of worker threads and lets each execute `do_work`
-fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
+fn start_worker_threads(no_of_workers: usize, cond_sync: &CondSync<usize>) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
     trace!(
         "(should not appear) Starting {} worker threads",
@@ -88,11 +93,12 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     );
     for thread_number in 0..no_of_workers {
         trace!("(should not appear) Starting thread {}", thread_number);
+        let cond_sync_t = cond_sync.clone();
         worker_handles.push(
             std::thread::Builder::new()
                 .name(thread_number.to_string())
                 .spawn(move || {
-                    do_work(thread_number);
+                    do_work(thread_number, cond_sync_t);
                     0
                 })
                 .unwrap(),
@@ -105,15 +111,17 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     worker_handles
 }
 
-fn do_work(thread_number: usize) {
+fn do_work(thread_number: usize, cond_sync: CondSync<usize>) {
     trace!(
         "(should not appear) ({})     Thread started working",
         thread_number
     );
+    cond_sync
+        .modify_and_notify(|value| *value += 1, Other::One)
+        .unwrap();
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("({})  writing out line number {}", thread_number, idx);
     }
-    std::thread::sleep(std::time::Duration::from_millis(500));
     trace!("MUST_BE_PRINTED");
 }
 

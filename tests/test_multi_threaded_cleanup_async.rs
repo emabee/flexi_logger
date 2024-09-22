@@ -3,6 +3,7 @@ mod test_utils;
 #[cfg(feature = "compress")]
 mod d {
     use chrono::{Local, NaiveDateTime};
+    use cond_sync::{CondSync, Other};
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
         Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
@@ -16,10 +17,8 @@ mod d {
         io::{BufRead, BufReader, Write},
         ops::Add,
         path::{Path, PathBuf},
-        thread::{self, JoinHandle},
+        thread::JoinHandle,
     };
-
-    use crate::test_utils;
 
     const NO_OF_THREADS: usize = 5;
     const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
@@ -31,8 +30,6 @@ mod d {
     // verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
-        test_utils::wait_for_start_of_second();
-
         let start = Local::now();
         let directory = super::test_utils::dir();
         let end = {
@@ -61,10 +58,12 @@ mod d {
              verify the log"
             );
 
-            let worker_handles = start_worker_threads(NO_OF_THREADS);
-            let new_spec = LogSpecification::parse("trace").unwrap();
-            thread::sleep(std::time::Duration::from_millis(500));
-            logger.set_new_spec(new_spec);
+            let cond_sync = CondSync::new(0_usize);
+            let worker_handles = start_worker_threads(NO_OF_THREADS, &cond_sync);
+            cond_sync
+                .wait_until(|value| *value == NO_OF_THREADS)
+                .unwrap();
+            logger.set_new_spec(LogSpecification::parse("trace").unwrap());
 
             wait_for_workers_to_close(worker_handles);
             Local::now()
@@ -80,16 +79,20 @@ mod d {
     }
 
     // Starts given number of worker threads and lets each execute `do_work`
-    fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
+    fn start_worker_threads(
+        no_of_workers: usize,
+        cond_sync: &CondSync<usize>,
+    ) -> Vec<JoinHandle<u8>> {
         let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
         trace!("Starting {} worker threads", no_of_workers);
         for thread_number in 0..no_of_workers {
             trace!("Starting thread {}", thread_number);
+            let cond_sync_t = cond_sync.clone();
             worker_handles.push(
-                thread::Builder::new()
+                std::thread::Builder::new()
                     .name(thread_number.to_string())
                     .spawn(move || {
-                        do_work(thread_number);
+                        do_work(thread_number, cond_sync_t);
                         0
                     })
                     .unwrap(),
@@ -99,16 +102,16 @@ mod d {
         worker_handles
     }
 
-    fn do_work(thread_number: usize) {
+    fn do_work(thread_number: usize, cond_sync: CondSync<usize>) {
         trace!("({})     Thread started working", thread_number);
         trace!("ERROR_IF_PRINTED");
+        cond_sync
+            .modify_and_notify(|value| *value += 1, Other::One)
+            .unwrap();
+
         for idx in 0..NO_OF_LOGLINES_PER_THREAD {
-            if idx % 1_000 == 0 {
-                std::thread::yield_now();
-            }
             debug!("({})  writing out line number {}", thread_number, idx);
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
         trace!("MUST_BE_PRINTED");
     }
 
@@ -130,7 +133,7 @@ mod d {
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
             now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
-            thread::current().name().unwrap_or("<unnamed>"),
+            std::thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),
             record.line().unwrap_or(0),
