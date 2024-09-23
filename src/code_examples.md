@@ -199,7 +199,7 @@ With [`Logger::format`](crate::Logger::format)
 you set the format for all used output channels of `flexi_logger`.
 
 `flexi_logger` provides a couple of format functions, and you can also create and use your own,
-e.g. by copying and modifying one of the provided format functions (see [formats.rs](https://github.com/emabee/flexi_logger/blob/master/src/formats.rs)).
+e.g. by copying and modifying one of the provided format functions (see [formats.rs](https://github.com/emabee/flexi_logger/blob/main/src/formats.rs)).
 
 Here's an example that you could create somewhere in your code.
 It also illustrates the signature the format function must have.
