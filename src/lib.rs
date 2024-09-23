@@ -41,7 +41,6 @@
 //! for a description how this can be done.
 
 mod deferred_now;
-mod file_spec;
 mod flexi_error;
 mod flexi_logger;
 mod formats;
@@ -63,18 +62,19 @@ pub mod writers;
 
 pub mod error_info;
 
-pub use crate::deferred_now::DeferredNow;
-pub use crate::file_spec::FileSpec;
-pub use crate::flexi_error::FlexiLoggerError;
-pub use crate::formats::*;
-pub use crate::log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter};
-pub use crate::logger::{Duplicate, ErrorChannel, Logger};
-pub use crate::logger_handle::{LogfileSelector, LoggerHandle};
-pub use crate::parameters::{Age, Cleanup, Criterion, Naming};
 pub(crate) use crate::write_mode::EffectiveWriteMode;
-pub use crate::write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL};
 #[cfg(feature = "async")]
 pub use crate::write_mode::{DEFAULT_MESSAGE_CAPA, DEFAULT_POOL_CAPA};
+pub use crate::{
+    deferred_now::DeferredNow,
+    flexi_error::FlexiLoggerError,
+    formats::*,
+    log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter},
+    logger::{Duplicate, ErrorChannel, Logger},
+    logger_handle::{LogfileSelector, LoggerHandle},
+    parameters::{Age, Cleanup, Criterion, FileSpec, Naming},
+    write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL},
+};
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
