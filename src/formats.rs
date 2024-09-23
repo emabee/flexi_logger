@@ -51,10 +51,10 @@ where
 }
 
 /// A logline-formatter that produces log lines like <br>
-/// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```,
-/// or
+/// ```INFO [my_prog::some_submodule] Task successfully read from conf.json```.
+///
+/// If the kv-feature is used, the log lines look like
 /// ```INFO [my_prog::some_submodule] {a=17, b="foo"} Task successfully read from conf.json```
-/// if the kv-feature is used.
 ///
 /// # Errors
 ///
@@ -77,12 +77,13 @@ pub fn default_format(
     write!(w, "{}", record.args())
 }
 
-/// A colored version of the logline-formatter `default_format`
-/// that produces log lines like <br>
+/// A colored version of the logline-formatter `default_format`.
+///
+/// It produces log lines like <br>
 /// <code><span style="color:red">ERROR</span> &#91;`my_prog::some_submodule`&#93; <span
 /// style="color:red">File not found</span></code>
 ///
-/// See method `[style](crate::style)` if you want to influence coloring.
+/// See method [`style`](crate::style) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -138,7 +139,7 @@ pub fn opt_format(
 
 /// A colored version of the logline-formatter `opt_format`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`style`](crate::style) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -166,11 +167,10 @@ pub fn colored_opt_format(
     write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
-/// A logline-formatter that produces log lines like
-/// <br>
+/// A logline-formatter that produces log lines like <br>
 /// ```[2016-01-13 15:25:01.640870 +01:00] INFO [foo::bar] src/foo/bar.rs:26: Task successfully read from conf.json```
-/// <br>
-/// i.e. with timestamp, module path and file location.
+///
+/// I.e. with timestamp, module path and file location.
 ///
 /// # Errors
 ///
@@ -198,7 +198,7 @@ pub fn detailed_format(
 
 /// A colored version of the logline-formatter `detailed_format`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`style`](crate::style) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -227,11 +227,10 @@ pub fn colored_detailed_format(
     write!(w, "{}", style(level).paint(record.args().to_string()))
 }
 
-/// A logline-formatter that produces log lines like
-/// <br>
+/// A logline-formatter that produces log lines like <br>
 /// ```[2016-01-13 15:25:01.640870 +01:00] T[taskreader] INFO [src/foo/bar:26] Task successfully read from conf.json```
-/// <br>
-/// i.e. with timestamp, thread name and file location.
+///
+/// I.e. with timestamp, thread name and file location.
 ///
 /// # Errors
 ///
@@ -259,7 +258,7 @@ pub fn with_thread(
 
 /// A colored version of the logline-formatter `with_thread`.
 ///
-/// See method [style](crate::style) if you want to influence coloring.
+/// See method [`style`](crate::style) if you want to influence coloring.
 ///
 /// # Errors
 ///
@@ -448,13 +447,13 @@ fn parse_style(input: &str) -> Result<Style, std::num::ParseIntError> {
     })
 }
 
-/// Can be used in
-/// [`Logger::adaptive_format_for_stderr`](crate::Logger::adaptive_format_for_stderr) and
-/// [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout)
-/// to use coloring only if the output goes to a tty.
+/// Helps to use coloring only if the output goes to a tty.
 ///
-/// This is helpful if the output is sometimes piped into other programs, which usually
-/// do not expect color control byte sequences.
+/// Is used in
+/// [`Logger::adaptive_format_for_stderr`](crate::Logger::adaptive_format_for_stderr) and
+/// [`Logger::adaptive_format_for_stdout`](crate::Logger::adaptive_format_for_stdout),
+/// which switch off coloring if the output is not going to a tty but is piped into another
+/// program, because then color control byte sequences are usually not expected.
 #[derive(Clone, Copy)]
 pub enum AdaptiveFormat {
     /// Chooses between [`default_format`](crate::default_format)

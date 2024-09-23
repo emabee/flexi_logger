@@ -1,5 +1,6 @@
-//! Describes how to extend `flexi_logger` with additional log writers
-//! (implementations of the trait [`LogWriter`]), and contains two ready-to-use log writers,
+//! Describes how to extend `flexi_logger` with additional log writers.
+//!
+//! The module also contains two ready-to-use log writers,
 //! one for writing to files ([`FileLogWriter`]), one for writing to the syslog ([`SyslogWriter`]).
 //!
 //! Log writers can be used in two ways:
