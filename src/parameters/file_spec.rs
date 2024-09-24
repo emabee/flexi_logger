@@ -493,4 +493,24 @@ mod test {
             .as_pathbuf(None);
         assert_eq!(path.file_name().unwrap().to_str().unwrap(), "1234.txt");
     }
+
+    #[test]
+    fn test_empty_base_name() {
+        let path = FileSpec::default()
+            .suppress_basename()
+            .suppress_timestamp()
+            .o_discriminant(Option::<String>::None)
+            .as_pathbuf(None);
+        assert_eq!(path.file_name().unwrap(), ".log");
+    }
+
+    #[test]
+    fn test_empty_name() {
+        let path = FileSpec::default()
+            .suppress_basename()
+            .suppress_timestamp()
+            .o_suffix(Option::<String>::None)
+            .as_pathbuf(None);
+        assert!(path.file_name().is_none());
+    }
 }
