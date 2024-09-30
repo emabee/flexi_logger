@@ -65,8 +65,11 @@ pub(super) enum InfixFormat {
 }
 impl InfixFormat {
     const STD_INFIX_FORMAT: &'static str = "_r%Y-%m-%d_%H-%M-%S";
-    pub(super) fn custom(f: &str) -> Self {
-        let mut fmt = "_".to_string();
+    pub(super) fn custom(use_underscore: bool, f: &str) -> Self {
+        let mut fmt = String::new();
+        if use_underscore {
+            fmt.push('_');
+        }
         fmt.push_str(f);
         Self::Custom(fmt)
     }
@@ -322,22 +325,23 @@ impl State {
                 current_infix: o_current_token,
                 format: ts_fmt,
             } => {
+                let use_underscore = !&self.config.basename().is_empty();
                 if let Some(current_token) = o_current_token {
-                    let current_infix = prepend_underscore(current_token);
+                    let current_infix = prepend_underscore(use_underscore, current_token);
                     let naming_state = NamingState::Timestamps(
                         rcurrents_creation_timestamp(
                             &self.config,
                             &current_infix,
                             !self.config.append,
                             None,
-                            &InfixFormat::custom(ts_fmt),
+                            &InfixFormat::custom(use_underscore, ts_fmt),
                         )?,
                         Some(current_infix.clone()),
-                        InfixFormat::custom(ts_fmt),
+                        InfixFormat::custom(use_underscore, ts_fmt),
                     );
                     (naming_state, current_infix)
                 } else {
-                    let fmt = InfixFormat::custom(ts_fmt);
+                    let fmt = InfixFormat::custom(use_underscore, ts_fmt);
                     let ts = latest_timestamp_file(&self.config, !self.config.append, &fmt);
                     let naming_state = NamingState::Timestamps(ts, None, fmt.clone());
                     let infix = infix_from_timestamp(&ts, self.config.use_utc, &fmt);
@@ -551,11 +555,14 @@ impl State {
     }
 }
 
-fn prepend_underscore(infix: &str) -> String {
+fn prepend_underscore(use_underscore: bool, infix: &str) -> String {
     if infix.is_empty() {
         infix.to_string()
     } else {
-        let mut infix_with_underscore = "_".to_string();
+        let mut infix_with_underscore = String::new();
+        if use_underscore {
+            infix_with_underscore.push('_');
+        }
         infix_with_underscore.push_str(infix);
         infix_with_underscore
     }
