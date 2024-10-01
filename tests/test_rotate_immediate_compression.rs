@@ -1,8 +1,6 @@
 mod test_utils;
 
 #[cfg(feature = "compress")]
-use chrono::Local;
-#[cfg(feature = "compress")]
 use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
 #[cfg(feature = "compress")]
 use log::*;
@@ -47,6 +45,8 @@ fn work(value: u8) {
 
 #[cfg(feature = "compress")]
 fn test_variant(naming: Naming, criterion: Criterion, cleanup: Cleanup) {
+    use std::time::{Duration, Instant};
+
     let directory = test_utils::dir();
 
     test_utils::wait_for_start_of_second();
@@ -70,15 +70,17 @@ fn test_variant(naming: Naming, criterion: Criterion, cleanup: Cleanup) {
         }
     );
     let mut written_lines = 1;
-    let start = Local::now();
-    let duration = chrono::Duration::from_std(std::time::Duration::from_millis(3200)).unwrap();
-    while Local::now() - start < duration {
+
+    let start = Instant::now();
+    let max_runtime = Duration::from_millis(3_200);
+    let sleep_time = Duration::from_millis(7);
+    while Instant::now() - start < max_runtime {
         written_lines += 1;
         if written_lines % 17 == 4 {
             logger.trigger_rotation().unwrap();
         }
         trace!("line_count = {written_lines}");
-        std::thread::sleep(std::time::Duration::from_millis(7));
+        std::thread::sleep(sleep_time);
     }
 
     std::thread::sleep(std::time::Duration::from_millis(100));

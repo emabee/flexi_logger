@@ -30,7 +30,6 @@ impl LineWriter {
         format: FormatFunction,
     ) -> IoResult<LineWriter> {
         const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
-        // FIXME
         Ok(LineWriter {
             header,
             hostname: hostname::get().map_or_else(

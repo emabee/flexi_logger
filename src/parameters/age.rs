@@ -1,5 +1,5 @@
 /// The age after which a log file rotation will be triggered,
-/// when [`Criterion::Age`] is chosen.
+/// when [Criterion::Age](crate::Criterion::Age) is chosen.
 #[derive(Copy, Clone, Debug)]
 pub enum Age {
     /// Rotate the log file when the local clock has started a new day since the
