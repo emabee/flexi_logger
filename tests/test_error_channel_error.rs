@@ -1,8 +1,11 @@
 mod test_utils;
 
 use std::{
+    env,
+    fs::{create_dir_all, remove_file, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 const CTRL_INDEX: &str = "CTRL_INDEX";
@@ -17,7 +20,7 @@ const MILLIS: u64 = 50;
 //   parent terminates directly and thus destroys the stderr of child, thus forcing child to panic
 #[test]
 fn main() {
-    match std::env::var(CTRL_INDEX).as_ref() {
+    match env::var(CTRL_INDEX).as_ref() {
         Err(_) => {
             controller();
         }
@@ -38,48 +41,47 @@ fn main() {
 }
 
 fn controller() {
-    let progpath = std::env::args().next().unwrap();
+    let progpath = env::args().next().unwrap();
 
-    std::fs::create_dir_all(crashdump_file().parent().unwrap()).unwrap();
+    create_dir_all(crashdump_file().parent().unwrap()).unwrap();
 
-    std::fs::remove_file(crashdump_file()).ok();
+    remove_file(crashdump_file()).ok();
 
     // First run: don't panic
-    std::process::Command::new(progpath.clone())
+    let mut child = Command::new(progpath.clone())
         .env(CTRL_INDEX, "parent")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-
-    // wait until child has terminated
-    std::thread::sleep(std::time::Duration::from_millis(MILLIS * (RUNS as u64 + 5)));
+    assert!(child.wait().expect("failed to wait on child").success());
 
     // check that no crashdump_file was written
+    std::thread::sleep(std::time::Duration::from_millis(200));
     assert!(!Path::new(&crashdump_file()).try_exists().unwrap());
 
     // Second run: panic
-    std::process::Command::new(progpath)
+    let mut child = Command::new(progpath)
         .env(CTRL_INDEX, "parent_panic")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-
-    // wait until child has terminated
-    std::thread::sleep(std::time::Duration::from_millis(MILLIS * (RUNS as u64 + 5)));
+    assert!(child.wait().expect("failed to wait on child").success());
 
     // check that crashdump_file was written
+    std::thread::sleep(std::time::Duration::from_millis(200));
     assert!(Path::new(&crashdump_file()).try_exists().unwrap());
 }
 
 fn parent(panic: bool) {
     let progpath = std::env::args().next().unwrap();
     // spawn child and terminate directly, thus destroying the child's stderr
-    std::process::Command::new(progpath)
+    #[allow(clippy::zombie_processes)]
+    Command::new(progpath)
         .env(CTRL_INDEX, if panic { "child_panic" } else { "child" })
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .unwrap();
 }
@@ -89,7 +91,7 @@ fn child(panic: bool) {
     std::panic::set_hook(Box::new(move |panic| {
         let backtrace = std::backtrace::Backtrace::capture();
 
-        let mut file = std::fs::OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
