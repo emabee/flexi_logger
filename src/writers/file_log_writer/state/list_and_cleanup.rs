@@ -6,7 +6,7 @@ use std::{
     thread::{Builder as ThreadBuilder, JoinHandle},
 };
 
-const INFIX_PATTERN: &str = "_r[0-9]*";
+const INFIX_PATTERN: &str = "r[0-9]*";
 
 pub(super) fn existing_log_files(
     file_spec: &FileSpec,

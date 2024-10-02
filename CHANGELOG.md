@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.1] - 2024-10-02
+
+Fix [issue #176](https://github.com/emabee/flexi_logger/issues/176):
+leading underscore in log file name if only the infix is used (no basename, no start time, no discriminant).
+
 ## [0.29.0] - 2024-08-25
 
 Revised `SyslogWriter` (-> version bump): introduced builder pattern,

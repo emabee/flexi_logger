@@ -1,8 +1,10 @@
 use super::{get_creation_timestamp, list_and_cleanup::list_of_infix_files, InfixFormat};
 use crate::{writers::FileLogWriterConfig, FileSpec};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
-use std::path::Path;
-use std::{ops::Add, path::PathBuf};
+use std::{
+    ops::Add,
+    path::{Path, PathBuf},
+};
 
 pub(super) fn infix_from_timestamp(
     ts: &DateTime<Local>,
@@ -19,11 +21,11 @@ pub(super) fn infix_from_timestamp(
 
 fn ts_infix_from_path(path: &Path, file_spec: &FileSpec) -> String {
     let idx = file_spec
-        .as_pathbuf(Some("_rXXXXX"))
+        .as_pathbuf(Some("rXXXXX"))
         .to_string_lossy()
-        .find("_rXXXXX")
+        .find("rXXXXX")
         .unwrap();
-    String::from_utf8_lossy(&path.to_string_lossy().as_bytes()[idx..idx + 21]).to_string()
+    String::from_utf8_lossy(&path.to_string_lossy().as_bytes()[idx..idx + 20]).to_string()
 }
 fn timestamp_from_ts_infix(infix: &str, fmt: &InfixFormat) -> Option<DateTime<Local>> {
     NaiveDateTime::parse_from_str(infix, fmt.format())
@@ -31,7 +33,7 @@ fn timestamp_from_ts_infix(infix: &str, fmt: &InfixFormat) -> Option<DateTime<Lo
         .and_then(|ts| Local.from_local_datetime(&ts).single())
 }
 
-pub(super) fn rcurrents_creation_timestamp(
+pub(super) fn creation_timestamp_of_currentfile(
     config: &FileLogWriterConfig,
     current_infix: &str,
     rotate_rcurrent: bool,
@@ -168,7 +170,7 @@ mod test {
             .suppress_timestamp();
 
         let now = Local::now();
-        let now = now
+        let now_rounded = now
             .checked_sub_signed(
                 Duration::from_std(std::time::Duration::from_nanos(u64::from(
                     now.timestamp_subsec_nanos(),
@@ -176,8 +178,9 @@ mod test {
                 .unwrap(),
             )
             .unwrap();
+
         let paths: Vec<PathBuf> = (0..10)
-            .map(|i| now - Duration::try_seconds(i).unwrap())
+            .map(|i| now_rounded - Duration::try_seconds(i).unwrap())
             .map(|ts| {
                 file_spec.as_pathbuf(Some(&super::infix_from_timestamp(
                     &ts,
@@ -187,21 +190,23 @@ mod test {
             })
             .collect();
 
+        let newest = paths
+            .iter()
+            // retrieve the infix
+            .map(|path| super::ts_infix_from_path(path, &file_spec))
+            // parse infix as date, ignore all files where this fails,
+            .filter_map(|infix| super::timestamp_from_ts_infix(&infix, &InfixFormat::Std))
+            // take the newest of these dates
+            .reduce(|acc, e| if acc > e { acc } else { e })
+            // if nothing is found, take Local::now()
+            .unwrap_or_else(Local::now);
+
         assert_eq!(
-            now,
+            now_rounded,
             // TODO: use mocking to avoid code duplication:
             // this test is only useful if the path evaluation is the same as in
             // super::latest_timestamp_file()
-            paths
-                .iter()
-                // retrieve the infix
-                .map(|path| super::ts_infix_from_path(path, &file_spec))
-                // parse infix as date, ignore all files where this fails,
-                .filter_map(|infix| super::timestamp_from_ts_infix(&infix, &InfixFormat::Std))
-                // take the newest of these dates
-                .reduce(|acc, e| if acc > e { acc } else { e })
-                // if nothing is found, take Local::now()
-                .unwrap_or_else(Local::now)
+            newest
         );
     }
 }

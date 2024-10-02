@@ -4,7 +4,7 @@ use crate::{writers::FileLogWriterConfig, FileSpec};
 use std::cmp::max;
 
 pub(super) fn number_infix(idx: u32) -> String {
-    format!("_r{idx:0>5}")
+    format!("r{idx:0>5}")
 }
 
 pub(super) fn index_for_rcurrent(
@@ -41,18 +41,26 @@ pub(super) fn index_for_rcurrent(
 pub(super) fn get_highest_index(file_spec: &FileSpec) -> Option<u32> {
     let mut o_highest_idx = None;
     for file in super::list_and_cleanup::list_of_log_and_compressed_files(file_spec) {
-        let filename = file.file_stem().unwrap(/*ok*/).to_string_lossy();
-        let mut it = filename.rsplit("_r");
-        match it.next() {
-            Some(next) => {
-                let idx: u32 = next.parse().unwrap_or(0);
-                o_highest_idx = match o_highest_idx {
-                    None => Some(idx),
-                    Some(prev) => Some(max(prev, idx)),
-                };
+        let name = file.file_stem().unwrap(/*ok*/).to_string_lossy();
+        let infix = if file_spec.has_basename()
+            || file_spec.has_discriminant()
+            || file_spec.uses_timestamp()
+        {
+            // infix is the last, but not the first part of the name, starts with _r
+            match name.rsplit("_r").next() {
+                Some(infix) => infix,
+                None => continue, // ignore unexpected files
             }
-            None => continue, // ignore unexpected files
-        }
+        } else {
+            // infix is the only part of the name, just skip over the r
+            &name[1..]
+        };
+
+        let idx: u32 = infix.parse().unwrap_or(0);
+        o_highest_idx = match o_highest_idx {
+            None => Some(idx),
+            Some(prev) => Some(max(prev, idx)),
+        };
     }
     o_highest_idx
 }

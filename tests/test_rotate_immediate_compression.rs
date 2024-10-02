@@ -51,39 +51,44 @@ fn test_variant(naming: Naming, criterion: Criterion, cleanup: Cleanup) {
 
     test_utils::wait_for_start_of_second();
 
-    let logger = Logger::try_with_str("trace")
-        .unwrap()
-        .log_to_file(FileSpec::default().directory(&directory))
-        .format_for_files(flexi_logger::detailed_format)
-        .format_for_stderr(flexi_logger::detailed_format)
-        .duplicate_to_stderr(Duplicate::Info)
-        .rotate(criterion, naming, cleanup)
-        .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
-
-    info!(
-        "test correct rotation by {}",
-        match criterion {
-            Criterion::Age(_) => "age",
-            Criterion::AgeOrSize(_, _) => "age or size",
-            Criterion::Size(_) => "size",
-        }
-    );
     let mut written_lines = 1;
+    {
+        let logger = Logger::try_with_str("trace")
+            .unwrap()
+            .log_to_file(
+                FileSpec::default()
+                    .directory(&directory)
+                    .suppress_basename(),
+            )
+            .format_for_files(flexi_logger::detailed_format)
+            .format_for_stderr(flexi_logger::detailed_format)
+            .duplicate_to_stderr(Duplicate::Info)
+            .rotate(criterion, naming, cleanup)
+            .start()
+            .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 
-    let start = Instant::now();
-    let max_runtime = Duration::from_millis(3_200);
-    let sleep_time = Duration::from_millis(7);
-    while Instant::now() - start < max_runtime {
-        written_lines += 1;
-        if written_lines % 17 == 4 {
-            logger.trigger_rotation().unwrap();
+        info!(
+            "test correct rotation by {}",
+            match criterion {
+                Criterion::Age(_) => "age",
+                Criterion::AgeOrSize(_, _) => "age or size",
+                Criterion::Size(_) => "size",
+            }
+        );
+
+        let start = Instant::now();
+        let max_runtime = Duration::from_millis(1_200);
+        let sleep_time = Duration::from_millis(7);
+        while Instant::now() - start < max_runtime {
+            written_lines += 1;
+            if written_lines % 17 == 4 {
+                logger.trigger_rotation().unwrap();
+            }
+            trace!("line_count = {written_lines}");
+            std::thread::sleep(sleep_time);
         }
-        trace!("line_count = {written_lines}");
-        std::thread::sleep(sleep_time);
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
     let read_lines = test_utils::count_log_lines(&directory);
     assert_eq!(
         read_lines, written_lines,

@@ -4,13 +4,26 @@ use std::path::{Path, PathBuf};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
-/// The filename is built from several partially optional components, using this pattern:
+/// The filename is built from several partially components, using this pattern:
 ///
-/// ```<basename>[_<discriminant>][_<date>_<time>][_infix][.<suffix>]```
+/// ```<filename> = [<basename>][_][<discriminant>][_][<starttime>][_][<infix>][.<suffix>]```
 ///
-/// The default filename pattern without rotation uses the program name as basename,
-/// no discriminant, the timestamp of the program start, and the suffix `.log`,
-/// e.g.
+/// - `[<basename>]`: This is by default the program's name, but can be set to a different value
+///   or suppressed at all.
+///
+/// - `[_]`: Consecutive name parts are separated by an underscore.
+///   No underscore is used at the beginning of the filename and directly before the suffix.
+///
+/// - `[<discriminant>]`: some optional name part that allows further differentiations.
+///
+/// - `[<starttime>]`: denotes the point in time when the program was started, if used.
+///
+/// - `[infix]`: used with rotation to differentiate consecutive files.
+///
+/// Without rotation, the default filename pattern uses the program name as basename,
+/// no discriminant, the timestamp of the program start
+/// (printed in the format "YYYY-MM-DD_hh-mm-ss"),
+/// and the suffix `.log`, e.g.
 ///
 /// ```myprog_2015-07-08_10-44-11.log```.
 ///
@@ -18,14 +31,14 @@ use std::path::{Path, PathBuf};
 /// be associated with a concrete program run.
 ///
 /// When the timestamp is suppressed with [`FileSpec::suppress_timestamp`],
-/// you get a fixed output file.
+/// you get a fixed output file name.
 /// It is then worth considering whether a new program start should discard
 /// the content of an already existing outputfile or if it should append its new content to it
 /// (see [`Logger::append`](crate::Logger::append)).
 ///
-/// With rotation the timestamp is by default suppressed and instead the infix is used.
-/// The infix always starts with "_r". For more details how its precise content can be influenced,
-/// see [`Naming`](crate::Naming).
+/// With rotation, the timestamp is by default suppressed and instead the infix is used.
+/// The infix starts always with "r".
+/// For more details how its precise content can be influenced, see [`Naming`](crate::Naming).
 ///
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FileSpec {
@@ -169,7 +182,7 @@ impl FileSpec {
         self
     }
 
-    /// Makes the logger not include a timestamp into the names of the log files
+    /// Makes the logger not include the start time into the names of the log files
     ///
     /// Equivalent to `use_timestamp(false)`.
     #[must_use]
@@ -177,7 +190,7 @@ impl FileSpec {
         self.use_timestamp(false)
     }
 
-    /// Defines if a timestamp should be included into the names of the log files.
+    /// Defines if the start time should be included into the names of the log files.
     ///
     /// The _default_ behavior depends on the usage:
     /// - without rotation, a timestamp is by default included into the name
@@ -190,6 +203,21 @@ impl FileSpec {
             TimestampCfg::No
         };
         self
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn used_directory(&self) -> PathBuf {
+        self.directory.clone()
+    }
+    pub(crate) fn has_basename(&self) -> bool {
+        !self.basename.is_empty()
+    }
+    pub(crate) fn has_discriminant(&self) -> bool {
+        self.o_discriminant.is_some()
+    }
+    pub(crate) fn uses_timestamp(&self) -> bool {
+        matches!(self.timestamp_cfg, TimestampCfg::Yes)
     }
 
     // If no decision was done yet, decide now whether to include a timestamp
@@ -213,9 +241,6 @@ impl FileSpec {
     }
 
     /// Derives a `PathBuf` from the spec and the given infix.
-    ///
-    /// It is composed like this:
-    ///  `<directory>/<basename>_<discr>_<timestamp><infix>.<suffix>`
     #[must_use]
     pub fn as_pathbuf(&self, o_infix: Option<&str>) -> PathBuf {
         let mut filename = self.basename.clone();
@@ -230,6 +255,7 @@ impl FileSpec {
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
+            FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(infix);
         };
         if let Some(suffix) = &self.o_suffix {
@@ -248,7 +274,7 @@ impl FileSpec {
         }
     }
 
-    // <directory>/<basename>_<discr>_<timestamp><infix_pattern>.<suffix>
+    // <directory>/[<basename>][_][<discriminant>][_][<starttime>][_][<infix_pattern>]
     pub(crate) fn as_glob_pattern(&self, infix_pattern: &str, o_suffix: Option<&str>) -> String {
         let mut filename = self.basename.clone();
         filename.reserve(50);
@@ -261,6 +287,8 @@ impl FileSpec {
             FileSpec::separate_with_underscore(&mut filename);
             filename.push_str(timestamp);
         }
+
+        FileSpec::separate_with_underscore(&mut filename);
         filename.push_str(infix_pattern);
 
         match o_suffix {

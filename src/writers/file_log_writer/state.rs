@@ -17,8 +17,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 use timestamps::{
-    collision_free_infix_for_rotated_file, infix_from_timestamp, latest_timestamp_file,
-    rcurrents_creation_timestamp,
+    collision_free_infix_for_rotated_file, creation_timestamp_of_currentfile, infix_from_timestamp,
+    latest_timestamp_file,
 };
 
 #[cfg(feature = "async")]
@@ -34,7 +34,7 @@ use {
 #[cfg(feature = "async")]
 const ASYNC_WRITER: &str = "flexi_logger-fs-async_writer";
 
-const CURRENT_INFIX: &str = "_rCURRENT";
+const CURRENT_INFIX: &str = "rCURRENT";
 
 #[derive(Debug)]
 enum NamingState {
@@ -64,11 +64,9 @@ pub(super) enum InfixFormat {
     Custom(String),
 }
 impl InfixFormat {
-    const STD_INFIX_FORMAT: &'static str = "_r%Y-%m-%d_%H-%M-%S";
-    pub(super) fn custom(f: &str) -> Self {
-        let mut fmt = "_".to_string();
-        fmt.push_str(f);
-        Self::Custom(fmt)
+    const STD_INFIX_FORMAT: &'static str = "r%Y-%m-%d_%H-%M-%S";
+    pub(super) fn custom(fmt: &str) -> Self {
+        Self::Custom(fmt.to_string())
     }
     fn format(&self) -> &str {
         match self {
@@ -306,7 +304,7 @@ impl State {
             }
             Naming::Timestamps => (
                 NamingState::Timestamps(
-                    rcurrents_creation_timestamp(
+                    creation_timestamp_of_currentfile(
                         &self.config,
                         CURRENT_INFIX,
                         !self.config.append,
@@ -323,9 +321,9 @@ impl State {
                 format: ts_fmt,
             } => {
                 if let Some(current_token) = o_current_token {
-                    let current_infix = prepend_underscore(current_token);
+                    let current_infix = current_token.to_string();
                     let naming_state = NamingState::Timestamps(
-                        rcurrents_creation_timestamp(
+                        creation_timestamp_of_currentfile(
                             &self.config,
                             &current_infix,
                             !self.config.append,
@@ -426,7 +424,7 @@ impl State {
                 let infix = match rotation_state.naming_state {
                     NamingState::Timestamps(ref mut ts, ref o_current_infix, ref fmt) => {
                         if let Some(current_infix) = o_current_infix {
-                            *ts = rcurrents_creation_timestamp(
+                            *ts = creation_timestamp_of_currentfile(
                                 &self.config,
                                 current_infix,
                                 true,
@@ -548,16 +546,6 @@ impl State {
             }
             writer.flush().ok();
         }
-    }
-}
-
-fn prepend_underscore(infix: &str) -> String {
-    if infix.is_empty() {
-        infix.to_string()
-    } else {
-        let mut infix_with_underscore = "_".to_string();
-        infix_with_underscore.push_str(infix);
-        infix_with_underscore
     }
 }
 
