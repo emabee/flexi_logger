@@ -31,7 +31,7 @@ macro_rules! command {
 }
 
 fn run_script(s: &str) {
-    let mut path = std::path::PathBuf::from(std::env::var("CARGO_SCRIPT_BASE_PATH").unwrap());
+    let mut path = std::path::PathBuf::from("./scripts");
     path.push(s);
     let command = format!(
         "cargo script {}",
