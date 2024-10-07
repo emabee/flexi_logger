@@ -75,7 +75,7 @@ pub(super) fn latest_timestamp_file(
         Local::now()
     } else {
         // find all file paths that fit the pattern
-        list_of_infix_files()
+        list_of_infix_files(&config.file_spec)
             .into_iter()
             // retrieve the infix
             .map(|path| ts_infix_from_path(&path, &config.file_spec))

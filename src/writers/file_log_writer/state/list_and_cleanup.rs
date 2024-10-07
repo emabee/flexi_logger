@@ -45,8 +45,9 @@ pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<Path
     )
 }
 
-pub(super) fn list_of_infix_files() -> Vec<PathBuf> {
-    list_of_files(INFIX_PATTERN)
+pub(super) fn list_of_infix_files(file_spec: &FileSpec) -> Vec<PathBuf> {
+    let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, file_spec.get_suffix().as_deref());
+    list_of_files(&pattern)
 }
 fn list_of_files(pattern: &str) -> Vec<PathBuf> {
     let mut log_files: Vec<PathBuf> = glob::glob(pattern)
@@ -60,7 +61,7 @@ fn list_of_files(pattern: &str) -> Vec<PathBuf> {
 }
 
 pub(super) fn remove_or_compress_too_old_logfiles(
-    o_cleanup_thread_handle: &Option<CleanupThreadHandle>,
+    o_cleanup_thread_handle: Option<&CleanupThreadHandle>,
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
     writes_direct: bool,

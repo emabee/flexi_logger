@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.2] - 2024-10-07
+
+Fix a regression ([issue #178](https://github.com/emabee/flexi_logger/issues/178))
+introduced with [0.29.1].
+
+Fix error with rotation & append & explicit directory & Naming::Timestamps.
+
 ## [0.29.1] - 2024-10-02
 
 Fix [issue #176](https://github.com/emabee/flexi_logger/issues/176):

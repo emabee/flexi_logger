@@ -255,8 +255,10 @@ impl FileSpec {
             filename.push_str(timestamp);
         }
         if let Some(infix) = o_infix {
-            FileSpec::separate_with_underscore(&mut filename);
-            filename.push_str(infix);
+            if !infix.is_empty() {
+                FileSpec::separate_with_underscore(&mut filename);
+                filename.push_str(infix);
+            }
         };
         if let Some(suffix) = &self.o_suffix {
             filename.push('.');
@@ -540,5 +542,24 @@ mod test {
             .o_suffix(Option::<String>::None)
             .as_pathbuf(None);
         assert!(path.file_name().is_none());
+    }
+
+    #[test]
+    fn issue_178() {
+        let path = FileSpec::default()
+            .basename("BASENAME")
+            .suppress_timestamp()
+            .as_pathbuf(Some(""));
+        assert_eq!(path.file_name().unwrap().to_string_lossy(), "BASENAME.log");
+
+        let path = FileSpec::default()
+            .basename("BASENAME")
+            .discriminant("1")
+            .suppress_timestamp()
+            .as_pathbuf(Some(""));
+        assert_eq!(
+            path.file_name().unwrap().to_string_lossy(),
+            "BASENAME_1.log"
+        );
     }
 }
