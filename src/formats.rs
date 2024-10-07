@@ -391,11 +391,11 @@ fn palette() -> &'static RwLock<Palette> {
 // or from the parameter, if filled.
 // Returns an error if parsing failed.
 #[cfg(feature = "colors")]
-pub(crate) fn set_palette(input: &Option<String>) -> Result<(), std::num::ParseIntError> {
+pub(crate) fn set_palette(input: Option<&str>) -> Result<(), std::num::ParseIntError> {
     *(palette().write().unwrap()) = match std::env::var_os("FLEXI_LOGGER_PALETTE") {
         Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref()),
         None => match input {
-            Some(ref input_string) => Palette::from(input_string),
+            Some(input_string) => Palette::from(input_string),
             None => return Ok(()),
         },
     }?;

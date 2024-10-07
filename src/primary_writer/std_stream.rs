@@ -32,7 +32,7 @@ pub(crate) enum StdstreamLock<'a> {
     Out(StdoutLock<'a>),
     Err(StderrLock<'a>),
 }
-impl<'a> Write for StdstreamLock<'a> {
+impl Write for StdstreamLock<'_> {
     fn write(&mut self, buffer: &[u8]) -> std::result::Result<usize, IoError> {
         match self {
             StdstreamLock::Out(l) => l.write(buffer),

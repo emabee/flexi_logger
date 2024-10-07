@@ -368,7 +368,7 @@ impl State {
         let roll_state = RollState::new(rotate_config.criterion, self.config.append, &path)?;
         let o_cleanup_thread_handle = if rotate_config.cleanup.do_cleanup() {
             list_and_cleanup::remove_or_compress_too_old_logfiles(
-                &None,
+                None,
                 &rotate_config.cleanup,
                 &self.config.file_spec,
                 rotate_config.naming.writes_direct(),
@@ -458,7 +458,7 @@ impl State {
                 rotation_state.roll_state.reset_size_and_date(current_path);
 
                 list_and_cleanup::remove_or_compress_too_old_logfiles(
-                    &rotation_state.o_cleanup_thread_handle,
+                    rotation_state.o_cleanup_thread_handle.as_ref(),
                     &rotation_state.cleanup,
                     &self.config.file_spec,
                     rotation_state.naming_state.writes_direct(),
