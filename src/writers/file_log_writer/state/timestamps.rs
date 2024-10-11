@@ -1,10 +1,7 @@
 use super::{get_creation_timestamp, list_and_cleanup::list_of_infix_files, InfixFormat};
 use crate::{writers::FileLogWriterConfig, FileSpec};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
-use std::{
-    ops::Add,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 pub(super) fn infix_from_timestamp(
     ts: &DateTime<Local>,
@@ -94,64 +91,12 @@ fn path_for_rotated_file_from_timestamp(
     timestamp_for_rotated_file: &DateTime<Local>,
     fmt: &InfixFormat,
 ) -> PathBuf {
-    let infix = collision_free_infix_for_rotated_file(
-        file_spec,
-        &infix_from_timestamp(timestamp_for_rotated_file, use_utc, fmt),
-    );
+    let infix = file_spec.collision_free_infix_for_rotated_file(&infix_from_timestamp(
+        timestamp_for_rotated_file,
+        use_utc,
+        fmt,
+    ));
     file_spec.as_pathbuf(Some(&infix))
-}
-
-// handles collisions by appending ".restart-<number>" to the infix, if necessary
-pub(super) fn collision_free_infix_for_rotated_file(file_spec: &FileSpec, infix: &str) -> String {
-    let mut new_path = file_spec.as_pathbuf(Some(infix));
-    let mut new_path_with_gz = new_path.clone();
-    match new_path.extension() {
-        Some(oss) => {
-            let mut oss_gz = oss.to_os_string();
-            oss_gz.push(".gz");
-            new_path_with_gz.set_extension(oss_gz.as_os_str());
-        }
-        None => {
-            new_path_with_gz.set_extension("gz");
-        }
-    }
-
-    // search for restart-siblings
-    let mut pattern = new_path.clone();
-    if file_spec.o_suffix.is_some() {
-        pattern.set_extension("");
-    }
-    let mut pattern = pattern.to_string_lossy().to_string();
-    pattern.push_str(".restart-*");
-    let mut restart_siblings = glob::glob(&pattern)
-        .unwrap(/* PatternError should be impossible */)
-        // ignore all files with GlobError
-        .filter_map(Result::ok)
-        .collect::<Vec<PathBuf>>();
-
-    // if collision would occur (new_path or compressed new_path exists already),
-    // find highest restart and add 1, else continue without restart
-    if new_path.exists() || new_path_with_gz.exists() || !restart_siblings.is_empty() {
-        let next_number = if restart_siblings.is_empty() {
-            0
-        } else {
-            restart_siblings.sort_unstable();
-            new_path = restart_siblings.pop().unwrap(/*ok*/);
-            let file_stem_string = if file_spec.o_suffix.is_some() {
-                new_path
-                    .file_stem().unwrap(/*ok*/)
-                    .to_string_lossy().to_string()
-            } else {
-                new_path.to_string_lossy().to_string()
-            };
-            let index = file_stem_string.find(".restart-").unwrap(/*ok*/);
-            file_stem_string[(index + 9)..(index + 13)].parse::<usize>().unwrap(/*ok*/) + 1
-        };
-
-        infix.to_string().add(&format!(".restart-{next_number:04}"))
-    } else {
-        infix.to_string()
-    }
 }
 
 #[cfg(test)]

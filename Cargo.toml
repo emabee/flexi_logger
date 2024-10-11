@@ -46,7 +46,6 @@ chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 crossbeam-channel = { version = "0.5", optional = true }
 crossbeam-queue = { version = "0.3", optional = true }
 flate2 = { version = "1.0", optional = true, features = ["rust_backend"] }
-glob = "0.3"
 hostname = { version = "0.4", optional = true }
 log = { version = "0.4", features = ["std"] }
 notify-debouncer-mini = { version = "0.4.1", optional = true, default-features = false }
@@ -68,7 +67,9 @@ libc = { version = "^0.2.50", optional = true }
 cond_sync = "0.2"
 either = "1.9"
 flate2 = "1.0"
+glob = "0.3"
 serde_derive = "1.0"
 version-sync = "0.9"
+temp-dir = "0.1"
 tracing = "0.1.36"
 #env_logger = '*' # optionally needed for the performance example

@@ -16,10 +16,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use timestamps::{
-    collision_free_infix_for_rotated_file, creation_timestamp_of_currentfile, infix_from_timestamp,
-    latest_timestamp_file,
-};
+use timestamps::{creation_timestamp_of_currentfile, infix_from_timestamp, latest_timestamp_file};
 
 #[cfg(feature = "async")]
 const ASYNC_FLUSHER: &str = "flexi_logger-fs-async_flusher";
@@ -39,8 +36,7 @@ const CURRENT_INFIX: &str = "rCURRENT";
 #[derive(Debug)]
 enum NamingState {
     // Contains the timestamp of the current output file (read from its name),
-    // plus the optional current infix (_with_ underscore),
-    // and the format of the timestamp infix (_with_ underscore)
+    // plus the optional current infix and the format of the timestamp infix
     Timestamps(DateTime<Local>, Option<String>, InfixFormat),
 
     // contains the index to which we will rotate
@@ -434,8 +430,7 @@ impl State {
                             current_infix.clone()
                         } else {
                             *ts = Local::now();
-                            collision_free_infix_for_rotated_file(
-                                &self.config.file_spec,
+                            self.config.file_spec.collision_free_infix_for_rotated_file(
                                 &infix_from_timestamp(ts, self.config.use_utc, &InfixFormat::Std),
                             )
                         }

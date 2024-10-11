@@ -1,6 +1,9 @@
 use crate::{DeferredNow, FlexiLoggerError};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::OsStr,
+    ops::Add,
+    path::{Path, PathBuf},
+};
 
 /// Builder object for specifying the name and path of the log output file.
 ///
@@ -240,20 +243,32 @@ impl FileSpec {
         self.o_suffix.clone()
     }
 
+    pub(crate) fn fixed_name_part(&self) -> String {
+        let mut fixed_name_part = self.basename.clone();
+        fixed_name_part.reserve(50);
+
+        if let Some(discriminant) = &self.o_discriminant {
+            FileSpec::separate_with_underscore(&mut fixed_name_part);
+            fixed_name_part.push_str(discriminant);
+        }
+        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
+            FileSpec::separate_with_underscore(&mut fixed_name_part);
+            fixed_name_part.push_str(timestamp);
+        }
+        fixed_name_part
+    }
+
+    fn separate_with_underscore(filename: &mut String) {
+        if !filename.is_empty() {
+            filename.push('_');
+        }
+    }
+
     /// Derives a `PathBuf` from the spec and the given infix.
     #[must_use]
     pub fn as_pathbuf(&self, o_infix: Option<&str>) -> PathBuf {
-        let mut filename = self.basename.clone();
-        filename.reserve(50);
+        let mut filename = self.fixed_name_part();
 
-        if let Some(discriminant) = &self.o_discriminant {
-            FileSpec::separate_with_underscore(&mut filename);
-            filename.push_str(discriminant);
-        }
-        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            FileSpec::separate_with_underscore(&mut filename);
-            filename.push_str(timestamp);
-        }
         if let Some(infix) = o_infix {
             if !infix.is_empty() {
                 FileSpec::separate_with_underscore(&mut filename);
@@ -270,45 +285,135 @@ impl FileSpec {
         p_path
     }
 
-    fn separate_with_underscore(filename: &mut String) {
-        if !filename.is_empty() {
-            filename.push('_');
+    // handles collisions by appending ".restart-<number>" to the infix, if necessary
+    pub(crate) fn collision_free_infix_for_rotated_file(&self, infix: &str) -> String {
+        // Some("log") -> ["log", "log.gz"], None -> [".gz"]:
+        let suffices = self
+            .o_suffix
+            .clone()
+            .into_iter()
+            .chain(
+                self.o_suffix
+                    .as_deref()
+                    .or(Some(""))
+                    .map(|s| [s, ".gz"].concat()),
+            )
+            .collect::<Vec<String>>();
+
+        let mut restart_siblings = self
+            .list_related_files()
+            .into_iter()
+            .filter(|pb| {
+                // ignore files with irrelevant suffixes:
+                // TODO this does not work correctly if o_suffix = None, because we ignore all
+                // non-compressed files
+                pb.file_name()
+                    .map(OsStr::to_string_lossy)
+                    .filter(|file_name| {
+                        file_name.ends_with(&suffices[0])
+                            || suffices.len() > 1 && file_name.ends_with(&suffices[1])
+                    })
+                    .is_some()
+            })
+            .filter(|pb| {
+                pb.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .contains(".restart-")
+            })
+            .collect::<Vec<PathBuf>>();
+
+        let new_path = self.as_pathbuf(Some(infix));
+        let new_path_with_gz = {
+            let mut new_path_with_gz = new_path.clone();
+            new_path_with_gz
+                .set_extension([self.o_suffix.as_deref().unwrap_or(""), ".gz"].concat());
+            new_path_with_gz
+        };
+
+        // if collision would occur (new_path or compressed new_path exists already),
+        // find highest restart and add 1, else continue without restart
+        if new_path.exists() || new_path_with_gz.exists() || !restart_siblings.is_empty() {
+            let next_number = if restart_siblings.is_empty() {
+                0
+            } else {
+                restart_siblings.sort_unstable();
+                let new_path = restart_siblings.pop().unwrap(/*ok*/);
+                let file_stem_string = if self.o_suffix.is_some() {
+                    new_path
+                    .file_stem().unwrap(/*ok*/)
+                    .to_string_lossy().to_string()
+                } else {
+                    new_path.to_string_lossy().to_string()
+                };
+                let index = file_stem_string.find(".restart-").unwrap(/*ok*/);
+                file_stem_string[(index + 9)..(index + 13)].parse::<usize>().unwrap(/*ok*/) + 1
+            };
+
+            infix.to_string().add(&format!(".restart-{next_number:04}"))
+        } else {
+            infix.to_string()
         }
     }
 
-    // <directory>/[<basename>][_][<discriminant>][_][<starttime>][_][<infix_pattern>]
-    pub(crate) fn as_glob_pattern(&self, infix_pattern: &str, o_suffix: Option<&str>) -> String {
-        let mut filename = self.basename.clone();
-        filename.reserve(50);
-
-        if let Some(discriminant) = &self.o_discriminant {
-            FileSpec::separate_with_underscore(&mut filename);
-            filename.push_str(discriminant);
-        }
-        if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            FileSpec::separate_with_underscore(&mut filename);
-            filename.push_str(timestamp);
-        }
-
-        FileSpec::separate_with_underscore(&mut filename);
-        filename.push_str(infix_pattern);
-
-        match o_suffix {
-            Some(s) => {
-                filename.push('.');
-                filename.push_str(s);
-            }
-            None => {
-                if let Some(suffix) = &self.o_suffix {
-                    filename.push('.');
-                    filename.push_str(suffix);
+    pub(crate) fn list_of_files(
+        &self,
+        infix_filter: fn(&str) -> bool,
+        o_suffix: Option<&str>,
+    ) -> Vec<PathBuf> {
+        let fixed_name_part = self.fixed_name_part();
+        self.list_related_files()
+            .into_iter()
+            .filter(|path| {
+                // if suffix is specified, it must match
+                if let Some(suffix) = o_suffix {
+                    path.extension().is_some_and(|ext| {
+                        let s = ext.to_string_lossy();
+                        s == suffix
+                    })
+                } else {
+                    true
                 }
-            }
-        }
+            })
+            .filter(|path| {
+                // infix filter must pass
+                let stem = path.file_stem().unwrap(/* CANNOT FAIL*/).to_string_lossy();
+                let infix_start = if fixed_name_part.is_empty() {
+                    0
+                } else {
+                    fixed_name_part.len() + 1 // underscore at the end
+                };
+                let maybe_infix = &stem[infix_start..];
+                infix_filter(maybe_infix)
+            })
+            .collect::<Vec<PathBuf>>()
+    }
 
-        let mut p_path = self.directory.clone();
-        p_path.push(filename);
-        p_path.to_str().unwrap(/* can hardly fail*/).to_string()
+    // returns an ordered list of all files in the right directory that start with the fixed_name_part
+    fn list_related_files(&self) -> Vec<PathBuf> {
+        let fixed_name_part = self.fixed_name_part();
+        let mut log_files = std::fs::read_dir(&self.directory)
+            .unwrap(/*ignore errors from reading the directory*/)
+            .flatten(/*ignore errors from reading entries in the directory*/)
+            .filter(|entry| entry.path().is_file())
+            .map(|de| de.path())
+            .filter(|path| {
+                // fixed name part must match
+                if let Some(fln) = path.file_name() {
+                    fln.to_string_lossy(/*good enough*/).starts_with(&fixed_name_part)
+                } else {
+                    false
+                }
+            })
+            .collect::<Vec<PathBuf>>();
+        log_files.sort_unstable();
+        log_files.reverse();
+        log_files
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_timestamp(&self) -> Option<String> {
+        self.timestamp_cfg.get_timestamp()
     }
 }
 
@@ -336,7 +441,10 @@ impl TimestampCfg {
 #[cfg(test)]
 mod test {
     use super::{FileSpec, TimestampCfg};
-    use std::path::{Path, PathBuf};
+    use std::{
+        fs::File,
+        path::{Path, PathBuf},
+    };
 
     #[test]
     fn test_timstamp_cfg() {
@@ -561,5 +669,59 @@ mod test {
             path.file_name().unwrap().to_string_lossy(),
             "BASENAME_1.log"
         );
+    }
+
+    #[test]
+    fn test_list_of_files() {
+        let dir = temp_dir::TempDir::new().unwrap();
+        let pd = dir.path();
+        let filespec: FileSpec = FileSpec::default()
+            .directory(pd)
+            .basename("Base")
+            .discriminant("Discr")
+            .use_timestamp(true);
+        println!("Filespec: {}", filespec.as_pathbuf(Some("Infix")).display());
+
+        let mut fn1 = String::new();
+        fn1.push_str("Base_Discr_");
+        fn1.push_str(&filespec.get_timestamp().unwrap());
+        fn1.push_str("_Infix");
+        fn1.push_str(".log");
+        assert_eq!(
+            filespec
+                .as_pathbuf(Some("Infix"))
+                .file_name()
+                .unwrap()
+                .to_string_lossy(),
+            fn1
+        );
+        // create typical set of files, and noise
+        create_file(pd, "test1.txt");
+        create_file(pd, &build_filename(&filespec, "Infix1"));
+        create_file(pd, &build_filename(&filespec, "Infix2"));
+
+        println!("\nFolder content:");
+        for entry in std::fs::read_dir(pd).unwrap() {
+            println!("  {}", entry.unwrap().path().display());
+        }
+
+        println!("\nRelevant subset:");
+        for pb in filespec.list_of_files(|s: &str| s.starts_with("Infix"), Some("log")) {
+            println!("  {}", pb.display());
+        }
+    }
+
+    fn build_filename(file_spec: &FileSpec, infix: &str) -> String {
+        let mut fn1 = String::new();
+        fn1.push_str("Base_Discr_");
+        fn1.push_str(&file_spec.get_timestamp().unwrap());
+        fn1.push('_');
+        fn1.push_str(infix);
+        fn1.push_str(".log");
+        fn1
+    }
+
+    fn create_file(dir: &Path, filename: &str) {
+        File::create(dir.join(filename)).unwrap();
     }
 }

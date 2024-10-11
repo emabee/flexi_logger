@@ -6,35 +6,18 @@ use std::{
     thread::{Builder as ThreadBuilder, JoinHandle},
 };
 
-const INFIX_PATTERN: &str = "r[0-9]*";
-
-pub(super) fn existing_log_files(
-    file_spec: &FileSpec,
-    use_rotation: bool,
-    selector: &LogfileSelector,
-) -> Vec<PathBuf> {
-    let mut result = Vec::new();
-    if use_rotation {
-        if selector.with_plain_files {
-            let pattern =
-                file_spec.as_glob_pattern(INFIX_PATTERN, file_spec.get_suffix().as_deref());
-            result.append(&mut list_of_files(&pattern));
-        }
-
-        if selector.with_compressed_files {
-            let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, Some("gz"));
-            result.append(&mut list_of_files(&pattern));
-        }
-
-        if selector.with_r_current {
-            let pattern =
-                file_spec.as_glob_pattern(super::CURRENT_INFIX, file_spec.get_suffix().as_deref());
-            result.append(&mut list_of_files(&pattern));
-        }
+// looks like std infix if it starts with r and a digit
+fn looks_like_std_infix(s: &str) -> bool {
+    if s.len() > 2 {
+        let mut chars = s.chars();
+        chars.next().unwrap() == 'r' && chars.next().unwrap().is_ascii_digit()
     } else {
-        result.push(file_spec.as_pathbuf(None));
+        false
     }
-    result
+}
+// FIXME !! must be flexibilized
+fn is_current_infix(s: &str) -> bool {
+    s == "rCURRENT"
 }
 
 pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<PathBuf> {
@@ -45,21 +28,38 @@ pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<Path
     )
 }
 
-pub(super) fn list_of_infix_files(file_spec: &FileSpec) -> Vec<PathBuf> {
-    let pattern = file_spec.as_glob_pattern(INFIX_PATTERN, file_spec.get_suffix().as_deref());
-    list_of_files(&pattern)
-}
-fn list_of_files(pattern: &str) -> Vec<PathBuf> {
-    let mut log_files: Vec<PathBuf> = glob::glob(pattern)
-        .unwrap(/* PatternError should be impossible */)
-        // ignore all files with GlobError
-        .filter_map(Result::ok)
-        .collect();
-    log_files.sort_unstable(); // should be no-op, but we don't want to rely on glob doing it
-    log_files.reverse();
-    log_files
+pub(super) fn existing_log_files(
+    file_spec: &FileSpec,
+    use_rotation: bool,
+    selector: &LogfileSelector,
+) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    if use_rotation {
+        if selector.with_plain_files {
+            result.append(
+                &mut file_spec
+                    .list_of_files(looks_like_std_infix, file_spec.get_suffix().as_deref()),
+            );
+        }
+
+        if selector.with_compressed_files {
+            result.append(&mut file_spec.list_of_files(looks_like_std_infix, Some("gz")));
+        }
+
+        if selector.with_r_current {
+            result.append(
+                &mut file_spec.list_of_files(is_current_infix, file_spec.get_suffix().as_deref()),
+            );
+        }
+    } else {
+        result.push(file_spec.as_pathbuf(None));
+    }
+    result
 }
 
+pub(super) fn list_of_infix_files(file_spec: &FileSpec) -> Vec<PathBuf> {
+    file_spec.list_of_files(looks_like_std_infix, file_spec.get_suffix().as_deref())
+}
 pub(super) fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: Option<&CleanupThreadHandle>,
     cleanup_config: &Cleanup,
