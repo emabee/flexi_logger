@@ -6,18 +6,14 @@ use std::{
     thread::{Builder as ThreadBuilder, JoinHandle},
 };
 
-// looks like std infix if it starts with r and a digit
-fn looks_like_std_infix(s: &str) -> bool {
+// looks like a standard infix if it starts with an r and a digit
+pub(crate) fn looks_like_std_infix(s: &str) -> bool {
     if s.len() > 2 {
         let mut chars = s.chars();
         chars.next().unwrap() == 'r' && chars.next().unwrap().is_ascii_digit()
     } else {
         false
     }
-}
-// FIXME !! must be flexibilized
-fn is_current_infix(s: &str) -> bool {
-    s == "rCURRENT"
 }
 
 pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<PathBuf> {
@@ -34,22 +30,36 @@ pub(super) fn existing_log_files(
     selector: &LogfileSelector,
 ) -> Vec<PathBuf> {
     let mut result = Vec::new();
+    let related_files = file_spec.read_dir_related_files();
+
     if use_rotation {
         if selector.with_plain_files {
-            result.append(
-                &mut file_spec
-                    .list_of_files(looks_like_std_infix, file_spec.get_suffix().as_deref()),
-            );
+            result.append(&mut file_spec.filter_files(
+                &related_files,
+                looks_like_std_infix,
+                file_spec.get_suffix().as_deref(),
+            ));
         }
-
         if selector.with_compressed_files {
-            result.append(&mut file_spec.list_of_files(looks_like_std_infix, Some("gz")));
+            result.append(&mut file_spec.filter_files(
+                &related_files,
+                looks_like_std_infix,
+                Some("gz"),
+            ));
         }
-
         if selector.with_r_current {
-            result.append(
-                &mut file_spec.list_of_files(is_current_infix, file_spec.get_suffix().as_deref()),
-            );
+            result.append(&mut file_spec.filter_files(
+                &related_files,
+                |s: &str| s == super::CURRENT_INFIX,
+                file_spec.get_suffix().as_deref(),
+            ));
+        }
+        if let Some(ref custom_current) = selector.with_configured_current {
+            result.append(&mut file_spec.filter_files(
+                &related_files,
+                |s: &str| s == custom_current,
+                file_spec.get_suffix().as_deref(),
+            ));
         }
     } else {
         result.push(file_spec.as_pathbuf(None));
@@ -57,9 +67,6 @@ pub(super) fn existing_log_files(
     result
 }
 
-pub(super) fn list_of_infix_files(file_spec: &FileSpec) -> Vec<PathBuf> {
-    file_spec.list_of_files(looks_like_std_infix, file_spec.get_suffix().as_deref())
-}
 pub(super) fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: Option<&CleanupThreadHandle>,
     cleanup_config: &Cleanup,

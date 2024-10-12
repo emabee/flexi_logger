@@ -1,6 +1,6 @@
 use crate::{DeferredNow, FlexiLoggerError};
 use std::{
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     ops::Add,
     path::{Path, PathBuf},
 };
@@ -49,12 +49,12 @@ pub struct FileSpec {
     pub(crate) basename: String,
     pub(crate) o_discriminant: Option<String>,
     timestamp_cfg: TimestampCfg,
-    pub(crate) o_suffix: Option<String>,
+    o_suffix: Option<String>,
     pub(crate) use_utc: bool,
 }
 impl Default for FileSpec {
     /// Describes a file in the current folder,
-    /// using, as its filestem the program name followed by the current timestamp,
+    /// using, as its filestem, the program name followed by the current timestamp,
     /// and the suffix ".log".
     #[must_use]
     fn default() -> Self {
@@ -287,33 +287,20 @@ impl FileSpec {
 
     // handles collisions by appending ".restart-<number>" to the infix, if necessary
     pub(crate) fn collision_free_infix_for_rotated_file(&self, infix: &str) -> String {
-        // Some("log") -> ["log", "log.gz"], None -> [".gz"]:
-        let suffices = self
-            .o_suffix
-            .clone()
-            .into_iter()
-            .chain(
-                self.o_suffix
-                    .as_deref()
-                    .or(Some(""))
-                    .map(|s| [s, ".gz"].concat()),
-            )
-            .collect::<Vec<String>>();
-
         let mut restart_siblings = self
-            .list_related_files()
+            .read_dir_related_files()
             .into_iter()
             .filter(|pb| {
-                // ignore files with irrelevant suffixes:
-                // TODO this does not work correctly if o_suffix = None, because we ignore all
-                // non-compressed files
-                pb.file_name()
-                    .map(OsStr::to_string_lossy)
-                    .filter(|file_name| {
-                        file_name.ends_with(&suffices[0])
-                            || suffices.len() > 1 && file_name.ends_with(&suffices[1])
-                    })
-                    .is_some()
+                // ignore .gz suffix
+                let mut pb2 = PathBuf::from(pb);
+                if pb2.extension() == Some(OsString::from("gz").as_ref()) {
+                    pb2.set_extension("");
+                };
+                // suffix must match the given suffix, if one is given
+                match self.o_suffix {
+                    Some(ref sfx) => pb2.extension() == Some(OsString::from(sfx).as_ref()),
+                    None => true,
+                }
             })
             .filter(|pb| {
                 pb.file_name()
@@ -356,14 +343,47 @@ impl FileSpec {
         }
     }
 
-    pub(crate) fn list_of_files(
-        &self,
-        infix_filter: fn(&str) -> bool,
-        o_suffix: Option<&str>,
-    ) -> Vec<PathBuf> {
+    pub(crate) fn list_of_files<F>(&self, infix_filter: F, o_suffix: Option<&str>) -> Vec<PathBuf>
+    where
+        F: Fn(&str) -> bool,
+    {
+        self.filter_files(&self.read_dir_related_files(), infix_filter, o_suffix)
+    }
+
+    // returns an ordered list of all files in the right directory that start with the fixed_name_part
+    pub(crate) fn read_dir_related_files(&self) -> Vec<PathBuf> {
         let fixed_name_part = self.fixed_name_part();
-        self.list_related_files()
-            .into_iter()
+        let mut log_files = std::fs::read_dir(&self.directory)
+            .unwrap(/*ignore errors from reading the directory*/)
+            .flatten(/*ignore errors from reading entries in the directory*/)
+            .filter(|entry| entry.path().is_file())
+            .map(|de| de.path())
+            .filter(|path| {
+                // fixed name part must match
+                if let Some(fln) = path.file_name() {
+                    fln.to_string_lossy(/*good enough*/).starts_with(&fixed_name_part)
+                } else {
+                    false
+                }
+            })
+            .collect::<Vec<PathBuf>>();
+        log_files.sort_unstable();
+        log_files.reverse();
+        log_files
+    }
+
+    pub(crate) fn filter_files<F>(
+        &self,
+        files: &[PathBuf],
+        infix_filter: F,
+        o_suffix: Option<&str>,
+    ) -> Vec<PathBuf>
+    where
+        F: Fn(&str) -> bool,
+    {
+        let fixed_name_part = self.fixed_name_part();
+        files
+            .iter()
             .filter(|path| {
                 // if suffix is specified, it must match
                 if let Some(suffix) = o_suffix {
@@ -383,32 +403,14 @@ impl FileSpec {
                 } else {
                     fixed_name_part.len() + 1 // underscore at the end
                 };
+                if stem.len() <= infix_start {
+                    return false;
+                }
                 let maybe_infix = &stem[infix_start..];
                 infix_filter(maybe_infix)
             })
+            .map(PathBuf::clone)
             .collect::<Vec<PathBuf>>()
-    }
-
-    // returns an ordered list of all files in the right directory that start with the fixed_name_part
-    fn list_related_files(&self) -> Vec<PathBuf> {
-        let fixed_name_part = self.fixed_name_part();
-        let mut log_files = std::fs::read_dir(&self.directory)
-            .unwrap(/*ignore errors from reading the directory*/)
-            .flatten(/*ignore errors from reading entries in the directory*/)
-            .filter(|entry| entry.path().is_file())
-            .map(|de| de.path())
-            .filter(|path| {
-                // fixed name part must match
-                if let Some(fln) = path.file_name() {
-                    fln.to_string_lossy(/*good enough*/).starts_with(&fixed_name_part)
-                } else {
-                    false
-                }
-            })
-            .collect::<Vec<PathBuf>>();
-        log_files.sort_unstable();
-        log_files.reverse();
-        log_files
     }
 
     #[cfg(test)]

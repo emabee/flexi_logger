@@ -1,4 +1,4 @@
-use super::{get_creation_timestamp, list_and_cleanup::list_of_infix_files, InfixFormat};
+use super::{get_creation_timestamp, list_and_cleanup::looks_like_std_infix, InfixFormat};
 use crate::{writers::FileLogWriterConfig, FileSpec};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use std::path::{Path, PathBuf};
@@ -72,7 +72,12 @@ pub(super) fn latest_timestamp_file(
         Local::now()
     } else {
         // find all file paths that fit the pattern
-        list_of_infix_files(&config.file_spec)
+        config
+            .file_spec
+            .list_of_files(
+                looks_like_std_infix,
+                config.file_spec.get_suffix().as_deref(),
+            )
             .into_iter()
             // retrieve the infix
             .map(|path| ts_infix_from_path(&path, &config.file_spec))

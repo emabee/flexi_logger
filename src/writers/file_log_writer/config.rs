@@ -46,7 +46,7 @@ impl FileLogWriterConfig {
     /// Returns the configured `suffix`.
     #[must_use]
     pub fn suffix(&self) -> Option<String> {
-        self.file_spec.o_suffix.clone()
+        self.file_spec.get_suffix()
     }
 
     /// Returns `true` if UTC is enforced.

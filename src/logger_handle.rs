@@ -414,6 +414,7 @@ pub struct LogfileSelector {
     pub(crate) with_plain_files: bool,
     pub(crate) with_r_current: bool,
     pub(crate) with_compressed_files: bool,
+    pub(crate) with_configured_current: Option<String>,
 }
 impl Default for LogfileSelector {
     /// Selects plain log files without the `rCURRENT` file.
@@ -422,6 +423,7 @@ impl Default for LogfileSelector {
             with_plain_files: true,
             with_r_current: false,
             with_compressed_files: false,
+            with_configured_current: None,
         }
     }
 }
@@ -433,12 +435,20 @@ impl LogfileSelector {
             with_plain_files: false,
             with_r_current: false,
             with_compressed_files: false,
+            with_configured_current: None,
         }
     }
     /// Selects additionally the `rCURRENT` file.
     #[must_use]
     pub fn with_r_current(mut self) -> Self {
         self.with_r_current = true;
+        self
+    }
+
+    /// Selects additionally a custom "current" file.
+    #[must_use]
+    pub fn with_custom_current(mut self, s: &str) -> Self {
+        self.with_configured_current = Some(s.to_string());
         self
     }
 
