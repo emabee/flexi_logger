@@ -152,19 +152,14 @@ mod d {
             .add(&basename)
             .add("_r[0-9][0-9]*.");
 
-        let log_pattern = fn_pattern.clone().add("log");
-        println!("log_pattern = {log_pattern}");
-        let no_of_log_files = glob(&log_pattern)
+        let no_of_log_files = glob(&fn_pattern.clone().add("log"))
             .unwrap()
             .map(Result::unwrap)
-            .inspect(|p| println!("found: {p:?}"))
             .count();
 
-        let gz_pattern = fn_pattern.add("gz");
-        let no_of_gz_files = glob(&gz_pattern)
+        let no_of_gz_files = glob(&fn_pattern.add("gz"))
             .unwrap()
             .map(Result::unwrap)
-            .inspect(|p| println!("found: {p:?}"))
             .count();
 
         assert_eq!(no_of_log_files, NO_OF_LOG_FILES);

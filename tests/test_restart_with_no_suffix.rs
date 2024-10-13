@@ -1,17 +1,12 @@
 mod test_utils;
 
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
-
 use flexi_logger::{Cleanup, Criterion, FileSpec, LogfileSelector, Logger, Naming};
 use log::*;
 
 const COUNT: u8 = 2;
 
 #[test]
-fn test_write_modes() {
+fn test_restart_with_no_suffix() {
     if let Some(value) = test_utils::dispatch(COUNT) {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         work(value)
@@ -21,10 +16,16 @@ fn test_write_modes() {
 fn work(value: u8) {
     let directory = test_utils::dir();
     let file_spec = FileSpec::default()
-        .directory(directory)
+        .directory(directory.clone())
         .o_suffix(match value {
-            0 => Some("log".to_string()),
-            1 => None,
+            0 => {
+                println!("With suffix log");
+                Some("log".to_string())
+            }
+            1 => {
+                println!("Without suffix");
+                None
+            }
             COUNT..=u8::MAX => {
                 unreachable!("got unexpected value {}", value)
             }
@@ -42,32 +43,37 @@ fn work(value: u8) {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
-    let mut contents = String::new();
+    // verify all log lines are found
+    assert_eq!(100, test_utils::count_log_lines(&directory));
 
-    assert_eq!(
-        100,
-        logger
-            .existing_log_files(&LogfileSelector::default().with_r_current())
-            .unwrap()
-            .into_iter()
-            .filter(|pb| {
-                let extension = pb.extension().map(|s| s.to_string_lossy().into_owned());
-                match value {
-                    0 => Some("log".to_string()) == extension,
-                    1 => extension.is_none() || extension.unwrap().starts_with("restart"),
-                    COUNT..=u8::MAX => {
-                        unreachable!("got unexpected value {}", value)
-                    }
-                }
-            })
-            .map(|path| {
-                let mut buf_reader = BufReader::new(File::open(path).unwrap());
-                let mut line_count = 0;
-                while buf_reader.read_line(&mut contents).unwrap() > 0 {
-                    line_count += 1;
-                }
-                line_count
-            })
-            .sum::<u32>()
-    );
+    // verify that no unexpected files are found
+    match value {
+        0 => assert_eq!(
+            0,
+            logger
+                .existing_log_files(&LogfileSelector::default())
+                .unwrap()
+                .into_iter()
+                .filter(
+                    |pb| pb.extension().map(|oss| oss.to_string_lossy().to_string())
+                        != Some(String::from("log"))
+                )
+                .count()
+        ),
+        1 => assert_eq!(
+            0,
+            logger
+                .existing_log_files(&LogfileSelector::default())
+                .unwrap()
+                .into_iter()
+                .filter(|pb| match pb.extension() {
+                    Some(oss) => !oss.to_string_lossy().to_string().starts_with("restart"),
+                    None => false,
+                })
+                .count()
+        ),
+        COUNT..=u8::MAX => {
+            unreachable!("got unexpected value {}", value)
+        }
+    }
 }

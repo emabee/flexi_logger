@@ -68,11 +68,11 @@ mod d {
             wait_for_workers_to_close(worker_handles);
             Local::now()
         };
-        let delta1 = end.signed_duration_since(start).num_milliseconds();
-        let delta2 = Local::now().signed_duration_since(end);
+        let delta1_ms = end.signed_duration_since(start).num_milliseconds();
+        let delta2_ms = Local::now().signed_duration_since(end).num_milliseconds();
         println!(
-            "Task executed with {NO_OF_THREADS} threads in {delta1} ms, \
-             program added {delta2} ms to finish writing logs.",
+            "Task executed with {NO_OF_THREADS} threads in {delta1_ms} ms, \
+             program added {delta2_ms} ms to finish writing logs.",
         );
 
         verify_logs(&directory.display().to_string());
@@ -164,15 +164,13 @@ mod d {
             // .add("_r[0-9][0-9]*.");
             .add("_r*.");
 
-        let log_pattern = fn_pattern.clone().add("log");
-        let no_of_log_files = glob(&log_pattern)
+        let no_of_log_files = glob(&fn_pattern.clone().add("log"))
             .unwrap()
             .map(Result::unwrap)
             .inspect(|p| inspect_file(p, &mut counters))
             .count();
 
-        let gz_pattern = fn_pattern.add("gz");
-        let no_of_gz_files = glob(&gz_pattern)
+        let no_of_gz_files = glob(&fn_pattern.add("gz"))
             .unwrap()
             .map(Result::unwrap)
             .inspect(|p| inspect_file(p, &mut counters))

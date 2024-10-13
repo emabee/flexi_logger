@@ -107,7 +107,8 @@ pub fn wait_for_end_of_second() {
     }
 }
 
-// Count all log lines written in all .log and .log.gz files in the given folder
+// Count all log lines written in all files in the given folder
+// ".gz" files are decompressed first
 pub fn count_log_lines(directory: &Path) -> usize {
     // read all files
     let pattern = directory.display().to_string().add("/*");
