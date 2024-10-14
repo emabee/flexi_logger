@@ -1,4 +1,6 @@
 use crate::formats::AdaptiveFormat;
+#[cfg(feature = "colors")]
+use crate::set_palette;
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
@@ -672,7 +674,7 @@ impl Logger {
     /// Several variants of [`FlexiLoggerError`] can occur.
     pub fn build(mut self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
         #[cfg(feature = "colors")]
-        crate::formats::set_palette(self.o_palette.as_deref())?;
+        set_palette(self.o_palette.as_deref())?;
 
         if self.use_utc {
             self.flwb = self.flwb.use_utc();

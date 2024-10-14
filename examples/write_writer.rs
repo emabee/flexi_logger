@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use flexi_logger::writers::LogWriter;
 use std::{
     io::{Error, ErrorKind},
@@ -7,6 +6,7 @@ use std::{
 
 fn main() {}
 
+#[allow(dead_code)]
 struct MyWriter<F> {
     file: Arc<Mutex<F>>,
 }

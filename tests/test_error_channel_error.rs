@@ -77,7 +77,6 @@ fn controller() {
 fn parent(panic: bool) {
     let progpath = std::env::args().next().unwrap();
     // spawn child and terminate directly, thus destroying the child's stderr
-    #[allow(clippy::zombie_processes)]
     Command::new(progpath)
         .env(CTRL_INDEX, if panic { "child_panic" } else { "child" })
         .stdout(Stdio::null())

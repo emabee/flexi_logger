@@ -19,9 +19,9 @@ impl<'a> DeferredNow {
         Self(None)
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     #[must_use]
-    pub(crate) fn new_from_datetime(dt: DateTime<Local>) -> Self {
+    fn new_from_datetime(dt: DateTime<Local>) -> Self {
         Self(Some(dt))
     }
 

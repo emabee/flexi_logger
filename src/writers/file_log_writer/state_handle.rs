@@ -183,7 +183,7 @@ impl StateHandle {
         }
     }
 
-    #[allow(clippy::unnecessary_wraps)]
+    #[allow(clippy::unnecessary_wraps)] // necessary if not compiled with feature = "async"
     #[inline]
     pub(super) fn write(&self, now: &mut DeferredNow, record: &Record) -> std::io::Result<()> {
         match &self {

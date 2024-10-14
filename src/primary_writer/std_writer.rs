@@ -99,7 +99,7 @@ impl StdWriter {
             EffectiveWriteMode::BufferDontFlushWith(capacity) => {
                 InnerStdWriter::Buffered(Mutex::new(BufWriter::with_capacity(capacity, stdstream)))
             }
-            EffectiveWriteMode::BufferAndFlushWith(_, _) => {
+            EffectiveWriteMode::BufferAndFlushWith(_) => {
                 unreachable!("Sync InnerStdWriter with own flushing is not implemented")
             }
             #[cfg(feature = "async")]

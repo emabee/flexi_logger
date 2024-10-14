@@ -114,26 +114,6 @@ pub enum WriteMode {
         flush_interval: Duration,
     },
 }
-
-pub(crate) enum EffectiveWriteMode {
-    Direct,
-    #[allow(dead_code)] // introduced due to a bug in clippy, should be removed again
-    BufferAndFlushWith(usize, Duration),
-    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
-    #[cfg(feature = "async")]
-    AsyncWith {
-        /// Capacity of the pool for the message buffers.
-        pool_capa: usize,
-        /// Capacity of an individual message buffer.
-        message_capa: usize,
-        /// The interval for flushing the output.
-        ///
-        /// With `Duration::ZERO` flushing is suppressed.
-        flush_interval: Duration,
-    },
-    BufferDontFlushWith(usize),
-}
-
 impl WriteMode {
     pub(crate) fn inner(&self) -> EffectiveWriteMode {
         match *self {
@@ -144,12 +124,9 @@ impl WriteMode {
             Self::BufferDontFlushWith(duration) => {
                 EffectiveWriteMode::BufferDontFlushWith(duration)
             }
-            Self::BufferAndFlush => EffectiveWriteMode::BufferAndFlushWith(
-                DEFAULT_BUFFER_CAPACITY,
-                DEFAULT_FLUSH_INTERVAL,
-            ),
-            Self::BufferAndFlushWith(bufsize, duration) => {
-                EffectiveWriteMode::BufferAndFlushWith(bufsize, duration)
+            Self::BufferAndFlush => EffectiveWriteMode::BufferAndFlushWith(DEFAULT_BUFFER_CAPACITY),
+            Self::BufferAndFlushWith(bufsize, _duration) => {
+                EffectiveWriteMode::BufferAndFlushWith(bufsize)
             }
             #[cfg(feature = "async")]
             Self::Async => EffectiveWriteMode::AsyncWith {
@@ -198,7 +175,7 @@ impl WriteMode {
     pub(crate) fn buffersize(&self) -> Option<usize> {
         match self.inner() {
             EffectiveWriteMode::Direct => None,
-            EffectiveWriteMode::BufferAndFlushWith(bufsize, _)
+            EffectiveWriteMode::BufferAndFlushWith(bufsize)
             | EffectiveWriteMode::BufferDontFlushWith(bufsize) => Some(bufsize),
             #[cfg(feature = "async")]
             EffectiveWriteMode::AsyncWith {
@@ -226,4 +203,22 @@ impl WriteMode {
             } => *flush_interval,
         }
     }
+}
+
+pub(crate) enum EffectiveWriteMode {
+    Direct,
+    BufferAndFlushWith(usize),
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+    #[cfg(feature = "async")]
+    AsyncWith {
+        /// Capacity of the pool for the message buffers.
+        pool_capa: usize,
+        /// Capacity of an individual message buffer.
+        message_capa: usize,
+        /// The interval for flushing the output.
+        ///
+        /// With `Duration::ZERO` flushing is suppressed.
+        flush_interval: Duration,
+    },
+    BufferDontFlushWith(usize),
 }

@@ -333,9 +333,8 @@ impl State {
                 } else {
                     let fmt = InfixFormat::custom(ts_fmt);
                     let ts = latest_timestamp_file(&self.config, !self.config.append, &fmt);
-                    let naming_state = NamingState::Timestamps(ts, None, fmt.clone());
                     let infix = infix_from_timestamp(&ts, self.config.use_utc, &fmt);
-                    (naming_state, infix)
+                    (NamingState::Timestamps(ts, None, fmt), infix)
                 }
             }
             Naming::Numbers => (
@@ -591,7 +590,6 @@ fn validate_logs_in_file(
     assert!(buf.is_empty(), "Found more log lines than expected: {buf} ");
 }
 
-#[allow(clippy::type_complexity)]
 fn open_log_file(
     config: &FileLogWriterConfig,
     o_infix: Option<&str>,

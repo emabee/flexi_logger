@@ -38,7 +38,7 @@ impl FileLogWriter {
     ) -> FileLogWriter {
         let state_handle = match state.config().write_mode.inner() {
             EffectiveWriteMode::Direct
-            | EffectiveWriteMode::BufferAndFlushWith(_, _)
+            | EffectiveWriteMode::BufferAndFlushWith(_)
             | EffectiveWriteMode::BufferDontFlushWith(_) => {
                 StateHandle::new_sync(state, format_function)
             }

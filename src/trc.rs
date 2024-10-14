@@ -138,9 +138,10 @@ impl LogSpecSubscriber for TraceLogSpecSubscriber {
     }
 }
 
-#[allow(dead_code)] // not really appropriate, seems to be a bug in clippy
 /// Rereads the specfile if it was updated and forwards the update to `tracing`'s filter.
-pub struct SpecFileNotifier(Option<Debouncer<RecommendedWatcher>>);
+pub struct SpecFileNotifier {
+    _watcher: Option<Debouncer<RecommendedWatcher>>,
+}
 
 /// Set up tracing to write into the specified `FileLogWriter`,
 /// and to use the (optionally) specified specfile.
@@ -166,19 +167,21 @@ pub fn setup_tracing(
         .with_filter_reloading();
 
     // Set up specfile watching
-    let spec_file_notifier = SpecFileNotifier(match o_specfile {
-        Some(specfile) => {
-            let reload_handle = Box::new(subscriber_builder.reload_handle());
-            subscribe_to_specfile(
-                specfile,
-                Box::new(move |logspec| {
-                    { reload_handle.reload(LogSpecAsFilter(logspec)) }.unwrap(/* OK */);
-                }),
-                initial_logspec,
-            )?
-        }
-        None => None,
-    });
+    let spec_file_notifier = SpecFileNotifier {
+        _watcher: match o_specfile {
+            Some(specfile) => {
+                let reload_handle = Box::new(subscriber_builder.reload_handle());
+                subscribe_to_specfile(
+                    specfile,
+                    Box::new(move |logspec| {
+                        { reload_handle.reload(LogSpecAsFilter(logspec)) }.unwrap(/* OK */);
+                    }),
+                    initial_logspec,
+                )?
+            }
+            None => None,
+        },
+    };
 
     // Get ready to trace
     tracing::subscriber::set_global_default(subscriber_builder.finish())?;

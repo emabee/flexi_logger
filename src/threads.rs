@@ -21,9 +21,8 @@ use {
     std::{sync::Mutex, thread::JoinHandle},
 };
 
-// no clue why we get a warning if this allow is omitted; if we omit the use, we get an error
-#[allow(unused_imports)]
 #[cfg(feature = "async")]
+#[cfg(test)]
 use std::io::Write;
 
 #[cfg(feature = "async")]

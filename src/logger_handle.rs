@@ -133,7 +133,6 @@ impl LoggerHandle {
     }
 
     /// Replaces the active `LogSpecification`.
-    #[allow(clippy::missing_panics_doc)]
     pub fn set_new_spec(&self, new_spec: LogSpecification) {
         self.writers_handle
             .set_new_spec(new_spec)
@@ -151,7 +150,7 @@ impl LoggerHandle {
         Ok(())
     }
 
-    /// Replaces the active `LogSpecification` and pushes the previous one to a Stack.
+    /// Replaces the active `LogSpecification` and pushes the previous one to a stack.
     #[allow(clippy::missing_panics_doc)]
     pub fn push_temp_spec(&mut self, new_spec: LogSpecification) {
         self.writers_handle

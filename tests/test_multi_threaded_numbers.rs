@@ -50,8 +50,6 @@ fn multi_threaded() {
              verify the log"
         );
 
-        // clippy ignores the Drop implementation of the inner log handle :-(
-        #[allow(clippy::redundant_clone)]
         let logger2 = logger.clone();
 
         let cond_sync = CondSync::new(0_usize);
