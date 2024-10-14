@@ -26,6 +26,8 @@ pub(crate) enum ErrorCode {
     LogFile,
     #[cfg(feature = "specfile")]
     LogSpecFile,
+    #[cfg(feature = "colors")]
+    Palette,
     Poison,
     #[cfg(target_family = "unix")]
     Symlink,
@@ -40,6 +42,8 @@ impl ErrorCode {
             Self::LogFile => "logfile",
             #[cfg(feature = "specfile")]
             Self::LogSpecFile => "logspecfile",
+            #[cfg(feature = "colors")]
+            Self::Palette => "palette",
             Self::Poison => "poison",
             #[cfg(target_family = "unix")]
             Self::Symlink => "symlink",

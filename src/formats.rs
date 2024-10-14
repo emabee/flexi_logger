@@ -9,7 +9,7 @@ use serde_derive::Serialize;
 #[cfg(feature = "kv")]
 use std::collections::BTreeMap;
 #[cfg(feature = "colors")]
-use std::sync::{OnceLock, RwLock};
+use std::sync::OnceLock;
 use std::thread;
 
 /// Time stamp format that is used by the provided format functions.
@@ -361,30 +361,15 @@ impl<'kvs> VisitSource<'kvs> for Collect<'kvs> {
     }
 }
 
-/// Helper function that is used in the provided coloring format functions to apply
-/// colors based on the log level and the effective color palette.
-///
-/// See [`Logger::set_palette`](crate::Logger::set_palette) if you want to
-/// modify the color palette.
-#[allow(clippy::missing_panics_doc)]
-#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
 #[cfg(feature = "colors")]
-#[must_use]
-pub fn style(level: log::Level) -> Style {
-    let palette = &*(palette().read().unwrap());
-    match level {
-        log::Level::Error => palette.error,
-        log::Level::Warn => palette.warn,
-        log::Level::Info => palette.info,
-        log::Level::Debug => palette.debug,
-        log::Level::Trace => palette.trace,
-    }
-}
+const DEFAULT_PALETTE: Palette = Palette::default();
 
 #[cfg(feature = "colors")]
-fn palette() -> &'static RwLock<Palette> {
-    static PALETTE: OnceLock<RwLock<Palette>> = OnceLock::new();
-    PALETTE.get_or_init(|| RwLock::new(Palette::default()))
+static PALETTE: OnceLock<Palette> = OnceLock::new();
+
+#[cfg(feature = "colors")]
+fn palette() -> &'static Palette {
+    PALETTE.get().unwrap_or(&DEFAULT_PALETTE)
 }
 
 // Overwrites the default PALETTE value either from the environment, if set,
@@ -392,16 +377,60 @@ fn palette() -> &'static RwLock<Palette> {
 // Returns an error if parsing failed.
 #[cfg(feature = "colors")]
 pub(crate) fn set_palette(input: Option<&str>) -> Result<(), std::num::ParseIntError> {
-    *(palette().write().unwrap()) = match std::env::var_os("FLEXI_LOGGER_PALETTE") {
-        Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref()),
-        None => match input {
-            Some(input_string) => Palette::from(input_string),
-            None => return Ok(()),
-        },
-    }?;
+    use crate::util::{eprint_msg, ErrorCode};
+
+    PALETTE
+        .set(match std::env::var_os("FLEXI_LOGGER_PALETTE") {
+            Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref())?,
+            None => match input {
+                Some(input_string) => Palette::from(input_string)?,
+                None => DEFAULT_PALETTE,
+            },
+        })
+        .map_err(|_palette| {
+            eprint_msg(
+                ErrorCode::Palette,
+                "Failed to initialize the palette, as it is already initialized",
+            );
+        })
+        .ok();
     Ok(())
 }
 
+/// Helper function that is used in the provided coloring format functions to apply
+/// colors based on the log level and the effective color palette.
+///
+/// See [`Logger::set_palette`](crate::Logger::set_palette) if you want to
+/// modify the color palette.
+#[cfg_attr(docsrs, doc(cfg(feature = "colors")))]
+#[cfg(feature = "colors")]
+#[must_use]
+pub fn style(level: log::Level) -> Style {
+    match level {
+        log::Level::Error => palette().error,
+        log::Level::Warn => palette().warn,
+        log::Level::Info => palette().info,
+        log::Level::Debug => palette().debug,
+        log::Level::Trace => palette().trace,
+    }
+}
+
+#[cfg(feature = "colors")]
+const fn default_style() -> Style {
+    Style {
+        foreground: None,
+        background: None,
+        is_bold: false,
+        is_dimmed: false,
+        is_italic: false,
+        is_underline: false,
+        is_blink: false,
+        is_reverse: false,
+        is_hidden: false,
+        is_strikethrough: false,
+        prefix_with_reset: false,
+    }
+}
 #[cfg(feature = "colors")]
 #[derive(Debug)]
 struct Palette {
@@ -413,13 +442,13 @@ struct Palette {
 }
 #[cfg(feature = "colors")]
 impl Palette {
-    fn default() -> Palette {
+    const fn default() -> Palette {
         Palette {
-            error: Style::default().fg(Color::Fixed(196)),
-            warn: Style::default().fg(Color::Fixed(208)),
-            info: Style::default(),
-            debug: Style::default().fg(Color::Fixed(27)),
-            trace: Style::default().fg(Color::Fixed(8)),
+            error: default_style().fg(Color::Fixed(196)),
+            warn: default_style().fg(Color::Fixed(208)),
+            info: default_style(),
+            debug: default_style().fg(Color::Fixed(27)),
+            trace: default_style().fg(Color::Fixed(8)),
         }
     }
 

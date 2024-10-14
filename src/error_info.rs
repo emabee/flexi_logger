@@ -45,6 +45,10 @@
 //!
 //! If this happens with one of `flexi_logger`s provided format functions, please open an issue.
 //!
+//! ## `Palette`
+//!
+//! This error is unexpected - please open an issue and describe your setup.
+//!
 //! ## `Poison`
 //!
 //! Log entries can be written by all threads of your program. Loggers thus must be thread-safe,
