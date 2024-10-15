@@ -76,6 +76,8 @@ fn controller() {
 
 fn parent(panic: bool) {
     let progpath = std::env::args().next().unwrap();
+    // we don't want to wait here, and it's not an issue because this is not a long running program
+    #[allow(clippy::zombie_processes)]
     // spawn child and terminate directly, thus destroying the child's stderr
     Command::new(progpath)
         .env(CTRL_INDEX, if panic { "child_panic" } else { "child" })
