@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unpublished]
+## [0.29.4] - 2024-10-21
+
+Fix [issue #179](https://github.com/emabee/flexi_logger/issues/179) that in rotation with
+custom time format the custom time format was not applied properly
+(kudos to [alboyer](https://github.com/alboyer)).
 
 Remove the RwLock around the color palette.
 
