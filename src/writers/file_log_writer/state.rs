@@ -430,7 +430,7 @@ impl State {
                         } else {
                             *ts = Local::now();
                             self.config.file_spec.collision_free_infix_for_rotated_file(
-                                &infix_from_timestamp(ts, self.config.use_utc, &InfixFormat::Std),
+                                &infix_from_timestamp(ts, self.config.use_utc, fmt),
                             )
                         }
                     }
