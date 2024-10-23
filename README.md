@@ -8,6 +8,7 @@ other output streams, and that can be influenced while the program is running.**
 [![License](https://img.shields.io/crates/l/flexi_logger.svg)](https://github.com/emabee/flexi_logger)
 [![Build](https://img.shields.io/github/actions/workflow/status/emabee/flexi_logger/ci_test.yml?branch=main)](https://github.com/emabee/flexi_logger/actions?query=workflow%3ACI)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9610/badge)](https://www.bestpractices.dev/projects/9610)
 
 ## Usage
 
