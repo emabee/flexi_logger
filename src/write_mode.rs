@@ -1,3 +1,4 @@
+use crate::ZERO_DURATION;
 use std::time::Duration;
 
 /// Default buffer capacity (8k), when buffering is used.
@@ -45,10 +46,10 @@ pub const DEFAULT_MESSAGE_CAPA: usize = 200;
 /// is dropped (and all output is flushed automatically).
 ///
 /// `WriteMode::Direct` (i.e. without buffering) is the slowest option with all output devices,
-/// showing that buffered I/O pays off. But it takes slightly more resources, especially
-/// if you do not suppress flushing.
+/// showing that buffered I/O pays off.
 ///
-/// Using `log_to_stdout()` and then redirecting the output to a file makes things faster,
+/// Using `log_to_stdout()` and then redirecting the output to a file can make things faster,
+/// likely because the operating system's adds buffering,
 /// but is still significantly slower than writing to files directly.
 ///
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -115,7 +116,7 @@ pub enum WriteMode {
     },
 }
 impl WriteMode {
-    pub(crate) fn inner(&self) -> EffectiveWriteMode {
+    pub(crate) fn effective_write_mode(&self) -> EffectiveWriteMode {
         match *self {
             Self::Direct | Self::SupportCapture => EffectiveWriteMode::Direct,
             Self::BufferDontFlush => {
@@ -158,7 +159,7 @@ impl WriteMode {
             Self::Async => Self::AsyncWith {
                 pool_capa: DEFAULT_POOL_CAPA,
                 message_capa: DEFAULT_MESSAGE_CAPA,
-                flush_interval: Duration::from_secs(0),
+                flush_interval: ZERO_DURATION,
             },
             #[cfg(feature = "async")]
             Self::AsyncWith {
@@ -168,12 +169,12 @@ impl WriteMode {
             } => Self::AsyncWith {
                 pool_capa: *pool_capa,
                 message_capa: *message_capa,
-                flush_interval: Duration::from_secs(0),
+                flush_interval: ZERO_DURATION,
             },
         }
     }
     pub(crate) fn buffersize(&self) -> Option<usize> {
-        match self.inner() {
+        match self.effective_write_mode() {
             EffectiveWriteMode::Direct => None,
             EffectiveWriteMode::BufferAndFlushWith(bufsize)
             | EffectiveWriteMode::BufferDontFlushWith(bufsize) => Some(bufsize),
@@ -190,7 +191,7 @@ impl WriteMode {
             Self::Direct
             | Self::SupportCapture
             | Self::BufferDontFlush
-            | Self::BufferDontFlushWith(_) => Duration::from_secs(0),
+            | Self::BufferDontFlushWith(_) => ZERO_DURATION,
             Self::BufferAndFlush => DEFAULT_FLUSH_INTERVAL,
             #[cfg(feature = "async")]
             Self::Async => DEFAULT_FLUSH_INTERVAL,

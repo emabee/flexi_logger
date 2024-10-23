@@ -79,6 +79,8 @@ pub use crate::{
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};
 
+pub(crate) const ZERO_DURATION: std::time::Duration = std::time::Duration::from_secs(0);
+
 /// Shortest form to get started.
 ///
 /// `flexi_logger::init();`.

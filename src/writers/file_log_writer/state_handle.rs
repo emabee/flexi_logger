@@ -3,7 +3,7 @@ use super::{builder::FileLogWriterBuilder, config::FileLogWriterConfig, state::S
 use crate::util::{ASYNC_FLUSH, ASYNC_SHUTDOWN};
 use crate::{
     util::{buffer_with, eprint_err, io_err, ErrorCode},
-    LogfileSelector,
+    LogfileSelector, ZERO_DURATION,
 };
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
@@ -35,7 +35,7 @@ impl SyncHandle {
         let flush_interval = state.config().write_mode.get_flush_interval();
         let am_state = Arc::new(Mutex::new(state));
 
-        if flush_interval.as_secs() != 0 || flush_interval.subsec_nanos() != 0 {
+        if flush_interval != ZERO_DURATION {
             super::state::start_sync_flusher(Arc::clone(&am_state), flush_interval);
         }
 
@@ -85,7 +85,7 @@ impl AsyncHandle {
             Arc::clone(&a_pool),
         );
 
-        if flush_interval != std::time::Duration::from_secs(0) {
+        if flush_interval != ZERO_DURATION {
             super::state::start_async_fs_flusher(sender.clone(), flush_interval);
         }
 

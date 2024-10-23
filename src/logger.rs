@@ -1,4 +1,3 @@
-use crate::formats::AdaptiveFormat;
 #[cfg(feature = "colors")]
 use crate::set_palette;
 use crate::{
@@ -12,6 +11,7 @@ use crate::{
     Cleanup, Criterion, DeferredNow, FileSpec, FlexiLoggerError, FormatFunction, LogSpecification,
     LoggerHandle, Naming, WriteMode,
 };
+use crate::{formats::AdaptiveFormat, ZERO_DURATION};
 
 use log::LevelFilter;
 #[cfg(feature = "specfile")]
@@ -21,7 +21,6 @@ use std::{
     io::IsTerminal,
     path::PathBuf,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 #[cfg(feature = "specfile_without_notification")]
 use {crate::logger_handle::LogSpecSubscriber, std::io::Read, std::path::Path};
@@ -165,7 +164,7 @@ impl Logger {
             format_for_writer: default_format,
             #[cfg(feature = "colors")]
             o_palette: None,
-            flush_interval: Duration::from_secs(0),
+            flush_interval: ZERO_DURATION,
             flwb: FileLogWriter::builder(FileSpec::default()),
             other_writers: HashMap::<String, Box<dyn LogWriter>>::new(),
             filter: None,
@@ -720,7 +719,7 @@ impl Logger {
 
         let a_other_writers = Arc::new(self.other_writers);
 
-        if self.flush_interval.as_secs() != 0 || self.flush_interval.subsec_nanos() != 0 {
+        if self.flush_interval != ZERO_DURATION {
             start_flusher_thread(
                 Arc::clone(&a_primary_writer),
                 Arc::clone(&a_other_writers),

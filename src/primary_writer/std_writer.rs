@@ -10,7 +10,7 @@ use {
     crate::{
         util::{io_err, write_buffered},
         writers::LogWriter,
-        DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode,
+        DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode, ZERO_DURATION,
     },
     log::Record,
     std::io::{BufWriter, Write},
@@ -94,7 +94,7 @@ impl StdWriter {
         #[cfg(test)]
         let validation_buffer = Arc::new(Mutex::new(Cursor::new(Vec::<u8>::new())));
 
-        let writer = match write_mode.inner() {
+        let writer = match write_mode.effective_write_mode() {
             EffectiveWriteMode::Direct => InnerStdWriter::Unbuffered(stdstream),
             EffectiveWriteMode::BufferDontFlushWith(capacity) => {
                 InnerStdWriter::Buffered(Mutex::new(BufWriter::with_capacity(capacity, stdstream)))
@@ -109,8 +109,7 @@ impl StdWriter {
                 flush_interval,
             } => {
                 assert_eq!(
-                    flush_interval,
-                    std::time::Duration::from_secs(0),
+                    flush_interval, ZERO_DURATION,
                     "Async InnerStdWriter with own flushing is not implemented"
                 );
                 InnerStdWriter::Async(AsyncHandle::new(

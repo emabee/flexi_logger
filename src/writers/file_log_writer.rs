@@ -36,7 +36,7 @@ impl FileLogWriter {
         max_log_level: log::LevelFilter,
         format_function: FormatFunction,
     ) -> FileLogWriter {
-        let state_handle = match state.config().write_mode.inner() {
+        let state_handle = match state.config().write_mode.effective_write_mode() {
             EffectiveWriteMode::Direct
             | EffectiveWriteMode::BufferAndFlushWith(_)
             | EffectiveWriteMode::BufferDontFlushWith(_) => {
@@ -199,6 +199,7 @@ impl Drop for FileLogWriter {
 
 #[cfg(test)]
 mod test {
+    use crate::ZERO_DURATION;
     use crate::{writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
     use chrono::Local;
     use std::ops::Add;
@@ -402,7 +403,7 @@ mod test {
             let flwb = flwb.write_mode(WriteMode::AsyncWith {
                 pool_capa: 5,
                 message_capa: 400,
-                flush_interval: Duration::from_secs(0),
+                flush_interval: ZERO_DURATION,
             });
 
             let flw = flwb.try_build().unwrap();
@@ -458,7 +459,7 @@ mod test {
         let write_mode = WriteMode::AsyncWith {
             pool_capa: 7,
             message_capa: 8,
-            flush_interval: Duration::from_secs(0),
+            flush_interval: ZERO_DURATION,
         };
         let flw = super::FileLogWriter::builder(
             FileSpec::default()

@@ -37,7 +37,7 @@ pub(crate) fn start_flusher_thread(
 ) -> Result<(), FlexiLoggerError> {
     let builder = ThreadBuilder::new().name(FLUSHER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-    let builder = builder.stack_size(128);
+    let builder = builder.stack_size(1024);
 
     builder.spawn(move || {
         let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();

@@ -3,6 +3,8 @@ mod numbers;
 mod timestamps;
 
 use super::config::{FileLogWriterConfig, RotationConfig};
+#[cfg(feature = "async")]
+use crate::util::eprint_msg;
 use crate::{
     util::{eprint_err, ErrorCode},
     Age, Cleanup, Criterion, FlexiLoggerError, LogfileSelector, Naming,
@@ -29,7 +31,7 @@ use {
 };
 
 #[cfg(feature = "async")]
-const ASYNC_WRITER: &str = "flexi_logger-fs-async_writer";
+const ASYNC_WRITER: &str = "flexi_logger-async_file_writer";
 
 const CURRENT_INFIX: &str = "rCURRENT";
 
@@ -688,9 +690,9 @@ pub(super) fn start_async_fs_writer(
 }
 
 pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: std::time::Duration) {
-    let builder = std::thread::Builder::new().name("flexi_logger-flusher".to_string());
+    let builder = std::thread::Builder::new().name("flexi_logger-file_flusher".to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-    let builder = builder.stack_size(128);
+    let builder = builder.stack_size(1024);
     builder.spawn(move || {
         let (_tx, rx) = std::sync::mpsc::channel::<()>();
             loop {
@@ -711,11 +713,9 @@ pub(crate) fn start_async_fs_flusher(
     async_writer: CrossbeamSender<Vec<u8>>,
     flush_interval: std::time::Duration,
 ) {
-    use crate::util::eprint_msg;
-
     let builder = std::thread::Builder::new().name(ASYNC_FLUSHER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
-    let builder = builder.stack_size(128);
+    let builder = builder.stack_size(1024);
     builder.spawn(move || {
             let (_tx, rx) = std::sync::mpsc::channel::<()>();
             loop {
