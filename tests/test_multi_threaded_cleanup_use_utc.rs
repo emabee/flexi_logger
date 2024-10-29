@@ -4,8 +4,8 @@ mod test_utils;
 mod d {
     use cond_sync::{CondSync, Other};
     use flexi_logger::{
-        Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, LogfileSelector,
-        Logger, Naming, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+        Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
+        WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
     };
     use glob::glob;
     use log::*;
@@ -57,18 +57,6 @@ mod d {
             logger.set_new_spec(LogSpecification::parse("trace").unwrap());
 
             join_all_workers(worker_handles);
-
-            let log_files = logger
-                .existing_log_files(
-                    &LogfileSelector::default()
-                        .with_compressed_files()
-                        .with_r_current(),
-                )
-                .unwrap();
-            assert_eq!(log_files.len(), NO_OF_LOG_FILES + NO_OF_GZ_FILES + 1);
-            for f in log_files {
-                debug!("Existing log file: {f:?}");
-            }
         } // drop stopwatch and logger
 
         verify_logs(&directory.display().to_string());

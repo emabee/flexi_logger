@@ -1,5 +1,5 @@
 //! The infix for rotated files contains an index number.
-use super::CURRENT_INFIX;
+use super::{InfixFilter, CURRENT_INFIX};
 use crate::{writers::FileLogWriterConfig, FileSpec};
 use std::cmp::max;
 
@@ -40,7 +40,9 @@ pub(super) fn index_for_rcurrent(
 
 pub(super) fn get_highest_index(file_spec: &FileSpec) -> Option<u32> {
     let mut o_highest_idx = None;
-    for file in super::list_and_cleanup::list_of_log_and_compressed_files(file_spec) {
+    for file in
+        super::list_and_cleanup::list_of_log_and_compressed_files(file_spec, &InfixFilter::Numbrs)
+    {
         let name = file.file_stem().unwrap(/*ok*/).to_string_lossy();
         let infix = if file_spec.has_basename()
             || file_spec.has_discriminant()

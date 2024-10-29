@@ -1,12 +1,14 @@
 #![allow(clippy::module_name_repetitions)]
 mod builder;
 mod config;
+mod infix_filter;
 mod state;
 mod state_handle;
 mod threads;
 
 pub use self::builder::{ArcFileLogWriter, FileLogWriterBuilder, FileLogWriterHandle};
 pub use self::config::FileLogWriterConfig;
+pub(crate) use infix_filter::InfixFilter;
 
 use self::{config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
@@ -199,6 +201,7 @@ impl Drop for FileLogWriter {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "async")]
     use crate::ZERO_DURATION;
     use crate::{writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
     use chrono::Local;

@@ -1,3 +1,4 @@
+use super::InfixFilter;
 use crate::{Cleanup, FileSpec, LogfileSelector};
 #[cfg(feature = "compress")]
 use std::fs::File;
@@ -6,20 +7,14 @@ use std::{
     thread::{Builder as ThreadBuilder, JoinHandle},
 };
 
-// looks like a standard infix if it starts with an r and a digit
-pub(crate) fn looks_like_std_infix(s: &str) -> bool {
-    if s.len() > 2 {
-        let mut chars = s.chars();
-        chars.next().unwrap() == 'r' && chars.next().unwrap().is_ascii_digit()
-    } else {
-        false
-    }
-}
-
-pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<PathBuf> {
+pub(super) fn list_of_log_and_compressed_files(
+    file_spec: &FileSpec,
+    infix_filter: &InfixFilter,
+) -> Vec<PathBuf> {
     existing_log_files(
         file_spec,
         true,
+        infix_filter,
         &LogfileSelector::default().with_compressed_files(),
     )
 }
@@ -27,37 +22,33 @@ pub(super) fn list_of_log_and_compressed_files(file_spec: &FileSpec) -> Vec<Path
 pub(super) fn existing_log_files(
     file_spec: &FileSpec,
     use_rotation: bool,
+    infix_filter: &InfixFilter,
     selector: &LogfileSelector,
 ) -> Vec<PathBuf> {
     let mut result = Vec::new();
     let related_files = file_spec.read_dir_related_files();
-
     if use_rotation {
         if selector.with_plain_files {
             result.append(&mut file_spec.filter_files(
                 &related_files,
-                looks_like_std_infix,
+                infix_filter,
                 file_spec.get_suffix().as_deref(),
             ));
         }
         if selector.with_compressed_files {
-            result.append(&mut file_spec.filter_files(
-                &related_files,
-                looks_like_std_infix,
-                Some("gz"),
-            ));
+            result.append(&mut file_spec.filter_files(&related_files, infix_filter, Some("gz")));
         }
         if selector.with_r_current {
             result.append(&mut file_spec.filter_files(
                 &related_files,
-                |s: &str| s == super::CURRENT_INFIX,
+                &InfixFilter::Equls(super::CURRENT_INFIX.to_string()),
                 file_spec.get_suffix().as_deref(),
             ));
         }
         if let Some(ref custom_current) = selector.with_configured_current {
             result.append(&mut file_spec.filter_files(
                 &related_files,
-                |s: &str| s == custom_current,
+                &InfixFilter::Equls(custom_current.to_string()),
                 file_spec.get_suffix().as_deref(),
             ));
         }
@@ -71,10 +62,18 @@ pub(super) fn remove_or_compress_too_old_logfiles(
     o_cleanup_thread_handle: Option<&CleanupThreadHandle>,
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
+    infix_filter: &InfixFilter,
     writes_direct: bool,
 ) -> Result<(), std::io::Error> {
     o_cleanup_thread_handle.as_ref().map_or_else(
-        || remove_or_compress_too_old_logfiles_impl(cleanup_config, file_spec, writes_direct),
+        || {
+            remove_or_compress_too_old_logfiles_impl(
+                cleanup_config,
+                file_spec,
+                infix_filter,
+                writes_direct,
+            )
+        },
         |cleanup_thread_handle| {
             cleanup_thread_handle
                 .sender
@@ -88,6 +87,7 @@ pub(super) fn remove_or_compress_too_old_logfiles(
 pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     cleanup_config: &Cleanup,
     file_spec: &FileSpec,
+    infix_filter: &InfixFilter,
     writes_direct: bool,
 ) -> Result<(), std::io::Error> {
     let (mut log_limit, compress_limit) = match *cleanup_config {
@@ -110,7 +110,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
         log_limit = 1;
     }
 
-    for (index, file) in list_of_log_and_compressed_files(file_spec)
+    for (index, file) in list_of_log_and_compressed_files(file_spec, infix_filter)
         .into_iter()
         .enumerate()
     {
@@ -174,17 +174,25 @@ impl CleanupThreadHandle {
 pub(super) fn start_cleanup_thread(
     cleanup: Cleanup,
     file_spec: FileSpec,
+    infix_filter: &InfixFilter,
     writes_direct: bool,
 ) -> Result<CleanupThreadHandle, std::io::Error> {
     let (sender, receiver) = std::sync::mpsc::channel();
     let builder = ThreadBuilder::new().name(CLEANER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
     let builder = builder.stack_size(512 * 1024);
+    let infix_filter_cp = infix_filter.clone();
     Ok(CleanupThreadHandle {
         sender,
         join_handle: builder.spawn(move || {
             while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
-                remove_or_compress_too_old_logfiles_impl(&cleanup, &file_spec, writes_direct).ok();
+                remove_or_compress_too_old_logfiles_impl(
+                    &cleanup,
+                    &file_spec,
+                    &infix_filter_cp,
+                    writes_direct,
+                )
+                .ok();
             }
         })?,
     })

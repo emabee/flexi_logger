@@ -1,6 +1,9 @@
 #[cfg(feature = "async")]
 use {
-    crate::util::{eprint_err, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
+    crate::{
+        util::{eprint_err, ErrorCode, ASYNC_FLUSH, ASYNC_SHUTDOWN},
+        ZERO_DURATION,
+    },
     crossbeam_channel::{SendError, Sender},
     crossbeam_queue::ArrayQueue,
 };
@@ -10,7 +13,7 @@ use {
     crate::{
         util::{io_err, write_buffered},
         writers::LogWriter,
-        DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode, ZERO_DURATION,
+        DeferredNow, EffectiveWriteMode, FormatFunction, WriteMode,
     },
     log::Record,
     std::io::{BufWriter, Write},

@@ -1,6 +1,6 @@
-use super::{get_creation_timestamp, list_and_cleanup::looks_like_std_infix, InfixFormat};
+use super::{get_creation_timestamp, InfixFilter, InfixFormat};
 use crate::{writers::FileLogWriterConfig, FileSpec};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{format::ParseErrorKind, DateTime, Local, NaiveDate, NaiveDateTime, TimeZone};
 use std::path::{Path, PathBuf};
 
 pub(super) fn infix_from_timestamp(
@@ -24,10 +24,29 @@ fn ts_infix_from_path(path: &Path, file_spec: &FileSpec) -> String {
         .unwrap();
     String::from_utf8_lossy(&path.to_string_lossy().as_bytes()[idx..idx + 20]).to_string()
 }
-fn timestamp_from_ts_infix(infix: &str, fmt: &InfixFormat) -> Option<DateTime<Local>> {
-    NaiveDateTime::parse_from_str(infix, fmt.format())
-        .ok()
-        .and_then(|ts| Local.from_local_datetime(&ts).single())
+
+pub(crate) fn timestamp_from_ts_infix(
+    infix: &str,
+    fmt: &InfixFormat,
+) -> Result<DateTime<Local>, String> {
+    match NaiveDateTime::parse_from_str(infix, fmt.format()) {
+        Ok(dt1) => Local
+            .from_local_datetime(&dt1)
+            .earliest()
+            .ok_or("Can't determine local time from infix".to_string()),
+        Err(e) if e.kind() == ParseErrorKind::NotEnough => {
+            match NaiveDate::parse_from_str(infix, fmt.format()) {
+                Ok(d1) => {
+                    Local
+                        .from_local_datetime(&d1.and_hms_opt(10, 0, 0).unwrap(/*OK*/))
+                        .earliest()
+                        .ok_or("Can't determine local time from infix".to_string())
+                }
+                Err(e) => Err(format!("Broken: {e:?}")),
+            }
+        }
+        Err(e) => Err(format!("Broken: {e:?}")),
+    }
 }
 
 pub(super) fn creation_timestamp_of_currentfile(
@@ -75,14 +94,14 @@ pub(super) fn latest_timestamp_file(
         config
             .file_spec
             .list_of_files(
-                looks_like_std_infix,
+                &InfixFilter::Numbrs,
                 config.file_spec.get_suffix().as_deref(),
             )
             .into_iter()
             // retrieve the infix
             .map(|path| ts_infix_from_path(&path, &config.file_spec))
             // parse infix as date, ignore all infixes where this fails
-            .filter_map(|infix| timestamp_from_ts_infix(&infix, fmt))
+            .filter_map(|infix| timestamp_from_ts_infix(&infix, fmt).ok())
             // take the newest of these dates
             .reduce(|acc, e| if acc > e { acc } else { e })
             // if nothing is found, take Local::now()
@@ -145,7 +164,7 @@ mod test {
             // retrieve the infix
             .map(|path| super::ts_infix_from_path(path, &file_spec))
             // parse infix as date, ignore all files where this fails,
-            .filter_map(|infix| super::timestamp_from_ts_infix(&infix, &InfixFormat::Std))
+            .filter_map(|infix| super::timestamp_from_ts_infix(&infix, &InfixFormat::Std).ok())
             // take the newest of these dates
             .reduce(|acc, e| if acc > e { acc } else { e })
             // if nothing is found, take Local::now()

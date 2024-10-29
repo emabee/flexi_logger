@@ -2,7 +2,12 @@ mod list_and_cleanup;
 mod numbers;
 mod timestamps;
 
-use super::config::{FileLogWriterConfig, RotationConfig};
+pub(crate) use timestamps::timestamp_from_ts_infix;
+
+use super::{
+    config::{FileLogWriterConfig, RotationConfig},
+    InfixFilter,
+};
 #[cfg(feature = "async")]
 use crate::util::eprint_msg;
 use crate::{
@@ -39,7 +44,11 @@ const CURRENT_INFIX: &str = "rCURRENT";
 enum NamingState {
     // Contains the timestamp of the current output file (read from its name),
     // plus the optional current infix and the format of the timestamp infix
-    Timestamps(DateTime<Local>, Option<String>, InfixFormat),
+    Timestamps {
+        current_timestamp: DateTime<Local>,
+        the_current_infix: Option<String>,
+        infix_format: InfixFormat,
+    },
 
     // contains the index to which we will rotate
     NumbersRCurrent(u32),
@@ -51,13 +60,29 @@ impl NamingState {
     pub(crate) fn writes_direct(&self) -> bool {
         matches!(
             self,
-            NamingState::NumbersDirect(_) | NamingState::Timestamps(_, None, _)
+            NamingState::NumbersDirect(_)
+                | NamingState::Timestamps {
+                    current_timestamp: _,
+                    the_current_infix: None,
+                    infix_format: _,
+                }
         )
+    }
+
+    pub(crate) fn infix_filter(&self) -> InfixFilter {
+        match self {
+            NamingState::Timestamps {
+                current_timestamp: _,
+                the_current_infix: _,
+                infix_format,
+            } => InfixFilter::Timstmps(infix_format.clone()),
+            NamingState::NumbersDirect(_) | NamingState::NumbersRCurrent(_) => InfixFilter::Numbrs,
+        }
     }
 }
 
 #[derive(Clone, Debug)]
-pub(super) enum InfixFormat {
+pub(crate) enum InfixFormat {
     Std,
     Custom(String),
 }
@@ -239,6 +264,13 @@ impl Inner {
             Inner::Active(o_r, _, _) => o_r.is_some(),
         }
     }
+    fn infix_filter(&self) -> InfixFilter {
+        match self {
+            Inner::Initial(_o_r, _) => None,
+            Inner::Active(o_r, _, _) => o_r.as_ref().map(|rs| rs.naming_state.infix_filter()),
+        }
+        .unwrap_or(InfixFilter::None)
+    }
 }
 impl std::fmt::Debug for Inner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
@@ -296,22 +328,26 @@ impl State {
                 let ts =
                     latest_timestamp_file(&self.config, !self.config.append, &InfixFormat::Std);
                 (
-                    NamingState::Timestamps(ts, None, InfixFormat::Std),
+                    NamingState::Timestamps {
+                        current_timestamp: ts,
+                        the_current_infix: None,
+                        infix_format: InfixFormat::Std,
+                    },
                     infix_from_timestamp(&ts, self.config.use_utc, &InfixFormat::Std),
                 )
             }
             Naming::Timestamps => (
-                NamingState::Timestamps(
-                    creation_timestamp_of_currentfile(
+                NamingState::Timestamps {
+                    current_timestamp: creation_timestamp_of_currentfile(
                         &self.config,
                         CURRENT_INFIX,
                         !self.config.append,
                         None,
                         &InfixFormat::Std,
                     )?,
-                    Some(CURRENT_INFIX.to_string()),
-                    InfixFormat::Std,
-                ),
+                    the_current_infix: Some(CURRENT_INFIX.to_string()),
+                    infix_format: InfixFormat::Std,
+                },
                 CURRENT_INFIX.to_string(),
             ),
             Naming::TimestampsCustomFormat {
@@ -320,23 +356,30 @@ impl State {
             } => {
                 if let Some(current_token) = o_current_token {
                     let current_infix = current_token.to_string();
-                    let naming_state = NamingState::Timestamps(
-                        creation_timestamp_of_currentfile(
+                    let naming_state = NamingState::Timestamps {
+                        current_timestamp: creation_timestamp_of_currentfile(
                             &self.config,
                             &current_infix,
                             !self.config.append,
                             None,
                             &InfixFormat::custom(ts_fmt),
                         )?,
-                        Some(current_infix.clone()),
-                        InfixFormat::custom(ts_fmt),
-                    );
+                        the_current_infix: Some(current_infix.clone()),
+                        infix_format: InfixFormat::custom(ts_fmt),
+                    };
                     (naming_state, current_infix)
                 } else {
                     let fmt = InfixFormat::custom(ts_fmt);
                     let ts = latest_timestamp_file(&self.config, !self.config.append, &fmt);
                     let infix = infix_from_timestamp(&ts, self.config.use_utc, &fmt);
-                    (NamingState::Timestamps(ts, None, fmt), infix)
+                    (
+                        NamingState::Timestamps {
+                            current_timestamp: ts,
+                            the_current_infix: None,
+                            infix_format: fmt,
+                        },
+                        infix,
+                    )
                 }
             }
             Naming::Numbers => (
@@ -368,12 +411,14 @@ impl State {
                 None,
                 &rotate_config.cleanup,
                 &self.config.file_spec,
+                &naming_state.infix_filter(),
                 rotate_config.naming.writes_direct(),
             )?;
             if cleanup_in_background_thread {
                 Some(list_and_cleanup::start_cleanup_thread(
                     rotate_config.cleanup,
                     self.config.file_spec.clone(),
+                    &naming_state.infix_filter(),
                     rotate_config.naming.writes_direct(),
                 )?)
             } else {
@@ -419,7 +464,11 @@ impl State {
         {
             if force || rotation_state.roll_state.rotation_necessary() {
                 let infix = match rotation_state.naming_state {
-                    NamingState::Timestamps(ref mut ts, ref o_current_infix, ref fmt) => {
+                    NamingState::Timestamps {
+                        current_timestamp: ref mut ts,
+                        the_current_infix: ref o_current_infix,
+                        infix_format: ref fmt,
+                    } => {
                         if let Some(current_infix) = o_current_infix {
                             *ts = creation_timestamp_of_currentfile(
                                 &self.config,
@@ -457,6 +506,7 @@ impl State {
                     rotation_state.o_cleanup_thread_handle.as_ref(),
                     &rotation_state.cleanup,
                     &self.config.file_spec,
+                    &rotation_state.naming_state.infix_filter(),
                     rotation_state.naming_state.writes_direct(),
                 )?;
             }
@@ -508,10 +558,11 @@ impl State {
         Ok(())
     }
 
-    pub fn existing_log_files(&self, selector: &LogfileSelector) -> Vec<PathBuf> {
+    pub(crate) fn existing_log_files(&self, selector: &LogfileSelector) -> Vec<PathBuf> {
         list_and_cleanup::existing_log_files(
             &self.config.file_spec,
             self.inner.uses_rotation(),
+            &self.inner.infix_filter(),
             selector,
         )
     }

@@ -1,10 +1,10 @@
+use crate::writers::file_log_writer::InfixFilter;
 use crate::{DeferredNow, FlexiLoggerError};
 use std::{
     ffi::{OsStr, OsString},
     ops::Add,
     path::{Path, PathBuf},
 };
-
 /// Builder object for specifying the name and path of the log output file.
 ///
 /// The filename is built from several partially components, using this pattern:
@@ -343,10 +343,11 @@ impl FileSpec {
         }
     }
 
-    pub(crate) fn list_of_files<F>(&self, infix_filter: F, o_suffix: Option<&str>) -> Vec<PathBuf>
-    where
-        F: Fn(&str) -> bool,
-    {
+    pub(crate) fn list_of_files(
+        &self,
+        infix_filter: &InfixFilter,
+        o_suffix: Option<&str>,
+    ) -> Vec<PathBuf> {
         self.filter_files(&self.read_dir_related_files(), infix_filter, o_suffix)
     }
 
@@ -372,15 +373,12 @@ impl FileSpec {
         log_files
     }
 
-    pub(crate) fn filter_files<F>(
+    pub(crate) fn filter_files(
         &self,
         files: &[PathBuf],
-        infix_filter: F,
+        infix_filter: &InfixFilter,
         o_suffix: Option<&str>,
-    ) -> Vec<PathBuf>
-    where
-        F: Fn(&str) -> bool,
-    {
+    ) -> Vec<PathBuf> {
         let fixed_name_part = self.fixed_name_part();
         files
             .iter()
@@ -407,7 +405,8 @@ impl FileSpec {
                     return false;
                 }
                 let maybe_infix = &stem[infix_start..];
-                infix_filter(maybe_infix)
+                let end = maybe_infix.find('.').unwrap_or(maybe_infix.len());
+                infix_filter.filter_infix(&maybe_infix[..end])
             })
             .map(PathBuf::clone)
             .collect::<Vec<PathBuf>>()
@@ -443,6 +442,7 @@ impl TimestampCfg {
 #[cfg(test)]
 mod test {
     use super::{FileSpec, TimestampCfg};
+    use crate::writers::file_log_writer::InfixFilter;
     use std::{
         fs::File,
         path::{Path, PathBuf},
@@ -708,7 +708,8 @@ mod test {
         }
 
         println!("\nRelevant subset:");
-        for pb in filespec.list_of_files(|s: &str| s.starts_with("Infix"), Some("log")) {
+        for pb in filespec.list_of_files(&InfixFilter::StartsWth("Infix".to_string()), Some("log"))
+        {
             println!("  {}", pb.display());
         }
     }

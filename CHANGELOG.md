@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [unpublished] - 202?-??-??
+## [0.25.5] - 2024-10-29
 
-Add badge for OpenSSF Best Practices.
+Fix [issue #181](https://github.com/emabee/flexi_logger/issues/181).
 
 Increase stack sizes for flusher threads from very minimal 128 to 1024 bytes.
+
+Add badge for OpenSSF Best Practices.
 
 ## [0.29.4] - 2024-10-21
 

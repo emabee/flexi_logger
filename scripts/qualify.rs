@@ -12,7 +12,11 @@ macro_rules! run_command {
         let mut child = command.spawn().unwrap();
         let status = child.wait().unwrap();
         if !status.success() {
-            print!("> {}", yansi::Paint::red("qualify terminates due to error"));
+            println!(
+                "{} in {}",
+                yansi::Paint::red("qualify terminates due to error"),
+                yansi::Paint::yellow($cmd)
+            );
             std::process::exit(-1);
         }
     };
@@ -42,6 +46,7 @@ fn run_script(s: &str) {
 
 fn main() {
     println!("Qualify flexi_logger");
+    run_command!("date");
 
     // format
     run_command!("cargo fmt");

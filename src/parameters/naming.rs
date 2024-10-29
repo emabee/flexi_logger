@@ -72,7 +72,16 @@ pub enum Naming {
         /// See <https://docs.rs/chrono/latest/chrono/format/strftime/index.html> for a list of
         /// supported specifiers.
         ///
-        /// Make sure you use a format that is compatible to your file system(s).
+        /// **Make sure to use a format**
+        ///
+        /// - that is compatible to your file system(s) (e.g., don't use slashes),
+        /// - that can be used by
+        ///   [chrono::NaiveDateTime](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveDateTime.html#method.parse_from_str)
+        ///   or [chrono::NaiveDate](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveDate.html#method.parse_from_str)
+        ///
+        /// Further, if you choose `current_infix` = `None` or `Some("")`, make sure to rotate only
+        /// by [age](crate::Criterion::Age), and choose an age that is not smaller than what
+        /// is expressed in the infix (e.g., don't rotate by minute if the infix only shows days).
         ///
         /// Examples:
         ///
@@ -97,6 +106,14 @@ pub enum Naming {
 }
 impl Naming {
     pub(crate) fn writes_direct(self) -> bool {
-        matches!(self, Naming::NumbersDirect | Naming::TimestampsDirect)
+        matches!(
+            self,
+            Naming::NumbersDirect
+                | Naming::TimestampsDirect
+                | Naming::TimestampsCustomFormat {
+                    current_infix: None | Some(""),
+                    format: _
+                }
+        )
     }
 }

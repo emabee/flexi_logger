@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const COUNT: u8 = 13;
+const COUNT: u8 = 14;
 
 #[test]
 fn test_rotate_naming_variants() {
@@ -74,20 +74,19 @@ fn work(value: u8) {
         ),
         8 => test_variant(
             FileSpec::default().directory(directory.join(value.to_string())),
-            Naming::Numbers,
+            Naming::TimestampsCustomFormat {
+                current_infix: None,
+                format: "%Y-%m-%d_%H-%M-%S",
+            },
             Criterion::Age(Age::Second),
         ),
         9 => test_variant(
             FileSpec::default().directory(directory.join(value.to_string())),
-            Naming::NumbersDirect,
+            Naming::Numbers,
             Criterion::Age(Age::Second),
         ),
         10 => test_variant(
-            FileSpec::default()
-                .directory(directory.join(value.to_string()))
-                .suppress_basename()
-                .suppress_timestamp()
-                .o_discriminant(Option::<String>::None),
+            FileSpec::default().directory(directory.join(value.to_string())),
             Naming::NumbersDirect,
             Criterion::Age(Age::Second),
         ),
@@ -97,10 +96,19 @@ fn work(value: u8) {
                 .suppress_basename()
                 .suppress_timestamp()
                 .o_discriminant(Option::<String>::None),
-            Naming::Timestamps,
+            Naming::NumbersDirect,
             Criterion::Age(Age::Second),
         ),
         12 => test_variant(
+            FileSpec::default()
+                .directory(directory.join(value.to_string()))
+                .suppress_basename()
+                .suppress_timestamp()
+                .o_discriminant(Option::<String>::None),
+            Naming::Timestamps,
+            Criterion::Age(Age::Second),
+        ),
+        13 => test_variant(
             FileSpec::default()
                 .directory(directory.join(value.to_string()))
                 .suppress_basename()
