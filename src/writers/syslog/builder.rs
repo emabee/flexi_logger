@@ -13,6 +13,7 @@ pub struct SyslogWriterBuilder {
     syslog_connection: SyslogConnection,
     syslog_line_header: SyslogLineHeader,
     syslog_facility: SyslogFacility,
+    custom_process_name: Option<String>,
     determine_severity: LevelToSyslogSeverity,
     max_log_level: log::LevelFilter,
     format: FormatFunction,
@@ -28,10 +29,18 @@ impl SyslogWriterBuilder {
             syslog_connection: syslog,
             syslog_line_header,
             syslog_facility,
+            custom_process_name: None,
             determine_severity: default_mapping,
             max_log_level: log::LevelFilter::Warn,
             format: syslog_default_format,
         }
+    }
+
+    /// Specify a custom process name, or unset it to revert back to name inference.
+    #[must_use]
+    pub fn custom_process_name(mut self, name: Option<&str>) -> Self {
+        self.custom_process_name = name.map(Into::into);
+        self
     }
 
     /// Use the given function to map the rust log levels to the syslog severities.
@@ -73,12 +82,16 @@ impl SyslogWriterBuilder {
     pub fn build(self) -> IoResult<Box<SyslogWriter>> {
         Ok(Box::new(SyslogWriter::new(
             std::process::id(),
-            std::env::args().next().ok_or_else(|| {
-                IoError::new(
-                    ErrorKind::Other,
-                    "Can't infer app name as no env args are present".to_owned(),
-                )
-            })?,
+            self.custom_process_name
+                .or(std::env::args().next())
+                .ok_or_else(|| {
+                    IoError::new(
+                        ErrorKind::Other,
+                        "Can't provide a process name as no env args are present and \
+                        no custom process name is set"
+                            .to_owned(),
+                    )
+                })?,
             self.syslog_line_header,
             self.syslog_facility,
             self.determine_severity,

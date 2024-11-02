@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.29.5"
+version = "0.29.6"
 authors = ["emabee <meinolf.block@sap.com>"]
 categories = ["development-tools::debugging"]
 description = """
