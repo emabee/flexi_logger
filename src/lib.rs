@@ -72,7 +72,10 @@ pub use crate::{
     log_specification::{LogSpecBuilder, LogSpecification, ModuleFilter},
     logger::{Duplicate, ErrorChannel, Logger},
     logger_handle::{LogfileSelector, LoggerHandle},
-    parameters::{Age, Cleanup, Criterion, FileSpec, Naming},
+    parameters::{
+        sort_by_creation_date, sort_by_default, Age, Cleanup, Criterion, CustomFormatter,
+        FileSorter, FileSpec, Naming,
+    },
     write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL},
 };
 

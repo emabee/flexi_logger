@@ -27,7 +27,7 @@ impl InfixFilter {
             #[cfg(test)]
             InfixFilter::StartsWth(s) => infix.starts_with(s),
             InfixFilter::Equls(s) => infix.eq(s),
-            InfixFilter::None => false,
+            InfixFilter::None => true,
         }
     }
 }
