@@ -103,7 +103,11 @@ pub enum Naming {
     ///
     /// File rotation switches over to the next file.
     NumbersDirect,
+
+    /// Allows to specify custom infix and treat each file with basename as log file
+    CustomFormat(CustomFormatter),
 }
+
 impl Naming {
     pub(crate) fn writes_direct(self) -> bool {
         matches!(
@@ -115,5 +119,23 @@ impl Naming {
                     format: _
                 }
         )
+    }
+}
+
+/// Custom Formatter
+#[derive(Copy, Clone, Debug)]
+pub struct CustomFormatter {
+    format_fn: fn(Option<String>) -> String,
+}
+
+impl CustomFormatter {
+    /// Instantiate custom formatter
+    pub fn new(format_fn: fn(Option<String>) -> String) -> Self {
+        CustomFormatter { format_fn }
+    }
+
+    /// call custom formatter
+    pub fn call(&self, o_last_infix: Option<String>) -> String {
+        (self.format_fn)(o_last_infix)
     }
 }

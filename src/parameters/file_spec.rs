@@ -1,5 +1,6 @@
 use crate::writers::file_log_writer::InfixFilter;
 use crate::{DeferredNow, FlexiLoggerError};
+use std::fs;
 use std::{
     ffi::{OsStr, OsString},
     ops::Add,
@@ -51,6 +52,7 @@ pub struct FileSpec {
     timestamp_cfg: TimestampCfg,
     o_suffix: Option<String>,
     pub(crate) use_utc: bool,
+    file_sorter: FileSorter,
 }
 impl Default for FileSpec {
     /// Describes a file in the current folder,
@@ -65,6 +67,7 @@ impl Default for FileSpec {
             timestamp_cfg: TimestampCfg::Default,
             o_suffix: Some(String::from("log")),
             use_utc: false,
+            file_sorter: FileSorter::default(),
         }
     }
 }
@@ -108,6 +111,7 @@ impl FileSpec {
                 o_suffix: p.extension().map(|s| s.to_string_lossy().to_string()),
                 timestamp_cfg: TimestampCfg::No,
                 use_utc: false,
+                file_sorter: FileSorter::default(),
             })
         }
     }
@@ -134,6 +138,11 @@ impl FileSpec {
     pub fn o_basename<S: Into<String>>(mut self, o_basename: Option<S>) -> Self {
         self.basename = o_basename.map_or_else(Self::default_basename, Into::into);
         self
+    }
+
+    ///Basename getter
+    pub fn get_basename(&self) -> &str {
+        &self.basename
     }
 
     /// Specifies a folder for the log files.
@@ -182,6 +191,12 @@ impl FileSpec {
     #[must_use]
     pub fn o_suffix<S: Into<String>>(mut self, o_suffix: Option<S>) -> Self {
         self.o_suffix = o_suffix.map(Into::into);
+        self
+    }
+
+    /// Specifies file sorter
+    pub fn file_sorter(mut self, file_sorter: FileSorter) -> Self {
+        self.file_sorter = file_sorter;
         self
     }
 
@@ -368,8 +383,7 @@ impl FileSpec {
                 }
             })
             .collect::<Vec<PathBuf>>();
-        log_files.sort_unstable();
-        log_files.reverse();
+        self.file_sorter.sort(&mut log_files);
         log_files
     }
 
@@ -416,6 +430,45 @@ impl FileSpec {
     pub(crate) fn get_timestamp(&self) -> Option<String> {
         self.timestamp_cfg.get_timestamp()
     }
+}
+
+/// File sorter stores and exposes interface to sorting strategy
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FileSorter {
+    sort_fn: fn(&mut [PathBuf]),
+}
+
+impl FileSorter {
+    /// Creates new FileSorter
+    pub fn new(sort_fn: fn(&mut [PathBuf])) -> Self {
+        Self { sort_fn }
+    }
+
+    fn sort(&self, files: &mut [PathBuf]) {
+        (self.sort_fn)(files)
+    }
+}
+
+impl Default for FileSorter {
+    fn default() -> Self {
+        Self::new(sort_by_default)
+    }
+}
+
+/// sorts log files by the creation date
+pub fn sort_by_creation_date(files: &mut [PathBuf]) {
+    files.sort_by_key(|path| {
+        fs::metadata(path)
+            .and_then(|metadata| metadata.created())
+            .ok()
+    });
+    files.reverse();
+}
+
+/// default sorting algorithm
+pub fn sort_by_default(files: &mut [PathBuf]) {
+    files.sort_unstable();
+    files.reverse();
 }
 
 const TS_USCORE_DASHES_USCORE_DASHES: &str = "%Y-%m-%d_%H-%M-%S";

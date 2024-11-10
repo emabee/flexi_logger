@@ -197,3 +197,16 @@ pub(super) fn start_cleanup_thread(
         })?,
     })
 }
+
+pub(super) fn get_last_infix(file_spec: &FileSpec) -> Option<String> {
+    let log_files =
+        super::list_and_cleanup::list_of_log_and_compressed_files(file_spec, &InfixFilter::None);
+    // ascending ordering
+    let last_log_file = log_files.first()?;
+    let last_log_name = last_log_file.file_stem().unwrap(/*ok*/).to_string_lossy();
+    Some(
+        last_log_name
+            .strip_prefix(&format!("{}_", file_spec.get_basename()))?
+            .to_owned(),
+    )
+}

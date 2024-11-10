@@ -2,6 +2,7 @@ mod list_and_cleanup;
 mod numbers;
 mod timestamps;
 
+use list_and_cleanup::get_last_infix;
 pub(crate) use timestamps::timestamp_from_ts_infix;
 
 use super::{
@@ -12,7 +13,7 @@ use super::{
 use crate::util::eprint_msg;
 use crate::{
     util::{eprint_err, ErrorCode},
-    Age, Cleanup, Criterion, FlexiLoggerError, LogfileSelector, Naming,
+    Age, Cleanup, Criterion, CustomFormatter, FlexiLoggerError, LogfileSelector, Naming,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
 #[cfg(feature = "async")]
@@ -55,6 +56,9 @@ enum NamingState {
 
     // contains the index of the current output file
     NumbersDirect(u32),
+
+    // contains custom formatter and last infix
+    CustomFormat(CustomFormatter, String),
 }
 impl NamingState {
     pub(crate) fn writes_direct(&self) -> bool {
@@ -77,6 +81,7 @@ impl NamingState {
                 infix_format,
             } => InfixFilter::Timstmps(infix_format.clone()),
             NamingState::NumbersDirect(_) | NamingState::NumbersRCurrent(_) => InfixFilter::Numbrs,
+            NamingState::CustomFormat(_, _) => InfixFilter::None,
         }
     }
 }
@@ -403,6 +408,14 @@ impl State {
                 };
                 (NamingState::NumbersDirect(idx), numbers::number_infix(idx))
             }
+            Naming::CustomFormat(ref formatter) => {
+                let o_last_infix: Option<String> = get_last_infix(&self.config.file_spec);
+                let current_infix = formatter.call(o_last_infix);
+                (
+                    NamingState::CustomFormat(*formatter, current_infix.clone()),
+                    current_infix,
+                )
+            }
         };
         let (write, path) = open_log_file(&self.config, Some(&infix))?;
         let roll_state = RollState::new(rotate_config.criterion, self.config.append, &path)?;
@@ -493,6 +506,11 @@ impl State {
                     NamingState::NumbersDirect(ref mut idx_state) => {
                         *idx_state += 1;
                         numbers::number_infix(*idx_state)
+                    }
+                    NamingState::CustomFormat(ref formatter, ref mut last_infix) => {
+                        let infix = formatter.call(Some(last_infix.clone()));
+                        *last_infix = infix.clone();
+                        infix
                     }
                 };
                 let (new_write, new_path) = open_log_file(&self.config, Some(&infix))?;
