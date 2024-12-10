@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.7] - 2024-12-10
+
+Fix issue #184.
+
+Update dependencies.
+
+Bump minimal supported rust version to 1.72.0.
+
 ## [0.25.6] - 2024-11-02
 
 Allow for custom process names when using the syslog writer (PR #182, kudos to

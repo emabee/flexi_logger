@@ -13,8 +13,7 @@ impl InfixFilter {
     pub(crate) fn filter_infix(&self, infix: &str) -> bool {
         match self {
             InfixFilter::Timstmps(infix_format) => {
-                let tmp = timestamp_from_ts_infix(infix, infix_format);
-                tmp.is_ok()
+                timestamp_from_ts_infix(infix, infix_format).is_ok()
             }
             InfixFilter::Numbrs => {
                 if infix.len() > 2 {

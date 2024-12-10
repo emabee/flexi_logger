@@ -266,10 +266,11 @@ impl Inner {
     }
     fn infix_filter(&self) -> InfixFilter {
         match self {
-            Inner::Initial(_o_r, _) => None,
-            Inner::Active(o_r, _, _) => o_r.as_ref().map(|rs| rs.naming_state.infix_filter()),
+            Inner::Initial(_o_r, _) => InfixFilter::None,
+            Inner::Active(o_r, _, _) => o_r
+                .as_ref()
+                .map_or(InfixFilter::None, |rs| rs.naming_state.infix_filter()),
         }
-        .unwrap_or(InfixFilter::None)
     }
 }
 impl std::fmt::Debug for Inner {

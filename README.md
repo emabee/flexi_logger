@@ -67,7 +67,7 @@ See
 
 ## Minimal rust version
 
-The minimal supported rust version is currently "1.70.0".
+The minimal supported rust version is currently "1.72.0".
 
 ## Crate Features
 

@@ -243,25 +243,20 @@ impl FileSpec {
         self.o_suffix.clone()
     }
 
+    // basename + o_discriminant + o_timestamp
     pub(crate) fn fixed_name_part(&self) -> String {
         let mut fixed_name_part = self.basename.clone();
         fixed_name_part.reserve(50);
 
         if let Some(discriminant) = &self.o_discriminant {
-            FileSpec::separate_with_underscore(&mut fixed_name_part);
+            append_underscore_if_not_empty(&mut fixed_name_part);
             fixed_name_part.push_str(discriminant);
         }
         if let Some(timestamp) = &self.timestamp_cfg.get_timestamp() {
-            FileSpec::separate_with_underscore(&mut fixed_name_part);
+            append_underscore_if_not_empty(&mut fixed_name_part);
             fixed_name_part.push_str(timestamp);
         }
         fixed_name_part
-    }
-
-    fn separate_with_underscore(filename: &mut String) {
-        if !filename.is_empty() {
-            filename.push('_');
-        }
     }
 
     /// Derives a `PathBuf` from the spec and the given infix.
@@ -271,7 +266,7 @@ impl FileSpec {
 
         if let Some(infix) = o_infix {
             if !infix.is_empty() {
-                FileSpec::separate_with_underscore(&mut filename);
+                append_underscore_if_not_empty(&mut filename);
                 filename.push_str(infix);
             }
         };
@@ -287,9 +282,16 @@ impl FileSpec {
 
     // handles collisions by appending ".restart-<number>" to the infix, if necessary
     pub(crate) fn collision_free_infix_for_rotated_file(&self, infix: &str) -> String {
-        let mut restart_siblings = self
-            .read_dir_related_files()
+        let uncompressed_files = self.list_of_files(
+            &InfixFilter::Equls(infix.to_string()),
+            self.o_suffix.as_deref(),
+        );
+        let compressed_files =
+            self.list_of_files(&InfixFilter::Equls(infix.to_string()), Some("gz"));
+
+        let mut restart_siblings = uncompressed_files
             .into_iter()
+            .chain(compressed_files)
             .filter(|pb| {
                 // ignore .gz suffix
                 let mut pb2 = PathBuf::from(pb);
@@ -418,6 +420,12 @@ impl FileSpec {
     }
 }
 
+fn append_underscore_if_not_empty(filename: &mut String) {
+    if !filename.is_empty() {
+        filename.push('_');
+    }
+}
+
 const TS_USCORE_DASHES_USCORE_DASHES: &str = "%Y-%m-%d_%H-%M-%S";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -501,7 +509,7 @@ mod test {
             );
         } else {
             assert_eq!(
-                stem.as_bytes().len(),
+                stem.len(),
                 progname.len(),
                 "stem: {stem:?}, progname: {progname:?}",
             );
