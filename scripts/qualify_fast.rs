@@ -1,7 +1,7 @@
-#!/usr/bin/env rust-script
+#!/usr/bin/env run-cargo-script
 //! ```cargo
 //! [dependencies]
-//! yansi = "0.5"
+//! yansi = "1.0"
 //! ```
 extern crate yansi;
 use std::process::Command;

@@ -1,7 +1,7 @@
-#!/usr/bin/env rust-script
+#!/usr/bin/env run-cargo-script
 //! ```cargo
 //! [dependencies]
-//! yansi = "0.5"
+//! yansi = "1.0"
 //! ```
 extern crate yansi;
 use std::process::Command;
@@ -53,8 +53,8 @@ fn main() {
 
     // Build in important variants
     std::fs::remove_file("Cargo.lock").ok();
-    run_command!("cargo +1.72.0 build --no-default-features");
-    run_command!("cargo +1.72.0 build --all-features");
+    run_command!("cargo +1.81.0 build --no-default-features");
+    run_command!("cargo +1.81.0 build --all-features");
 
     std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo build");
@@ -69,7 +69,7 @@ fn main() {
     run_command!("cargo +nightly clippy --all-targets --all-features -- -D warnings");
 
     // Run tests in important variants
-    run_command!("cargo +1.72.0 test --all-features");
+    run_command!("cargo +1.81.0 test --all-features");
     run_command!("cargo test --release --all-features");
     run_command!("cargo test --no-default-features");
     run_command!("cargo test --release");

@@ -1,4 +1,4 @@
-#!/usr/bin/env rust-script
+#!/usr/bin/env run-cargo-script
 //! Cleans up all files and folders that were produced by test runs.
 //!
 //! ```cargo
