@@ -532,7 +532,7 @@ impl State {
 
             if let Some(ref mut rotation_state) = o_rotation_state {
                 rotation_state.roll_state.increase_size(buf.len() as u64);
-            };
+            }
         }
         Ok(())
     }
@@ -571,7 +571,7 @@ impl State {
     pub fn validate_logs(&mut self, expected: &[(&'static str, &'static str, &'static str)]) {
         if let Inner::Initial(_, _) = self.inner {
             self.initialize().expect("validate_logs: initialize failed");
-        };
+        }
         if let Inner::Active(ref o_rotation_state, _, ref path) = self.inner {
             let rotation_possible = o_rotation_state.is_some();
             let f = File::open(path.clone()).unwrap_or_else(|e| {

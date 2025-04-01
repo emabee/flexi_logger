@@ -225,7 +225,7 @@ impl FileLogWriterBuilder {
         std::fs::create_dir_all(p_directory)?;
         if !std::fs::metadata(p_directory)?.is_dir() {
             return Err(FlexiLoggerError::OutputBadDirectory);
-        };
+        }
 
         #[cfg(feature = "async")]
         let cleanup_in_background_thread = if let WriteMode::AsyncWith {

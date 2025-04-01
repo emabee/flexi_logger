@@ -1,19 +1,17 @@
-use {
-    crate::{writers::LogWriter, DeferredNow, FormatFunction},
-    log::Record,
+use crate::{
+    util::{eprint_err, ErrorCode},
+    writers::LogWriter,
+    DeferredNow, FormatFunction,
 };
-
+use log::Record;
+use std::cell::RefCell;
 #[cfg(test)]
 use std::io::Cursor;
-
-use std::cell::RefCell;
 #[cfg(test)]
 use std::{
     io::Write,
     sync::{Arc, Mutex},
 };
-
-use crate::util::{eprint_err, ErrorCode};
 
 // `TestWriter` writes logs using println!
 pub(crate) struct TestWriter {

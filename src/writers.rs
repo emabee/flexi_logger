@@ -106,6 +106,13 @@
 //!   ```
 //!
 
+#[cfg(feature = "buffer_writer")]
+mod buffer_writer;
+#[cfg(feature = "buffer_writer")]
+pub(crate) use buffer_writer::BufferWriter;
+#[cfg(feature = "buffer_writer")]
+pub use buffer_writer::Snapshot;
+
 pub(crate) mod file_log_writer;
 mod log_writer;
 
@@ -123,4 +130,6 @@ pub use self::syslog::{
 pub use self::file_log_writer::{
     ArcFileLogWriter, FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, FileLogWriterHandle,
 };
+#[cfg(feature = "buffer_writer")]
+pub use self::log_writer::AsAny;
 pub use self::log_writer::LogWriter;

@@ -75,6 +75,8 @@ pub use crate::{
     parameters::{Age, Cleanup, Criterion, FileSpec, Naming},
     write_mode::{WriteMode, DEFAULT_BUFFER_CAPACITY, DEFAULT_FLUSH_INTERVAL},
 };
+#[cfg(feature = "buffer_writer")]
+pub use writers::{AsAny, Snapshot};
 
 /// Re-exports from log crate
 pub use log::{Level, LevelFilter, Record};

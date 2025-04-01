@@ -1,3 +1,5 @@
+#[cfg(feature = "buffer_writer")]
+use crate::writers::Snapshot;
 use crate::{
     primary_writer::PrimaryWriter,
     util::{eprint_err, ErrorCode},
@@ -75,7 +77,7 @@ use std::{
 /// # }
 /// ```
 ///
-/// However, when debugging, you often want to modify the log spec only temporarily, for  
+/// However, when debugging, you might want to modify the log spec only temporarily, for
 /// one or few method calls only; this is easier done with the following method, because
 /// it allows switching back to the previous spec:
 ///
@@ -306,6 +308,40 @@ impl LoggerHandle {
         result
     }
 
+    /// Updates the given `Snapshot` object with the current content of the buffer,
+    /// provided that logging to buffer is configured (see [`Logger::log_to_buffer`](crate::Logger::log_to_buffer)).
+    ///
+    /// Does nothing if logging to buffer is not configured
+    /// or if the given snapshot object is already up-to-date.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use flexi_logger::{opt_format, Logger, LogSpecification, Snapshot};
+    /// let logger_handle = Logger::with(LogSpecification::info())
+    ///     .log_to_buffer(1_000_000, Some(opt_format))
+    ///     .start()
+    ///     .unwrap();
+    /// let mut snapshot = Snapshot::new();
+    /// logger_handle.update_snapshot(&mut snapshot).unwrap();
+    /// // use_in_ui(&snapshot.text);
+    /// # fn use_in_ui(_: &str){}
+    ///
+    /// ```
+    #[cfg(feature = "buffer_writer")]
+    pub fn update_snapshot(&self, snapshot: &mut Snapshot) -> Result<bool, FlexiLoggerError> {
+        if let PrimaryWriter::Multi(ref mw) = *self.writers_handle.primary_writer {
+            if let Some(s) = mw.get_buffer_writer() {
+                return s.update_snapshot(snapshot);
+            }
+        }
+        Ok(false)
+    }
+
     /// Shutdown all participating writers.
     ///
     /// This method is supposed to be called at the very end of your program, if
@@ -409,6 +445,7 @@ impl LoggerHandle {
 ///         .with_compressed_files()
 /// );
 /// ```
+#[allow(clippy::struct_field_names)]
 pub struct LogfileSelector {
     pub(crate) with_plain_files: bool,
     pub(crate) with_r_current: bool,

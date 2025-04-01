@@ -1,8 +1,10 @@
+#[cfg(feature = "buffer_writer")]
+use crate::writers::BufferWriter;
 use crate::{
     logger::Duplicate,
     util::{eprint_err, write_buffered, ErrorCode},
     writers::{FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
-    LogfileSelector, {DeferredNow, FlexiLoggerError, FormatFunction},
+    DeferredNow, FlexiLoggerError, FormatFunction, LogfileSelector,
 };
 use log::Record;
 use std::{
@@ -110,6 +112,12 @@ impl MultiWriter {
     }
     fn duplication_to_stdout(&self) -> Duplicate {
         Duplicate::from(self.duplicate_stdout.load(Ordering::Relaxed))
+    }
+    #[cfg(feature = "buffer_writer")]
+    pub fn get_buffer_writer(&self) -> Option<&BufferWriter> {
+        self.o_other_writer
+            .as_ref()
+            .and_then(|ow| ow.as_any_ref().downcast_ref::<BufferWriter>())
     }
 }
 

@@ -1,5 +1,7 @@
 #[cfg(feature = "colors")]
 use crate::set_palette;
+#[cfg(feature = "buffer_writer")]
+use crate::writers::BufferWriter;
 use crate::{
     filter::LogLineFilter,
     flexi_logger::FlexiLogger,
@@ -12,7 +14,6 @@ use crate::{
     LoggerHandle, Naming, WriteMode,
 };
 use crate::{formats::AdaptiveFormat, ZERO_DURATION};
-
 use log::LevelFilter;
 #[cfg(feature = "specfile")]
 use std::sync::Mutex;
@@ -74,6 +75,7 @@ pub struct Logger {
 enum LogTarget {
     StdErr,
     StdOut,
+    // use_file_writer, optional additional writer
     Multi(bool, Option<Box<dyn LogWriter>>),
 }
 
@@ -220,6 +222,36 @@ impl Logger {
     pub fn log_to_file_and_writer(mut self, file_spec: FileSpec, w: Box<dyn LogWriter>) -> Self {
         self.log_target = LogTarget::Multi(true, Some(w));
         self.flwb = self.flwb.file_spec(file_spec);
+        self
+    }
+
+    /// Log is written to an in-memory buffer.
+    ///
+    /// This can be used in programs that want to display the log in their own UI
+    /// but do not want to store it in a file.
+    ///
+    /// The buffer has a maximum size (counting the bytes of the buffered message Strings)
+    /// and drops the oldest messages when needed to observe the limit.
+    ///
+    /// The buffer content can be retrieved with [`LoggerHandle::update_snapshot`].
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    #[must_use]
+    #[cfg(feature = "buffer_writer")]
+    pub fn log_to_buffer(
+        mut self,
+        max_size: usize,
+        format_function: Option<FormatFunction>,
+    ) -> Self {
+        self.log_target = LogTarget::Multi(
+            false,
+            Some(Box::new(BufferWriter::new(
+                max_size,
+                format_function.unwrap_or(default_format),
+            ))),
+        );
         self
     }
 
@@ -695,13 +727,13 @@ impl Logger {
                     PrimaryWriter::stderr(self.format_for_stderr, self.flwb.get_write_mode())
                 }
             }
-            LogTarget::Multi(use_file, mut o_writer) => PrimaryWriter::multi(
+            LogTarget::Multi(use_file_writer, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
                 self.duplicate_out,
                 WriteMode::SupportCapture == *self.flwb.get_write_mode(),
                 self.format_for_stderr,
                 self.format_for_stdout,
-                if use_file {
+                if use_file_writer {
                     Some(Box::new(
                         self.flwb.format(self.format_for_file).try_build()?,
                     ))

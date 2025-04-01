@@ -9,7 +9,7 @@ use std::{
 /// Implements the connection to the syslog.
 ///
 /// Choose one of the factory methods that matches your environment,
-/// depending on how the syslog is managed on your system,  
+/// depending on how the syslog is managed on your system,
 /// how you can access it and with which protocol you can write to it.
 ///
 /// Is required to instantiate a [`SyslogWriter`](crate::writers::SyslogWriter).

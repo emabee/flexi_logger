@@ -137,7 +137,7 @@ fn try_writing_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
 }
 
 pub(crate) fn io_err(s: &'static str) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, s)
+    std::io::Error::other(s)
 }
 
 // Thread-local buffer
@@ -169,9 +169,8 @@ pub(crate) fn write_buffered(
                 .write_all(b"\n")
                 .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
 
-            result = w.write_all(&buffer).map_err(|e| {
-                eprint_err(ErrorCode::Write, "writing failed", &e);
-                e
+            result = w.write_all(&buffer).inspect_err(|e| {
+                eprint_err(ErrorCode::Write, "writing failed", e);
             });
 
             #[cfg(test)]
@@ -192,9 +191,8 @@ pub(crate) fn write_buffered(
                 .write_all(b"\n")
                 .unwrap_or_else(|e| eprint_err(ErrorCode::Write, "writing failed", &e));
 
-            result = w.write_all(&tmp_buf).map_err(|e| {
-                eprint_err(ErrorCode::Write, "writing failed", &e);
-                e
+            result = w.write_all(&tmp_buf).inspect_err(|e| {
+                eprint_err(ErrorCode::Write, "writing failed", e);
             });
 
             #[cfg(test)]

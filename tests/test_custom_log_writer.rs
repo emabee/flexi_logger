@@ -1,7 +1,6 @@
 mod test_utils;
 
-use flexi_logger::writers::LogWriter;
-use flexi_logger::{default_format, DeferredNow, FormatFunction, Logger};
+use flexi_logger::{default_format, writers::LogWriter, DeferredNow, FormatFunction, Logger};
 use log::*;
 use std::sync::Mutex;
 

@@ -102,13 +102,11 @@ impl AsyncHandle {
 
     fn write(&self, now: &mut DeferredNow, record: &Record) -> Result<(), std::io::Error> {
         let mut buffer = self.pop_buffer();
-        (self.format_function)(&mut buffer, now, record).map_err(|e| {
+        (self.format_function)(&mut buffer, now, record).inspect_err(|e| {
             eprint_err(ErrorCode::Format, "formatting failed", &e);
-            e
         })?;
-        buffer.write_all(self.line_ending).map_err(|e| {
+        buffer.write_all(self.line_ending).inspect_err(|e| {
             eprint_err(ErrorCode::Write, "writing failed", &e);
-            e
         })?;
         self.sender.send(buffer).map_err(|_e| io_err("Send"))
     }

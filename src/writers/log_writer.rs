@@ -1,11 +1,12 @@
 use crate::{DeferredNow, FlexiLoggerError, FormatFunction};
 use log::Record;
+use std::any::Any;
 
 /// Writes to a single log output stream.
 ///
 /// Boxed instances of `LogWriter` can be used as additional log targets
 /// (see [writers](crate::writers) for more details).
-pub trait LogWriter: Sync + Send {
+pub trait LogWriter: Send + Sync + AsAny {
     /// Writes out a log line.
     ///
     /// # Errors
@@ -73,5 +74,19 @@ pub trait LogWriter: Sync + Send {
     #[doc(hidden)]
     fn validate_logs(&self, _expected: &[(&'static str, &'static str, &'static str)]) {
         unimplemented!("only useful for tests");
+    }
+}
+
+/// Trait to support runtime dynamic typing.
+pub trait AsAny {
+    /// Cast into `&dyn Any`.
+    fn as_any_ref(&self) -> &dyn Any;
+}
+impl<T> AsAny for T
+where
+    T: Any,
+{
+    fn as_any_ref(&self) -> &dyn Any {
+        self
     }
 }

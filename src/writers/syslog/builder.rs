@@ -3,7 +3,7 @@ use super::{
     LevelToSyslogSeverity, SyslogConnection, SyslogFacility, SyslogWriter,
 };
 use crate::FormatFunction;
-use std::io::{Error as IoError, ErrorKind, Result as IoResult};
+use std::io::{Error as IoError, Result as IoResult};
 
 #[allow(clippy::module_name_repetitions)]
 /// Builder for the `SyslogWriter`.
@@ -85,8 +85,7 @@ impl SyslogWriterBuilder {
             self.custom_process_name
                 .or(std::env::args().next())
                 .ok_or_else(|| {
-                    IoError::new(
-                        ErrorKind::Other,
+                    IoError::other(
                         "Can't provide a process name as no env args are present and \
                         no custom process name is set"
                             .to_owned(),

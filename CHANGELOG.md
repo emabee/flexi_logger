@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.25.7] - 2024-12-10
+## [0.30.0] - 2025-04-01
+
+Added non-default feature 'buffer_writer', which adds an in-memory log target with limited size and FIFO-logic.
+
+Adds as additional requirement that `LogWriter` implementations must be `'static`.
+Most usages don't use own `LogWriter` implementations, and most of those which do will not have to
+adapt their code. Own `LogWriter` implementations that really contain a non-static reference
+will not work anymore, but that's hard to imagine anyway. `LogWriter` implementations that use
+generics might have to adapt their requirements to the supported types
+(as an example, see
+[`examples/write_writer.rs`](https://github.com/emabee/flexi_logger/blob/main/examples/write_writer.rs#L14)).
+
+Bump minimal supported rust version to 1.81.0.
+
+## [0.29.7] - 2024-12-10
 
 Fix issue #184.
 
@@ -13,12 +27,12 @@ Update dependencies.
 
 Bump minimal supported rust version to 1.72.0.
 
-## [0.25.6] - 2024-11-02
+## [0.29.6] - 2024-11-02
 
 Allow for custom process names when using the syslog writer (PR #182, kudos to
 [Julien JPK](https://github.com/julienjpk-withings)).
 
-## [0.25.5] - 2024-10-29
+## [0.29.5] - 2024-10-29
 
 Fix [issue #181](https://github.com/emabee/flexi_logger/issues/181).
 
@@ -57,8 +71,8 @@ Revised `SyslogWriter` (-> version bump): introduced builder pattern,
 added a configuration option for the message format
 (resolves [issue #168](https://github.com/emabee/flexi_logger/issues/168), kudos to [krims0n32](https://github.com/krims0n32)).
 
-`LoggerHandle::existing_log_files` now also returns a meaningful result if file rotation is not
-used. Kudos to [drdo](https://github.com/drdo) for
+`LoggerHandle::existing_log_files` now also returns a meaningful result
+if file rotation is not used. Kudos to [drdo](https://github.com/drdo) for
 [discussion 170](https://github.com/emabee/flexi_logger/discussions/170).
 
 ## [0.28.5] - 2024-06-21
@@ -111,7 +125,7 @@ The new feature `json` adds a format function `json_format` and dependencies to 
 
 Add ability to omit the basename cleanly, without leading underscore
 ([issue #153](https://github.com/emabee/flexi_logger/issues/153),
-kudos to [krystejj](https://github.com/krystejj).
+kudos to [krystejj](https://github.com/krystejj)).
 
 ## [0.27.3] - 2023-11-10
 

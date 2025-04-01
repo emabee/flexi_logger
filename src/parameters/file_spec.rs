@@ -56,7 +56,6 @@ impl Default for FileSpec {
     /// Describes a file in the current folder,
     /// using, as its filestem, the program name followed by the current timestamp,
     /// and the suffix ".log".
-    #[must_use]
     fn default() -> Self {
         FileSpec {
             directory: PathBuf::from("."),
@@ -269,7 +268,7 @@ impl FileSpec {
                 append_underscore_if_not_empty(&mut filename);
                 filename.push_str(infix);
             }
-        };
+        }
         if let Some(suffix) = &self.o_suffix {
             filename.push('.');
             filename.push_str(suffix);
@@ -297,7 +296,7 @@ impl FileSpec {
                 let mut pb2 = PathBuf::from(pb);
                 if pb2.extension() == Some(OsString::from("gz").as_ref()) {
                     pb2.set_extension("");
-                };
+                }
                 // suffix must match the given suffix, if one is given
                 match self.o_suffix {
                     Some(ref sfx) => pb2.extension() == Some(OsString::from(sfx).as_ref()),

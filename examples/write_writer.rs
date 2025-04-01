@@ -11,7 +11,7 @@ struct MyWriter<W> {
     writer: Arc<Mutex<W>>,
 }
 
-impl<F: std::io::Write + Send + Sync> LogWriter for MyWriter<F> {
+impl<F: std::io::Write + Send + Sync + 'static> LogWriter for MyWriter<F> {
     fn write(
         &self,
         now: &mut flexi_logger::DeferredNow,
