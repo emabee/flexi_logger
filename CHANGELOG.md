@@ -19,6 +19,10 @@ generics might have to adapt their requirements to the supported types
 
 Bump minimal supported rust version to 1.81.0.
 
+## [0.29.8] - 2024-12-18
+
+Fix issue #185.
+
 ## [0.29.7] - 2024-12-10
 
 Fix issue #184.

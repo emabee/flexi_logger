@@ -320,6 +320,12 @@ impl ArcFileLogWriter {
         (Self(Arc::clone(&a_flw)), FileLogWriterHandle(a_flw))
     }
 }
+impl std::ops::Deref for ArcFileLogWriter {
+    type Target = FileLogWriter;
+    fn deref(&self) -> &FileLogWriter {
+        &(self.0)
+    }
+}
 impl Clone for ArcFileLogWriter {
     fn clone(&self) -> Self {
         Self(Arc::clone(&self.0))
