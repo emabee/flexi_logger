@@ -233,6 +233,9 @@ impl Logger {
     /// The buffer has a maximum size (counting the bytes of the buffered message Strings)
     /// and drops the oldest messages when needed to observe the limit.
     ///
+    /// Once filled, the buffer will always contain at least the latest message,
+    /// even if this message is bigger than the limit.
+    ///
     /// The buffer content can be retrieved with [`LoggerHandle::update_snapshot`].
     ///
     /// # Errors
