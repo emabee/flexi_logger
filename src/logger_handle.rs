@@ -239,6 +239,24 @@ impl LoggerHandle {
         }
     }
 
+    /// Get the current maximimum log level.
+    pub fn current_max_level(&self) -> log::LevelFilter {
+        let read_guard = self.writers_handle.spec.read().unwrap();
+        read_guard.max_level()
+    }
+
+    /// Get the log level for a specific module, following the same rules as 
+    /// [crate::log_specification::ModuleFilter] (if module is `None` it will be the default filter).
+    /// 
+    /// Returns none if the given module name is not found in the current log spec.
+    pub fn current_level_for_module(&self, module: Option<&str>) -> Option<log::LevelFilter> {
+        let read_guard = self.writers_handle.spec.read().unwrap();
+        read_guard.module_filters()
+            .iter()
+            .find(|mod_filter| mod_filter.module_name.as_ref().map(String::as_str) == module)
+            .map(|found_filter| found_filter.level_filter)
+    }
+
     /// Makes the logger re-open the current log file.
     ///
     /// If the log is written to a file, `flexi_logger` expects that nobody else modifies the file,
