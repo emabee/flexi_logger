@@ -419,6 +419,16 @@ impl LogSpecification {
     pub fn text_filter(&self) -> Option<&Regex> {
         self.textfilter.as_deref()
     }
+
+    /// Returns the log level for some module or, if None is provided, for the default log level,
+    /// if one is set. If no level is set, None is returned.
+    #[must_use]
+    pub fn level_for_module(&self, module: Option<&str>) -> Option<LevelFilter> {
+        self.module_filters()
+            .iter()
+            .find(|mod_filter| mod_filter.module_name.as_deref() == module)
+            .map(|found_filter| found_filter.level_filter)
+    }
 }
 
 impl std::fmt::Display for LogSpecification {
@@ -986,6 +996,8 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "specfile_without_notification")]
 mod test_with_specfile {
+    use log::LevelFilter;
+
     #[cfg(feature = "specfile_without_notification")]
     use crate::LogSpecification;
 
@@ -1042,5 +1054,17 @@ mod test_with_specfile {
                 ls_spec.textfilter.unwrap().to_string()
             );
         }
+    }
+
+    #[test]
+    fn test_level_for_module() {
+        let spec = LogSpecification::parse("info,crate1::mod1=warn").unwrap();
+        assert_eq!(spec.level_for_module(None), Some(LevelFilter::Info));
+        assert_eq!(
+            spec.level_for_module(Some("crate1::mod1")),
+            Some(LevelFilter::Warn)
+        );
+        assert_eq!(spec.level_for_module(Some("crate2::mod2")), None,);
+        assert_eq!(spec.level_for_module(Some("crate3")), None);
     }
 }

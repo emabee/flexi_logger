@@ -67,7 +67,7 @@ fn work(value: u8) {
                 }
             }
         }
-        info!("YYY {} AAA", i);
+        info!("YYY {i} AAA");
     }
 
     logger.flush();

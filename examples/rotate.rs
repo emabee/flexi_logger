@@ -19,7 +19,7 @@ fn main() -> Result<(), FlexiLoggerError> {
 
     log::info!("start");
     for step in 0..10 {
-        log::info!("step {}", step);
+        log::info!("step {step}");
         sleep(Duration::from_millis(250));
     }
     log::info!("done");

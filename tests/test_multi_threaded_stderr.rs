@@ -22,7 +22,7 @@ fn multi_threaded() {
     info!("create a huge number of log lines with a considerable number of threads");
     for i in 0..50 {
         std::thread::sleep(std::time::Duration::from_millis(100));
-        info!("********** check delay of this log line ({}) **********", i);
+        info!("********** check delay of this log line ({i}) **********");
     }
     let _stopwatch = test_utils::Stopwatch::default();
 
@@ -34,9 +34,9 @@ fn multi_threaded() {
 // Starts given number of worker threads and lets each execute `do_work`
 fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
-    trace!("Starting {} worker threads", no_of_workers);
+    trace!("Starting {no_of_workers} worker threads");
     for thread_number in 0..no_of_workers {
-        trace!("Starting thread {}", thread_number);
+        trace!("Starting thread {thread_number}");
         worker_handles.push(
             thread::Builder::new()
                 .name(thread_number.to_string())
@@ -52,10 +52,10 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 }
 
 fn do_work(thread_number: usize) {
-    trace!("({})     Thread started working", thread_number);
+    trace!("({thread_number})     Thread started working");
     trace!("ERROR_IF_PRINTED");
     for idx in 0..NO_OF_LOGLINES_PER_THREAD {
-        debug!("({})  writing out line number {}", thread_number, idx);
+        debug!("({thread_number})  writing out line number {idx}");
     }
     trace!("MUST_BE_PRINTED");
 }

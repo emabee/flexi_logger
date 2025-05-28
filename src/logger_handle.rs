@@ -239,6 +239,34 @@ impl LoggerHandle {
         }
     }
 
+    /// Get the current maximimum log level.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn current_max_level(&self) -> Result<log::LevelFilter, FlexiLoggerError> {
+        let read_guard = self
+            .writers_handle
+            .spec
+            .read()
+            .map_err(|_| FlexiLoggerError::Poison)?;
+        Ok(read_guard.max_level())
+    }
+
+    /// Get a copy of the current log spec.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn current_log_spec(&self) -> Result<LogSpecification, FlexiLoggerError> {
+        Ok(self
+            .writers_handle
+            .spec
+            .read()
+            .map_err(|_| FlexiLoggerError::Poison)?
+            .clone())
+    }
+
     /// Makes the logger re-open the current log file.
     ///
     /// If the log is written to a file, `flexi_logger` expects that nobody else modifies the file,
