@@ -59,9 +59,9 @@ fn multi_threaded() {
 // Starts given number of worker threads and lets each execute `do_work`
 fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
     let mut worker_handles: Vec<JoinHandle<u8>> = Vec::with_capacity(no_of_workers);
-    trace!("Starting {} worker threads", no_of_workers);
+    trace!("Starting {no_of_workers} worker threads");
     for thread_number in 0..no_of_workers {
-        trace!("Starting thread {}", thread_number);
+        trace!("Starting thread {thread_number}");
         worker_handles.push(
             std::thread::Builder::new()
                 .name(thread_number.to_string())
@@ -77,7 +77,7 @@ fn start_worker_threads(no_of_workers: usize) -> Vec<JoinHandle<u8>> {
 }
 
 fn do_work(thread_number: usize) {
-    trace!("({})     Thread started working", thread_number);
+    trace!("({thread_number})     Thread started working");
     trace!("ERROR_IF_PRINTED");
     for _idx in 0..NO_OF_LOGLINES_PER_THREAD {
         debug!("bliblablub");

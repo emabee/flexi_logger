@@ -30,11 +30,11 @@ fn test_recursion() {
     let dummy = Dummy();
 
     for _ in 0..10 {
-        error!("This is an error message for {}", dummy);
-        warn!("This is a warning for {}", dummy);
-        info!("This is an info message for {}", dummy);
-        debug!("This is a debug message for {}", dummy);
-        trace!("This is a trace message for {}", dummy);
+        error!("This is an error message for {dummy}");
+        warn!("This is a warning for {dummy}");
+        info!("This is an info message for {dummy}");
+        debug!("This is a debug message for {dummy}");
+        trace!("This is a trace message for {dummy}");
     }
 }
 

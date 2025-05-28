@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.2] - 2025-05-27
+
+Add abilities
+
+- to read the current log specification from LoggerHandle,
+- to read individual module filters from the log specification
+
+(kudos to [Venus Xeon-Blonde](https://github.com/vcfxb)).
+
+Fix some clippies.
+
+Bump minimal supported rust version to 1.82.0, due to updated dependencies.
+
 ## [0.30.1] - 2025-04-02
 
 Fix endless loop if a single log message is bigger than `buffer_writer`'s overall limit.

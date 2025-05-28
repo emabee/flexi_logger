@@ -27,7 +27,17 @@ fn test_parse_new_spec(logger: &LoggerHandle) {
     debug!("1-debug message - you must not see it!");
     trace!("1-trace message - you must not see it!");
 
+    assert_eq!(
+        logger.current_log_spec().unwrap().level_for_module(None),
+        Some(LevelFilter::Info)
+    );
+
     logger.parse_new_spec("error").ok();
+    assert_eq!(
+        logger.current_log_spec().unwrap().level_for_module(None),
+        Some(LevelFilter::Error)
+    );
+
     error!("1-error message");
     warn!("1-warning - you must not see it!");
     info!("1-info message - you must not see it!");
@@ -51,7 +61,16 @@ fn test_push_new_spec(logger: &mut LoggerHandle) {
     debug!("2-debug message - you must not see it!");
     trace!("2-trace message - you must not see it!");
 
+    assert_eq!(
+        logger.current_log_spec().unwrap().level_for_module(None),
+        Some(LevelFilter::Info)
+    );
     logger.parse_and_push_temp_spec("error").ok();
+    assert_eq!(
+        logger.current_log_spec().unwrap().level_for_module(None),
+        Some(LevelFilter::Error)
+    );
+
     error!("2-error message");
     warn!("2-warning - you must not see it!");
     info!("2-info message - you must not see it!");

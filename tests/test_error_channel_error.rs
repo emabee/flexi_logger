@@ -98,7 +98,7 @@ fn child(panic: bool) {
             .truncate(true)
             .open(crashdump_file())
             .unwrap();
-        file.write_all(format!("Panic occured:\n{}\n{}\n", panic, backtrace).as_bytes())
+        file.write_all(format!("Panic occured:\n{panic}\n{backtrace}\n").as_bytes())
             .unwrap();
         file.flush().unwrap();
 
