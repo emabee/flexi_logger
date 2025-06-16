@@ -3,8 +3,8 @@ mod test_utils;
 #[cfg(feature = "trc")]
 mod a {
     use flexi_logger::{
-        writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec, LogSpecification, Naming,
-        WriteMode,
+        trc::FormatConfig, writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec,
+        LogSpecification, Naming, WriteMode,
     };
     use std::io::Write;
     use tracing::{debug, error, info, trace, warn};
@@ -29,6 +29,11 @@ mod a {
                     Cleanup::KeepLogFiles(7),
                 )
                 .write_mode(WriteMode::Async),
+            &FormatConfig::default()
+                .with_ansi(false)
+                .with_level(true)
+                .with_target(true)
+                .with_time(true),
         )
         .unwrap();
 

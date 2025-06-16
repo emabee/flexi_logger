@@ -19,7 +19,7 @@ and you use the ```log``` macros to write log lines from your code):
 
 ```toml
 [dependencies]
-flexi_logger = "0.30"
+flexi_logger = "0.31"
 log = "0.4"
 ```
 
@@ -75,7 +75,7 @@ Make use of the non-default features by specifying them in your `Cargo.toml`, e.
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.30", features = ["async", "specfile", "compress"] }
+flexi_logger = { version = "0.31", features = ["async", "specfile", "compress"] }
 log = "0.4"
 ```
 
@@ -83,7 +83,7 @@ or, to get the smallest footprint (and no colors), switch off even the default f
 
 ```toml
 [dependencies]
-flexi_logger = { version = "0.30", default_features = false }
+flexi_logger = { version = "0.31", default_features = false }
 log = "0.4"
 ```
 
@@ -91,7 +91,7 @@ log = "0.4"
 
 Adds an additional write mode that decouples `flexi_logger`'s I/O from your application threads.
 Works with `log_to_stdout()`, `log_to_stderr()`, and `log_to_file()`.
-See [here](./docs/diagrams.pdf) for a performance comparison of some write modes.
+See [performance comparison](./docs/diagrams.pdf) of some write modes.
 
 Adds dependencies to
 [`crossbeam-channel`](https://docs.rs/crossbeam-channel/latest/crossbeam_channel/)
@@ -130,7 +130,7 @@ or all rotated log files in compressed form (`.gz`) rather than as plain text fi
 Normally, `flexi_logger` reduces the stack size of all threads that it might spawn
 (flusher, specfile-watcher, async writer, cleanup) to a bare minimum.
 For usecases where this is not desirable
-(see [here](https://github.com/emabee/flexi_logger/issues/95) for some motivation),
+([here is some motivation](https://github.com/emabee/flexi_logger/issues/95)),
 you can activate this feature.
 
 ### **`json`**
@@ -171,7 +171,7 @@ For that reason the feature is not active by default.
 ### **`specfile_without_notification`**
 
 Pretty much like `specfile`, except that updates to the file are being ignored.
-See [here](https://github.com/emabee/flexi_logger/issues/59) for more details.
+See [issue 59](https://github.com/emabee/flexi_logger/issues/59) for more details.
 
 ### **`syslog_writer`**
 

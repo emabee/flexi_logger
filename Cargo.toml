@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.30.2"
+version = "0.31.0"
 authors = ["emabee <meinolf.block-hd@t-online.de>"]
 categories = ["development-tools::debugging"]
 description = """
