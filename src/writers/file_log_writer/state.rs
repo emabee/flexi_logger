@@ -2,12 +2,9 @@ mod list_and_cleanup;
 mod numbers;
 mod timestamps;
 
+use super::{config::FileLogWriterConfig, rotation_config::RotationConfig, InfixFilter};
 pub(crate) use timestamps::timestamp_from_ts_infix;
 
-use super::{
-    config::{FileLogWriterConfig, RotationConfig},
-    InfixFilter,
-};
 #[cfg(feature = "async")]
 use crate::util::eprint_msg;
 use crate::{

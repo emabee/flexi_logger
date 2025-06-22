@@ -26,6 +26,10 @@ pub enum FlexiLoggerError {
     #[error("Log file cannot be written because the specified path is a directory")]
     OutputBadFile,
 
+    /// Invalid input for deriving `FileSpec`.
+    #[error("Invalid input for deriving FileSpec")]
+    BadFileSpec(&'static str),
+
     /// Spawning the cleanup thread failed.
     ///
     /// This error can safely be avoided with `Logger::cleanup_in_background_thread(false)`.

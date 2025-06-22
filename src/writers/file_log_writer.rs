@@ -2,6 +2,7 @@
 mod builder;
 mod config;
 mod infix_filter;
+mod rotation_config;
 mod state;
 mod state_handle;
 mod threads;
@@ -10,7 +11,7 @@ pub use self::builder::{ArcFileLogWriter, FileLogWriterBuilder, FileLogWriterHan
 pub use self::config::FileLogWriterConfig;
 pub(crate) use infix_filter::InfixFilter;
 
-use self::{config::RotationConfig, state::State, state_handle::StateHandle};
+use self::{rotation_config::RotationConfig, state::State, state_handle::StateHandle};
 use crate::{
     writers::LogWriter, DeferredNow, EffectiveWriteMode, FileSpec, FlexiLoggerError,
     FormatFunction, LogfileSelector,

@@ -1,10 +1,10 @@
-use crate::writers::file_log_writer::InfixFilter;
-use crate::{DeferredNow, FlexiLoggerError};
+use crate::{writers::file_log_writer::InfixFilter, DeferredNow, FlexiLoggerError};
 use std::{
     ffi::{OsStr, OsString},
     ops::Add,
     path::{Path, PathBuf},
 };
+
 /// Builder object for specifying the name and path of the log output file.
 ///
 /// The filename is built from several partially components, using this pattern:
@@ -91,23 +91,56 @@ impl FileSpec {
     /// # Errors
     ///
     /// [`FlexiLoggerError::OutputBadFile`] if the given path exists and is a folder.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the basename of the given path has no filename
+    /// [`FlexiLoggerError::BadFileSpec`] if deriving the `FileSpec` from the given path fails.
+    #[allow(clippy::missing_panics_doc)]
     pub fn try_from<P: Into<PathBuf>>(p: P) -> Result<Self, FlexiLoggerError> {
-        let p: PathBuf = p.into();
-        if p.is_dir() {
-            Err(FlexiLoggerError::OutputBadFile)
+        let input: PathBuf = p.into();
+
+        if input.is_dir() {
+            Err(FlexiLoggerError::BadFileSpec("File path is a directory"))
         } else {
-            Ok(FileSpec {
-                directory: p.parent().unwrap(/*cannot fail*/).to_path_buf(),
-                basename: p.file_stem().unwrap(/*ok*/).to_string_lossy().to_string(),
-                o_discriminant: None,
-                o_suffix: p.extension().map(|s| s.to_string_lossy().to_string()),
-                timestamp_cfg: TimestampCfg::No,
-                use_utc: false,
-            })
+            let input_as_str = input.as_os_str().to_string_lossy();
+            if input_as_str.is_empty() {
+                Err(FlexiLoggerError::BadFileSpec("File path is empty"))
+            } else if input_as_str.ends_with('/')
+                || input_as_str.ends_with("/.")
+                || input_as_str.ends_with("/..")
+            {
+                Err(FlexiLoggerError::BadFileSpec(
+                    "Path ends with '/' or '/.' or '/..'",
+                ))
+            } else if input
+                .file_name()
+                .ok_or(FlexiLoggerError::OutputBadFile)?
+                .to_string_lossy()
+                .starts_with('.')
+                && input.extension().is_none()
+            {
+                Err(FlexiLoggerError::BadFileSpec(
+                    "File name cannot start with '.' without an extension",
+                ))
+            } else {
+                match input.parent() {
+                    None => Err(FlexiLoggerError::BadFileSpec(
+                        "File path has no parent directory",
+                    )),
+                    Some(parent) => {
+                        let filespec = FileSpec {
+                            directory: if parent.as_os_str().is_empty() {
+                                PathBuf::from(".")
+                            } else {
+                                parent.to_path_buf()
+                            },
+                            basename: input.file_stem().unwrap(/*ok*/).to_string_lossy().to_string(),
+                            o_discriminant: None,
+                            o_suffix: input.extension().map(|s| s.to_string_lossy().to_string()),
+                            timestamp_cfg: TimestampCfg::No,
+                            use_utc: false,
+                        };
+                        Ok(filespec)
+                    }
+                }
+            }
         }
     }
 
@@ -471,6 +504,27 @@ mod test {
     fn test_default() {
         let path = FileSpec::default().as_pathbuf(None);
         assert_file_spec(&path, &PathBuf::from("."), true, "log");
+    }
+
+    #[test]
+    fn issue_194() {
+        assert!(dbg!(FileSpec::try_from("")).is_err());
+        assert!(dbg!(FileSpec::try_from(".")).is_err());
+        assert!(dbg!(FileSpec::try_from("..")).is_err());
+        assert!(dbg!(FileSpec::try_from("/Users")).is_err());
+        assert!(dbg!(FileSpec::try_from("/Users/")).is_err());
+        assert!(dbg!(FileSpec::try_from("./f/")).is_err());
+        assert!(dbg!(FileSpec::try_from("./f/.")).is_err());
+        assert!(dbg!(FileSpec::try_from("./f/..")).is_err());
+        assert!(dbg!(FileSpec::try_from(".log")).is_err());
+        assert!(dbg!(FileSpec::try_from("./.log")).is_err());
+        assert!(dbg!(FileSpec::try_from("./f/.log")).is_err());
+
+        let filespec = FileSpec::try_from("test.log").unwrap();
+        std::fs::create_dir_all(filespec.get_directory()).unwrap();
+        assert!(std::fs::metadata(filespec.get_directory())
+            .unwrap()
+            .is_dir());
     }
 
     // todo: does not support suppress_timestamp & suppress_basename & use discriminant

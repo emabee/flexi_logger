@@ -1,10 +1,11 @@
-use crate::flexi_error::FlexiLoggerError;
-use crate::formats::default_format;
-use crate::{Cleanup, Criterion, FileSpec, FormatFunction, Naming, WriteMode};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use crate::{
+    default_format,
+    writers::{FileLogWriter, FileLogWriterConfig, LogWriter},
+    Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, Naming, WriteMode,
+};
+use std::{path::PathBuf, sync::Arc};
 
-use super::{FileLogWriter, FileLogWriterConfig, LogWriter, RotationConfig, State};
+use super::{RotationConfig, State};
 
 /// Builder for [`FileLogWriter`].
 #[allow(clippy::struct_excessive_bools, clippy::module_name_repetitions)]
@@ -219,11 +220,10 @@ impl FileLogWriterBuilder {
     }
 
     pub(super) fn try_build_state(&self) -> Result<State, FlexiLoggerError> {
-        // make sure the folder exists or create it
-        let dir = self.file_spec.get_directory();
-        let p_directory = Path::new(&dir);
-        std::fs::create_dir_all(p_directory)?;
-        if !std::fs::metadata(p_directory)?.is_dir() {
+        // make sure the folder exists, or create it
+        let parent = self.file_spec.get_directory();
+        std::fs::create_dir_all(&parent)?;
+        if !std::fs::metadata(&parent)?.is_dir() {
             return Err(FlexiLoggerError::OutputBadDirectory);
         }
 
