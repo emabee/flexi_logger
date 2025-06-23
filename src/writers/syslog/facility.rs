@@ -53,3 +53,35 @@ pub enum SyslogFacility {
     /// local use 7  (local7).
     LocalUse7 = 23 << 3,
 }
+
+#[cfg(unix)]
+impl SyslogFacility {
+    pub(crate) fn to_nix(self) -> nix::syslog::Facility {
+        match self {
+            SyslogFacility::Kernel => nix::syslog::Facility::LOG_KERN,
+            SyslogFacility::UserLevel => nix::syslog::Facility::LOG_USER,
+            SyslogFacility::MailSystem => nix::syslog::Facility::LOG_MAIL,
+            SyslogFacility::SystemDaemons => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::Authorization => nix::syslog::Facility::LOG_AUTH,
+            SyslogFacility::SyslogD => nix::syslog::Facility::LOG_SYSLOG,
+            SyslogFacility::LinePrinter => nix::syslog::Facility::LOG_LPR,
+            SyslogFacility::News => nix::syslog::Facility::LOG_NEWS,
+            SyslogFacility::Uucp => nix::syslog::Facility::LOG_UUCP,
+            SyslogFacility::Clock => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::Authorization2 => nix::syslog::Facility::LOG_AUTH,
+            SyslogFacility::Ftp => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::Ntp => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::LogAudit => nix::syslog::Facility::LOG_USER,
+            SyslogFacility::LogAlert => nix::syslog::Facility::LOG_USER,
+            SyslogFacility::Clock2 => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::LocalUse0 => nix::syslog::Facility::LOG_LOCAL0,
+            SyslogFacility::LocalUse1 => nix::syslog::Facility::LOG_LOCAL1,
+            SyslogFacility::LocalUse2 => nix::syslog::Facility::LOG_LOCAL2,
+            SyslogFacility::LocalUse3 => nix::syslog::Facility::LOG_LOCAL3,
+            SyslogFacility::LocalUse4 => nix::syslog::Facility::LOG_LOCAL4,
+            SyslogFacility::LocalUse5 => nix::syslog::Facility::LOG_LOCAL5,
+            SyslogFacility::LocalUse6 => nix::syslog::Facility::LOG_LOCAL6,
+            SyslogFacility::LocalUse7 => nix::syslog::Facility::LOG_LOCAL7,
+        }
+    }
+}

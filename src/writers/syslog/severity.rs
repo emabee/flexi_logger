@@ -35,3 +35,19 @@ pub(crate) fn default_mapping(level: log::Level) -> SyslogSeverity {
         log::Level::Debug | log::Level::Trace => SyslogSeverity::Debug,
     }
 }
+
+#[cfg(unix)]
+impl SyslogSeverity {
+    pub(crate) fn to_nix(self) -> nix::syslog::Severity {
+        match self {
+            SyslogSeverity::Emergency => nix::syslog::Severity::LOG_EMERG.into(),
+            SyslogSeverity::Alert => nix::syslog::Severity::LOG_ALERT.into(),
+            SyslogSeverity::Critical => nix::syslog::Severity::LOG_CRIT.into(),
+            SyslogSeverity::Error => nix::syslog::Severity::LOG_ERR.into(),
+            SyslogSeverity::Warning => nix::syslog::Severity::LOG_WARNING.into(),
+            SyslogSeverity::Notice => nix::syslog::Severity::LOG_NOTICE.into(),
+            SyslogSeverity::Info => nix::syslog::Severity::LOG_INFO.into(),
+            SyslogSeverity::Debug => nix::syslog::Severity::LOG_DEBUG.into(),
+        }
+    }
+}

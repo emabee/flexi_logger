@@ -1,8 +1,22 @@
 use std::io::{Error as IoError, ErrorKind, Result as IoResult, Write};
+#[cfg(unix)]
+use std::{ffi::CStr, sync::Mutex};
 
 use crate::{DeferredNow, FormatFunction};
 
 use super::{LevelToSyslogSeverity, SyslogFacility};
+
+#[cfg(unix)]
+static POSIX_SYSLOG_STATE: Mutex<PosixSyslogState> = Mutex::new(PosixSyslogState {
+    idents_stack: vec![],
+    buf: vec![],
+});
+
+#[cfg(unix)]
+struct PosixSyslogState {
+    idents_stack: Vec<&'static CStr>,
+    buf: Vec<u8>,
+}
 
 /// Defines the format of the header of a syslog line.
 pub enum SyslogLineHeader {
@@ -13,7 +27,7 @@ pub enum SyslogLineHeader {
 }
 pub(crate) struct LineWriter {
     header: SyslogLineHeader,
-    hostname: String,
+    hostname: Option<String>,
     process: String,
     pid: u32,
     format: FormatFunction,
@@ -29,20 +43,13 @@ impl LineWriter {
         pid: u32,
         format: FormatFunction,
     ) -> IoResult<LineWriter> {
-        const UNKNOWN_HOSTNAME: &str = "<unknown_hostname>";
         Ok(LineWriter {
+            hostname: if matches!(header, SyslogLineHeader::Rfc5424(_)) {
+                get_hostname()?
+            } else {
+                None
+            },
             header,
-            hostname: hostname::get().map_or_else(
-                |_| Ok(UNKNOWN_HOSTNAME.to_owned()),
-                |s| {
-                    s.into_string().map_err(|_| {
-                        IoError::new(
-                            ErrorKind::InvalidData,
-                            "Hostname contains non-UTF8 characters".to_owned(),
-                        )
-                    })
-                },
-            )?,
             process,
             pid,
             format,
@@ -51,7 +58,7 @@ impl LineWriter {
         })
     }
 
-    pub(crate) fn write_syslog_entry(
+    pub(crate) fn write_to_syslog_socket_buffer(
         &self,
         buffer: &mut dyn Write,
         now: &mut DeferredNow,
@@ -80,7 +87,7 @@ impl LineWriter {
                     pri = self.facility as u8 | severity as u8,
                     version = "1",
                     timestamp = now.format_rfc3339(),
-                    hostname = self.hostname,
+                    hostname = self.hostname.as_deref().unwrap_or("<unknown_hostname>"),
                     appname = self.process,
                     procid = self.pid,
                     msgid = message_id,
@@ -91,13 +98,89 @@ impl LineWriter {
         }
         Ok(())
     }
+
+    #[cfg(unix)]
+    pub(crate) fn write_with_syslog_call(
+        &self,
+        now: &mut DeferredNow,
+        record: &log::Record,
+    ) -> IoResult<()> {
+        use std::{
+            ffi::{CString, OsStr},
+            os::unix::ffi::OsStrExt,
+        };
+
+        use nix::syslog::{openlog, syslog, LogFlags};
+
+        let mut posix_syslog_state = POSIX_SYSLOG_STATE
+            .lock()
+            .map_err(|_| crate::util::io_err("LineWriter is poisoned"))?;
+
+        // If the ident (process) to use does not match the globally last used
+        // ident, we need to call `openlog` to set it process-wide. We use a stack
+        // as a set of sorts because it's much more efficient for the extremely common
+        // case of always using the same ident (i.e., only a syslog writer was set up)
+        if Some(self.process.as_bytes())
+            != posix_syslog_state.idents_stack.last().map(|s| s.to_bytes())
+        {
+            let ident_cstr = if let Some((i, _)) = posix_syslog_state
+                .idents_stack
+                .iter()
+                .enumerate()
+                .find(|(_, s)| s.to_bytes() == &*self.process.as_bytes())
+            {
+                // Reuse the pooled C ident string to avoid leaking it again
+                posix_syslog_state.idents_stack.swap_remove(i)
+            } else {
+                Box::leak(
+                    CString::new(&*self.process)
+                        .map_err(|_| {
+                            crate::util::io_err("SyslogWriter ident contains internal NUL bytes")
+                        })?
+                        .into_boxed_c_str(),
+                )
+            };
+
+            posix_syslog_state.idents_stack.push(ident_cstr);
+
+            // nix openlog bindings have a strange Linux-specific signature we have to work around.
+            // More details: https://github.com/nix-rust/nix/pull/2537#discussion_r2163724906
+            #[cfg(target_os = "linux")]
+            openlog(Some(ident_cstr), LogFlags::LOG_PID, self.facility.to_nix())?;
+            #[cfg(not(target_os = "linux"))]
+            openlog(
+                Some(OsStr::from_bytes(ident_cstr.to_bytes())),
+                LogFlags::LOG_PID,
+                self.facility.to_nix(),
+            )?;
+        }
+
+        posix_syslog_state.buf.clear();
+        (self.format)(&mut posix_syslog_state.buf, now, record)?;
+
+        Ok(syslog(
+            (self.determine_severity)(record.level()).to_nix(),
+            OsStr::from_bytes(&posix_syslog_state.buf),
+        )?)
+    }
+
+    pub(crate) fn shutdown(&self) {
+        #[cfg(unix)]
+        if let Ok(posix_syslog_state) = POSIX_SYSLOG_STATE.lock() {
+            if !posix_syslog_state.idents_stack.is_empty() {
+                nix::syslog::closelog();
+            }
+        }
+    }
 }
 
 // Helpers for printing key-value pairs
+#[allow(unused_variables)]
 fn write_key_value_pairs(
     w: &mut dyn std::io::Write,
     record: &log::Record<'_>,
 ) -> Result<(), std::io::Error> {
+    #[allow(unused_mut)]
     let mut kv_written = false;
     #[cfg(feature = "kv")]
     if record.key_values().count() > 0 {
@@ -133,4 +216,30 @@ where
         self.1 = true;
         Ok(())
     }
+}
+
+fn get_hostname() -> IoResult<Option<String>> {
+    // Even though the `hostname` crate provides a cross-platform way to get the hostname,
+    // it may also introduce version conflicts on the `libc` crate pulled by `nix`, so let's
+    // just use `nix` directly when possible, which also has the advantage of reducing the
+    // number of dependencies
+    {
+        #[cfg(not(unix))]
+        {
+            hostname::get().map_or_else(|_| Ok(None), |s| s.into_string())
+        }
+        #[cfg(unix)]
+        {
+            nix::unistd::gethostname()?.into_string()
+        }
+    }
+    .map_or_else(
+        |_| {
+            Err(IoError::new(
+                ErrorKind::InvalidData,
+                "Hostname contains non-UTF8 characters",
+            ))
+        },
+        |s| Ok(Some(s)),
+    )
 }

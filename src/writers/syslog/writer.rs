@@ -6,7 +6,7 @@ use crate::{writers::log_writer::LogWriter, DeferredNow, FormatFunction};
 #[cfg(test)]
 use std::io::BufRead;
 use std::{
-    io::{Cursor, Result as IoResult, Write},
+    io::{Result as IoResult, Write},
     sync::Mutex,
 };
 
@@ -18,10 +18,10 @@ use std::{
 #[allow(clippy::module_name_repetitions)]
 pub struct SyslogWriter {
     line_writer: LineWriter,
-    m_conn_buf: Mutex<ConnectorAndBuffer>,
+    m_conn_state: SyslogConnectionState,
     max_log_level: log::LevelFilter,
     #[cfg(test)]
-    validation_buffer: Mutex<Cursor<Vec<u8>>>,
+    validation_buffer: Mutex<std::io::Cursor<Vec<u8>>>,
 }
 impl SyslogWriter {
     /// Instantiate the builder for the `SysLogWriter`.
@@ -53,50 +53,73 @@ impl SyslogWriter {
                 pid,
                 format,
             )?,
-            m_conn_buf: Mutex::new(ConnectorAndBuffer {
-                conn: syslog_connection.into_inner(),
-                buf: Vec::with_capacity(200),
-            }),
+            m_conn_state: match syslog_connection.into_inner() {
+                #[cfg(unix)]
+                Connection::SyslogCall => SyslogConnectionState::SyslogCall,
+                conn => SyslogConnectionState::SocketConnection(Mutex::new(ConnectorAndBuffer {
+                    conn,
+                    buf: Vec::with_capacity(200),
+                })),
+            },
             max_log_level,
             #[cfg(test)]
-            validation_buffer: Mutex::new(Cursor::new(Vec::new())),
+            validation_buffer: Mutex::new(std::io::Cursor::new(Vec::new())),
         })
     }
 }
 impl LogWriter for SyslogWriter {
     fn write(&self, now: &mut DeferredNow, record: &log::Record) -> IoResult<()> {
-        let mut conn_buf_guard = self
-            .m_conn_buf
-            .lock()
-            .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?;
-        let cb = &mut *conn_buf_guard;
-        cb.buf.clear();
-        let mut buffer = Cursor::new(&mut cb.buf);
-
-        self.line_writer
-            .write_syslog_entry(&mut buffer, now, record)?;
-
-        #[cfg(test)]
-        {
-            let mut valbuf = self.validation_buffer.lock().unwrap();
-            valbuf.write_all(&cb.buf)?;
-            valbuf.write_all(b"\n")?;
+        if record.level() > self.max_log_level {
+            return Ok(());
         }
 
-        // we _have_ to buffer above because each write here generates a syslog entry
-        cb.conn.write_all(&cb.buf)
+        match &self.m_conn_state {
+            SyslogConnectionState::SocketConnection(conn_state) => {
+                let mut conn_state = conn_state
+                    .lock()
+                    .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?;
+
+                conn_state.buf.clear();
+
+                self.line_writer
+                    .write_to_syslog_socket_buffer(&mut conn_state.buf, now, record)?;
+
+                #[cfg(test)]
+                {
+                    let mut valbuf = self.validation_buffer.lock().unwrap();
+                    valbuf.write_all(&conn_state.buf)?;
+                    valbuf.write_all(b"\n")?;
+                }
+
+                // we _have_ to buffer above because each write here generates a syslog entry
+                let conn_state = &mut *conn_state;
+                conn_state.conn.write_all(&conn_state.buf)
+            }
+            #[cfg(unix)]
+            SyslogConnectionState::SyslogCall => {
+                self.line_writer.write_with_syslog_call(now, record)
+            }
+        }
     }
 
     fn flush(&self) -> IoResult<()> {
-        self.m_conn_buf
-            .lock()
-            .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?
-            .conn
-            .flush()
+        match &self.m_conn_state {
+            SyslogConnectionState::SocketConnection(conn_state) => conn_state
+                .lock()
+                .map_err(|_| crate::util::io_err("SyslogWriter is poisoned"))?
+                .conn
+                .flush(),
+            #[cfg(unix)]
+            SyslogConnectionState::SyslogCall => Ok(()),
+        }
     }
 
     fn max_log_level(&self) -> log::LevelFilter {
         self.max_log_level
+    }
+
+    fn shutdown(&self) {
+        self.line_writer.shutdown();
     }
 
     #[doc(hidden)]
@@ -104,7 +127,7 @@ impl LogWriter for SyslogWriter {
         #[cfg(test)]
         {
             let write_cursor = self.validation_buffer.lock().unwrap();
-            let mut reader = std::io::BufReader::new(Cursor::new(write_cursor.get_ref()));
+            let mut reader = std::io::BufReader::new(&**write_cursor.get_ref());
             let mut buf = String::new();
             #[allow(clippy::used_underscore_binding)]
             for tuple in _expected {
@@ -129,6 +152,12 @@ impl LogWriter for SyslogWriter {
 struct ConnectorAndBuffer {
     conn: Connection,
     buf: Vec<u8>,
+}
+
+enum SyslogConnectionState {
+    SocketConnection(Mutex<ConnectorAndBuffer>),
+    #[cfg(unix)]
+    SyslogCall,
 }
 
 /////////////////////////////
