@@ -55,7 +55,7 @@ impl SyslogConnection {
     /// of log messages.
     ///
     /// Because the `syslog` function has its own internal and opaque process-wide
-    /// state, this connection assumes that no code external to the logger in will
+    /// state, this connection assumes that no code external to the logger will
     /// attempt to set up the `syslog` function with different parameters.
     ///
     /// For reference, on Linux with `musl` or `glibc`, the `syslog` function
