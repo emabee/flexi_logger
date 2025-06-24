@@ -45,7 +45,7 @@ impl LineWriter {
     ) -> IoResult<LineWriter> {
         Ok(LineWriter {
             hostname: if matches!(header, SyslogLineHeader::Rfc5424(_)) {
-                get_hostname()?
+                Some(get_hostname()?)
             } else {
                 None
             },
@@ -218,7 +218,7 @@ where
     }
 }
 
-fn get_hostname() -> IoResult<Option<String>> {
+fn get_hostname() -> IoResult<String> {
     // Even though the `hostname` crate provides a cross-platform way to get the hostname,
     // it may also introduce version conflicts on the `libc` crate pulled by `nix`, so let's
     // just use `nix` directly when possible, which also has the advantage of reducing the
@@ -226,20 +226,17 @@ fn get_hostname() -> IoResult<Option<String>> {
     {
         #[cfg(not(unix))]
         {
-            hostname::get().map_or_else(|_| Ok(None), |s| s.into_string())
+            hostname::get()?.into_string()
         }
         #[cfg(unix)]
         {
             nix::unistd::gethostname()?.into_string()
         }
     }
-    .map_or_else(
-        |_| {
-            Err(IoError::new(
-                ErrorKind::InvalidData,
-                "Hostname contains non-UTF8 characters",
-            ))
-        },
-        |s| Ok(Some(s)),
-    )
+    .map_err(|_| {
+        IoError::new(
+            ErrorKind::InvalidData,
+            "Hostname contains non-UTF8 characters",
+        )
+    })
 }
