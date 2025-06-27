@@ -58,22 +58,15 @@ pub enum SyslogFacility {
 impl SyslogFacility {
     pub(crate) fn to_nix(self) -> nix::syslog::Facility {
         match self {
+            SyslogFacility::Authorization | SyslogFacility::Authorization2 => {
+                nix::syslog::Facility::LOG_AUTH
+            }
+            SyslogFacility::Clock
+            | SyslogFacility::Clock2
+            | SyslogFacility::Ftp
+            | SyslogFacility::Ntp
+            | SyslogFacility::SystemDaemons => nix::syslog::Facility::LOG_DAEMON,
             SyslogFacility::Kernel => nix::syslog::Facility::LOG_KERN,
-            SyslogFacility::UserLevel => nix::syslog::Facility::LOG_USER,
-            SyslogFacility::MailSystem => nix::syslog::Facility::LOG_MAIL,
-            SyslogFacility::SystemDaemons => nix::syslog::Facility::LOG_DAEMON,
-            SyslogFacility::Authorization => nix::syslog::Facility::LOG_AUTH,
-            SyslogFacility::SyslogD => nix::syslog::Facility::LOG_SYSLOG,
-            SyslogFacility::LinePrinter => nix::syslog::Facility::LOG_LPR,
-            SyslogFacility::News => nix::syslog::Facility::LOG_NEWS,
-            SyslogFacility::Uucp => nix::syslog::Facility::LOG_UUCP,
-            SyslogFacility::Clock => nix::syslog::Facility::LOG_DAEMON,
-            SyslogFacility::Authorization2 => nix::syslog::Facility::LOG_AUTH,
-            SyslogFacility::Ftp => nix::syslog::Facility::LOG_DAEMON,
-            SyslogFacility::Ntp => nix::syslog::Facility::LOG_DAEMON,
-            SyslogFacility::LogAudit => nix::syslog::Facility::LOG_USER,
-            SyslogFacility::LogAlert => nix::syslog::Facility::LOG_USER,
-            SyslogFacility::Clock2 => nix::syslog::Facility::LOG_DAEMON,
             SyslogFacility::LocalUse0 => nix::syslog::Facility::LOG_LOCAL0,
             SyslogFacility::LocalUse1 => nix::syslog::Facility::LOG_LOCAL1,
             SyslogFacility::LocalUse2 => nix::syslog::Facility::LOG_LOCAL2,
@@ -82,6 +75,14 @@ impl SyslogFacility {
             SyslogFacility::LocalUse5 => nix::syslog::Facility::LOG_LOCAL5,
             SyslogFacility::LocalUse6 => nix::syslog::Facility::LOG_LOCAL6,
             SyslogFacility::LocalUse7 => nix::syslog::Facility::LOG_LOCAL7,
+            SyslogFacility::LinePrinter => nix::syslog::Facility::LOG_LPR,
+            SyslogFacility::MailSystem => nix::syslog::Facility::LOG_MAIL,
+            SyslogFacility::News => nix::syslog::Facility::LOG_NEWS,
+            SyslogFacility::SyslogD => nix::syslog::Facility::LOG_SYSLOG,
+            SyslogFacility::LogAlert | SyslogFacility::LogAudit | SyslogFacility::UserLevel => {
+                nix::syslog::Facility::LOG_USER
+            }
+            SyslogFacility::Uucp => nix::syslog::Facility::LOG_UUCP,
         }
     }
 }

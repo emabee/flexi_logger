@@ -127,7 +127,7 @@ impl LineWriter {
                 .idents_stack
                 .iter()
                 .enumerate()
-                .find(|(_, s)| s.to_bytes() == &*self.process.as_bytes())
+                .find(|(_, s)| s.to_bytes() == self.process.as_bytes())
             {
                 // Reuse the pooled C ident string to avoid leaking it again
                 posix_syslog_state.idents_stack.swap_remove(i)
@@ -164,7 +164,7 @@ impl LineWriter {
         )?)
     }
 
-    pub(crate) fn shutdown(&self) {
+    pub(crate) fn shutdown() {
         #[cfg(unix)]
         if let Ok(posix_syslog_state) = POSIX_SYSLOG_STATE.lock() {
             if !posix_syslog_state.idents_stack.is_empty() {

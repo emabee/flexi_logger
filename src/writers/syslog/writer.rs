@@ -119,7 +119,7 @@ impl LogWriter for SyslogWriter {
     }
 
     fn shutdown(&self) {
-        self.line_writer.shutdown();
+        LineWriter::shutdown();
     }
 
     #[doc(hidden)]

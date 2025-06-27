@@ -64,13 +64,14 @@ impl SyslogConnection {
     /// `syslogd`, `rsyslogd`, or `syslog-ng`. FreeBSD uses the `syslogd` daemon
     /// listening on the `/var/run/log` Unix datagram socket. Older macOS versions
     /// used the `/var/run/syslog` Unix stream socket, while newer versions (10.x+)
-    /// forward logs to the OSLog framework (a.k.a. unified logging system) and lack
+    /// forward logs to the `OSLog` framework (a.k.a. unified logging system) and lack
     /// a `syslogd`-compatible daemon that listens on a socket. Other systems and
     /// standard C libraries may have different implementations of such a function.
     ///
     /// [`syslog` C function]: https://pubs.opengroup.org/onlinepubs/9799919799/functions/syslog.html
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[cfg(unix)]
+    #[must_use]
     pub fn syslog_call() -> Self {
         SyslogConnection(Connection::SyslogCall)
     }

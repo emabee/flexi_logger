@@ -6,27 +6,27 @@ use std::{
 // Writable and flushable connection to the syslog backend.
 #[derive(Debug)]
 pub(super) enum Connection {
-    /// Sends log lines to the syslog via a
-    /// [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
+    // Sends log lines to the syslog via a
+    // [UnixStream](https://doc.rust-lang.org/std/os/unix/net/struct.UnixStream.html).
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[cfg(unix)]
     Stream(std::os::unix::net::UnixStream),
 
-    /// Sends log lines to the syslog via a
-    /// [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
+    // Sends log lines to the syslog via a
+    // [UnixDatagram](https://doc.rust-lang.org/std/os/unix/net/struct.UnixDatagram.html).
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[cfg(unix)]
     Datagram(std::os::unix::net::UnixDatagram),
 
-    /// Sends log lines to the local syslog using the `syslog` C function.
+    // Sends log lines to the local syslog using the `syslog` C function.
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     #[cfg(unix)]
     SyslogCall,
 
-    /// Sends log lines to the syslog via UDP.
+    // Sends log lines to the syslog via UDP.
     Udp(UdpSocket),
 
-    /// Sends log lines to the syslog via TCP.
+    // Sends log lines to the syslog via TCP.
     Tcp(TcpStream),
 }
 
