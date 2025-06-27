@@ -1,7 +1,7 @@
 /// Syslog severity.
 ///
 /// See [RFC 5424](https://datatracker.ietf.org/doc/rfc5424).
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub enum SyslogSeverity {
     /// System is unusable.
@@ -33,5 +33,21 @@ pub(crate) fn default_mapping(level: log::Level) -> SyslogSeverity {
         log::Level::Warn => SyslogSeverity::Warning,
         log::Level::Info => SyslogSeverity::Info,
         log::Level::Debug | log::Level::Trace => SyslogSeverity::Debug,
+    }
+}
+
+#[cfg(unix)]
+impl SyslogSeverity {
+    pub(crate) fn to_nix(self) -> nix::syslog::Severity {
+        match self {
+            SyslogSeverity::Emergency => nix::syslog::Severity::LOG_EMERG,
+            SyslogSeverity::Alert => nix::syslog::Severity::LOG_ALERT,
+            SyslogSeverity::Critical => nix::syslog::Severity::LOG_CRIT,
+            SyslogSeverity::Error => nix::syslog::Severity::LOG_ERR,
+            SyslogSeverity::Warning => nix::syslog::Severity::LOG_WARNING,
+            SyslogSeverity::Notice => nix::syslog::Severity::LOG_NOTICE,
+            SyslogSeverity::Info => nix::syslog::Severity::LOG_INFO,
+            SyslogSeverity::Debug => nix::syslog::Severity::LOG_DEBUG,
+        }
     }
 }

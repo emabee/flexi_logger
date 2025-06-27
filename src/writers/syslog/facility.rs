@@ -53,3 +53,36 @@ pub enum SyslogFacility {
     /// local use 7  (local7).
     LocalUse7 = 23 << 3,
 }
+
+#[cfg(unix)]
+impl SyslogFacility {
+    pub(crate) fn to_nix(self) -> nix::syslog::Facility {
+        match self {
+            SyslogFacility::Authorization | SyslogFacility::Authorization2 => {
+                nix::syslog::Facility::LOG_AUTH
+            }
+            SyslogFacility::Clock
+            | SyslogFacility::Clock2
+            | SyslogFacility::Ftp
+            | SyslogFacility::Ntp
+            | SyslogFacility::SystemDaemons => nix::syslog::Facility::LOG_DAEMON,
+            SyslogFacility::Kernel => nix::syslog::Facility::LOG_KERN,
+            SyslogFacility::LocalUse0 => nix::syslog::Facility::LOG_LOCAL0,
+            SyslogFacility::LocalUse1 => nix::syslog::Facility::LOG_LOCAL1,
+            SyslogFacility::LocalUse2 => nix::syslog::Facility::LOG_LOCAL2,
+            SyslogFacility::LocalUse3 => nix::syslog::Facility::LOG_LOCAL3,
+            SyslogFacility::LocalUse4 => nix::syslog::Facility::LOG_LOCAL4,
+            SyslogFacility::LocalUse5 => nix::syslog::Facility::LOG_LOCAL5,
+            SyslogFacility::LocalUse6 => nix::syslog::Facility::LOG_LOCAL6,
+            SyslogFacility::LocalUse7 => nix::syslog::Facility::LOG_LOCAL7,
+            SyslogFacility::LinePrinter => nix::syslog::Facility::LOG_LPR,
+            SyslogFacility::MailSystem => nix::syslog::Facility::LOG_MAIL,
+            SyslogFacility::News => nix::syslog::Facility::LOG_NEWS,
+            SyslogFacility::SyslogD => nix::syslog::Facility::LOG_SYSLOG,
+            SyslogFacility::LogAlert | SyslogFacility::LogAudit | SyslogFacility::UserLevel => {
+                nix::syslog::Facility::LOG_USER
+            }
+            SyslogFacility::Uucp => nix::syslog::Facility::LOG_UUCP,
+        }
+    }
+}
