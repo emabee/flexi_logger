@@ -48,7 +48,7 @@ pub(super) fn existing_log_files(
         if let Some(ref custom_current) = selector.with_configured_current {
             result.append(&mut file_spec.filter_files(
                 &related_files,
-                &InfixFilter::Equls(custom_current.to_string()),
+                &InfixFilter::Equls(custom_current.clone()),
                 file_spec.get_suffix().as_deref(),
             ));
         }

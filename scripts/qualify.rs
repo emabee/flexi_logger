@@ -49,7 +49,7 @@ fn main() {
     run_command!("date");
 
     // format
-    run_command!("cargo fmt");
+    run_command!("cargo fmt --check");
 
     // Build in important variants
     std::fs::remove_file("Cargo.lock").ok();

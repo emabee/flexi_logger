@@ -52,7 +52,7 @@ pub fn subscribe_to_specfile<P: AsRef<Path>>(
 #[cfg(feature = "specfile_without_notification")]
 struct TraceLogSpecSubscriber {
     initial_logspec: LogSpecification,
-    update: Box<(dyn Fn(LogSpecification) + Send + Sync)>,
+    update: Box<dyn Fn(LogSpecification) + Send + Sync>,
 }
 impl TraceLogSpecSubscriber {
     /// Factory method.
@@ -63,7 +63,7 @@ impl TraceLogSpecSubscriber {
     /// update: Closure that implements the update of the log specification to some consumer
     #[must_use]
     pub fn new(
-        update: Box<(dyn Fn(LogSpecification) + Send + Sync)>,
+        update: Box<dyn Fn(LogSpecification) + Send + Sync>,
         initial_logspec: LogSpecification,
     ) -> Self {
         Self {
