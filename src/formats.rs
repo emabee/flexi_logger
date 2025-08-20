@@ -1,16 +1,18 @@
-use crate::DeferredNow;
 #[cfg(feature = "kv")]
 use log::kv::{self, Key, Value, VisitSource};
-use log::Record;
-#[cfg(feature = "colors")]
-use nu_ansi_term::{Color, Style};
 #[cfg(feature = "json")]
 use serde_derive::Serialize;
 #[cfg(feature = "kv")]
 use std::collections::BTreeMap;
+
 #[cfg(feature = "colors")]
-use std::sync::OnceLock;
-use std::thread;
+use {
+    crate::FlexiLoggerError,
+    nu_ansi_term::{Color, Style},
+    std::sync::OnceLock,
+};
+
+use {crate::DeferredNow, log::Record, std::thread};
 
 /// Time stamp format that is used by the provided format functions.
 pub const TS_DASHES_BLANK_COLONS_DOT_BLANK: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
@@ -374,27 +376,24 @@ fn palette() -> &'static Palette {
 
 // Overwrites the default PALETTE value either from the environment, if set,
 // or from the parameter, if filled.
-// Returns an error if parsing failed.
+// Returns an error if parsing failed, or if repeated initialization is attempted.
 #[cfg(feature = "colors")]
-pub(crate) fn set_palette(input: Option<&str>) -> Result<(), std::num::ParseIntError> {
-    use crate::util::{eprint_msg, ErrorCode};
+pub(crate) fn set_palette(o_palette_string: Option<&str>) -> Result<(), FlexiLoggerError> {
+    let palette = match std::env::var_os("FLEXI_LOGGER_PALETTE") {
+        Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref())?,
+        None => match o_palette_string {
+            Some(palette_string) => Palette::from(palette_string)?,
+            None => DEFAULT_PALETTE,
+        },
+    };
 
-    PALETTE
-        .set(match std::env::var_os("FLEXI_LOGGER_PALETTE") {
-            Some(ref env_osstring) => Palette::from(env_osstring.to_string_lossy().as_ref())?,
-            None => match input {
-                Some(input_string) => Palette::from(input_string)?,
-                None => DEFAULT_PALETTE,
-            },
-        })
-        .map_err(|_palette| {
-            eprint_msg(
-                ErrorCode::Palette,
-                "Failed to initialize the palette, as it is already initialized",
-            );
-        })
-        .ok();
-    Ok(())
+    PALETTE.set(palette).or_else(|old_palette| {
+        if old_palette == palette {
+            Ok(())
+        } else {
+            Err(FlexiLoggerError::RepeatedPaletteInitialization)
+        }
+    })
 }
 
 /// Helper function that is used in the provided coloring format functions to apply
@@ -432,7 +431,7 @@ const fn default_style() -> Style {
     }
 }
 #[cfg(feature = "colors")]
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Palette {
     pub error: Style,
     pub warn: Style,

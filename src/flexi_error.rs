@@ -80,8 +80,14 @@ pub enum FlexiLoggerError {
     Poison,
 
     /// Palette parsing failed
+    #[cfg(feature = "colors")]
     #[error("Palette parsing failed")]
     Palette(#[from] std::num::ParseIntError),
+
+    /// Repeated palette initialization failed
+    #[cfg(feature = "colors")]
+    #[error("Repeated palette initialization failed")]
+    RepeatedPaletteInitialization,
 
     /// Logger is shut down.
     #[cfg(feature = "async")]

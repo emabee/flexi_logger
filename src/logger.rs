@@ -707,13 +707,13 @@ impl Logger {
     ///
     /// Several variants of [`FlexiLoggerError`] can occur.
     pub fn build(mut self) -> Result<(Box<dyn log::Log>, LoggerHandle), FlexiLoggerError> {
-        #[cfg(feature = "colors")]
-        set_palette(self.o_palette.as_deref())?;
-
         if self.use_utc {
             self.flwb = self.flwb.use_utc();
         }
         set_panic_on_error_channel_error(self.panic_on_error_channel_error);
+
+        #[cfg(feature = "colors")]
+        set_palette(self.o_palette.as_deref())?;
 
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
