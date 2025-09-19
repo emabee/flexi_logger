@@ -32,6 +32,7 @@ async = ["dep:crossbeam-channel", "dep:crossbeam-queue"]
 buffer_writer = []
 colors = ["dep:nu-ansi-term"]
 compress = ["dep:flate2"]
+days = ["dep:filetime"]
 dont_minimize_extra_stacks = []
 json = ["dep:serde_json", "dep:serde", "dep:serde_derive"]
 kv = ["log/kv_serde"]
@@ -59,6 +60,7 @@ tracing = { version = "0.1.36", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = [
     "env-filter",
 ] }
+filetime = { version = "0.2.26", optional = true }
 
 [target.'cfg(not(unix))'.dependencies]
 hostname = { version = "0.4", optional = true }

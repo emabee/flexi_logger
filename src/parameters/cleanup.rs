@@ -19,6 +19,12 @@ pub enum Cleanup {
     /// The specified number of rotated log files are kept.
     /// Older files are deleted, if necessary.
     KeepLogFiles(usize),
+    
+    /// The specified number of days log files are kept.
+    /// Older files are deleted, if necessary.
+    #[cfg(feature = "days")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "days")))]
+    KeepLogDays(usize),
 
     /// The specified number of rotated log files are compressed and kept.
     /// Older files are deleted, if necessary.
