@@ -90,18 +90,19 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     infix_filter: &InfixFilter,
     writes_direct: bool,
 ) -> Result<(), std::io::Error> {
-    let (mut log_limit, compress_limit) = match *cleanup_config {
+    let (mut log_limit, day_limit, compress_limit): (usize, usize, usize) = match *cleanup_config {
         Cleanup::Never => {
             return Ok(());
         }
-        Cleanup::KeepLogFiles(log_limit) => (log_limit, 0),
+        Cleanup::KeepLogFiles(log_limit) => (log_limit, 0, 0),
+
+        Cleanup::KeepForDays(day_limit) => (0, day_limit, 0),
 
         #[cfg(feature = "compress")]
-        Cleanup::KeepCompressedFiles(compress_limit) => (0, compress_limit),
-
+        Cleanup::KeepCompressedFiles(compress_limit) => (0, 0, compress_limit),
         #[cfg(feature = "compress")]
         Cleanup::KeepLogAndCompressedFiles(log_limit, compress_limit) => {
-            (log_limit, compress_limit)
+            (log_limit, 0, compress_limit)
         }
     };
 
@@ -145,6 +146,20 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
                         std::fs::remove_file(&file)?;
                     }
                 }
+            }
+        } else if day_limit > 0 {
+            // Remove files older than the configured day limit
+            let mod_limit = std::time::SystemTime::now()
+                .checked_sub(std::time::Duration::from_secs(
+                    u64::try_from(day_limit)
+                        .ok()
+                        .and_then(|days| days.checked_mul(24 * 3600))
+                        .unwrap_or(u64::MAX),
+                ))
+                .unwrap_or(std::time::UNIX_EPOCH);
+
+            if std::fs::metadata(&file)?.modified()? < mod_limit {
+                std::fs::remove_file(&file)?;
             }
         }
     }
