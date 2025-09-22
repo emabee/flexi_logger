@@ -1,6 +1,5 @@
 mod test_utils;
 
-#[cfg(feature = "days")]
 #[test]
 fn test_cleanup_by_day_limit() {
     use filetime::{set_file_mtime, FileTime};
@@ -17,7 +16,7 @@ fn test_cleanup_by_day_limit() {
         .rotate(
             Criterion::Size(100),
             Naming::Numbers,
-            Cleanup::KeepLogDays(1),
+            Cleanup::KeepForDays(1),
         )
         .start()
         .unwrap();

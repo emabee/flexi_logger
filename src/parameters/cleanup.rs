@@ -17,17 +17,15 @@ pub enum Cleanup {
     Never,
 
     /// The specified number of rotated log files are kept.
-    /// Older files are deleted, if necessary.
+    /// Older files are deleted.
     KeepLogFiles(usize),
-    
-    /// The specified number of days log files are kept.
-    /// Older files are deleted, if necessary.
-    #[cfg(feature = "days")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "days")))]
-    KeepLogDays(usize),
+
+    /// Log files are kept for the specified number of days.
+    /// Older files are deleted.
+    KeepForDays(usize),
 
     /// The specified number of rotated log files are compressed and kept.
-    /// Older files are deleted, if necessary.
+    /// Older files are deleted.
     #[cfg_attr(docsrs, doc(cfg(feature = "compress")))]
     #[cfg(feature = "compress")]
     KeepCompressedFiles(usize),

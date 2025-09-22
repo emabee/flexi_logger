@@ -183,7 +183,7 @@ Adds the ability to filter logs by text, but also adds a dependency on the regex
 
 ### **`trc`**
 
-An experimental feature that allows using `flexi_logger` functionality with `tracing`.
+Allows using `flexi_logger` functionality with `tracing`.
 
 ## Versions
 

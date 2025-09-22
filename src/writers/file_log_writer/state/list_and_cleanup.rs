@@ -1,9 +1,5 @@
 use super::InfixFilter;
 use crate::{Cleanup, FileSpec, LogfileSelector};
-#[cfg(feature = "days")]
-use filetime::FileTime;
-#[cfg(feature = "days")]
-use std::convert::TryFrom;
 #[cfg(feature = "compress")]
 use std::fs::File;
 use std::{
@@ -100,8 +96,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
         }
         Cleanup::KeepLogFiles(log_limit) => (log_limit, 0, 0),
 
-        #[cfg(feature = "days")]
-        Cleanup::KeepLogDays(day_limit) => (0, day_limit, 0),
+        Cleanup::KeepForDays(day_limit) => (0, day_limit, 0),
 
         #[cfg(feature = "compress")]
         Cleanup::KeepCompressedFiles(compress_limit) => (0, 0, compress_limit),
@@ -115,17 +110,6 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     if writes_direct && log_limit == 0 {
         log_limit = 1;
     }
-
-    #[cfg(feature = "days")]
-    let now_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    #[cfg(feature = "days")]
-    let retention_secs: u64 = u64::try_from(day_limit)
-        .ok()
-        .and_then(|days| days.checked_mul(24 * 3600))
-        .unwrap_or(u64::MAX);
 
     for (index, file) in list_of_log_and_compressed_files(file_spec, infix_filter)
         .into_iter()
@@ -164,29 +148,18 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
                 }
             }
         } else if day_limit > 0 {
-            #[cfg(feature = "days")]
-            {
-                // Remove files older than the configured day limit
-                let metadata = std::fs::metadata(&file)?;
-                let mtime = FileTime::from_last_modification_time(&metadata).unix_seconds();
-                let safe_mtime = u64::try_from(mtime).ok();
+            // Remove files older than the configured day limit
+            let mod_limit = std::time::SystemTime::now()
+                .checked_sub(std::time::Duration::from_secs(
+                    u64::try_from(day_limit)
+                        .ok()
+                        .and_then(|days| days.checked_mul(24 * 3600))
+                        .unwrap_or(u64::MAX),
+                ))
+                .unwrap_or(std::time::UNIX_EPOCH);
 
-                if let Some(mtime) = safe_mtime {
-                    if now_secs > mtime + retention_secs {
-                        if let Err(e) = std::fs::remove_file(&file) {
-                            eprintln!(
-                                "Failed to remove old log file {}: {}",
-                                file.to_string_lossy(),
-                                e
-                            );
-                        }
-                    }
-                } else {
-                    eprintln!(
-                        "File {} has invalid mtime (< 1970), skipping",
-                        file.to_string_lossy()
-                    );
-                }
+            if std::fs::metadata(&file)?.modified()? < mod_limit {
+                std::fs::remove_file(&file)?;
             }
         }
     }
