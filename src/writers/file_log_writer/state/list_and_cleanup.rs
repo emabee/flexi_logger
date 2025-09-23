@@ -96,7 +96,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
         }
         Cleanup::KeepLogFiles(log_limit) => (log_limit, 0, 0),
 
-        Cleanup::KeepForDays(day_limit) => (0, day_limit, 0),
+        Cleanup::KeepForDays(day_limit) => (usize::MAX, day_limit, 0),
 
         #[cfg(feature = "compress")]
         Cleanup::KeepCompressedFiles(compress_limit) => (0, 0, compress_limit),
