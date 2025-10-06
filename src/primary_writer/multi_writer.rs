@@ -2,7 +2,7 @@
 use crate::writers::BufferWriter;
 use crate::{
     logger::Duplicate,
-    util::{eprint_err, write_buffered, ErrorCode},
+    util::{eprint_err, panic_on_error_error, write_buffered, ErrorCode},
     writers::{FileLogWriter, FileLogWriterBuilder, FileLogWriterConfig, LogWriter},
     DeferredNow, FlexiLoggerError, FormatFunction, LogfileSelector,
 };
@@ -146,14 +146,17 @@ impl LogWriter for MultiWriter {
                     .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
                 eprintln!("{}", String::from_utf8_lossy(&tmp_buf));
             } else {
-                write_buffered(
+                let result = write_buffered(
                     self.format_for_stderr,
                     now,
                     record,
                     &mut std::io::stderr(),
                     #[cfg(test)]
                     None,
-                )?;
+                );
+                if result.is_err() && panic_on_error_error() {
+                    return result;
+                }
             }
         }
 
@@ -171,22 +174,31 @@ impl LogWriter for MultiWriter {
                     .unwrap_or_else(|e| eprint_err(ErrorCode::Format, "formatting failed", &e));
                 println!("{}", String::from_utf8_lossy(&tmp_buf));
             } else {
-                write_buffered(
+                let result = write_buffered(
                     self.format_for_stdout,
                     now,
                     record,
                     &mut std::io::stdout(),
                     #[cfg(test)]
                     None,
-                )?;
+                );
+                if result.is_err() && panic_on_error_error() {
+                    return result;
+                }
             }
         }
 
         if let Some(ref writer) = self.o_file_writer {
-            writer.write(now, record)?;
+            let result = writer.write(now, record);
+            if result.is_err() && panic_on_error_error() {
+                return result;
+            }
         }
         if let Some(ref writer) = self.o_other_writer {
-            writer.write(now, record)?;
+            let result = writer.write(now, record);
+            if result.is_err() && panic_on_error_error() {
+                return result;
+            }
         }
         Ok(())
     }

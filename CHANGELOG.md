@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.5] - 2025-10-06
+
+Fix [issue #198](https://github.com/emabee/flexi_logger/issues/198).
+
 ## [0.31.4] - 2025-09-23
 
 Add variant `Cleanup::KeepForDays(usize)` to have log files being deleted after a given number of days.
@@ -61,11 +65,11 @@ Bump minimal supported rust version to 1.81.0.
 
 ## [0.29.8] - 2024-12-18
 
-Fix issue #185.
+Fix [issue #185](https://github.com/emabee/flexi_logger/issues/185).
 
 ## [0.29.7] - 2024-12-10
 
-Fix issue #184.
+Fix [issue #184](https://github.com/emabee/flexi_logger/issues/184).
 
 Update dependencies.
 

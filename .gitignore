@@ -16,3 +16,4 @@ tests/*logspec.toml
 .*~
 .vscode
 .idea/
+.DS_Store

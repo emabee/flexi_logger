@@ -78,7 +78,7 @@ static PANIC_ON_ERROR_ERROR: OnceLock<bool> = OnceLock::new();
 pub(crate) fn set_panic_on_error_channel_error(b: bool) {
     PANIC_ON_ERROR_ERROR.get_or_init(|| b);
 }
-fn panic_on_error_error() -> bool {
+pub(crate) fn panic_on_error_error() -> bool {
     *PANIC_ON_ERROR_ERROR.get().unwrap_or(&false)
 }
 fn handle_error_error(result: &Result<(), std::io::Error>) {
@@ -104,6 +104,8 @@ pub(crate) fn set_error_channel(channel: ErrorChannel) {
     }
 }
 
+// Tries to write the given string to the configured error output channel.
+// If that fails, it either panics (if configured to do so) or continues silently.
 fn try_writing_to_error_channel(s: &str) {
     match &*(error_channel().read().unwrap()) {
         ErrorChannel::StdErr => {
@@ -112,18 +114,17 @@ fn try_writing_to_error_channel(s: &str) {
         ErrorChannel::StdOut => {
             handle_error_error(&writeln!(std::io::stdout(), "{s}"));
         }
-        ErrorChannel::File(path) => try_writing_to_file(s, path).unwrap_or_else(|e| {
-            handle_error_error(&writeln!(std::io::stderr(), "{s}"));
+        ErrorChannel::File(path) => write_to_file(s, path).unwrap_or_else(|e| {
             handle_error_error(&writeln!(
                 std::io::stderr(),
-                "Can't open error output file, caused by: {e}"
+                "{s}\nCan't open error output file, caused by: {e}"
             ));
         }),
         ErrorChannel::DevNull => {}
     }
 }
 
-fn try_writing_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
+fn write_to_file(s: &str, path: &Path) -> Result<(), std::io::Error> {
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
