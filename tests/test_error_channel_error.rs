@@ -14,6 +14,7 @@ use std::{
 const TEST_CONTROL: &str = "TEST_CONTROL";
 const LOG_FOLDER: &str = "LOG_FOLDER";
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     NormalNoPanic,
@@ -34,7 +35,7 @@ impl Mode {
             Mode::DuplNoPanic | Mode::DuplPanic => true,
         }
     }
-    fn to_n(&self) -> u8 {
+    fn as_n(&self) -> u8 {
         match self {
             Mode::NormalNoPanic => 0,
             Mode::NormalPanic => 1,
@@ -43,37 +44,37 @@ impl Mode {
         }
     }
 }
-enum CTRL {
+enum Ctrl {
     Parent(Mode),
     Child(Mode),
 }
-impl FromStr for CTRL {
+impl FromStr for Ctrl {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "A" => Ok(CTRL::Parent(Mode::NormalNoPanic)),
-            "B" => Ok(CTRL::Parent(Mode::NormalPanic)),
-            "C" => Ok(CTRL::Parent(Mode::DuplNoPanic)),
-            "D" => Ok(CTRL::Parent(Mode::DuplPanic)),
-            "E" => Ok(CTRL::Child(Mode::NormalNoPanic)),
-            "F" => Ok(CTRL::Child(Mode::NormalPanic)),
-            "G" => Ok(CTRL::Child(Mode::DuplNoPanic)),
-            "H" => Ok(CTRL::Child(Mode::DuplPanic)),
+            "A" => Ok(Ctrl::Parent(Mode::NormalNoPanic)),
+            "B" => Ok(Ctrl::Parent(Mode::NormalPanic)),
+            "C" => Ok(Ctrl::Parent(Mode::DuplNoPanic)),
+            "D" => Ok(Ctrl::Parent(Mode::DuplPanic)),
+            "E" => Ok(Ctrl::Child(Mode::NormalNoPanic)),
+            "F" => Ok(Ctrl::Child(Mode::NormalPanic)),
+            "G" => Ok(Ctrl::Child(Mode::DuplNoPanic)),
+            "H" => Ok(Ctrl::Child(Mode::DuplPanic)),
             _ => Err(()),
         }
     }
 }
-impl ToString for CTRL {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Ctrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CTRL::Parent(Mode::NormalNoPanic) => "A".to_string(),
-            CTRL::Parent(Mode::NormalPanic) => "B".to_string(),
-            CTRL::Parent(Mode::DuplNoPanic) => "C".to_string(),
-            CTRL::Parent(Mode::DuplPanic) => "D".to_string(),
-            CTRL::Child(Mode::NormalNoPanic) => "E".to_string(),
-            CTRL::Child(Mode::NormalPanic) => "F".to_string(),
-            CTRL::Child(Mode::DuplNoPanic) => "G".to_string(),
-            CTRL::Child(Mode::DuplPanic) => "H".to_string(),
+            Ctrl::Parent(Mode::NormalNoPanic) => write!(f, "A"),
+            Ctrl::Parent(Mode::NormalPanic) => write!(f, "B"),
+            Ctrl::Parent(Mode::DuplNoPanic) => write!(f, "C"),
+            Ctrl::Parent(Mode::DuplPanic) => write!(f, "D"),
+            Ctrl::Child(Mode::NormalNoPanic) => write!(f, "E"),
+            Ctrl::Child(Mode::NormalPanic) => write!(f, "F"),
+            Ctrl::Child(Mode::DuplNoPanic) => write!(f, "G"),
+            Ctrl::Child(Mode::DuplPanic) => write!(f, "H"),
         }
     }
 }
@@ -89,10 +90,10 @@ fn main() {
         Err(_) => {
             controller();
         }
-        Ok(s) => match s.parse::<CTRL>() {
+        Ok(s) => match s.parse::<Ctrl>() {
             Ok(v) => match v {
-                CTRL::Parent(m) => parent(m),
-                CTRL::Child(m) => child(m),
+                Ctrl::Parent(m) => parent(m),
+                Ctrl::Child(m) => child(m),
             },
             Err(()) => panic!("Unexpected value {s}"),
         },
@@ -113,7 +114,7 @@ fn controller() {
     ] {
         println!("Testing mode {mode:?} at {}", chrono::Local::now());
         let mut parent = Command::new(progpath.clone())
-            .env(TEST_CONTROL, CTRL::Parent(mode).to_string())
+            .env(TEST_CONTROL, Ctrl::Parent(mode).to_string())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
@@ -124,13 +125,13 @@ fn controller() {
         match mode {
             Mode::NormalNoPanic | Mode::DuplNoPanic => {
                 // check that no crashdump_file was written
-                assert!(!Path::new(&crashdump_file(mode.to_n()))
+                assert!(!Path::new(&crashdump_file(mode.as_n()))
                     .try_exists()
                     .unwrap());
             }
             Mode::NormalPanic | Mode::DuplPanic => {
                 // check that crashdump_file was written
-                assert!(Path::new(&crashdump_file(mode.to_n()))
+                assert!(Path::new(&crashdump_file(mode.as_n()))
                     .try_exists()
                     .unwrap());
             }
@@ -144,7 +145,7 @@ fn parent(mode: Mode) {
     #[allow(clippy::zombie_processes)]
     // spawn child and terminate directly, thus destroying the child's stderr
     Command::new(progpath)
-        .env(TEST_CONTROL, CTRL::Child(mode).to_string())
+        .env(TEST_CONTROL, Ctrl::Child(mode).to_string())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
@@ -160,7 +161,7 @@ fn child(mode: Mode) {
             .create(true)
             .write(true)
             .truncate(true)
-            .open(crashdump_file(mode.to_n()))
+            .open(crashdump_file(mode.as_n()))
             .unwrap();
         file.write_all(format!("Panic occured:\n{panic}\n{backtrace}\n").as_bytes())
             .unwrap();
@@ -177,7 +178,7 @@ fn child(mode: Mode) {
             .log_to_file(
                 flexi_logger::FileSpec::default()
                     .directory(test_utils::dir())
-                    .basename(basename(mode.to_n()))
+                    .basename(basename(mode.as_n()))
                     .suppress_timestamp(),
             )
             .duplicate_to_stderr(flexi_logger::Duplicate::All)
