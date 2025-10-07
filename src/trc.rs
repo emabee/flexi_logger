@@ -229,7 +229,29 @@ pub fn setup_tracing(
 struct LogSpecAsFilter(pub LogSpecification);
 impl From<LogSpecAsFilter> for EnvFilter {
     fn from(wrapped_logspec: LogSpecAsFilter) -> Self {
-        Self::new(wrapped_logspec.0.to_string())
+        Self::new(wrapped_logspec.to_trc_env_filter())
+    }
+}
+impl LogSpecAsFilter {
+    pub fn to_trc_env_filter(&self) -> String {
+        let mut s = String::new();
+        let mut write_comma = false;
+        if let Some(last) = self.0.module_filters.last() {
+            if last.module_name.is_none() {
+                s.push_str(&last.level_filter.to_string().to_lowercase());
+                write_comma = true;
+            }
+        }
+        for mf in &self.0.module_filters {
+            if let Some(ref name) = mf.module_name {
+                if write_comma {
+                    s.push(',');
+                }
+                s.push_str(&format!("{name}={}", mf.level_filter.to_string().to_lowercase()));
+                write_comma = true;
+            }
+        }
+        s
     }
 }
 

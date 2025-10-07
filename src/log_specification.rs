@@ -54,7 +54,8 @@ use std::{collections::HashMap, env};
 /// rustc (“extern crate” does not allow hyphens).
 #[derive(Clone, Debug, Default)]
 pub struct LogSpecification {
-    module_filters: Vec<ModuleFilter>,
+    /// List of module filters.
+    pub module_filters: Vec<ModuleFilter>,
     #[cfg(feature = "textfilter")]
     textfilter: Option<Box<Regex>>,
 }
