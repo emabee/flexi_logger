@@ -430,10 +430,12 @@ impl LogSpecification {
             .find(|mod_filter| mod_filter.module_name.as_deref() == module)
             .map(|found_filter| found_filter.level_filter)
     }
-}
 
-impl std::fmt::Display for LogSpecification {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub(crate) fn to_string_int(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        space: Space,
+    ) -> std::fmt::Result {
         let mut write_comma = false;
         // Optional: Default log level
         if let Some(last) = self.module_filters.last() {
@@ -443,7 +445,8 @@ impl std::fmt::Display for LogSpecification {
             }
         }
 
-        // TODO: global_pattern is not modelled into String representation, only into yaml file
+        // TODO: global_pattern (feature text_filter) is not modelled into String representation,
+        // only into yaml file
         // Optional: specify a regular expression to suppress all messages that don't match
         // w.write_all(b"#global_pattern = 'foo'\n")?;
 
@@ -451,13 +454,40 @@ impl std::fmt::Display for LogSpecification {
         for mf in &self.module_filters {
             if let Some(ref name) = mf.module_name {
                 if write_comma {
-                    write!(f, ", ")?;
+                    write!(f, ",{}", space.as_str())?;
                 }
-                write!(f, "{name} = {}", mf.level_filter.to_string().to_lowercase())?;
+                write!(
+                    f,
+                    "{name}{}={}{}",
+                    space.as_str(),
+                    space.as_str(),
+                    mf.level_filter.to_string().to_lowercase()
+                )?;
                 write_comma = true;
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Space {
+    Yes,
+    #[cfg(feature = "trc")]
+    No,
+}
+impl Space {
+    fn as_str(&self) -> &str {
+        match self {
+            Space::Yes => " ",
+            #[cfg(feature = "trc")]
+            Space::No => "",
+        }
+    }
+}
+impl std::fmt::Display for LogSpecification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.to_string_int(f, Space::Yes)
     }
 }
 

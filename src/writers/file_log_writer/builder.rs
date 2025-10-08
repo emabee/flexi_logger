@@ -1,7 +1,8 @@
 use crate::{
     default_format,
     writers::{FileLogWriter, FileLogWriterConfig, LogWriter},
-    Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, Naming, WriteMode,
+    Cleanup, Criterion, FileSpec, FlexiLoggerError, FormatFunction, LogfileSelector, Naming,
+    WriteMode,
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -346,5 +347,27 @@ pub struct FileLogWriterHandle(Arc<FileLogWriter>);
 impl Drop for FileLogWriterHandle {
     fn drop(&mut self) {
         self.0.shutdown();
+    }
+}
+impl FileLogWriterHandle {
+    /// Returns the list of existing log files according to the current `FileSpec`.
+    ///
+    /// Depending on the given selector, the list may include the CURRENT log file
+    /// and the compressed files, if they exist.
+    ///
+    /// # Errors
+    ///
+    /// `FlexiLoggerError::Poison` if some mutex is poisoned.
+    pub fn existing_log_files(
+        &self,
+        selector: &LogfileSelector,
+    ) -> Result<Vec<PathBuf>, FlexiLoggerError> {
+        self.0.existing_log_files(selector)
+    }
+
+    // Allows checking the logs written so far to the writer
+    #[doc(hidden)]
+    pub fn validate_logs(&self, expected: &[(&'static str, &'static str, &'static str)]) {
+        self.0.validate_logs(expected);
     }
 }
