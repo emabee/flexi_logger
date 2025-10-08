@@ -27,7 +27,7 @@ pub enum SyslogLineHeader {
 }
 pub(crate) struct LineWriter {
     header: SyslogLineHeader,
-    hostname: Option<String>,
+    hostname: String,
     process: String,
     pid: u32,
     format: FormatFunction,
@@ -44,11 +44,7 @@ impl LineWriter {
         format: FormatFunction,
     ) -> IoResult<LineWriter> {
         Ok(LineWriter {
-            hostname: if matches!(header, SyslogLineHeader::Rfc5424(_)) {
-                Some(get_hostname()?)
-            } else {
-                None
-            },
+            hostname: get_hostname()?,
             header,
             process,
             pid,
@@ -71,9 +67,10 @@ impl LineWriter {
             SyslogLineHeader::Rfc3164 => {
                 write!(
                     buffer,
-                    "<{pri}>{timestamp} {tag}[{procid}]: ",
+                    "<{pri}>{timestamp} {hostname} {tag}[{procid}]: ",
                     pri = self.facility as u8 | severity as u8,
                     timestamp = now.format_rfc3164(),
+                    hostname = self.hostname,
                     tag = self.process,
                     procid = self.pid
                 )?;
@@ -87,7 +84,7 @@ impl LineWriter {
                     pri = self.facility as u8 | severity as u8,
                     version = "1",
                     timestamp = now.format_rfc3339(),
-                    hostname = self.hostname.as_deref().unwrap_or("<unknown_hostname>"),
+                    hostname = self.hostname,
                     appname = self.process,
                     procid = self.pid,
                     msgid = message_id,
