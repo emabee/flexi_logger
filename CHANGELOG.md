@@ -5,9 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.6] - 2025-10-08
+
+Make sure that `tracing` does not get confused with blanks that are normally printed into
+`LogSpecification`'s `Display` String (issue [#200](https://github.com/emabee/flexi_logger/pull/200)),
+by providing a dedicated method.
+Kudos goes to [samantehrani](https://github.com/samantehrani).
+
 ## [0.31.5] - 2025-10-06
 
 Fix [issue #198](https://github.com/emabee/flexi_logger/issues/198).
+Kudos goes to [hasezoey](https://github.com/hasezoey).
 
 ## [0.31.4] - 2025-09-23
 

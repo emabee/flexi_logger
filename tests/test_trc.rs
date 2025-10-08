@@ -9,9 +9,8 @@ mod a {
     use std::io::Write;
     use tracing::{debug, error, info, trace, warn};
 
-    const WAIT_MILLIS: u64 = 2000;
+    const WAIT_MILLIS: u64 = 1_500;
 
-    /// Test of the specfile feature
     #[test]
     fn test_specfile() {
         let specfile = super::test_utils::file("logspec.toml");
@@ -19,7 +18,7 @@ mod a {
         std::fs::remove_file(&specfile).ok();
         assert!(!specfile.exists());
 
-        let _keep_alive_handles = flexi_logger::trc::setup_tracing(
+        let keep_alive_handles = flexi_logger::trc::setup_tracing(
             LogSpecification::info(),
             Some(&specfile),
             FileLogWriter::builder(FileSpec::default().directory(super::test_utils::dir()))
@@ -39,11 +38,8 @@ mod a {
 
         assert!(specfile.exists());
 
-        error!("This is an error-0");
-        warn!("This is a warning-0");
-        info!("This is an info-0");
-        debug!("This is a debug-0");
-        trace!("This is a trace-0");
+        write_logs(0);
+        super::b::write_logs(0);
 
         eprintln!(
             "[{}] ===== behave like many editors: rename and recreate; set to warn",
@@ -60,8 +56,9 @@ mod a {
                 .unwrap();
             file.write_all(
                 b"
-                global_level = 'warn'
-                [modules]
+                global_level = 'warn'\n\
+                [modules]\n\
+                'test_trc::b' = 'error'\n\
                 ",
             )
             .unwrap();
@@ -69,11 +66,8 @@ mod a {
 
         std::thread::sleep(std::time::Duration::from_millis(WAIT_MILLIS));
 
-        error!("This is an error-1");
-        warn!("This is a warning-1");
-        info!("This is an info-1");
-        debug!("This is a debug-1");
-        trace!("This is a trace-1");
+        write_logs(1);
+        super::b::write_logs(1);
 
         eprintln!(
             "[{}] ===== truncate and rewrite; set to error",
@@ -89,6 +83,7 @@ mod a {
                 "\
                 global_level = 'error'\n\
                 [modules]\n\
+                'test_trc::b' = 'debug'\n\
                 "
                 .as_bytes(),
             )
@@ -97,10 +92,45 @@ mod a {
 
         std::thread::sleep(std::time::Duration::from_millis(WAIT_MILLIS));
 
-        error!("This is an error-2");
-        warn!("This is a warning-2");
-        info!("This is an info-2");
-        debug!("This is a debug-2");
-        trace!("This is a trace-2");
+        write_logs(2);
+        super::b::write_logs(2);
+
+        std::thread::sleep(std::time::Duration::from_millis(WAIT_MILLIS));
+
+        keep_alive_handles.0.validate_logs(&[
+            ("ERROR", "test_trc::a", "0"),
+            ("WARN", "test_trc::a", "0"),
+            ("INFO", "test_trc::a", "0"),
+            ("ERROR", "test_trc::b", "0"),
+            ("WARN", "test_trc::b", "0"),
+            ("INFO", "test_trc::b", "0"),
+            ("ERROR", "test_trc::a:", "1"),
+            ("WARN", "test_trc::a:", "1"),
+            ("ERROR", "test_trc::b:", "1"),
+            ("ERROR", "test_trc::a:", "2"),
+            ("ERROR", "test_trc::b:", "2"),
+            ("WARN", "test_trc::b:", "2"),
+            ("INFO", "test_trc::b:", "2"),
+            ("DEBUG", "test_trc::b:", "2"),
+        ]);
+    }
+
+    pub(crate) fn write_logs(idx: u8) {
+        error!("Error from a::write_logs {idx}");
+        warn!("Warning from a::write_logs {idx}");
+        info!("Info from a::write_logs {idx}");
+        debug!("Debug from a::write_logs {idx}");
+        trace!("Trace from a::write_logs {idx}");
+    }
+}
+mod b {
+    use tracing::{debug, error, info, trace, warn};
+
+    pub(crate) fn write_logs(idx: u8) {
+        error!("Error from b::write_logs {idx}");
+        warn!("Warning from b::write_logs {idx}");
+        info!("Info from b::write_logs {idx}");
+        debug!("Debug from b::write_logs {idx}");
+        trace!("Trace from b::write_logs {idx}");
     }
 }
