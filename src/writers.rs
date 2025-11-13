@@ -1,3 +1,4 @@
+#![allow(clippy::needless_doctest_main)]
 //! Describes how to extend `flexi_logger` with additional log writers.
 //!
 //! The module also contains two ready-to-use log writers,

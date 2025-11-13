@@ -53,8 +53,8 @@ fn main() {
 
     // Build in important variants
     std::fs::remove_file("Cargo.lock").ok();
-    run_command!("cargo +1.82.0 build --no-default-features");
-    run_command!("cargo +1.82.0 build --all-features");
+    run_command!("cargo +1.83.0 build --no-default-features");
+    run_command!("cargo +1.83.0 build --all-features");
 
     std::fs::remove_file("Cargo.lock").ok();
     run_command!("cargo build");
@@ -69,7 +69,7 @@ fn main() {
     run_command!("cargo +nightly clippy --all-targets --all-features -- -D warnings");
 
     // Run tests in important variants
-    run_command!("cargo +1.82.0 test --all-features");
+    run_command!("cargo +1.83.0 test --all-features");
     run_command!("cargo test --release --all-features");
     run_command!("cargo test --no-default-features");
     run_command!("cargo test --release");
