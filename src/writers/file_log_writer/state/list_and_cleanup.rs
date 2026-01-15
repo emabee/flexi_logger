@@ -1,4 +1,6 @@
 use super::InfixFilter;
+#[cfg(feature = "affinity")]
+use crate::threads::bind_to_core;
 use crate::{Cleanup, FileSpec, LogfileSelector};
 #[cfg(feature = "compress")]
 use std::fs::File;
@@ -167,7 +169,7 @@ pub(crate) fn remove_or_compress_too_old_logfiles_impl(
     Ok(())
 }
 
-const CLEANER: &str = "flexi_logger-fs-cleanup";
+const CLEANER: &str = "flexi_logger-file-cleanup";
 
 #[derive(Debug)]
 pub(super) struct CleanupThreadHandle {
@@ -191,6 +193,7 @@ pub(super) fn start_cleanup_thread(
     file_spec: FileSpec,
     infix_filter: &InfixFilter,
     writes_direct: bool,
+    #[cfg(feature = "affinity")] o_core_id: Option<usize>,
 ) -> Result<CleanupThreadHandle, std::io::Error> {
     let (sender, receiver) = std::sync::mpsc::channel();
     let builder = ThreadBuilder::new().name(CLEANER.to_string());
@@ -200,6 +203,8 @@ pub(super) fn start_cleanup_thread(
     Ok(CleanupThreadHandle {
         sender,
         join_handle: builder.spawn(move || {
+            #[cfg(feature = "affinity")]
+            bind_to_core(o_core_id);
             while let Ok(MessageToCleanupThread::Act) = receiver.recv() {
                 remove_or_compress_too_old_logfiles_impl(
                     &cleanup,

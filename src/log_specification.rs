@@ -1079,11 +1079,8 @@ mod test_with_specfile {
 
         assert_eq!(ls_toml.module_filters, ls_spec.module_filters);
         assert_eq!(ls_toml.textfilter.is_none(), ls_spec.textfilter.is_none());
-        if ls_toml.textfilter.is_some() && ls_spec.textfilter.is_some() {
-            assert_eq!(
-                ls_toml.textfilter.unwrap().to_string(),
-                ls_spec.textfilter.unwrap().to_string()
-            );
+        if let (Some(s1), Some(s2)) = (ls_toml.textfilter, ls_spec.textfilter) {
+            assert_eq!(s1.to_string(), s2.to_string());
         }
     }
 

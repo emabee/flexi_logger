@@ -51,7 +51,8 @@ impl FileLogWriter {
                 pool_capa,
                 message_capa,
                 flush_interval: _,
-            } => StateHandle::new_async(pool_capa, message_capa, state, format_function),
+                o_core_id,
+            } => StateHandle::new_async(pool_capa, message_capa, state, format_function, o_core_id),
         };
 
         FileLogWriter {

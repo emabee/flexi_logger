@@ -19,17 +19,17 @@ use {crossbeam_channel::Sender, crossbeam_queue::ArrayQueue};
 
 #[derive(Debug)]
 pub(super) enum StateHandle {
-    Sync(SyncHandle),
+    Sync(SyncStateHandle),
     #[cfg(feature = "async")]
-    Async(AsyncHandle),
+    Async(AsyncStateHandle),
 }
 
-pub(super) struct SyncHandle {
+pub(super) struct SyncStateHandle {
     am_state: Arc<Mutex<State>>,
     format_function: FormatFunction,
     line_ending: &'static [u8],
 }
-impl SyncHandle {
+impl SyncStateHandle {
     fn new(state: State, format_function: FormatFunction) -> Self {
         let line_ending = state.config().line_ending;
         let flush_interval = state.config().write_mode.get_flush_interval();
@@ -46,7 +46,7 @@ impl SyncHandle {
         }
     }
 }
-impl std::fmt::Debug for SyncHandle {
+impl std::fmt::Debug for SyncStateHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         f.debug_struct("SyncHandle")
             .field("am_state", &self.am_state)
@@ -57,7 +57,7 @@ impl std::fmt::Debug for SyncHandle {
 }
 
 #[cfg(feature = "async")]
-pub(super) struct AsyncHandle {
+pub(super) struct AsyncStateHandle {
     am_state: Arc<Mutex<State>>,
     sender: Sender<Vec<u8>>,
     mo_thread_handle: Mutex<Option<JoinHandle<()>>>,
@@ -67,12 +67,13 @@ pub(super) struct AsyncHandle {
     line_ending: &'static [u8],
 }
 #[cfg(feature = "async")]
-impl AsyncHandle {
+impl AsyncStateHandle {
     fn new(
         pool_capa: usize,
         message_capa: usize,
         state: State,
         format_function: FormatFunction,
+        o_core_id: Option<usize>,
     ) -> Self {
         let flush_interval = state.config().write_mode.get_flush_interval();
         let line_ending = state.config().line_ending;
@@ -83,10 +84,11 @@ impl AsyncHandle {
             Arc::clone(&am_state),
             message_capa,
             Arc::clone(&a_pool),
+            o_core_id,
         );
 
         if flush_interval != ZERO_DURATION {
-            super::state::start_async_fs_flusher(sender.clone(), flush_interval);
+            super::state::start_async_fs_flusher(sender.clone(), flush_interval, o_core_id);
         }
 
         Self {
@@ -119,9 +121,9 @@ impl AsyncHandle {
 }
 
 #[cfg(feature = "async")]
-impl std::fmt::Debug for AsyncHandle {
+impl std::fmt::Debug for AsyncStateHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        f.debug_struct("AsyncHandle")
+        f.debug_struct("AsyncStateHandle")
             .field("am_state", &self.am_state)
             .field("sender", &self.sender)
             .field("mo_thread_handle", &self.mo_thread_handle)
@@ -136,7 +138,7 @@ impl std::fmt::Debug for AsyncHandle {
 impl StateHandle {
     // produce a StateHandle::Sync, optionally with an own flusher-thread
     pub(super) fn new_sync(state: State, format_function: FormatFunction) -> StateHandle {
-        StateHandle::Sync(SyncHandle::new(state, format_function))
+        StateHandle::Sync(SyncStateHandle::new(state, format_function))
     }
 
     // produce a StateHandle::Async with its writer-thread, and optionally an own flusher-thread
@@ -146,12 +148,14 @@ impl StateHandle {
         message_capa: usize,
         state: State,
         format_function: FormatFunction,
+        o_core_id: Option<usize>,
     ) -> Self {
-        Self::Async(AsyncHandle::new(
+        Self::Async(AsyncStateHandle::new(
             pool_capa,
             message_capa,
             state,
             format_function,
+            o_core_id,
         ))
     }
 

@@ -715,25 +715,26 @@ impl Logger {
         #[cfg(feature = "colors")]
         set_palette(self.o_palette.as_deref())?;
 
+        let write_mode = *self.flwb.get_write_mode();
         let a_primary_writer = Arc::new(match self.log_target {
             LogTarget::StdOut => {
-                if let WriteMode::SupportCapture = self.flwb.get_write_mode() {
+                if let WriteMode::SupportCapture = write_mode {
                     PrimaryWriter::test(true, self.format_for_stdout)
                 } else {
-                    PrimaryWriter::stdout(self.format_for_stdout, self.flwb.get_write_mode())
+                    PrimaryWriter::stdout(self.format_for_stdout, &write_mode)
                 }
             }
             LogTarget::StdErr => {
-                if let WriteMode::SupportCapture = self.flwb.get_write_mode() {
+                if let WriteMode::SupportCapture = write_mode {
                     PrimaryWriter::test(false, self.format_for_stderr)
                 } else {
-                    PrimaryWriter::stderr(self.format_for_stderr, self.flwb.get_write_mode())
+                    PrimaryWriter::stderr(self.format_for_stderr, &write_mode)
                 }
             }
             LogTarget::Multi(use_file_writer, mut o_writer) => PrimaryWriter::multi(
                 self.duplicate_err,
                 self.duplicate_out,
-                WriteMode::SupportCapture == *self.flwb.get_write_mode(),
+                WriteMode::SupportCapture == write_mode,
                 self.format_for_stderr,
                 self.format_for_stdout,
                 if use_file_writer {
@@ -759,6 +760,8 @@ impl Logger {
                 Arc::clone(&a_primary_writer),
                 Arc::clone(&a_other_writers),
                 self.flush_interval,
+                #[cfg(feature = "affinity")]
+                write_mode.get_core_id(),
             )?;
         }
 

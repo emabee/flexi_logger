@@ -43,6 +43,7 @@ fn run_script(s: &str) {
 fn main() {
     // Build in important variants
     run_command!("cargo build --release --all-features");
+    run_command!("cargo build --no-default-features");
 
     // Clippy in important variants
     run_command!("cargo clippy --all-features -- -D warnings");

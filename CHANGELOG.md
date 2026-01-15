@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.31.8-unpublished] - xxx
+## [0.31.8] - 2026-01-15
+
+Add option to bind background threads to a specific cpu core. See `WriteMode::AsyncPinnedWith`.
 
 Bump minimal supported rust version to 1.83.0, due to updated dependencies.
 
@@ -69,7 +71,8 @@ Fix endless loop if a single log message is bigger than `buffer_writer`'s overal
 
 ## [0.30.0] - 2025-04-01
 
-Added non-default feature 'buffer_writer', which adds an in-memory log target with limited size and FIFO-logic.
+Added non-default feature 'buffer_writer', which adds an in-memory log target with limited size
+and FIFO-logic.
 
 Adds as additional requirement that `LogWriter` implementations must be `'static`.
 Most usages don't use own `LogWriter` implementations, and most of those which do will not have to

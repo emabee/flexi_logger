@@ -33,6 +33,10 @@
 //!
 //! For possible reasons, see [Write](#write).
 //!
+//! ## `BindToCore`
+//!
+//! Binding a thread to a specific CPU core failed.
+//!
 //! ## `Format`
 //!
 //! The chosen format function had produced an error.
@@ -44,15 +48,6 @@
 //! ```
 //!
 //! If this happens with one of `flexi_logger`s provided format functions, please open an issue.
-//!
-//! ## `Poison`
-//!
-//! Log entries can be written by all threads of your program. Loggers thus must be thread-safe,
-//! by guarding their mutable parts with `Mutex`es, `RwLocks`, etc. In case that a thread panics
-//! while owning one of these locks, the lock is subsequently considered "poisoned".
-//!
-//! A typical root cause for this is some `panic!` in a `Debug` or `Display` implementation
-//! of a logged object.
 //!
 //! ## `LogFile`
 //!
@@ -83,6 +78,15 @@
 //! ```
 //!
 //! Watching the log-specification-file failed.
+//!
+//! ## `Poison`
+//!
+//! Log entries can be written by all threads of your program. Loggers thus must be thread-safe,
+//! by guarding their mutable parts with `Mutex`es, `RwLocks`, etc. In case that a thread panics
+//! while owning one of these locks, the lock is subsequently considered "poisoned".
+//!
+//! A typical root cause for this is some `panic!` in a `Debug` or `Display` implementation
+//! of a logged object.
 //!
 //! ## `Symlink`
 //!

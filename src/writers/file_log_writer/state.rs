@@ -3,6 +3,8 @@ mod numbers;
 mod timestamps;
 
 use super::{config::FileLogWriterConfig, rotation_config::RotationConfig, InfixFilter};
+#[cfg(feature = "async")]
+use crate::threads::bind_to_core;
 pub(crate) use timestamps::timestamp_from_ts_infix;
 
 #[cfg(feature = "async")]
@@ -22,8 +24,10 @@ use std::{
 };
 use timestamps::{creation_timestamp_of_currentfile, infix_from_timestamp, latest_timestamp_file};
 
+const FILE_FLUSHER: &str = "flexi_logger-file-flusher (sync)";
+
 #[cfg(feature = "async")]
-const ASYNC_FLUSHER: &str = "flexi_logger-fs-async_flusher";
+const ASYNC_FLUSHER: &str = "flexi_logger-file-flusher (async)";
 
 #[cfg(feature = "async")]
 use {
@@ -33,7 +37,7 @@ use {
 };
 
 #[cfg(feature = "async")]
-const ASYNC_WRITER: &str = "flexi_logger-async_file_writer";
+const ASYNC_WRITER: &str = "flexi_logger-file-writer";
 
 const CURRENT_INFIX: &str = "rCURRENT";
 
@@ -307,9 +311,12 @@ impl State {
                     let (write, path) = open_log_file(&self.config, None)?;
                     Inner::Active(None, write, path)
                 }
-                Some(rotate_config) => {
-                    self.initialize_with_rotation(rotate_config, *cleanup_in_background_thread)?
-                }
+                Some(rotate_config) => self.initialize_with_rotation(
+                    rotate_config,
+                    *cleanup_in_background_thread,
+                    #[cfg(feature = "affinity")]
+                    self.config.write_mode.get_core_id(),
+                )?,
             };
         }
         Ok(())
@@ -320,6 +327,7 @@ impl State {
         &self,
         rotate_config: &RotationConfig,
         cleanup_in_background_thread: bool,
+        #[cfg(feature = "affinity")] o_core_id: Option<usize>,
     ) -> Result<Inner, std::io::Error> {
         let (naming_state, infix) = match rotate_config.naming {
             Naming::TimestampsDirect => {
@@ -418,6 +426,8 @@ impl State {
                     self.config.file_spec.clone(),
                     &naming_state.infix_filter(),
                     rotate_config.naming.writes_direct(),
+                    #[cfg(feature = "affinity")]
+                    o_core_id,
                 )?)
             } else {
                 None
@@ -698,6 +708,7 @@ pub(super) fn start_async_fs_writer(
     am_state: Arc<Mutex<State>>,
     message_capa: usize,
     a_pool: Arc<ArrayQueue<Vec<u8>>>,
+    o_core_id: Option<usize>,
 ) -> (CrossbeamSender<Vec<u8>>, Mutex<Option<JoinHandle<()>>>) {
     let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
     (
@@ -705,30 +716,33 @@ pub(super) fn start_async_fs_writer(
         Mutex::new(Some(
             std::thread::Builder::new()
                 .name(ASYNC_WRITER.to_string())
-                .spawn(move || loop {
-                    match receiver.recv() {
-                        Err(_) => break,
-                        Ok(mut message) => {
-                            let mut state = am_state.lock().unwrap(/* ok */);
-                            match message.as_ref() {
-                                ASYNC_FLUSH => {
-                                    state.flush().unwrap_or_else(|e| {
-                                        eprint_err(ErrorCode::Flush, "flushing failed", &e);
-                                    });
+                .spawn(move || {
+                    bind_to_core(o_core_id);
+                    loop {
+                        match receiver.recv() {
+                            Err(_) => break,
+                            Ok(mut message) => {
+                                let mut state = am_state.lock().unwrap(/* ok */);
+                                match message.as_ref() {
+                                    ASYNC_FLUSH => {
+                                        state.flush().unwrap_or_else(|e| {
+                                            eprint_err(ErrorCode::Flush, "flushing failed", &e);
+                                        });
+                                    }
+                                    ASYNC_SHUTDOWN => {
+                                        state.shutdown();
+                                        break;
+                                    }
+                                    _ => {
+                                        state.write_buffer(&message).unwrap_or_else(|e| {
+                                            eprint_err(ErrorCode::Write, "writing failed", &e);
+                                        });
+                                    }
                                 }
-                                ASYNC_SHUTDOWN => {
-                                    state.shutdown();
-                                    break;
+                                if message.capacity() <= message_capa {
+                                    message.clear();
+                                    a_pool.push(message).ok();
                                 }
-                                _ => {
-                                    state.write_buffer(&message).unwrap_or_else(|e| {
-                                        eprint_err(ErrorCode::Write, "writing failed", &e);
-                                    });
-                                }
-                            }
-                            if message.capacity() <= message_capa {
-                                message.clear();
-                                a_pool.push(message).ok();
                             }
                         }
                     }
@@ -739,7 +753,7 @@ pub(super) fn start_async_fs_writer(
 }
 
 pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: std::time::Duration) {
-    let builder = std::thread::Builder::new().name("flexi_logger-file_flusher".to_string());
+    let builder = std::thread::Builder::new().name(FILE_FLUSHER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
     let builder = builder.stack_size(1024);
     builder.spawn(move || {
@@ -761,11 +775,13 @@ pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: st
 pub(crate) fn start_async_fs_flusher(
     async_writer: CrossbeamSender<Vec<u8>>,
     flush_interval: std::time::Duration,
+    o_core_id: Option<usize>,
 ) {
     let builder = std::thread::Builder::new().name(ASYNC_FLUSHER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
     let builder = builder.stack_size(1024);
     builder.spawn(move || {
+                bind_to_core(o_core_id);
             let (_tx, rx) = std::sync::mpsc::channel::<()>();
             loop {
                 if let Err(std::sync::mpsc::RecvTimeoutError::Disconnected) =

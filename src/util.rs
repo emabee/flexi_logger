@@ -22,6 +22,8 @@ pub(crate) const ASYNC_SHUTDOWN: &[u8] = b"S";
 pub(crate) enum ErrorCode {
     Write,
     Flush,
+    #[cfg(feature = "affinity")]
+    BindToCore,
     Format,
     LogFile,
     #[cfg(feature = "specfile")]
@@ -36,6 +38,8 @@ impl ErrorCode {
         match self {
             Self::Write => "write",
             Self::Flush => "flush",
+            #[cfg(feature = "affinity")]
+            Self::BindToCore => "bindtocore",
             Self::Format => "format",
             Self::LogFile => "logfile",
             #[cfg(feature = "specfile")]

@@ -26,7 +26,7 @@ use {
 use std::io::Write;
 
 #[cfg(feature = "async")]
-const ASYNC_STD_WRITER: &str = "flexi_logger-async_std_writer";
+const ASYNC_STD_WRITER: &str = "flexi_logger-std-writer";
 const FLUSHER: &str = "flexi_logger-flusher";
 
 // Used in Logger
@@ -34,12 +34,15 @@ pub(crate) fn start_flusher_thread(
     primary_writer: Arc<PrimaryWriter>,
     other_writers: Arc<HashMap<String, Box<dyn LogWriter>>>,
     flush_interval: std::time::Duration,
+    #[cfg(feature = "affinity")] o_core_id: Option<usize>,
 ) -> Result<(), FlexiLoggerError> {
     let builder = ThreadBuilder::new().name(FLUSHER.to_string());
     #[cfg(not(feature = "dont_minimize_extra_stacks"))]
     let builder = builder.stack_size(1024);
 
     builder.spawn(move || {
+        #[cfg(feature = "affinity")]
+        bind_to_core(o_core_id);
         let (_sender, receiver): (Sender<()>, Receiver<()>) = channel();
         loop {
             receiver.recv_timeout(flush_interval).ok();
@@ -58,6 +61,7 @@ pub(crate) fn start_async_stdwriter(
     receiver: CrossbeamReceiver<std::vec::Vec<u8>>,
     t_pool: Arc<ArrayQueue<Vec<u8>>>,
     msg_capa: usize,
+    o_core_id: Option<usize>,
     #[cfg(test)] t_validation_buffer: Arc<Mutex<std::io::Cursor<Vec<u8>>>>,
 ) -> Mutex<Option<JoinHandle<()>>> {
     Mutex::new(Some(
@@ -66,6 +70,7 @@ pub(crate) fn start_async_stdwriter(
                 ASYNC_STD_WRITER.to_string()
             )
             .spawn(move || {
+                bind_to_core(o_core_id);
                 loop {
                     match receiver.recv() {
                         Err(_) => break,
@@ -105,4 +110,20 @@ pub(crate) fn start_async_stdwriter(
             })
             .unwrap(/* yes, let's panic if the thread can't be spawned */),
     ))
+}
+
+#[cfg(feature = "affinity")]
+pub(crate) fn bind_to_core(o_core_id: Option<usize>) {
+    if let Some(id) = o_core_id {
+        if !core_affinity::set_for_current(core_affinity::CoreId { id }) {
+            crate::util::eprint_msg(
+                ErrorCode::BindToCore,
+                &format!(
+                    "flexi_logger: Warning: Could not bind thread {:?} to core {}",
+                    std::thread::current().name(),
+                    id,
+                ),
+            );
+        }
+    }
 }

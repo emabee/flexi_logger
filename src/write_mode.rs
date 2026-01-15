@@ -114,6 +114,22 @@ pub enum WriteMode {
         /// With `Duration::ZERO` flushing is suppressed.
         flush_interval: Duration,
     },
+
+    /// Like `AsyncWith`, but pinned to the specified core.
+    #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+    #[cfg(feature = "async")]
+    AsyncPinnedWith {
+        /// Capacity of the pool for the message buffers.
+        pool_capa: usize,
+        /// Capacity of an individual message buffer.
+        message_capa: usize,
+        /// The interval for flushing the output.
+        ///
+        /// With `Duration::ZERO` flushing is suppressed.
+        flush_interval: Duration,
+        /// The id of the core to which `flexi_logger`'s background threads should be pinned.
+        core_id: usize,
+    },
 }
 impl WriteMode {
     pub(crate) fn effective_write_mode(&self) -> EffectiveWriteMode {
@@ -134,6 +150,7 @@ impl WriteMode {
                 pool_capa: DEFAULT_POOL_CAPA,
                 message_capa: DEFAULT_MESSAGE_CAPA,
                 flush_interval: DEFAULT_FLUSH_INTERVAL,
+                o_core_id: None,
             },
             #[cfg(feature = "async")]
             Self::AsyncWith {
@@ -144,6 +161,19 @@ impl WriteMode {
                 pool_capa,
                 message_capa,
                 flush_interval,
+                o_core_id: None,
+            },
+            #[cfg(feature = "async")]
+            Self::AsyncPinnedWith {
+                pool_capa,
+                message_capa,
+                flush_interval,
+                core_id,
+            } => EffectiveWriteMode::AsyncWith {
+                pool_capa,
+                message_capa,
+                flush_interval,
+                o_core_id: Some(core_id),
             },
         }
     }
@@ -171,6 +201,18 @@ impl WriteMode {
                 message_capa: *message_capa,
                 flush_interval: ZERO_DURATION,
             },
+            #[cfg(feature = "async")]
+            Self::AsyncPinnedWith {
+                pool_capa,
+                message_capa,
+                flush_interval: _,
+                core_id,
+            } => Self::AsyncPinnedWith {
+                pool_capa: *pool_capa,
+                message_capa: *message_capa,
+                flush_interval: ZERO_DURATION,
+                core_id: *core_id,
+            },
         }
     }
     pub(crate) fn buffersize(&self) -> Option<usize> {
@@ -183,6 +225,7 @@ impl WriteMode {
                 pool_capa: _,
                 message_capa: _,
                 flush_interval: _,
+                o_core_id: _,
             } => None,
         }
     }
@@ -202,6 +245,27 @@ impl WriteMode {
                 message_capa: _,
                 flush_interval,
             } => *flush_interval,
+            #[cfg(feature = "async")]
+            Self::AsyncPinnedWith {
+                pool_capa: _,
+                message_capa: _,
+                flush_interval,
+                core_id: _,
+            } => *flush_interval,
+        }
+    }
+
+    #[cfg(feature = "affinity")]
+    pub(crate) fn get_core_id(&self) -> Option<usize> {
+        match self {
+            #[cfg(feature = "async")]
+            Self::AsyncPinnedWith {
+                pool_capa: _,
+                message_capa: _,
+                flush_interval: _,
+                core_id,
+            } => Some(*core_id),
+            _ => None,
         }
     }
 }
@@ -220,6 +284,8 @@ pub(crate) enum EffectiveWriteMode {
         ///
         /// With `Duration::ZERO` flushing is suppressed.
         flush_interval: Duration,
+        /// An optional core id to which the async logging thread should be pinned.
+        o_core_id: Option<usize>,
     },
     BufferDontFlushWith(usize),
 }

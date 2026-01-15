@@ -55,6 +55,7 @@ impl AsyncHandle {
         stdstream: StdStream,
         pool_capa: usize,
         msg_capa: usize,
+        o_core_id: Option<usize>,
         #[cfg(test)] validation_buffer: &Arc<Mutex<Cursor<Vec<u8>>>>,
     ) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded::<Vec<u8>>();
@@ -65,6 +66,7 @@ impl AsyncHandle {
             receiver,
             Arc::clone(&a_pool),
             msg_capa,
+            o_core_id,
             #[cfg(test)]
             Arc::clone(validation_buffer),
         );
@@ -110,6 +112,7 @@ impl StdWriter {
                 pool_capa,
                 message_capa,
                 flush_interval,
+                o_core_id,
             } => {
                 assert_eq!(
                     flush_interval, ZERO_DURATION,
@@ -119,6 +122,7 @@ impl StdWriter {
                     stdstream,
                     pool_capa,
                     message_capa,
+                    o_core_id,
                     #[cfg(test)]
                     &validation_buffer,
                 ))
