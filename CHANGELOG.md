@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.9-unpublished] - XXX
+
+Code maintenance: update dependencies, add semver check to `qualify.rs`, fix new clippy.
+
 ## [0.31.8] - 2026-01-15
 
 Add option to bind background threads to a specific cpu core. See `WriteMode::AsyncPinnedWith`.

@@ -908,14 +908,10 @@ pub(crate) fn create_specfile_watcher<S: LogSpecSubscriber>(
     let parent = clone.parent().unwrap(/*cannot fail*/);
 
     let mut debouncer = new_debouncer(
-        std::time::Duration::from_millis(1000),
+        std::time::Duration::from_secs(1),
         move |res: DebounceEventResult| match res {
             Ok(events) => events.iter().for_each(|e| {
-                if e.path
-                    .canonicalize()
-                    .map(|x| x == specfile)
-                    .unwrap_or(false)
-                {
+                if e.path.canonicalize().is_ok_and(|x| x == specfile) {
                     log_spec_string_from_file(&specfile)
                         .map_err(FlexiLoggerError::SpecfileIo)
                         .and_then(LogSpecification::from_toml)

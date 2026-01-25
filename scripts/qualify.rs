@@ -82,6 +82,9 @@ fn main() {
     // check version consistency
     run_command!("cargo run --example version_numbers");
 
+    // error out on semver violations
+    run_command!("cargo semver-checks");
+
     // check git status
     let mut cmd = command!("git status -s");
     let child = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
