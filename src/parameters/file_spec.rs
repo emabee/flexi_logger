@@ -1,6 +1,6 @@
 use crate::{writers::file_log_writer::InfixFilter, DeferredNow, FlexiLoggerError};
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     ops::Add,
     path::{Path, PathBuf},
 };
@@ -69,8 +69,24 @@ impl Default for FileSpec {
 }
 impl FileSpec {
     fn default_basename() -> String {
-        let arg0 = std::env::args().next().unwrap_or_else(|| "rs".to_owned());
-        Path::new(&arg0).file_stem().map(OsStr::to_string_lossy).unwrap(/*cannot fail*/).to_string()
+        FileSpec::basename_from(std::env::args().next())
+    }
+    fn basename_from(o_s: Option<String>) -> String {
+        const DEFAULT_BASENAME: &str = "logfile";
+        match o_s {
+            None => DEFAULT_BASENAME.into(),
+            Some(s) => Path::new(&s).file_stem().map_or_else(
+                || DEFAULT_BASENAME.into(),
+                |oss| {
+                    let s = oss.to_string_lossy().to_string();
+                    if s.is_empty() {
+                        DEFAULT_BASENAME.into()
+                    } else {
+                        s
+                    }
+                },
+            ),
+        }
     }
 
     /// The provided path should describe a log file.
@@ -787,5 +803,15 @@ mod test {
 
     fn create_file(dir: &Path, filename: &str) {
         File::create(dir.join(filename)).unwrap();
+    }
+
+    #[test]
+    fn test_default_basename() {
+        assert_eq!("logfile", FileSpec::basename_from(None));
+        assert_eq!("logfile", FileSpec::basename_from(Some(String::new())));
+        assert_eq!(
+            "c3",
+            FileSpec::basename_from(Some("./a1/b2/c3.test".into()))
+        );
     }
 }

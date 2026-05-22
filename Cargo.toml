@@ -1,6 +1,6 @@
 [package]
 name = "flexi_logger"
-version = "0.31.9-unpublished"
+version = "0.31.9"
 authors = ["emabee <meinolf.block-hd@t-online.de>"]
 categories = ["development-tools::debugging"]
 description = """
@@ -14,15 +14,15 @@ keywords = ["file", "logger"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/emabee/flexi_logger"
-rust-version = "1.85.0"
+rust-version = "1.87.0"
 
 [lib]
 doctest = false
 
 ## docs.rs-specific configuration
 [package.metadata.docs.rs]
-# document all features
 all-features = true
+default-target = "x86_64-unknown-linux-gnu"
 # define the configuration attribute `docsrs`
 rustdoc-args = ["--cfg", "docsrs"]
 

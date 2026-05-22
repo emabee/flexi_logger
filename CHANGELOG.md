@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.31.9-unpublished] - XXX
+## [0.31.9] - 2026-05-22
+
+Fix bug #205 in `FileSpec::default_basename`, and add a test.
 
 Code maintenance: update dependencies, add semver check to `qualify.rs`, fix new clippy.
 
