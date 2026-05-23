@@ -231,14 +231,14 @@ mod test {
             // with local timestamps, offsets ≠ 0 are printed (except in Greenwich time zone):
             super::set_force_utc(false);
             let (mut dn1, mut dn2) = get_deferred_nows();
-            log::info!("2021-04-29T15:14:15.678+02:00, {}", &dn1.format_rfc3339());
-            log::info!("2021-04-29T14:14:15.678+02:00, {}", &dn2.format_rfc3339());
+            log::info!("2021-04-29T15:14:15.678+02:00, {}", dn1.format_rfc3339());
+            log::info!("2021-04-29T14:14:15.678+02:00, {}", dn2.format_rfc3339());
 
             // with utc, the timestamps are normalized to offset 0
             super::set_force_utc(true);
             let (mut dn1, mut dn2) = get_deferred_nows();
-            assert_eq!("2021-04-29T13:14:15.678+00:00", &dn1.format_rfc3339());
-            assert_eq!("2021-04-29T12:14:15.678+00:00", &dn2.format_rfc3339());
+            assert_eq!("2021-04-29T13:14:15.678+00:00", dn1.format_rfc3339());
+            assert_eq!("2021-04-29T12:14:15.678+00:00", dn2.format_rfc3339());
         }
     }
 }

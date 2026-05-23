@@ -136,7 +136,7 @@ pub fn opt_format(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", &record.args())
+    write!(w, "{}", record.args())
 }
 
 /// A colored version of the logline-formatter `opt_format`.
@@ -195,7 +195,7 @@ pub fn detailed_format(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", &record.args())
+    write!(w, "{}", record.args())
 }
 
 /// A colored version of the logline-formatter `detailed_format`.
@@ -255,7 +255,7 @@ pub fn with_thread(
     #[cfg(feature = "kv")]
     write_key_value_pairs(w, record)?;
 
-    write!(w, "{}", &record.args())
+    write!(w, "{}", record.args())
 }
 
 /// A colored version of the logline-formatter `with_thread`.

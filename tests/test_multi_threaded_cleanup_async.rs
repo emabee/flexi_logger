@@ -137,7 +137,7 @@ mod d {
             record.level(),
             record.file().unwrap_or("<unnamed>"),
             record.line().unwrap_or(0),
-            &record.args()
+            record.args()
         )
     }
 

@@ -139,7 +139,7 @@ pub fn test_format(
         record.level(),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        &record.args()
+        record.args()
     )
 }
 

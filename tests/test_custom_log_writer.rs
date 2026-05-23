@@ -110,5 +110,5 @@ fn custom_format(
     record: &Record,
 ) -> Result<(), std::io::Error> {
     // Only write the message and the level, without the module
-    write!(writer, "{}: {}", record.level(), &record.args())
+    write!(writer, "{}: {}", record.level(), record.args())
 }

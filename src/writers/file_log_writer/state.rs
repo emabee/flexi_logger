@@ -658,7 +658,7 @@ fn open_log_file(
     let path = config.file_spec.as_pathbuf(o_infix);
 
     if config.print_message {
-        println!("Log is written to {}", &path.display());
+        println!("Log is written to {}", path.display());
     }
     if let Some(ref link) = config.o_create_symlink {
         self::platform::create_symlink_if_possible(link, &path);
