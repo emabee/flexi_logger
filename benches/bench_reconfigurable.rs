@@ -12,9 +12,13 @@ fn b10_no_logger_active(b: &mut Bencher) {
 
 #[bench]
 fn b20_initialize_logger(_: &mut Bencher) {
+    let base_dir = std::env::temp_dir();
+    let target_dir = base_dir.canonicalize().unwrap_or(base_dir).join("log_files");
+    let _ = std::fs::create_dir_all(&target_dir);
+
     Logger::try_with_str("info")
         .unwrap()
-        .log_to_file(FileSpec::default().directory("log_files"))
+        .log_to_file(FileSpec::default().directory(target_dir))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 }

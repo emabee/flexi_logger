@@ -54,6 +54,8 @@ fn work(value: u8) {
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
         4 => {
+            let tmp_link_path = std::env::temp_dir().join(&link_name);
+
             logger = logger
                 .format(opt_format)
                 .log_to_file(
@@ -63,7 +65,7 @@ fn work(value: u8) {
                         .discriminant("foo".to_string()),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
-                .create_symlink(link_name.clone());
+                .create_symlink(tmp_link_path);
         }
         5 => {
             logger = logger.format(opt_format).log_to_file(
@@ -117,7 +119,9 @@ fn work(value: u8) {
 mod platform {
     #[cfg(target_family = "unix")]
     pub fn check_link(link_name: &str) {
-        match std::fs::symlink_metadata(link_name) {
+        let tmp_link_path = std::env::temp_dir().join(link_name);
+
+        match std::fs::symlink_metadata(tmp_link_path) {
             Err(e) => panic!("error with symlink: {e}"),
             Ok(metadata) => assert!(metadata.file_type().is_symlink(), "not a symlink"),
         }

@@ -23,10 +23,14 @@ pub fn file(filename: &str) -> PathBuf {
 const TS: &str = "%Y-%m-%d_%H-%M-%S";
 
 pub fn dir() -> PathBuf {
-    let mut d = PathBuf::new();
+    let mut d = std::env::temp_dir();
     d.push("log_files");
     add_prog_name(&mut d);
     d.push(now_local().format(TS).to_string());
+    if let Err(e) = std::fs::create_dir_all(&d) {
+        eprintln!("Warning: Failed to pre-create directory {:?}: {}", d, e);
+    }
+
     d
 }
 fn add_prog_name(pb: &mut PathBuf) {
