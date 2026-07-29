@@ -15,6 +15,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/emabee/flexi_logger"
 rust-version = "1.87.0"
+exclude = ["/scripts"]
 
 [lib]
 doctest = false
