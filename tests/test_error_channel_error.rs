@@ -1,5 +1,4 @@
-mod test_utils;
-
+use flexi_logger::test_utils;
 use std::{
     env,
     fs::{create_dir_all, OpenOptions},
@@ -79,7 +78,7 @@ impl std::fmt::Display for Ctrl {
     }
 }
 
-// use the same technique as test_utils::dispatch to launch itself in child mode,
+// use the same technique as helpers::dispatch to launch itself in child mode,
 // but do it twice:
 //   controller starts parent, parent starts child
 //   controller keeps running and verifies that the child's panic file is created (or not),

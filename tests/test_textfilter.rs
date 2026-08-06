@@ -1,9 +1,9 @@
-mod test_utils;
+mod helpers;
 
 #[test]
 #[cfg(feature = "textfilter")]
 fn test_textfilter() {
-    use flexi_logger::{default_format, FileSpec, LogSpecification, Logger};
+    use flexi_logger::{default_format, test_utils, FileSpec, LogSpecification, Logger};
     use log::*;
 
     let logspec = LogSpecification::parse("info/Hello").unwrap();
@@ -12,7 +12,7 @@ fn test_textfilter() {
         .print_message()
         .log_to_file(
             FileSpec::default()
-                .directory(self::test_utils::dir())
+                .directory(test_utils::dir())
                 .suppress_timestamp(),
         )
         .start()

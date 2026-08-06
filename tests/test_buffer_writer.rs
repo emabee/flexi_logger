@@ -1,5 +1,3 @@
-mod test_utils;
-
 #[cfg(feature = "buffer_writer")]
 #[test]
 fn test_buffer_writer() {

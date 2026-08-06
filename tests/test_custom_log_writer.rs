@@ -1,4 +1,4 @@
-mod test_utils;
+mod helpers;
 
 use flexi_logger::{default_format, writers::LogWriter, DeferredNow, FormatFunction, Logger};
 use log::*;
@@ -8,7 +8,7 @@ const COUNT: u8 = 2;
 
 #[test]
 fn test_custom_log_writer() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }

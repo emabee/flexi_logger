@@ -1,4 +1,4 @@
-mod test_utils;
+mod helpers;
 
 use flexi_logger::{Logger, WriteMode};
 use log::*;
@@ -9,7 +9,7 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 5_000;
 
 #[test]
 fn multi_threaded() {
-    test_utils::wait_for_start_of_second();
+    helpers::wait_for_start_of_second();
     let _logger = Logger::try_with_str("debug")
         .unwrap()
         .log_to_stderr()
@@ -24,7 +24,7 @@ fn multi_threaded() {
         std::thread::sleep(std::time::Duration::from_millis(100));
         info!("********** check delay of this log line ({i}) **********");
     }
-    let _stopwatch = test_utils::Stopwatch::default();
+    let _stopwatch = helpers::Stopwatch::default();
 
     let worker_handles = start_worker_threads(NO_OF_THREADS);
 

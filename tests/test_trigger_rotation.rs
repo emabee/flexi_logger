@@ -1,4 +1,4 @@
-mod test_utils;
+mod helpers;
 
 use std::{
     fs::File,
@@ -7,7 +7,9 @@ use std::{
     path::Path,
 };
 
-use flexi_logger::{Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
+use flexi_logger::{
+    detailed_format, test_utils, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming,
+};
 use glob::glob;
 use log::*;
 
@@ -15,7 +17,7 @@ const COUNT: u8 = 4;
 
 #[test]
 fn test_rotate_naming_variants() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -35,13 +37,13 @@ fn test_variant(naming: Naming, criterion: Criterion) {
 
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    test_utils::wait_for_start_of_second();
+    helpers::wait_for_start_of_second();
 
     let logger = Logger::try_with_str("trace")
         .unwrap()
         .log_to_file(FileSpec::default().directory(&directory))
-        .format_for_files(flexi_logger::detailed_format)
-        .format_for_stderr(flexi_logger::detailed_format)
+        .format_for_files(detailed_format)
+        .format_for_stderr(detailed_format)
         .duplicate_to_stderr(Duplicate::Info)
         .rotate(criterion, naming, Cleanup::Never)
         .start()

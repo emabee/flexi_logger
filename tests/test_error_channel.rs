@@ -1,4 +1,4 @@
-mod test_utils;
+mod helpers;
 
 #[cfg(feature = "async")]
 const COUNT: u8 = 4;
@@ -6,14 +6,14 @@ const COUNT: u8 = 4;
 #[cfg(feature = "async")]
 #[test]
 fn test_error_channels() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
 
 #[cfg(feature = "async")]
 fn work(value: u8) {
-    use flexi_logger::{ErrorChannel, FileSpec, Logger, WriteMode};
+    use flexi_logger::{test_utils, ErrorChannel, FileSpec, Logger, WriteMode};
     use log::*;
     use std::{
         fs::File,
@@ -27,7 +27,7 @@ fn work(value: u8) {
     {
         logger = logger.write_mode(WriteMode::Async);
     }
-    let err_file = test_utils::file("flexi_logger_error_channel.err");
+    let err_file = test_utils::child_in_dir("flexi_logger_error_channel.err");
     match value {
         0 => {
             logger = logger.error_channel(ErrorChannel::StdErr);

@@ -1,4 +1,4 @@
-mod test_utils;
+mod helpers;
 
 #[cfg(feature = "compress")]
 use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
@@ -11,7 +11,7 @@ const COUNT: u8 = 4;
 #[cfg(feature = "compress")]
 #[test]
 fn test_rotate_immediate_compression() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -47,9 +47,9 @@ fn work(value: u8) {
 fn test_variant(naming: Naming, criterion: Criterion, cleanup: Cleanup) {
     use std::time::{Duration, Instant};
 
-    let directory = test_utils::dir();
+    let directory = flexi_logger::test_utils::dir();
 
-    test_utils::wait_for_start_of_second();
+    helpers::wait_for_start_of_second();
 
     let mut written_lines = 1;
     {
@@ -89,7 +89,7 @@ fn test_variant(naming: Naming, criterion: Criterion, cleanup: Cleanup) {
         }
     }
 
-    let read_lines = test_utils::count_log_lines(&directory);
+    let read_lines = helpers::count_log_lines(&directory);
     assert_eq!(
         read_lines, written_lines,
         "wrong line count: {read_lines} instead of {written_lines}"

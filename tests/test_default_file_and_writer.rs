@@ -1,12 +1,14 @@
-use flexi_logger::writers::{FileLogWriter, LogWriter};
-use flexi_logger::{detailed_format, FileSpec, Logger};
+use flexi_logger::{
+    detailed_format, test_utils,
+    writers::{FileLogWriter, LogWriter},
+    FileSpec, Logger,
+};
 use log::*;
-mod test_utils;
 
 #[test]
 fn test_default_file_and_writer() {
     let file_spec_bar = FileSpec::default()
-        .directory(self::test_utils::dir())
+        .directory(test_utils::dir())
         .suppress_timestamp()
         .discriminant("bar");
     let file_spec_foo = file_spec_bar.clone().discriminant("foo");

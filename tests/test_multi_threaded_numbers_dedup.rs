@@ -1,8 +1,8 @@
-mod test_utils;
+mod helpers;
 
 use flexi_logger::{
     filter::{LogLineFilter, LogLineWriter},
-    Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, Logger, Naming, WriteMode,
+    test_utils, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, Logger, Naming, WriteMode,
     TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 
@@ -24,11 +24,11 @@ const ROTATE_OVER_SIZE: u64 = 800_000;
 // verify that all log lines are written correctly
 #[test]
 fn multi_threaded() {
-    test_utils::wait_for_start_of_second();
+    helpers::wait_for_start_of_second();
     let directory = test_utils::dir();
     {
         let _logger;
-        let _stopwatch = test_utils::Stopwatch::default();
+        let _stopwatch = helpers::Stopwatch::default();
         _logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(

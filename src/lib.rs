@@ -57,6 +57,7 @@ mod write_mode;
 
 pub mod code_examples;
 pub mod filter;
+pub mod test_utils;
 mod util;
 pub mod writers;
 

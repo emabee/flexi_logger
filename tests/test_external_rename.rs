@@ -1,6 +1,6 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{FileSpec, Logger, WriteMode};
+use flexi_logger::{test_utils, FileSpec, Logger, WriteMode};
 use log::*;
 use std::path::Path;
 
@@ -11,7 +11,7 @@ const COUNT: u8 = 2;
 
 #[test]
 fn test_external_rename() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -19,7 +19,7 @@ fn test_external_rename() {
 fn work(value: u8) {
     let mut logger = Logger::try_with_str("info").unwrap();
     let file_spec = FileSpec::default()
-        .directory(self::test_utils::dir())
+        .directory(test_utils::dir())
         .suppress_timestamp()
         .basename("myprog");
     let file_path = file_spec.as_pathbuf(None);

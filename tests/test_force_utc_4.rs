@@ -1,7 +1,5 @@
-mod test_utils;
-
 use chrono::{Local, NaiveDate, NaiveDateTime, NaiveTime};
-use flexi_logger::{detailed_format, FileSpec, Logger};
+use flexi_logger::{detailed_format, test_utils, FileSpec, Logger};
 use log::*;
 
 #[test]

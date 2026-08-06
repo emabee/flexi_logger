@@ -1,13 +1,15 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{detailed_format, opt_format, Cleanup, Criterion, FileSpec, Logger, Naming};
+use flexi_logger::{
+    detailed_format, opt_format, test_utils, Cleanup, Criterion, FileSpec, Logger, Naming,
+};
 use log::*;
 
 const COUNT: u8 = 8;
 
 #[test]
 fn test_write_modes() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -20,7 +22,7 @@ fn work(value: u8) {
         0 => {
             logger = logger.log_to_file(
                 FileSpec::default()
-                    .directory(self::test_utils::dir())
+                    .directory(test_utils::dir())
                     .basename("to_foo_or_not_to_foo"),
             );
         }
@@ -29,7 +31,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir()),
+                        .directory(test_utils::dir()),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
@@ -38,7 +40,7 @@ fn work(value: u8) {
                 .format(detailed_format)
                 .log_to_file(
                     FileSpec::default()
-                        .directory(self::test_utils::dir())
+                        .directory(test_utils::dir())
                         .use_timestamp(false),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
@@ -49,7 +51,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir()),
+                        .directory(test_utils::dir()),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never);
         }
@@ -59,7 +61,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir())
+                        .directory(test_utils::dir())
                         .discriminant("foo".to_string()),
                 )
                 .rotate(Criterion::Size(2000), Naming::Numbers, Cleanup::Never)
@@ -69,21 +71,21 @@ fn work(value: u8) {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
                     .suppress_timestamp()
-                    .directory(self::test_utils::dir())
+                    .directory(test_utils::dir())
                     .discriminant("foo"),
             );
         }
         6 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
-                    .directory(self::test_utils::dir())
+                    .directory(test_utils::dir())
                     .suppress_basename(),
             );
         }
         7 => {
             logger = logger.format(opt_format).log_to_file(
                 FileSpec::default()
-                    .directory(self::test_utils::dir())
+                    .directory(test_utils::dir())
                     .suppress_basename()
                     .discriminant("foo"),
             );

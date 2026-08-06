@@ -1,6 +1,6 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{detailed_format, FileSpec, Logger, LoggerHandle};
+use flexi_logger::{detailed_format, test_utils, FileSpec, Logger, LoggerHandle};
 use log::*;
 
 #[test]
@@ -13,7 +13,7 @@ fn test_mods() {
     .log_to_file(
         FileSpec::default()
             .suppress_timestamp()
-            .directory(self::test_utils::dir()),
+            .directory(test_utils::dir()),
     )
     .use_windows_line_ending()
     .start()

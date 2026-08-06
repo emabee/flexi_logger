@@ -1,6 +1,4 @@
-mod test_utils;
-
-use flexi_logger::{FileSpec, Logger};
+use flexi_logger::{test_utils, FileSpec, Logger};
 use log::*;
 
 #[test]
@@ -8,7 +6,7 @@ fn test_kv() {
     {}
     let logger = Logger::try_with_str("trace")
         .unwrap()
-        .log_to_file(FileSpec::default().directory(self::test_utils::dir()))
+        .log_to_file(FileSpec::default().directory(test_utils::dir()))
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));
 

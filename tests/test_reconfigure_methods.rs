@@ -1,6 +1,4 @@
-mod test_utils;
-
-use flexi_logger::{FileSpec, Logger, LoggerHandle};
+use flexi_logger::{test_utils, FileSpec, Logger, LoggerHandle};
 use log::*;
 
 #[test]
@@ -10,7 +8,7 @@ fn test_reconfigure_methods() {
         .log_to_file(
             FileSpec::default()
                 .suppress_timestamp()
-                .directory(self::test_utils::dir()),
+                .directory(test_utils::dir()),
         )
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));

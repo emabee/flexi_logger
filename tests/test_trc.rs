@@ -1,9 +1,7 @@
-mod test_utils;
-
 #[cfg(feature = "trc")]
 mod a {
     use flexi_logger::{
-        trc::FormatConfig, writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec,
+        test_utils, trc::FormatConfig, writers::FileLogWriter, Age, Cleanup, Criterion, FileSpec,
         LogSpecification, Naming, WriteMode,
     };
     use std::io::Write;
@@ -13,7 +11,7 @@ mod a {
 
     #[test]
     fn test_specfile() {
-        let specfile = super::test_utils::file("logspec.toml");
+        let specfile = test_utils::child_in_dir("logspec.toml");
 
         std::fs::remove_file(&specfile).ok();
         assert!(!specfile.exists());
@@ -21,7 +19,7 @@ mod a {
         let keep_alive_handles = flexi_logger::trc::setup_tracing(
             LogSpecification::info(),
             Some(&specfile),
-            FileLogWriter::builder(FileSpec::default().directory(super::test_utils::dir()))
+            FileLogWriter::builder(FileSpec::default().directory(test_utils::dir()))
                 .rotate(
                     Criterion::Age(Age::Day),
                     Naming::Timestamps,
@@ -43,7 +41,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== behave like many editors: rename and recreate; set to warn",
-            super::test_utils::now_local()
+            test_utils::now_local()
         );
         {
             let mut old_name = specfile.clone();
@@ -71,7 +69,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== truncate and rewrite; set to error",
-            super::test_utils::now_local()
+            test_utils::now_local()
         );
         {
             let mut file = std::fs::OpenOptions::new()

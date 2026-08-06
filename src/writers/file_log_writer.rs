@@ -205,7 +205,10 @@ impl Drop for FileLogWriter {
 mod test {
     #[cfg(feature = "async")]
     use crate::ZERO_DURATION;
-    use crate::{writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming, WriteMode};
+    use crate::{
+        test_utils, writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming,
+        WriteMode,
+    };
     use chrono::Local;
     use std::ops::Add;
     use std::path::{Path, PathBuf};
@@ -389,12 +392,11 @@ mod test {
         const NUMBER_OF_FILES: usize = 5;
         const NUMBER_OF_PSEUDO_PROCESSES: usize = 11;
         const ISSUE_38: &str = "issue_38";
-        const LOG_FOLDER: &str = "log_files/issue_38";
 
         for _ in 0..NUMBER_OF_PSEUDO_PROCESSES {
             let flwb = crate::writers::file_log_writer::FileLogWriter::builder(
                 FileSpec::default()
-                    .directory(LOG_FOLDER)
+                    .directory(test_utils::child_in_dir(ISSUE_38))
                     .discriminant(ISSUE_38),
             )
             .rotate(
@@ -435,12 +437,12 @@ mod test {
         std::thread::sleep(Duration::from_millis(50));
 
         let fn_pattern = String::with_capacity(180)
+            .add(&test_utils::child_in_dir(ISSUE_38).display().to_string())
+            .add("/")
             .add(
-                &String::from(LOG_FOLDER).add("/").add(
-                    &Path::new(&std::env::args().next().unwrap())
+                &Path::new(&std::env::args().next().unwrap())
             .file_stem().unwrap(/*cannot fail*/)
             .to_string_lossy(),
-                ),
             )
             .add("_")
             .add(ISSUE_38)

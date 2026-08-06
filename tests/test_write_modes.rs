@@ -1,13 +1,13 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{opt_format, FileSpec, Logger, WriteMode};
+use flexi_logger::{opt_format, test_utils, FileSpec, Logger, WriteMode};
 use log::*;
 
 const COUNT: u8 = 12;
 
 #[test]
 fn test_write_modes() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -75,7 +75,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir()),
+                        .directory(test_utils::dir()),
                 )
                 .write_mode(WriteMode::Direct)
         }
@@ -85,7 +85,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir()),
+                        .directory(test_utils::dir()),
                 )
                 .write_mode(WriteMode::BufferAndFlush)
         }
@@ -97,7 +97,7 @@ fn work(value: u8) {
                     .log_to_file(
                         FileSpec::default()
                             .suppress_timestamp()
-                            .directory(self::test_utils::dir()),
+                            .directory(test_utils::dir()),
                     )
                     .write_mode(WriteMode::Async)
             }
@@ -113,7 +113,7 @@ fn work(value: u8) {
                 .log_to_file(
                     FileSpec::default()
                         .suppress_timestamp()
-                        .directory(self::test_utils::dir()),
+                        .directory(test_utils::dir()),
                 )
                 .write_mode(WriteMode::BufferDontFlush)
         }

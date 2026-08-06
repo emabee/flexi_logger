@@ -1,8 +1,6 @@
-mod test_utils;
-
 #[cfg(feature = "specfile_without_notification")]
 mod a {
-    use flexi_logger::{detailed_format, FileSpec, Logger};
+    use flexi_logger::{detailed_format, test_utils, FileSpec, Logger};
     use log::*;
     use std::io::Write;
 
@@ -11,7 +9,7 @@ mod a {
     /// Test of the specfile feature
     #[test]
     fn test_specfile() {
-        let specfile = super::test_utils::file("logspec.toml");
+        let specfile = test_utils::child_in_dir("logspec.toml");
 
         std::fs::remove_file(&specfile).ok();
         assert!(!specfile.exists());
@@ -20,7 +18,7 @@ mod a {
             .unwrap()
             .log_to_file(
                 FileSpec::default()
-                    .directory(super::test_utils::dir())
+                    .directory(test_utils::dir())
                     .suppress_timestamp(),
             )
             .format(detailed_format)
@@ -37,7 +35,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== behave like many editors: rename and recreate; set to warn",
-            super::test_utils::now_local()
+            test_utils::now_local()
         );
         {
             let mut old_name = specfile.clone();
@@ -67,7 +65,7 @@ mod a {
 
         eprintln!(
             "[{}] ===== truncate and rewrite; set to error",
-            super::test_utils::now_local()
+            test_utils::now_local()
         );
         {
             let mut file = std::fs::OpenOptions::new()

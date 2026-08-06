@@ -1,5 +1,4 @@
-use crate::logger::ErrorChannel;
-use crate::{DeferredNow, FormatFunction};
+use crate::{logger::ErrorChannel, DeferredNow, FormatFunction};
 use log::Record;
 use std::{
     cell::RefCell,

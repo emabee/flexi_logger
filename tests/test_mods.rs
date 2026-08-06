@@ -1,6 +1,4 @@
-mod test_utils;
-
-use flexi_logger::{detailed_format, FileSpec, Logger};
+use flexi_logger::{detailed_format, test_utils, FileSpec, Logger};
 use log::*;
 
 #[test]
@@ -13,7 +11,7 @@ fn test_mods() {
     .log_to_file(
         FileSpec::default()
             .suppress_timestamp()
-            .directory(self::test_utils::dir()),
+            .directory(test_utils::dir()),
     )
     .start()
     .unwrap_or_else(|e| panic!("Logger initialization failed with {e}"));

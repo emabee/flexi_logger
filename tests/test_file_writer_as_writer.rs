@@ -1,13 +1,13 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{writers::FileLogWriter, FileSpec, Logger};
+use flexi_logger::{test_utils, writers::FileLogWriter, FileSpec, Logger};
 use log::*;
 
 const COUNT: u8 = 3;
 
 #[test]
 fn test_write_modes() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }
@@ -17,7 +17,7 @@ fn work(value: u8) {
     let mut logger = Logger::try_with_str("trace").unwrap();
     let flwb = FileLogWriter::builder(
         FileSpec::default()
-            .directory(self::test_utils::dir())
+            .directory(test_utils::dir())
             .basename("to_foo_or_not_to_foo"),
     );
     match value {

@@ -1,9 +1,7 @@
-mod test_utils;
-
 #[test]
 fn test_cleanup_by_day_limit() {
     use filetime::{set_file_mtime, FileTime};
-    use flexi_logger::{Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
+    use flexi_logger::{test_utils, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
     use log::*;
     use std::{
         fs, thread,

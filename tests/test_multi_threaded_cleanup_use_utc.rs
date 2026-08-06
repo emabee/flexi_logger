@@ -1,11 +1,11 @@
-mod test_utils;
+mod helpers;
 
 #[cfg(feature = "compress")]
 mod d {
     use cond_sync::{CondSync, Other};
     use flexi_logger::{
-        Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-        WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
+        test_utils, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger,
+        Naming, WriteMode, TS_DASHES_BLANK_COLONS_DOT_BLANK,
     };
     use glob::glob;
     use log::*;
@@ -21,9 +21,9 @@ mod d {
     // so that it is easier to verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
-        let directory = super::test_utils::dir();
+        let directory = test_utils::dir();
         {
-            let _stopwatch = super::test_utils::Stopwatch::default();
+            let _stopwatch = super::helpers::Stopwatch::default();
             let logger = Logger::try_with_str("debug")
                 .unwrap()
                 .log_to_file(FileSpec::default().directory(&directory))

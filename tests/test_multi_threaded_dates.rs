@@ -1,9 +1,9 @@
-mod test_utils;
+mod helpers;
 
 use cond_sync::{CondSync, Other};
 use flexi_logger::{
-    Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-    TS_DASHES_BLANK_COLONS_DOT_BLANK,
+    test_utils, Age, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification,
+    Logger, Naming, TS_DASHES_BLANK_COLONS_DOT_BLANK,
 };
 use glob::glob;
 use log::*;
@@ -23,7 +23,7 @@ const NO_OF_LOGLINES_PER_THREAD: usize = 20_000;
 fn test_multi_threaded_dates() {
     let directory = test_utils::dir();
     {
-        let _stopwatch = test_utils::Stopwatch::default();
+        let _stopwatch = helpers::Stopwatch::default();
         let logger = Logger::try_with_str("debug")
             .unwrap()
             .log_to_file(FileSpec::default().directory(&directory))

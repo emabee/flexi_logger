@@ -1,6 +1,6 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
+use flexi_logger::{test_utils, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
 use glob::glob;
 use log::*;
 use std::{
@@ -16,7 +16,7 @@ const COUNT: u8 = 14;
 #[test]
 fn test_rotate_naming_variants() {
     // work(6)
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         work(value)
     }
 }

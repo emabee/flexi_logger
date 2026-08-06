@@ -1,13 +1,11 @@
-mod test_utils;
-
 #[cfg(feature = "compress")]
 mod d {
     use chrono::{Local, NaiveDateTime};
     use cond_sync::{CondSync, Other};
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
-        Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger, Naming,
-        WriteMode,
+        test_utils, Cleanup, Criterion, DeferredNow, Duplicate, FileSpec, LogSpecification, Logger,
+        Naming, WriteMode,
     };
     use glob::glob;
     use log::*;
@@ -31,7 +29,7 @@ mod d {
     #[test]
     fn multi_threaded() {
         let start = Local::now();
-        let directory = super::test_utils::dir();
+        let directory = test_utils::dir();
         let end = {
             let logger = Logger::try_with_str("debug")
                 .unwrap()

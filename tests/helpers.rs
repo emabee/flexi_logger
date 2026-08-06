@@ -1,40 +1,17 @@
 #![allow(dead_code)]
-
 use chrono::{DateTime, Local};
 use either::Either;
 use flate2::read::GzDecoder;
+use flexi_logger::test_utils;
 #[cfg(feature = "compress")]
 use std::ffi::OsStr;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     ops::Add,
-    path::{Path, PathBuf},
+    path::Path,
 };
-
 const CTRL_INDEX: &str = "CTRL_INDEX";
-
-pub fn file(filename: &str) -> PathBuf {
-    let mut f = dir();
-    f.push(filename);
-    f
-}
-
-const TS: &str = "%Y-%m-%d_%H-%M-%S";
-
-pub fn dir() -> PathBuf {
-    let mut d = PathBuf::new();
-    d.push("log_files");
-    add_prog_name(&mut d);
-    d.push(now_local().format(TS).to_string());
-    d
-}
-fn add_prog_name(pb: &mut PathBuf) {
-    let path = PathBuf::from(std::env::args().next().unwrap());
-    let filename = path.file_stem().unwrap(/*ok*/).to_string_lossy();
-    let (progname, _) = filename.rsplit_once('-').unwrap_or((&filename, ""));
-    pb.push(progname);
-}
 
 // launch child processes from same executable and set for each of them an environment variable
 // with a specific number, and then return None,
@@ -65,22 +42,17 @@ pub fn dispatch(count: u8) -> Option<u8> {
     }
 }
 
-#[must_use]
-pub fn now_local() -> DateTime<Local> {
-    Local::now()
-}
-
 pub struct Stopwatch(DateTime<Local>);
 impl Default for Stopwatch {
     fn default() -> Self {
-        Stopwatch(now_local())
+        Stopwatch(test_utils::now_local())
     }
 }
 impl Drop for Stopwatch {
     fn drop(&mut self) {
         log::info!(
             "Task executed in {} ms.",
-            (now_local() - self.0).num_milliseconds()
+            (test_utils::now_local() - self.0).num_milliseconds()
         );
     }
 }

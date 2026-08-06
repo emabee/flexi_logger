@@ -1,13 +1,13 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{Cleanup, Criterion, FileSpec, LogfileSelector, Logger, Naming};
+use flexi_logger::{test_utils, Cleanup, Criterion, FileSpec, LogfileSelector, Logger, Naming};
 use log::*;
 
 const COUNT: u8 = 2;
 
 #[test]
 fn test_restart_with_no_suffix() {
-    if let Some(value) = test_utils::dispatch(COUNT) {
+    if let Some(value) = helpers::dispatch(COUNT) {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         work(value)
     }
@@ -44,7 +44,7 @@ fn work(value: u8) {
     }
 
     // verify all log lines are found
-    assert_eq!(100, test_utils::count_log_lines(&directory));
+    assert_eq!(100, helpers::count_log_lines(&directory));
 
     // verify that no unexpected files are found
     match value {

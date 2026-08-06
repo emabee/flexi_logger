@@ -1,6 +1,6 @@
-mod test_utils;
+mod helpers;
 
-use flexi_logger::{Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
+use flexi_logger::{test_utils, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
 use glob::glob;
 use log::*;
 use std::fs::File;
@@ -12,7 +12,7 @@ use std::path::Path;
 fn test_age_or_size() {
     let directory = test_utils::dir();
 
-    test_utils::wait_for_start_of_second();
+    helpers::wait_for_start_of_second();
 
     Logger::try_with_str("trace")
         .unwrap()

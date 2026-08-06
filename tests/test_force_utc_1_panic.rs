@@ -1,5 +1,3 @@
-mod test_utils;
-
 use flexi_logger::{DeferredNow, Logger};
 use log::*;
 
