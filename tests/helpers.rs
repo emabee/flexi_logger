@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-use chrono::{DateTime, Local};
 use either::Either;
 use flate2::read::GzDecoder;
 use flexi_logger::test_utils;
+use jiff::ZonedDateTime;
 #[cfg(feature = "compress")]
 use std::ffi::OsStr;
 use std::{
@@ -42,7 +42,7 @@ pub fn dispatch(count: u8) -> Option<u8> {
     }
 }
 
-pub struct Stopwatch(DateTime<Local>);
+pub struct Stopwatch(ZonedDateTime);
 impl Default for Stopwatch {
     fn default() -> Self {
         Stopwatch(test_utils::now_local())
@@ -52,14 +52,14 @@ impl Drop for Stopwatch {
     fn drop(&mut self) {
         log::info!(
             "Task executed in {} ms.",
-            (test_utils::now_local() - self.0).num_milliseconds()
+            test_utils::now_local().duration_since(&self.0).as_millis()
         );
     }
 }
 
 pub fn wait_for_start_of_second() {
     loop {
-        let ms = Local::now().timestamp_subsec_millis();
+        let ms = u32::try_from(ZonedDateTime::now().subsec_nanosecond() / 1_000_000).unwrap();
         if ms < 50 {
             break;
         } else {
@@ -70,7 +70,7 @@ pub fn wait_for_start_of_second() {
 
 pub fn wait_for_end_of_second() {
     loop {
-        let ms = Local::now().timestamp_subsec_millis();
+        let ms = u32::try_from(ZonedDateTime::now().subsec_nanosecond() / 1_000_000).unwrap();
         if ms > 980 {
             break;
         } else {

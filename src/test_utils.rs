@@ -2,7 +2,7 @@
 // and internal tests (in submodules) and benches
 
 #![doc(hidden)]
-use chrono::{DateTime, Local};
+use jiff::ZonedDateTime;
 use std::path::PathBuf;
 
 #[must_use]
@@ -35,7 +35,7 @@ pub const TS: &str = "%Y-%m-%d_%H-%M-%S";
 fn folder_for_log_files(mut d: PathBuf) -> PathBuf {
     d.push("log_files");
     add_prog_name(&mut d);
-    d.push(now_local().format(TS).to_string());
+    d.push(now_local().strftime(TS).to_string());
     d
 }
 fn add_prog_name(pb: &mut PathBuf) {
@@ -45,6 +45,6 @@ fn add_prog_name(pb: &mut PathBuf) {
     pb.push(progname);
 }
 #[must_use]
-pub fn now_local() -> DateTime<Local> {
-    Local::now()
+pub fn now_local() -> ZonedDateTime {
+    ZonedDateTime::now()
 }

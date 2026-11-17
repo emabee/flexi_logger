@@ -13,7 +13,7 @@ use crate::{
     util::{eprint_err, ErrorCode},
     Age, Cleanup, Criterion, FlexiLoggerError, LogfileSelector, Naming,
 };
-use chrono::{DateTime, Datelike, Local, Timelike};
+use jiff::ZonedDateTime;
 #[cfg(feature = "async")]
 use std::thread::JoinHandle;
 use std::{
@@ -46,7 +46,7 @@ enum NamingState {
     // Contains the timestamp of the current output file (read from its name),
     // plus the optional current infix and the format of the timestamp infix
     Timestamps {
-        current_timestamp: DateTime<Local>,
+        current_timestamp: ZonedDateTime,
         the_current_infix: Option<String>,
         infix_format: InfixFormat,
     },
@@ -108,11 +108,11 @@ enum RollState {
     },
     Age {
         age: Age,
-        created_at: DateTime<Local>,
+        created_at: ZonedDateTime,
     },
     AgeOrSize {
         age: Age,
-        created_at: DateTime<Local>,
+        created_at: ZonedDateTime,
         max_size: u64,
         current_size: u64,
     },
@@ -164,8 +164,8 @@ impl RollState {
         current_size > max_size
     }
 
-    fn age_rotation_necessary(age: Age, created_at: &DateTime<Local>) -> bool {
-        let now = Local::now();
+    fn age_rotation_necessary(age: Age, created_at: &ZonedDateTime) -> bool {
+        let now = ZonedDateTime::now();
         match age {
             Age::Day => {
                 created_at.year() != now.year()
@@ -333,13 +333,14 @@ impl State {
             Naming::TimestampsDirect => {
                 let ts =
                     latest_timestamp_file(&self.config, !self.config.append, &InfixFormat::Std);
+                let infix = infix_from_timestamp(&ts, self.config.use_utc, &InfixFormat::Std);
                 (
                     NamingState::Timestamps {
                         current_timestamp: ts,
                         the_current_infix: None,
                         infix_format: InfixFormat::Std,
                     },
-                    infix_from_timestamp(&ts, self.config.use_utc, &InfixFormat::Std),
+                    infix,
                 )
             }
             Naming::Timestamps => (
@@ -487,7 +488,7 @@ impl State {
                             )?;
                             current_infix.clone()
                         } else {
-                            *ts = Local::now();
+                            *ts = ZonedDateTime::now();
                             self.config.file_spec.collision_free_infix_for_rotated_file(
                                 &infix_from_timestamp(ts, self.config.use_utc, fmt),
                             )
@@ -679,7 +680,7 @@ fn open_log_file(
     Ok((w, path))
 }
 
-fn get_creation_timestamp(path: &Path) -> DateTime<Local> {
+fn get_creation_timestamp(path: &Path) -> ZonedDateTime {
     // On windows, we know that try_get_creation_date() returns a result, but it is wrong.
     if cfg!(target_os = "windows") {
         get_current_timestamp()
@@ -691,16 +692,16 @@ fn get_creation_timestamp(path: &Path) -> DateTime<Local> {
             .unwrap_or_else(|_| get_current_timestamp())
     }
 }
-fn try_get_creation_timestamp(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
-    Ok(std::fs::metadata(path)?.created()?.into())
+fn try_get_creation_timestamp(path: &Path) -> Result<ZonedDateTime, std::io::Error> {
+    ZonedDateTime::try_from(std::fs::metadata(path)?.created()?).map_err(std::io::Error::other)
 }
-fn try_get_modification_timestamp(path: &Path) -> Result<DateTime<Local>, FlexiLoggerError> {
+fn try_get_modification_timestamp(path: &Path) -> Result<ZonedDateTime, std::io::Error> {
     let md = std::fs::metadata(path)?;
     let d = md.created().or_else(|_| md.modified())?;
-    Ok(d.into())
+    ZonedDateTime::try_from(d).map_err(std::io::Error::other)
 }
-fn get_current_timestamp() -> DateTime<Local> {
-    Local::now()
+fn get_current_timestamp() -> ZonedDateTime {
+    ZonedDateTime::now()
 }
 
 #[cfg(feature = "async")]

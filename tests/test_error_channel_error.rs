@@ -103,7 +103,7 @@ fn controller() {
     let progpath = env::args().next().unwrap();
     create_dir_all(crashdump_file(0).parent().unwrap()).unwrap();
 
-    println!("Starting at {}", chrono::Local::now());
+    println!("Starting at {}", jiff::ZonedDateTime::now());
 
     for mode in [
         Mode::NormalNoPanic,
@@ -111,7 +111,7 @@ fn controller() {
         Mode::NormalPanic,
         Mode::DuplPanic,
     ] {
-        println!("Testing mode {mode:?} at {}", chrono::Local::now());
+        println!("Testing mode {mode:?} at {}", jiff::ZonedDateTime::now());
         let mut parent = Command::new(progpath.clone())
             .env(TEST_CONTROL, Ctrl::Parent(mode).to_string())
             .stdout(Stdio::null())

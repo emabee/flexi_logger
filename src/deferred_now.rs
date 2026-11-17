@@ -1,9 +1,4 @@
-use chrono::{
-    format::{DelayedFormat, StrftimeItems},
-    DateTime, Local, SecondsFormat, Utc,
-};
-#[cfg(feature = "syslog_writer")]
-use chrono::{Datelike, Timelike};
+use jiff::{fmt::strtime::Display, tz::TimeZone, ZonedDateTime};
 use std::sync::{Mutex, OnceLock};
 
 /// Deferred timestamp creation.
@@ -11,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 /// Is used to ensure that a log record that is sent to multiple outputs
 /// (in maybe different formats) always uses the same timestamp.
 #[derive(Debug, Default)]
-pub struct DeferredNow(Option<DateTime<Local>>);
+pub struct DeferredNow(Option<ZonedDateTime>);
 impl<'a> DeferredNow {
     /// Constructs a new instance, but does not generate the timestamp.
     #[must_use]
@@ -21,34 +16,30 @@ impl<'a> DeferredNow {
 
     #[cfg(test)]
     #[must_use]
-    fn new_from_datetime(dt: DateTime<Local>) -> Self {
+    fn new_from_datetime(dt: ZonedDateTime) -> Self {
         Self(Some(dt))
     }
 
     /// Retrieve the timestamp for local time zone.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
-    pub fn now(&'a mut self) -> &'a DateTime<Local> {
-        self.0.get_or_insert_with(Local::now)
+    pub fn now(&'a mut self) -> &'a ZonedDateTime {
+        self.0.get_or_insert_with(ZonedDateTime::now)
     }
 
     /// Retrieve the UTC timestamp.
     ///
     /// Requires mutability because the first caller will generate the timestamp.
-    pub fn now_utc_owned(&'a mut self) -> DateTime<Utc> {
-        (*self.now()).into()
+    pub fn now_utc_owned(&mut self) -> ZonedDateTime {
+        self.now().with_time_zone(TimeZone::UTC)
     }
 
     /// Produces a preformatted object suitable for printing.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `fmt` has an inappropriate value.
-    pub fn format<'b>(&'a mut self, fmt: &'b str) -> DelayedFormat<StrftimeItems<'b>> {
+    pub fn format<'b>(&mut self, fmt: &'b str) -> Display<'b> {
         if use_utc() {
-            self.now_utc_owned().format(fmt)
+            self.now_utc_owned().strftime(fmt)
         } else {
-            self.now().format(fmt)
+            self.now().strftime(fmt)
         }
     }
 
@@ -58,12 +49,7 @@ impl<'a> DeferredNow {
     ///
     /// We do not use the Z variant of RFC 3339, because it is often misinterpreted.
     pub fn format_rfc3339(&mut self) -> String {
-        if use_utc() {
-            self.now_utc_owned()
-                .to_rfc3339_opts(SecondsFormat::Millis, false)
-        } else {
-            self.now().to_rfc3339_opts(SecondsFormat::Millis, false)
-        }
+        self.format("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string()
     }
 
     // format_rfc3164: Mmm dd hh:mm:ss, where
@@ -73,17 +59,15 @@ impl<'a> DeferredNow {
     // mm, ss= "00" ... "59"
     #[cfg(feature = "syslog_writer")]
     pub(crate) fn format_rfc3164(&mut self) -> String {
-        let (date, time) = if use_utc() {
-            let now = self.now_utc_owned();
-            (now.date_naive(), now.time())
+        let dt = if use_utc() {
+            self.now_utc_owned().datetime()
         } else {
-            let now = self.now();
-            (now.date_naive(), now.time())
+            self.now().datetime()
         };
 
         format!(
             "{mmm} {dd:>2} {hh:02}:{mm:02}:{ss:02}",
-            mmm = match date.month() {
+            mmm = match dt.month() {
                 1 => "Jan",
                 2 => "Feb",
                 3 => "Mar",
@@ -98,10 +82,10 @@ impl<'a> DeferredNow {
                 12 => "Dec",
                 _ => unreachable!(),
             },
-            dd = date.day(),
-            hh = time.hour(),
-            mm = time.minute(),
-            ss = time.second()
+            dd = dt.day(),
+            hh = dt.hour(),
+            mm = dt.minute(),
+            ss = dt.second()
         )
     }
 
@@ -155,62 +139,45 @@ pub(crate) fn set_force_utc(b: bool) {
 #[cfg(test)]
 mod test {
     use crate::DeferredNow;
-    use chrono::{
-        DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat, TimeZone, Utc,
-    };
+    use jiff::{civil, tz, ZonedDateTime};
 
     #[test]
     fn test_timestamp_taken_only_once() {
         let mut deferred_now = super::DeferredNow::new();
-        let once = *deferred_now.now();
+        let once = deferred_now.now().clone();
         std::thread::sleep(std::time::Duration::from_millis(30));
-        let again = *deferred_now.now();
+        let again = deferred_now.now().clone();
         assert_eq!(once, again);
         println!("Now: {}", deferred_now.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
-        println!("Now: {}", once.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
-        println!("Now: {}", again.format("%Y-%m-%d %H:%M:%S%.6f %:z"));
+        println!("Now: {}", once.strftime("%Y-%m-%d %H:%M:%S%.6f %:z"));
+        println!("Now: {}", again.strftime("%Y-%m-%d %H:%M:%S%.6f %:z"));
     }
 
-    fn utc_and_offset_timestamps() -> (DateTime<Utc>, DateTime<FixedOffset>) {
-        let naive_datetime = NaiveDateTime::new(
-            NaiveDate::from_ymd_opt(2021, 4, 29).unwrap(),
-            NaiveTime::from_hms_milli_opt(13, 14, 15, 678).unwrap(),
-        );
+    fn utc_and_offset_timestamps() -> (ZonedDateTime, ZonedDateTime) {
+        let dt = civil::date(2021, 4, 29).at(13, 14, 15, 678_000_000);
         (
-            Utc.from_local_datetime(&naive_datetime).unwrap(),
-            FixedOffset::east_opt(3600)
-                .unwrap()
-                .from_local_datetime(&naive_datetime)
-                .unwrap(),
+            dt.to_zoned_datetime(tz::TimeZone::UTC).unwrap(),
+            dt.to_zoned_datetime(tz::offset(1).to_time_zone()).unwrap(),
         )
     }
     fn get_deferred_nows() -> (DeferredNow, DeferredNow) {
         let (ts_utc, ts_plus1) = utc_and_offset_timestamps();
         (
-            DeferredNow::new_from_datetime(ts_utc.into()),
-            DeferredNow::new_from_datetime(ts_plus1.into()),
+            DeferredNow::new_from_datetime(ts_utc.with_time_zone(tz::TimeZone::system())),
+            DeferredNow::new_from_datetime(ts_plus1.with_time_zone(tz::TimeZone::system())),
         )
     }
 
     #[test]
-    fn test_chrono_rfc3339() {
+    fn test_rfc3339() {
         let (ts_utc, ts_plus1) = utc_and_offset_timestamps();
 
         assert_eq!(
-            ts_utc.to_rfc3339_opts(SecondsFormat::Millis, true),
-            "2021-04-29T13:14:15.678Z",
-        );
-        assert_eq!(
-            ts_plus1.to_rfc3339_opts(SecondsFormat::Millis, true),
-            "2021-04-29T13:14:15.678+01:00",
-        );
-
-        assert_eq!(
-            ts_utc.to_rfc3339_opts(SecondsFormat::Millis, false),
+            ts_utc.strftime("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string(),
             "2021-04-29T13:14:15.678+00:00",
         );
         assert_eq!(
-            ts_plus1.to_rfc3339_opts(SecondsFormat::Millis, false),
+            ts_plus1.strftime("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string(),
             "2021-04-29T13:14:15.678+01:00",
         );
     }

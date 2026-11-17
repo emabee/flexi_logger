@@ -69,15 +69,15 @@ pub enum Naming {
         current_infix: Option<&'static str>,
         /// The format of the timestamp infix.
         ///
-        /// See <https://docs.rs/chrono/latest/chrono/format/strftime/index.html> for a list of
-        /// supported specifiers.
+        /// See <https://docs.rs/jiff/latest/jiff/fmt/strtime/index.html#conversion-specifications>
+        /// for a list of supported specifiers.
         ///
         /// **Make sure to use a format**
         ///
         /// - that is compatible to your file system(s) (e.g., don't use slashes),
-        /// - that can be used by
-        ///   [chrono::NaiveDateTime](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveDateTime.html#method.parse_from_str)
-        ///   or [chrono::NaiveDate](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveDate.html#method.parse_from_str)
+        /// - that can be parsed into a
+        ///   [jiff::civil::DateTime](https://docs.rs/jiff/latest/jiff/civil/struct.DateTime.html#method.strptime)
+        ///   or [jiff::civil::Date](https://docs.rs/jiff/latest/jiff/civil/struct.Date.html#method.strptime)
         ///
         /// Further, if you choose `current_infix` = `None` or `Some("")`, make sure to rotate only
         /// by [age](crate::Criterion::Age), and choose an age that is not smaller than what

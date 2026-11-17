@@ -173,7 +173,7 @@ mod test {
         },
         FileSpec, Logger,
     };
-    use chrono::{DateTime, Local};
+    use jiff::ZonedDateTime;
     use log::*;
     use std::path::PathBuf;
 
@@ -288,7 +288,7 @@ mod test {
         let mut d = PathBuf::new();
         d.push("log_files");
         add_prog_name(&mut d);
-        d.push(now_local().format(TS).to_string());
+        d.push(now_local().strftime(TS).to_string());
         d
     }
     fn add_prog_name(pb: &mut PathBuf) {
@@ -298,8 +298,8 @@ mod test {
         pb.push(progname);
     }
     #[must_use]
-    pub fn now_local() -> DateTime<Local> {
-        Local::now()
+    pub fn now_local() -> ZonedDateTime {
+        ZonedDateTime::now()
     }
     const TS: &str = "%Y-%m-%d_%H-%M-%S";
 }
