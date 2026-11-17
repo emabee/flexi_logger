@@ -595,7 +595,7 @@ mod test {
         assert_eq!(buf[17], b':');
         assert_eq!(buf[20], b'.');
         assert_eq!(buf[27], b' ');
-        assert_eq!(buf[28], b'+');
+        assert!(matches!(buf[28], b'+' | b'-'));
         assert_eq!(buf[31], b':');
         assert_eq!(buf[34], b']');
 

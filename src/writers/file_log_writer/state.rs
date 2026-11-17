@@ -760,12 +760,9 @@ pub(super) fn start_sync_flusher(am_state: Arc<Mutex<State>>, flush_interval: st
         let (_tx, rx) = std::sync::mpsc::channel::<()>();
             loop {
                 rx.recv_timeout(flush_interval).ok();
-                (*am_state).lock().map_or_else(
-                    |_e| (),
-                    |mut state| {
-                        state.flush().ok();
-                    },
-                );
+                if let Ok(mut state) = (*am_state).lock() {
+                    state.flush().ok();
+                }
             }
         })
         .unwrap(/* yes, let's panic if the thread can't be spawned */);

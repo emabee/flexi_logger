@@ -329,12 +329,12 @@ mod test {
         let naming = Naming::Timestamps;
 
         println!("{} ensure we start with -/-/-", chrono::Local::now());
-        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 0);
         assert!(not_exists("CURRENT", &ts_discr));
 
         println!("{} ensure this produces -/-/ONE", chrono::Local::now());
         write_loglines(false, naming, &ts_discr, &[ONE]);
-        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 0);
         assert!(contains("CURRENT", &ts_discr, ONE));
 
         std::thread::sleep(Duration::from_secs(2));
@@ -367,7 +367,7 @@ mod test {
         let naming = Naming::Timestamps;
 
         // ensure we start with -/-/-
-        assert!(list_rotated_files(&basename, &ts).is_empty());
+        assert_eq!(list_rotated_files(&basename, &ts).len(), 0);
         assert!(not_exists("CURRENT", &ts));
 
         // ensure this produces 12/-/3
