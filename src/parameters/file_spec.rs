@@ -573,7 +573,7 @@ mod test {
             assert_eq!(stem.as_bytes()[progname.len()], b'_');
             let s_ts = &stem[progname.len() + 1..];
             assert!(
-                chrono::NaiveDateTime::parse_from_str(s_ts, "%Y-%m-%d_%H-%M-%S").is_ok(),
+                jiff::civil::DateTime::strptime("%Y-%m-%d_%H-%M-%S", s_ts).is_ok(),
                 "s_ts: \"{s_ts}\"",
             );
         } else {

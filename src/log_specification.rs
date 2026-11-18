@@ -491,6 +491,13 @@ impl std::fmt::Display for LogSpecification {
     }
 }
 
+impl std::str::FromStr for LogSpecification {
+    type Err = FlexiLoggerError;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        LogSpecification::parse(value)
+    }
+}
+
 impl std::convert::TryFrom<&str> for LogSpecification {
     type Error = FlexiLoggerError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {

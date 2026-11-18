@@ -1,17 +1,13 @@
 use super::{get_creation_timestamp, InfixFilter, InfixFormat};
 use crate::{writers::FileLogWriterConfig, FileSpec};
-use chrono::{format::ParseErrorKind, DateTime, Local, NaiveDate, NaiveDateTime, TimeZone};
+use jiff::{fmt::strtime::BrokenDownTime, tz::TimeZone, ZonedDateTime};
 use std::path::{Path, PathBuf};
 
-pub(super) fn infix_from_timestamp(
-    ts: &DateTime<Local>,
-    use_utc: bool,
-    fmt: &InfixFormat,
-) -> String {
+pub(super) fn infix_from_timestamp(ts: &ZonedDateTime, use_utc: bool, fmt: &InfixFormat) -> String {
     if use_utc {
-        ts.naive_utc().format(fmt.format())
+        ts.with_time_zone(TimeZone::UTC).strftime(fmt.format())
     } else {
-        ts.format(fmt.format())
+        ts.strftime(fmt.format())
     }
     .to_string()
 }
@@ -28,39 +24,34 @@ fn ts_infix_from_path(path: &Path, file_spec: &FileSpec) -> String {
 pub(crate) fn timestamp_from_ts_infix(
     infix: &str,
     fmt: &InfixFormat,
-) -> Result<DateTime<Local>, String> {
-    match NaiveDateTime::parse_from_str(infix, fmt.format()) {
-        Ok(dt1) => Local
-            .from_local_datetime(&dt1)
-            .earliest()
-            .ok_or("Can't determine local time from infix".to_string()),
-        Err(e) if e.kind() == ParseErrorKind::NotEnough => {
-            match NaiveDate::parse_from_str(infix, fmt.format()) {
-                Ok(d1) => {
-                    Local
-                        .from_local_datetime(&d1.and_hms_opt(10, 0, 0).unwrap(/*OK*/))
-                        .earliest()
-                        .ok_or("Can't determine local time from infix".to_string())
-                }
-                Err(e) => Err(format!("Broken: {e:?}")),
-            }
-        }
-        Err(e) => Err(format!("Broken: {e:?}")),
+) -> Result<ZonedDateTime, String> {
+    let mut bdt = BrokenDownTime::parse(fmt.format(), infix)
+        .map_err(|e| format!("Parsing infix failed: {e:?}"))?;
+    if bdt.hour().is_none() {
+        // see https://github.com/emabee/flexi_logger/issues/181
+        bdt.set_hour(Some(10)).unwrap(/*Ok*/);
     }
+    let dt = bdt
+        .to_datetime()
+        .map_err(|e| format!("Evaluating infix failed: {e:?}"))?;
+
+    TimeZone::system()
+        .to_zoned_datetime(dt)
+        .map_err(|e| format!("Can't determine local time from infix: {e:?}"))
 }
 
 pub(super) fn creation_timestamp_of_currentfile(
     config: &FileLogWriterConfig,
     current_infix: &str,
     rotate_rcurrent: bool,
-    o_date_for_rotated_file: Option<&DateTime<Local>>,
+    o_date_for_rotated_file: Option<&ZonedDateTime>,
     fmt: &InfixFormat,
-) -> Result<DateTime<Local>, std::io::Error> {
+) -> Result<ZonedDateTime, std::io::Error> {
     let current_path = config.file_spec.as_pathbuf(Some(current_infix));
 
     if rotate_rcurrent {
         let date_for_rotated_file = o_date_for_rotated_file
-            .copied()
+            .cloned()
             .unwrap_or_else(|| get_creation_timestamp(&current_path));
         let rotated_path = path_for_rotated_file_from_timestamp(
             &config.file_spec,
@@ -86,9 +77,9 @@ pub(super) fn latest_timestamp_file(
     config: &FileLogWriterConfig,
     rotate: bool,
     fmt: &InfixFormat,
-) -> DateTime<Local> {
+) -> ZonedDateTime {
     if rotate {
-        Local::now()
+        ZonedDateTime::now()
     } else {
         // find all file paths that fit the pattern
         config
@@ -104,15 +95,15 @@ pub(super) fn latest_timestamp_file(
             .filter_map(|infix| timestamp_from_ts_infix(&infix, fmt).ok())
             // take the newest of these dates
             .reduce(|acc, e| if acc > e { acc } else { e })
-            // if nothing is found, take Local::now()
-            .unwrap_or_else(Local::now)
+            // if nothing is found, take ZonedDateTime::now()
+            .unwrap_or_else(ZonedDateTime::now)
     }
 }
 
 fn path_for_rotated_file_from_timestamp(
     file_spec: &FileSpec,
     use_utc: bool,
-    timestamp_for_rotated_file: &DateTime<Local>,
+    timestamp_for_rotated_file: &ZonedDateTime,
     fmt: &InfixFormat,
 ) -> PathBuf {
     let infix = file_spec.collision_free_infix_for_rotated_file(&infix_from_timestamp(
@@ -127,7 +118,7 @@ fn path_for_rotated_file_from_timestamp(
 mod test {
     use super::InfixFormat;
     use crate::FileSpec;
-    use chrono::{Duration, Local};
+    use jiff::{SignedDuration, ZonedDateTime};
     use std::path::PathBuf;
 
     #[test]
@@ -138,18 +129,19 @@ mod test {
             .discriminant("disc")
             .suppress_timestamp();
 
-        let now = Local::now();
+        let now = ZonedDateTime::now();
         let now_rounded = now
-            .checked_sub_signed(
-                Duration::from_std(std::time::Duration::from_nanos(u64::from(
-                    now.timestamp_subsec_nanos(),
-                )))
-                .unwrap(),
-            )
+            .checked_sub(SignedDuration::from_nanos(i64::from(
+                now.subsec_nanosecond(),
+            )))
             .unwrap();
 
         let paths: Vec<PathBuf> = (0..10)
-            .map(|i| now_rounded - Duration::try_seconds(i).unwrap())
+            .map(|i| {
+                now_rounded
+                    .checked_sub(SignedDuration::from_secs(i))
+                    .unwrap()
+            })
             .map(|ts| {
                 file_spec.as_pathbuf(Some(&super::infix_from_timestamp(
                     &ts,
@@ -167,8 +159,8 @@ mod test {
             .filter_map(|infix| super::timestamp_from_ts_infix(&infix, &InfixFormat::Std).ok())
             // take the newest of these dates
             .reduce(|acc, e| if acc > e { acc } else { e })
-            // if nothing is found, take Local::now()
-            .unwrap_or_else(Local::now);
+            // if nothing is found, take ZonedDateTime::now()
+            .unwrap_or_else(ZonedDateTime::now);
 
         assert_eq!(
             now_rounded,

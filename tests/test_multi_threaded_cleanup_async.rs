@@ -1,6 +1,5 @@
 #[cfg(feature = "compress")]
 mod d {
-    use chrono::{Local, NaiveDateTime};
     use cond_sync::{CondSync, Other};
     use flate2::bufread::GzDecoder;
     use flexi_logger::{
@@ -8,6 +7,7 @@ mod d {
         Naming, WriteMode,
     };
     use glob::glob;
+    use jiff::{Timestamp, ZonedDateTime};
     use log::*;
     use std::{
         collections::BTreeMap,
@@ -28,7 +28,7 @@ mod d {
     // verify that all log lines are written correctly
     #[test]
     fn multi_threaded() {
-        let start = Local::now();
+        let start = ZonedDateTime::now();
         let directory = test_utils::dir();
         let end = {
             let logger = Logger::try_with_str("debug")
@@ -64,10 +64,10 @@ mod d {
             logger.set_new_spec(LogSpecification::parse("trace").unwrap());
 
             wait_for_workers_to_close(worker_handles);
-            Local::now()
+            ZonedDateTime::now()
         };
-        let delta1_ms = end.signed_duration_since(start).num_milliseconds();
-        let delta2_ms = Local::now().signed_duration_since(end).num_milliseconds();
+        let delta1_ms = end.duration_since(&start).as_millis();
+        let delta2_ms = ZonedDateTime::now().duration_since(&end).as_millis();
         println!(
             "Task executed with {NO_OF_THREADS} threads in {delta1_ms} ms, \
              program added {delta2_ms} ms to finish writing logs.",
@@ -130,7 +130,7 @@ mod d {
         write!(
             w,
             "XXXXX [{}] T[{:?}] {} [{}:{}] {}",
-            now.now().format("%Y-%m-%d %H:%M:%S%.6f %:z"),
+            now.now().strftime("%Y-%m-%d %H:%M:%S%.6f %:z"),
             std::thread::current().name().unwrap_or("<unnamed>"),
             record.level(),
             record.file().unwrap_or("<unnamed>"),
@@ -195,11 +195,11 @@ mod d {
             Box::new(BufReader::new(File::open(p).unwrap()))
         };
 
-        const TS: &str = "%Y-%m-%d %H:%M:%S.%.6f %:z";
+        const TS: &str = "%Y-%m-%d %H:%M:%S%.6f %:z";
         for line in buf_reader.lines() {
             let line = line.unwrap();
             //9 fraction digits, should be 6
-            if let Ok(ts) = NaiveDateTime::parse_from_str(&line[7..40], TS) {
+            if let Ok(ts) = Timestamp::strptime(TS, &line[7..40]) {
                 let n = match &line[45..46].parse::<usize>() {
                     Ok(n) => *n,
                     Err(_) => continue,
@@ -209,7 +209,7 @@ mod d {
                     *counters
                         .total
                         .1
-                        .entry((ts - bts).num_microseconds().unwrap())
+                        .entry(i64::try_from(ts.duration_since(bts).as_micros()).unwrap())
                         .or_insert(1) += 1;
                 }
                 counters.total.0 = Some(ts);
@@ -217,7 +217,7 @@ mod d {
                 if let Some(bts) = counters.threads[n].0 {
                     *counters.threads[n]
                         .1
-                        .entry((ts - bts).num_microseconds().unwrap())
+                        .entry(i64::try_from(ts.duration_since(bts).as_micros()).unwrap())
                         .or_insert(1) += 1;
                 }
                 counters.threads[n].0 = Some(ts);
@@ -242,7 +242,7 @@ mod d {
     }
 
     struct Counters {
-        total: (Option<NaiveDateTime>, BTreeMap<i64, usize>),
-        threads: [(Option<NaiveDateTime>, BTreeMap<i64, usize>); 5],
+        total: (Option<Timestamp>, BTreeMap<i64, usize>),
+        threads: [(Option<Timestamp>, BTreeMap<i64, usize>); 5],
     }
 }

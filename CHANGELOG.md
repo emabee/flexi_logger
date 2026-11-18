@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2026-11-18
+
+Switch from `chrono`, which was recently marked as unmaintained, to `jiff`
+(kudos to [Lencerf](https://github.com/Lencerf)).
+
+As this affects the API as well (through the return type of `DeferredNow::format`
+and potentially through `Naming::TimestampsCustomFormat.format`),
+we bump the version to `0.32`.
+
+Add an impl of `std::str::FromStr` for `LogSpecification`.
+
+Bump rust version to 1.91.
+
 ## [0.31.10] - 2026-08-06
 
 Allow tests to run even when the current directory is not writable,

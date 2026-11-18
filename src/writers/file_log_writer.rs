@@ -209,7 +209,7 @@ mod test {
         test_utils, writers::LogWriter, Cleanup, Criterion, DeferredNow, FileSpec, Naming,
         WriteMode,
     };
-    use chrono::Local;
+    use jiff::ZonedDateTime;
     use std::ops::Add;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
@@ -230,8 +230,10 @@ mod test {
     #[test]
     fn test_rotate_no_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts =
-            String::from("false-numbers-") + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
+        let ts = String::from("false-numbers-")
+            + &ZonedDateTime::now()
+                .strftime(FMT_DASHES_U_DASHES)
+                .to_string();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -269,8 +271,10 @@ mod test {
     #[test]
     fn test_rotate_with_append_numbers() {
         // we use timestamp as discriminant to allow repeated runs
-        let ts =
-            String::from("true-numbers-") + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
+        let ts = String::from("true-numbers-")
+            + &ZonedDateTime::now()
+                .strftime(FMT_DASHES_U_DASHES)
+                .to_string();
         let naming = Naming::Numbers;
 
         // ensure we start with -/-/-
@@ -319,7 +323,9 @@ mod test {
     fn test_rotate_no_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
         let ts_discr = String::from("false-timestamps-")
-            + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
+            + &ZonedDateTime::now()
+                .strftime(FMT_DASHES_U_DASHES)
+                .to_string();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -328,17 +334,17 @@ mod test {
         );
         let naming = Naming::Timestamps;
 
-        println!("{} ensure we start with -/-/-", chrono::Local::now());
-        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        println!("{} ensure we start with -/-/-", ZonedDateTime::now());
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 0);
         assert!(not_exists("CURRENT", &ts_discr));
 
-        println!("{} ensure this produces -/-/ONE", chrono::Local::now());
+        println!("{} ensure this produces -/-/ONE", ZonedDateTime::now());
         write_loglines(false, naming, &ts_discr, &[ONE]);
-        assert!(list_rotated_files(&basename, &ts_discr).is_empty());
+        assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 0);
         assert!(contains("CURRENT", &ts_discr, ONE));
 
         std::thread::sleep(Duration::from_secs(2));
-        println!("{} ensure this produces ONE/-/TWO", chrono::Local::now());
+        println!("{} ensure this produces ONE/-/TWO", ZonedDateTime::now());
         write_loglines(false, naming, &ts_discr, &[TWO]);
         assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 1);
         assert!(contains("CURRENT", &ts_discr, TWO));
@@ -346,7 +352,7 @@ mod test {
         std::thread::sleep(Duration::from_secs(2));
         println!(
             "{} ensure this produces ONE/TWO/THREE",
-            chrono::Local::now()
+            ZonedDateTime::now()
         );
         write_loglines(false, naming, &ts_discr, &[THREE]);
         assert_eq!(list_rotated_files(&basename, &ts_discr).len(), 2);
@@ -357,7 +363,9 @@ mod test {
     fn test_rotate_with_append_timestamps() {
         // we use timestamp as discriminant to allow repeated runs
         let ts = String::from("true-timestamps-")
-            + &Local::now().format(FMT_DASHES_U_DASHES).to_string();
+            + &ZonedDateTime::now()
+                .strftime(FMT_DASHES_U_DASHES)
+                .to_string();
 
         let basename = String::from(DIRECTORY).add("/").add(
             &Path::new(&std::env::args().next().unwrap())
@@ -367,7 +375,7 @@ mod test {
         let naming = Naming::Timestamps;
 
         // ensure we start with -/-/-
-        assert!(list_rotated_files(&basename, &ts).is_empty());
+        assert_eq!(list_rotated_files(&basename, &ts).len(), 0);
         assert!(not_exists("CURRENT", &ts));
 
         // ensure this produces 12/-/3
