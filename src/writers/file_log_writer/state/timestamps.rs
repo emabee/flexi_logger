@@ -5,12 +5,11 @@ use std::path::{Path, PathBuf};
 
 pub(super) fn infix_from_timestamp(ts: &ZonedDateTime, use_utc: bool, fmt: &InfixFormat) -> String {
     if use_utc {
-        ts.with_time_zone(TimeZone::UTC)
-            .strftime(fmt.format())
-            .to_string()
+        ts.with_time_zone(TimeZone::UTC).strftime(fmt.format())
     } else {
-        ts.strftime(fmt.format()).to_string()
+        ts.strftime(fmt.format())
     }
+    .to_string()
 }
 
 fn ts_infix_from_path(path: &Path, file_spec: &FileSpec) -> String {
@@ -26,13 +25,16 @@ pub(crate) fn timestamp_from_ts_infix(
     infix: &str,
     fmt: &InfixFormat,
 ) -> Result<ZonedDateTime, String> {
-    let mut tm =
-        BrokenDownTime::parse(fmt.format(), infix).map_err(|e| format!("Broken: {e:?}"))?;
-    if tm.hour().is_none() {
-        tm.set_hour(Some(10))
-            .map_err(|e| format!("Broken: {e:?}"))?;
+    let mut bdt = BrokenDownTime::parse(fmt.format(), infix)
+        .map_err(|e| format!("Parsing infix failed: {e:?}"))?;
+    if bdt.hour().is_none() {
+        // see https://github.com/emabee/flexi_logger/issues/181
+        bdt.set_hour(Some(10)).unwrap(/*Ok*/);
     }
-    let dt = tm.to_datetime().map_err(|e| format!("Broken: {e:?}"))?;
+    let dt = bdt
+        .to_datetime()
+        .map_err(|e| format!("Evaluating infix failed: {e:?}"))?;
+
     TimeZone::system()
         .to_zoned_datetime(dt)
         .map_err(|e| format!("Can't determine local time from infix: {e:?}"))

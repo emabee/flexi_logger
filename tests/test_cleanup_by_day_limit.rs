@@ -1,10 +1,11 @@
+#[rustversion::since(1.99)]
 #[test]
 fn test_cleanup_by_day_limit() {
-    use filetime::{set_file_mtime, FileTime};
     use flexi_logger::{test_utils, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
     use log::*;
     use std::{
-        fs, thread,
+        fs::{read_dir, set_times, FileTimes},
+        thread,
         time::{Duration, Instant, SystemTime},
     };
 
@@ -27,7 +28,7 @@ fn test_cleanup_by_day_limit() {
         info!("log line {i}");
     }
 
-    let mut log_files: Vec<_> = fs::read_dir(&directory)
+    let mut log_files: Vec<_> = read_dir(&directory)
         .unwrap()
         .filter_map(|r_dir_entry| {
             let p = r_dir_entry.unwrap().path();
@@ -43,7 +44,7 @@ fn test_cleanup_by_day_limit() {
     // artificially age the first file...
     let first_file = log_files.first().unwrap();
     let two_days_ago = SystemTime::now() - Duration::from_secs(2 * 24 * 3600);
-    set_file_mtime(first_file, FileTime::from_system_time(two_days_ago)).unwrap();
+    set_times(first_file, FileTimes::new().set_modified(two_days_ago)).unwrap();
 
     // ...and ensure it gets deleted automatically with the next rotation
     info!("add line to trigger the cleanup");

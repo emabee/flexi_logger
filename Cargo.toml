@@ -14,7 +14,7 @@ keywords = ["file", "logger"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/emabee/flexi_logger"
-rust-version = "1.87.0"
+rust-version = "1.91.0"
 exclude = ["/scripts"]
 
 [lib]
@@ -67,14 +67,14 @@ tracing-subscriber = { version = "0.3", optional = true, features = [
 hostname = { version = "0.4", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31.1", optional = true, features = ["hostname", "syslog"] }
+nix = { version = "0.32", optional = true, features = ["hostname", "syslog"] }
 
 [dev-dependencies]
 cond_sync = "0.2"
 either = "1.9"
-filetime = "0.2.26"
 flate2 = "1.0"
 glob = "0.3"
+rustversion = "1.0"
 serde_derive = "1.0"
 version-sync = "0.9"
 temp-dir = "0.2"

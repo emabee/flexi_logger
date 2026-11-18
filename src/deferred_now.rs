@@ -1,6 +1,8 @@
 use jiff::{fmt::strtime::Display, tz::TimeZone, ZonedDateTime};
 use std::sync::{Mutex, OnceLock};
 
+const FMT_RFC3339: &str = "%Y-%m-%dT%H:%M:%S%.3f%:z";
+
 /// Deferred timestamp creation.
 ///
 /// Is used to ensure that a log record that is sent to multiple outputs
@@ -49,7 +51,7 @@ impl<'a> DeferredNow {
     ///
     /// We do not use the Z variant of RFC 3339, because it is often misinterpreted.
     pub fn format_rfc3339(&mut self) -> String {
-        self.format("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string()
+        self.format(FMT_RFC3339).to_string()
     }
 
     // format_rfc3164: Mmm dd hh:mm:ss, where
@@ -138,7 +140,7 @@ pub(crate) fn set_force_utc(b: bool) {
 
 #[cfg(test)]
 mod test {
-    use crate::DeferredNow;
+    use super::{DeferredNow, FMT_RFC3339};
     use jiff::{civil, tz, ZonedDateTime};
 
     #[test]
@@ -173,11 +175,11 @@ mod test {
         let (ts_utc, ts_plus1) = utc_and_offset_timestamps();
 
         assert_eq!(
-            ts_utc.strftime("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string(),
+            ts_utc.strftime(FMT_RFC3339).to_string(),
             "2021-04-29T13:14:15.678+00:00",
         );
         assert_eq!(
-            ts_plus1.strftime("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string(),
+            ts_plus1.strftime(FMT_RFC3339).to_string(),
             "2021-04-29T13:14:15.678+01:00",
         );
     }
